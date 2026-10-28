@@ -3119,6 +3119,18 @@
           <div class="qs-hint u-mt-8" id="updateMsg" aria-live="polite"></div>
         </div>
 
+        <!-- GitHub token for the private update repository -->
+        <div class="tunnel-card" id="ghTokenCard">
+          <div class="tc-header"><p class="tc-title" data-i18n="ghtok_title">GitHub access token</p><span class="badge dim" id="ghtokBadge">—</span></div>
+          <p class="qs-hint" data-i18n="ghtok_hint">Releases live in the private Dark-modem/quantum repository. Paste a fine-grained token with Contents: Read-only on that repo (GitHub → Settings → Developer settings → Fine-grained tokens). It is stored only on this server and is sent only to github.com.</p>
+          <div class="u-flex-center-wrap10">
+            <input type="password" class="hashem-input u-max-w-360 u-mono" id="ghtokInput" autocomplete="new-password" spellcheck="false" placeholder="github_pat_…" dir="ltr">
+            <button class="hashem-btn hashem-btn-primary" id="ghtokSaveBtn" data-i18n="ghtok_save">Save Token</button>
+            <button class="hashem-btn hashem-btn-ghost hidden" id="ghtokClearBtn" data-i18n="ghtok_clear">Remove Token</button>
+          </div>
+          <div class="qs-hint u-mt-8 hidden" id="ghtokMsg" aria-live="polite"></div>
+        </div>
+
         <div class="tunnel-card" id="updNotesCard" hidden>
           <div class="tc-header"><p class="tc-title">What's New</p></div>
           <div class="upd-notes" id="updNotes"></div>

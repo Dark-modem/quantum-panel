@@ -2915,5 +2915,12 @@ window.FA_TEXT = {
 "Main tunnel settings": "تنظیمات تونل اصلی",
 "Bagher tunnel settings": "تنظیمات تونل باقر",
 "Tunnel settings": "تنظیمات تونل",
-"One row per tunnel: its live status, its full settings and its remove button.": "برای هر تونل یک ردیف: وضعیت زنده، تنظیمات کامل و دکمه‌ی حذف."
+"One row per tunnel: its live status, its full settings and its remove button.": "برای هر تونل یک ردیف: وضعیت زنده، تنظیمات کامل و دکمه‌ی حذف.",
+"GitHub access token": "توکن دسترسی گیت‌هاب",
+"Releases live in the private Dark-modem/quantum repository. Paste a fine-grained token with Contents: Read-only on that repo (GitHub → Settings → Developer settings → Fine-grained tokens). It is stored only on this server and is sent only to github.com.": "ریلیزها در ریپوی خصوصی Dark-modem/quantum هستند. یک توکن fine-grained با دسترسی Contents: Read-only روی همان ریپو بسازید (گیت‌هاب ← Settings ← Developer settings ← Fine-grained tokens) و اینجا بچسبانید. توکن فقط روی همین سرور ذخیره می‌شود و فقط به github.com فرستاده می‌شود.",
+"Save Token": "ذخیره توکن",
+"Remove Token": "حذف توکن",
+"Token saved — update checks use it from now on.": "توکن ذخیره شد — بررسی آپدیت از این به بعد از آن استفاده می‌کند.",
+"Token removed.": "توکن حذف شد.",
+"saved": "ذخیره شده"
 };

@@ -877,6 +877,14 @@ const I18N = {
     err_bundle: "Bundle lookup failed",
     err_retry: "Retry failed",
     carrier_switch_confirm: "Switch both Iran & Foreign servers to carrier \"{id}\"?",
+    ghtok_title: "GitHub access token",
+    ghtok_hint: "Releases live in the private Dark-modem/quantum repository. Paste a fine-grained token with Contents: Read-only on that repo (GitHub → Settings → Developer settings → Fine-grained tokens). It is stored only on this server and is sent only to github.com.",
+    ghtok_save: "Save Token",
+    ghtok_clear: "Remove Token",
+    ghtok_saved: "Token saved — update checks use it from now on.",
+    ghtok_cleared: "Token removed.",
+    ghtok_set: "saved",
+    ghtok_unset: "not set",
     tunnels_title: "Tunnels",
     tunnels_hint: "One row per tunnel: its live status, its full settings and its remove button.",
     tunnels_view: "View",
@@ -3958,7 +3966,44 @@ function updAgo(ts) {
 function updRow(k, vHTML) { return '<div class="ver-row"><span class="k">' + esc(k) + '</span><span>' + vHTML + '</span></div>'; }
 function updDot(cls, txt) { $('updDot').className = 'status-indicator ' + cls; $('updDotTxt').textContent = txt; }
 
+// ---- GitHub token (Update tab): stored server-side 0600, shown only as a badge ----
+async function loadGhToken() {
+  const badge = $('ghtokBadge'), clear = $('ghtokClearBtn');
+  if (!badge) return;
+  try {
+    const r = await api('/api/update/github-token');
+    const set = !!r.set;
+    badge.textContent = set ? tr('', 'saved') : tr('', 'not set');
+    badge.className = 'badge ' + (set ? 'ok' : 'warn');
+    if (clear) clear.classList.toggle('hidden', !set);
+  } catch (e) { badge.textContent = '—'; }
+}
+if ($('ghtokSaveBtn')) $('ghtokSaveBtn').onclick = async () => {
+  const inp = $('ghtokInput'), msg = $('ghtokMsg');
+  msg.classList.add('hidden');
+  try {
+    const r = await api('/api/update/github-token', { token: (inp.value || '').trim() });
+    inp.value = '';
+    msg.textContent = r.detail || tr('', 'Token saved — update checks use it from now on.');
+    msg.classList.remove('hidden');
+    toastOk(tr('', 'GitHub access token') + ': ' + tr('', 'saved'));
+    loadGhToken();
+    loadVersion(true);
+  } catch (e) { toastErr('token save failed', e.message); }
+};
+if ($('ghtokClearBtn')) $('ghtokClearBtn').onclick = async () => {
+  const msg = $('ghtokMsg');
+  try {
+    await api('/api/update/github-token', { token: '' });
+    msg.textContent = tr('', 'Token removed.');
+    msg.classList.remove('hidden');
+    loadGhToken();
+    loadVersion(true);
+  } catch (e) { toastErr('token remove failed', e.message); }
+};
+
 async function loadVersion(force) {
+  loadGhToken();
   const chk = $('updCheckBtn');
   if (force) { chk.disabled = true; chk.textContent = tr('', 'Checking…'); }
   try {
