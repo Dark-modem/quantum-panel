@@ -1541,8 +1541,8 @@ function applyTunnelDetail(scroll) {
   // list mode hides every tunnel-specific card — the table is the overview.
   // All of them open with View on the main tunnel: status, rescue, fleet
   // health, tunnel health, carriers and the GRE wrap.
-  const hide = !m ? ['tunnelStatusCard', 'rescueCard', 'fleetCard', 'tunnelHealthCard', 'carriersCard', 'carrierCard'] : (m === 'main'
-    ? ['tunnelsListCard', 'limitsCard', 'dialCard']
+  const hide = !m ? ['tunnelStatusCard', 'rescueCard', 'fleetCard', 'tunnelHealthCard', 'carriersCard', 'carrierCard', 'limitsCard'] : (m === 'main'
+    ? ['tunnelsListCard', 'dialCard']
     : ['tunnelsListCard', 'fleetCard', 'limitsCard', 'tunnelHealthCard', 'carriersCard', 'carrierCard', 'dialCard', 'rescueCard']);
   hide.forEach(id => { const c = $(id); if (c) c.classList.add('td-hide'); });
   ['tunnelsListCard', 'tunnelStatusCard', 'rescueCard', 'fleetCard', 'limitsCard', 'tunnelHealthCard', 'carriersCard', 'carrierCard', 'dialCard']
