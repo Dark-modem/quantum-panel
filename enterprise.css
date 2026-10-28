@@ -1113,6 +1113,7 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 #tab-tunnel.td-peer #peerCards > .peer-card.td-keep { display: block !important; }
 
 /* Tunnels table: Arvan-style columns — name (opens the tunnel) · address · engine · ports · status · actions */
+#tunnelsEmpty:empty { display: none; }
 .tnl-table { margin-top: 6px; }
 .tnl-head, .tnl-row {
   display: grid;

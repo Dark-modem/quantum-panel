@@ -1612,6 +1612,13 @@
           </div>
           <div class="qs-hint u-mt-8" data-i18n="tunnels_hint2">Click a tunnel's name to open its full settings — status details, carrier, health and every action.</div>
         </div>
+        <!-- empty / hint slot for the tunnels table (no tunnel status card in list mode) -->
+        <div id="tunnelsEmpty"></div>
+        <!-- action output lives at tab level so table-row actions can show it too -->
+        <div class="tun-out hidden" id="actOutWrap">
+          <div class="tun-out-head"><span id="actOutTitle">Output</span><button type="button" class="hashem-btn hashem-btn-ghost u-btn-xs" id="actOutClose">Close</button></div>
+          <pre id="actOut" class="logs"></pre>
+        </div>
         <!-- Detail mode bar: shown while a single tunnel's settings are open -->
         <div class="tunnel-card td-bar" id="tunnelDetailBar">
           <button type="button" class="hashem-btn hashem-btn-secondary u-btn-30" id="tunnelDetailBack"><span data-i18n="tunnels_back">Back to tunnels</span></button>
@@ -1648,10 +1655,6 @@
               <button class="hashem-btn hashem-btn-secondary hidden" id="restoreBtn">Restore Previous Settings</button>
             </div>
             <button class="hashem-btn hashem-btn-danger" id="removeTunnelBtn">Remove Tunnel</button>
-          </div>
-          <div class="tun-out hidden" id="actOutWrap">
-            <div class="tun-out-head"><span id="actOutTitle">Output</span><button type="button" class="hashem-btn hashem-btn-ghost u-btn-xs" id="actOutClose">Close</button></div>
-            <pre id="actOut" class="logs"></pre>
           </div>
           <div class="qs-hint hidden" id="tuneHint">Optimize Network: FQ + BBR, 16 MB TCP buffers, GRE MTU 1380, MSS clamp 1340 and keepalive. The current settings are saved first, so Restore can bring them back.</div>
         </div>

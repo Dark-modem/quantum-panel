@@ -1322,18 +1322,23 @@ function renderPeers(peers) {
   const lbl = $('peerCardsLabel');
   if (lbl) lbl.classList.toggle('hidden', !(peers && peers.length) && !bagherCardHtml);
   renderCarriers();
+  const emptyBox = $('tunnelsEmpty');
   if (!peers || !peers.length) {
     if (bagherCardHtml) {
       box.innerHTML = bagherCardHtml;
+      if (emptyBox) emptyBox.innerHTML = '';
     } else if (!hasMain) {
       // Nothing on this server yet: one clear next step instead of empty cards.
-      box.innerHTML = '<div class="u-col-full">' + stateEmpty({ title: tr('', 'No tunnel on this server yet'), msg: tr('', 'Set one up from the Setup tab. It takes about a minute on each server.'), actionKey: 'setup', actionLabel: tr('onb_go', 'Open Setup'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg>' }) + '</div>';
+      box.innerHTML = '';
+      if (emptyBox) emptyBox.innerHTML = '<div class="u-col-full">' + stateEmpty({ title: tr('', 'No tunnel on this server yet'), msg: tr('', 'Set one up from the Setup tab. It takes about a minute on each server.'), actionKey: 'setup', actionLabel: tr('onb_go', 'Open Setup'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg>' }) + '</div>';
     } else {
       // A foreign server has exactly one tunnel; only the Iran hub adds more.
-      box.innerHTML = isForeign ? '' : '<p class="tun-empty-hint">' + esc(tr('', 'More foreign servers can be added from Setup → Add another foreign server.')) + '</p>';
+      box.innerHTML = '';
+      if (emptyBox) emptyBox.innerHTML = isForeign ? '' : '<p class="tun-empty-hint">' + esc(tr('', 'More foreign servers can be added from Setup → Add another foreign server.')) + '</p>';
     }
     return;
   }
+  if (emptyBox) emptyBox.innerHTML = '';
   // unit / interface names (gre-t2, backhaul-server-2) are names, never translated
   const stBadge = (ok, label) => `<span class="badge ${ok ? 'ok' : 'err'}"><span class="dot"></span><bdi data-no-i18n>${esc(label)}</bdi></span>`;
   box.innerHTML = bagherCardHtml + peers.map(p => {
@@ -1524,11 +1529,13 @@ function applyTunnelDetail(scroll) {
   tab.classList.toggle('td-mode', !!m);
   tab.classList.toggle('td-main', m === 'main');
   tab.classList.toggle('td-peer', !!m && m !== 'main');
-  const hide = !m ? [] : (m === 'main'
+  // list mode hides the full status card: the table is the overview, the
+  // status card belongs to the View drill-in.
+  const hide = !m ? ['tunnelStatusCard'] : (m === 'main'
     ? ['tunnelsListCard', 'fleetCard', 'usageCard', 'limitsCard', 'dialCard']
     : ['tunnelsListCard', 'fleetCard', 'usageCard', 'limitsCard', 'tunnelHealthCard', 'carriersCard', 'carrierCard', 'dialCard']);
   hide.forEach(id => { const c = $(id); if (c) c.classList.add('td-hide'); });
-  ['tunnelsListCard', 'fleetCard', 'usageCard', 'limitsCard', 'tunnelHealthCard', 'carriersCard', 'carrierCard', 'dialCard']
+  ['tunnelsListCard', 'tunnelStatusCard', 'fleetCard', 'usageCard', 'limitsCard', 'tunnelHealthCard', 'carriersCard', 'carrierCard', 'dialCard']
     .filter(id => !hide.includes(id)).forEach(id => { const c = $(id); if (c) c.classList.remove('td-hide'); });
   // the active peer card is marked on every rebuild (renderPeers rebuilds the DOM)
   document.querySelectorAll('#peerCards > .peer-card.td-keep').forEach(c => c.classList.remove('td-keep'));
