@@ -1133,7 +1133,7 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 .tnl-state { display: flex; }
 .tnl-acts { display: flex; gap: 6px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
 .tnl-acts .hashem-btn { display: inline-flex; align-items: center; }
-.tnl-acts svg.i { width: 16px; height: 16px; }
+.tnl-acts .hashem-btn svg.i, .tnl-acts svg.i { width: 18px; height: 18px; stroke-width: 2; flex: none; }
 @media (max-width: 900px) {
   .tnl-head { display: none; }
   .tnl-row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name state" "ip ip" "acts acts"; row-gap: 8px; }

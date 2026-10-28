@@ -1462,7 +1462,7 @@ function renderTunnelsList() {
   const badge = $('tunnelsCountBadge');
   if (badge) badge.textContent = rows.length ? String(rows.length) : '—';
   if (!rows.length) { box.innerHTML = ''; return; }
-  const ICO_TRASH = '<svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H8a2 2 0 01-2-2V6"/></svg>';
+  const ICO_TRASH = '<svg class="i" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H8a2 2 0 01-2-2V6"/></svg>';
   box.innerHTML = rows.map(r => {
     const eng = { frp: 'GRE + FRP', backhaul: 'Backhaul', 'gre-backhaul': 'Backhaul + GRE', bagher: 'Bagher' }[r.engine] || '—';
     const arg = typeof r.kind === 'number' ? String(r.kind) : JSON.stringify(r.kind);
