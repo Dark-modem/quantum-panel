@@ -885,6 +885,7 @@ const I18N = {
     ghtok_cleared: "Token removed.",
     ghtok_set: "saved",
     ghtok_unset: "not set",
+    ver_check_failed: "Version check failed: ",
     tunnels_title: "Tunnels",
     tunnels_hint: "One row per tunnel: its live status, its full settings and its remove button.",
     tunnels_col_name: "Name",
@@ -4069,7 +4070,7 @@ async function loadVersion(force) {
     btn.textContent = docTpl('Update to {0}', [v.latest]);
     if (!updState.busy) {
       $('updateMsg').textContent = failed
-        ? tr('', 'Could not reach GitHub to check for a new version. Check that this server can reach github.com, then press Check Now.')
+        ? (v.error ? tr('', 'Version check failed: ') + v.error : tr('', 'Could not reach GitHub to check for a new version. Check that this server can reach github.com, then press Check Now.'))
         : v.update_available ? tr('', 'A new version is ready. Updating restarts only the panel; tunnels keep running.') : '';
     }
 

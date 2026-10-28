@@ -174,6 +174,19 @@ func getJSON(path string, out any) error {
 		if resp.StatusCode != http.StatusOK {
 			resp.Body.Close()
 			lastErr = fmt.Errorf("github api: %s", resp.Status)
+			// A stored token turns generic failures into actionable ones —
+			// for a private repo GitHub answers 404 (not 403) when the token
+			// simply cannot see the repository.
+			if token != "" {
+				switch resp.StatusCode {
+				case http.StatusUnauthorized:
+					lastErr = fmt.Errorf("github api: 401 — the access token is invalid or expired; paste it again on the Update tab")
+				case http.StatusNotFound:
+					lastErr = fmt.Errorf("github api: 404 — the token cannot see Dark-modem/quantum: edit the token so Repository access includes this repo and grant Contents: Read-only")
+				case http.StatusForbidden:
+					lastErr = fmt.Errorf("github api: 403 — the token lacks the permission or the API rate limit was hit")
+				}
+			}
 			continue
 		}
 		err = json.NewDecoder(resp.Body).Decode(out)
