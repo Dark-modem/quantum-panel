@@ -1569,23 +1569,6 @@
         </div>
       </section>
       <section id="tab-tunnel" role="tabpanel" hidden>
-        <div class="tunnel-card rsc" id="rescueCard" hidden aria-live="polite">
-          <div class="rsc-head">
-            <span class="rsc-ic" id="rscIc" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3l9 4v5c0 5-3.8 8.4-9 9.5C6.8 20.4 3 17 3 12V7l9-4z"/><path d="M9 12l2 2 4-4"/></svg></span>
-            <div class="rsc-ttl"><p class="tc-title" id="rscTitle" data-i18n="rsc_title">Connectivity Rescue</p>
-              <span class="badge" id="rscBadge"><span class="dot"></span><span id="rscBadgeTxt">—</span></span></div>
-          </div>
-          <p class="rsc-msg" id="rscMsg"></p>
-          <div class="rsc-det" id="rscDet"></div>
-          <div class="rsc-form" id="rscForm" hidden>
-            <div class="fg"><label for="rscRemote" data-i18n="rsc_remote">Reachable server (the one that can connect to this server)</label><input class="hashem-input" id="rscRemote" inputmode="decimal" autocomplete="off" placeholder="203.0.113.10"></div>
-            <div class="fg"><label for="rscPorts" data-i18n="rsc_ports">Ports to connect (TCP + UDP)</label><input class="hashem-input" id="rscPorts" inputmode="numeric" autocomplete="off" placeholder="1020, 1030, 1040"></div>
-          </div>
-          <div class="rsc-join" id="rscJoin" hidden>
-            <div class="fg"><label for="rscCode" data-i18n="rsc_code">Rescue code from the blocked server</label><input class="hashem-input" id="rscCode" autocomplete="off" spellcheck="false" placeholder="hrc1_…"></div>
-          </div>
-          <div class="rsc-acts" id="rscActs"></div>
-        </div>
         <div class="tunnel-card rsc-banner" id="rscBanner" hidden role="alert">
           <span class="rsc-ic warn" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg></span>
           <div class="rsc-ban-t"><b data-i18n="rsc_ban_t">This server cannot connect to its peer</b><span data-i18n="rsc_ban_d">Ping works but every TCP connection is dropped on the way. A one-click fix reverses the connection direction.</span></div>
@@ -1657,6 +1640,25 @@
             <button class="hashem-btn hashem-btn-danger" id="removeTunnelBtn">Remove Tunnel</button>
           </div>
           <div class="qs-hint hidden" id="tuneHint">Optimize Network: FQ + BBR, 16 MB TCP buffers, GRE MTU 1380, MSS clamp 1340 and keepalive. The current settings are saved first, so Restore can bring them back.</div>
+        </div>
+
+        <!-- Connectivity Rescue: server-level workaround for one-way blocked paths; lives inside the main tunnel's View -->
+        <div class="tunnel-card rsc" id="rescueCard" hidden aria-live="polite">
+          <div class="rsc-head">
+            <span class="rsc-ic" id="rscIc" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3l9 4v5c0 5-3.8 8.4-9 9.5C6.8 20.4 3 17 3 12V7l9-4z"/><path d="M9 12l2 2 4-4"/></svg></span>
+            <div class="rsc-ttl"><p class="tc-title" id="rscTitle" data-i18n="rsc_title">Connectivity Rescue</p>
+              <span class="badge" id="rscBadge"><span class="dot"></span><span id="rscBadgeTxt">—</span></span></div>
+          </div>
+          <p class="rsc-msg" id="rscMsg"></p>
+          <div class="rsc-det" id="rscDet"></div>
+          <div class="rsc-form" id="rscForm" hidden>
+            <div class="fg"><label for="rscRemote" data-i18n="rsc_remote">Reachable server (the one that can connect to this server)</label><input class="hashem-input" id="rscRemote" inputmode="decimal" autocomplete="off" placeholder="203.0.113.10"></div>
+            <div class="fg"><label for="rscPorts" data-i18n="rsc_ports">Ports to connect (TCP + UDP)</label><input class="hashem-input" id="rscPorts" inputmode="numeric" autocomplete="off" placeholder="1020, 1030, 1040"></div>
+          </div>
+          <div class="rsc-join" id="rscJoin" hidden>
+            <div class="fg"><label for="rscCode" data-i18n="rsc_code">Rescue code from the blocked server</label><input class="hashem-input" id="rscCode" autocomplete="off" spellcheck="false" placeholder="hrc1_…"></div>
+          </div>
+          <div class="rsc-acts" id="rscActs"></div>
         </div>
 
         <div class="tunnel-card" id="usageCard">

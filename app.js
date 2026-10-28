@@ -1537,13 +1537,13 @@ function applyTunnelDetail(scroll) {
   tab.classList.toggle('td-mode', !!m);
   tab.classList.toggle('td-main', m === 'main');
   tab.classList.toggle('td-peer', !!m && m !== 'main');
-  // list mode hides the full status card: the table is the overview, the
-  // status card belongs to the View drill-in.
-  const hide = !m ? ['tunnelStatusCard'] : (m === 'main'
+  // list mode hides the full status card and the rescue card (both belong to
+  // the View drill-in of the main tunnel); the table is the overview.
+  const hide = !m ? ['tunnelStatusCard', 'rescueCard'] : (m === 'main'
     ? ['tunnelsListCard', 'fleetCard', 'usageCard', 'limitsCard', 'dialCard']
-    : ['tunnelsListCard', 'fleetCard', 'usageCard', 'limitsCard', 'tunnelHealthCard', 'carriersCard', 'carrierCard', 'dialCard']);
+    : ['tunnelsListCard', 'fleetCard', 'usageCard', 'limitsCard', 'tunnelHealthCard', 'carriersCard', 'carrierCard', 'dialCard', 'rescueCard']);
   hide.forEach(id => { const c = $(id); if (c) c.classList.add('td-hide'); });
-  ['tunnelsListCard', 'tunnelStatusCard', 'fleetCard', 'usageCard', 'limitsCard', 'tunnelHealthCard', 'carriersCard', 'carrierCard', 'dialCard']
+  ['tunnelsListCard', 'tunnelStatusCard', 'rescueCard', 'fleetCard', 'usageCard', 'limitsCard', 'tunnelHealthCard', 'carriersCard', 'carrierCard', 'dialCard']
     .filter(id => !hide.includes(id)).forEach(id => { const c = $(id); if (c) c.classList.remove('td-hide'); });
   // the active peer card is marked on every rebuild (renderPeers rebuilds the DOM)
   document.querySelectorAll('#peerCards > .peer-card.td-keep').forEach(c => c.classList.remove('td-keep'));
@@ -8085,7 +8085,7 @@ async function rscShowCode() {
     row.append(inp, cp);
   } catch (e) { toastErr(e.message || String(e)); }
 }
-$('rscBanGo').onclick = () => { goTab('tunnel'); setTimeout(() => { $('rescueCard').scrollIntoView({ behavior: 'smooth', block: 'start' }); rscOpenEnable(); }, 80); };
+$('rscBanGo').onclick = () => { goTab('tunnel'); openTunnelDetail('main'); setTimeout(() => { $('rescueCard').scrollIntoView({ behavior: 'smooth', block: 'start' }); rscOpenEnable(); }, 150); };
 makePoller(async () => { if ($('app').classList.contains('hidden')) return true; return await loadRescue(); }, 20000);
 // First paint must not wait a whole poll interval: fetch once as soon as the app is visible.
 (function rscFirst(n) { if (!$('app').classList.contains('hidden')) { loadRescue(); return; } if (n < 40) setTimeout(() => rscFirst(n + 1), 500); })(0);
