@@ -1537,10 +1537,11 @@ function applyTunnelDetail(scroll) {
   tab.classList.toggle('td-mode', !!m);
   tab.classList.toggle('td-main', m === 'main');
   tab.classList.toggle('td-peer', !!m && m !== 'main');
-  // list mode hides the full status card and the rescue card (both belong to
-  // the View drill-in of the main tunnel); the table is the overview.
-  const hide = !m ? ['tunnelStatusCard', 'rescueCard'] : (m === 'main'
-    ? ['tunnelsListCard', 'fleetCard', 'usageCard', 'limitsCard', 'dialCard']
+  // list mode hides the full status card, the rescue card and the fleet
+  // health card — all three belong to the View drill-in of the main tunnel;
+  // the table is the overview.
+  const hide = !m ? ['tunnelStatusCard', 'rescueCard', 'fleetCard'] : (m === 'main'
+    ? ['tunnelsListCard', 'usageCard', 'limitsCard', 'dialCard']
     : ['tunnelsListCard', 'fleetCard', 'usageCard', 'limitsCard', 'tunnelHealthCard', 'carriersCard', 'carrierCard', 'dialCard', 'rescueCard']);
   hide.forEach(id => { const c = $(id); if (c) c.classList.add('td-hide'); });
   ['tunnelsListCard', 'tunnelStatusCard', 'rescueCard', 'fleetCard', 'usageCard', 'limitsCard', 'tunnelHealthCard', 'carriersCard', 'carrierCard', 'dialCard']
