@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -32,7 +33,7 @@ var (
 	semverRe   = regexp.MustCompile(`^v(\d+)\.(\d+)\.(\d+)$`)
 	devTagRe   = regexp.MustCompile(`^dev-r(\d+)$`)
 	legacyRRe  = regexp.MustCompile(`^panel-r(\d+)$`)
-	releaseAPI = "https://api.github.com/repos/pdnczone/hashem-panel/releases"
+	releaseAPI = "https://api.github.com/repos/Dark-modem/quantum/releases"
 )
 
 // validTag is the only shape of release tag the updater will ever put into a
@@ -126,20 +127,45 @@ var (
 	latestTagFetcher = fetchLatestTag
 )
 
+// githubToken returns the access token for the private update repository:
+// GRE_GITHUB_TOKEN, then GITHUB_TOKEN, then <configDir>/github-token (0600).
+// Empty string = no token (only works while the repository is public).
+func githubToken() string {
+	if t := strings.TrimSpace(os.Getenv("GRE_GITHUB_TOKEN")); t != "" {
+		return t
+	}
+	if t := strings.TrimSpace(os.Getenv("GITHUB_TOKEN")); t != "" {
+		return t
+	}
+	if data, err := os.ReadFile(filepath.Join(configDir, "github-token")); err == nil {
+		return strings.TrimSpace(string(data))
+	}
+	return ""
+}
+
 func apiURLs(path string) []string {
 	u := releaseAPI + path
+	// Never send the access token through a third-party mirror.
+	if githubToken() != "" {
+		return []string{u}
+	}
 	return []string{u, "https://mirror.ghproxy.com/" + u, "https://ghproxy.net/" + u}
 }
 
-// getJSON tries the API URL and its mirrors until one decodes into out.
+// getJSON tries the API URL (and its mirrors, without a token) until one
+// decodes into out.
 func getJSON(path string, out any) error {
 	var lastErr error
+	token := githubToken()
 	for _, u := range apiURLs(path) {
 		req, err := http.NewRequest("GET", u, nil)
 		if err != nil {
 			continue
 		}
 		req.Header.Set("User-Agent", "hashem-panel-updater/"+panelVersion)
+		if token != "" {
+			req.Header.Set("Authorization", "Bearer "+token)
+		}
 		resp, err := updateClient.Do(req)
 		if err != nil {
 			lastErr = err
@@ -470,7 +496,7 @@ func runningReleaseTag() string {
 }
 
 func releaseAssetURL(tag, name string) string {
-	return "https://github.com/pdnczone/hashem-panel/releases/download/" + tag + "/" + name
+	return "https://github.com/Dark-modem/quantum/releases/download/" + tag + "/" + name
 }
 
 // fetchScript downloads name into dst from release `tag` and verifies it

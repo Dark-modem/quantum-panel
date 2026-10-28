@@ -272,7 +272,7 @@ func TestFetchScriptPrefersReleaseTag(t *testing.T) {
 	if err := fetchScript("v1.0.0", "hashem.sh", scriptURL, dst); err == nil {
 		t.Fatal("expected checksum failure")
 	}
-	if len(urls) != 1 || urls[0] != "https://github.com/pdnczone/hashem-panel/releases/download/v1.0.0/hashem.sh" {
+	if len(urls) != 1 || urls[0] != "https://github.com/Dark-modem/quantum/releases/download/v1.0.0/hashem.sh" {
 		t.Fatalf("urls=%v", urls)
 	}
 

@@ -28,6 +28,64 @@ var updateClient = &http.Client{Timeout: 25 * time.Second}
 // next to the panel binary, and restarts the service.
 const panelScriptName = "hashem.sh"
 
+// quantumRepo is the private repository the updater pulls releases from.
+const quantumRepo = "Dark-modem/quantum"
+
+// ghFetchAsset streams release asset `name` of tag `tag` ("latest" allowed)
+// from the private quantum repository: the release's asset list is read
+// through the API (Bearer) and the asset is downloaded from its API URL with
+// Accept: application/octet-stream, which for a private repository redirects
+// to a short-lived signed URL.
+func ghFetchAsset(tag, name string, tmp *os.File) error {
+	tagPath := "tags/" + tag
+	if tag == "" || tag == "latest" {
+		tagPath = "latest"
+	}
+	var rel struct {
+		Assets []struct {
+			Name string `json:"name"`
+			URL  string `json:"url"`
+		} `json:"assets"`
+	}
+	if err := getJSON("/"+tagPath, &rel); err != nil {
+		return err
+	}
+	assetURL := ""
+	for _, a := range rel.Assets {
+		if a.Name == name {
+			assetURL = a.URL
+			break
+		}
+	}
+	if assetURL == "" {
+		return fmt.Errorf("asset %q not found in release %s", name, tag)
+	}
+	client := &http.Client{Timeout: 120 * time.Second}
+	req, err := http.NewRequest("GET", assetURL, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("User-Agent", "hashem-panel-updater/"+panelVersion)
+	req.Header.Set("Authorization", "Bearer "+githubToken())
+	req.Header.Set("Accept", "application/octet-stream")
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("asset download: %s", resp.Status)
+	}
+	if _, err := tmp.Seek(0, 0); err == nil {
+		_ = tmp.Truncate(0)
+	}
+	_, err = io.Copy(tmp, resp.Body)
+	if err != nil {
+		return err
+	}
+	return tmp.Close()
+}
+
 func handleUpdate(w http.ResponseWriter, r *http.Request) {
 	arch, asset, err := panelAsset()
 	if err != nil {
@@ -75,9 +133,9 @@ func handleUpdate(w http.ResponseWriter, r *http.Request) {
 
 	var dlURL string
 	if latest == "latest" {
-		dlURL = "https://github.com/pdnczone/hashem-panel/releases/latest/download/" + asset
+		dlURL = "https://github.com/Dark-modem/quantum/releases/latest/download/" + asset
 	} else {
-		dlURL = "https://github.com/pdnczone/hashem-panel/releases/download/" + latest + "/" + asset
+		dlURL = "https://github.com/Dark-modem/quantum/releases/download/" + latest + "/" + asset
 	}
 	tmp, err := os.CreateTemp("", "gre-panel-update-*")
 	if err != nil {
@@ -201,23 +259,17 @@ func verifyAssetChecksum(tmpPath, tag, asset string) error {
 // and a manifest from the same mirror could simply match a forged binary.
 // If GitHub is unreachable the update fails closed (see verifyAssetChecksum).
 func fetchChecksumManifest(tag string) (map[string]string, error) {
-	base := "https://github.com/pdnczone/hashem-panel/releases/download/" + tag + "/"
-	if tag == "latest" || tag == "" {
-		base = "https://github.com/pdnczone/hashem-panel/releases/latest/download/"
-	}
-	var candidates []string
 	for _, name := range []string{"checksums.txt", "SHA256SUMS"} {
-		candidates = append(candidates, base+name)
-	}
-	client := &http.Client{Timeout: 30 * time.Second}
-	for _, u := range candidates {
-		resp, err := client.Get(u)
+		tmp, err := os.CreateTemp("", "quantum-manifest-*")
 		if err != nil {
-			continue
+			return nil, err
 		}
-		if resp.StatusCode == http.StatusOK {
-			data, rerr := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
-			resp.Body.Close()
+		tmpPath := tmp.Name()
+		err = downloadFile(releaseAssetURL(tag, name), tmp)
+		tmp.Close()
+		if err == nil {
+			data, rerr := os.ReadFile(tmpPath)
+			os.Remove(tmpPath)
 			if rerr == nil && len(data) > 0 {
 				if m := ParseChecksumManifest(string(data)); len(m) > 0 {
 					return m, nil
@@ -225,7 +277,7 @@ func fetchChecksumManifest(tag string) (map[string]string, error) {
 			}
 			continue
 		}
-		resp.Body.Close()
+		os.Remove(tmpPath)
 	}
 	return nil, fmt.Errorf("no checksum manifest found")
 }
@@ -233,6 +285,55 @@ func fetchChecksumManifest(tag string) (map[string]string, error) {
 func downloadFile(rawURL string, tmp *os.File) error {
 	if !isOfficialGitHubURL(rawURL) {
 		return fmt.Errorf("untrusted download URL domain: %s", rawURL)
+	}
+
+	// With an access token (private repository) everything goes straight to
+	// GitHub: a third-party mirror would see the token and cannot authenticate
+	// anyway. Release assets resolve through the API (the github.com download
+	// endpoint does not accept API tokens for private repos); raw files get
+	// the Bearer header directly.
+	if token := githubToken(); token != "" {
+		if strings.HasPrefix(rawURL, "https://raw.githubusercontent.com/") {
+			client := &http.Client{Timeout: 60 * time.Second}
+			req, err := http.NewRequest("GET", rawURL, nil)
+			if err != nil {
+				return err
+			}
+			req.Header.Set("User-Agent", "hashem-panel-updater/"+panelVersion)
+			req.Header.Set("Authorization", "Bearer "+token)
+			resp, err := client.Do(req)
+			if err != nil {
+				return err
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				return fmt.Errorf("http %s", resp.Status)
+			}
+			if _, err := tmp.Seek(0, 0); err == nil {
+				_ = tmp.Truncate(0)
+			}
+			_, err = io.Copy(tmp, resp.Body)
+			if err != nil {
+				return err
+			}
+			return tmp.Close()
+		}
+		if strings.HasPrefix(rawURL, "https://github.com/"+quantumRepo+"/releases/") {
+			rest := strings.TrimPrefix(rawURL, "https://github.com/"+quantumRepo+"/releases/")
+			tag, name := "", ""
+			switch {
+			case strings.HasPrefix(rest, "latest/download/"):
+				tag, name = "latest", strings.TrimPrefix(rest, "latest/download/")
+			case strings.HasPrefix(rest, "download/"):
+				parts := strings.SplitN(strings.TrimPrefix(rest, "download/"), "/", 2)
+				if len(parts) == 2 {
+					tag, name = parts[0], parts[1]
+				}
+			}
+			if name != "" && !strings.Contains(name, "/") {
+				return ghFetchAsset(tag, name, tmp)
+			}
+		}
 	}
 
 	// Mirrors only for release assets, which are then checked against the
@@ -410,7 +511,7 @@ func syncPanelScriptFrom(tag string) {
 	_ = os.Symlink("/usr/local/bin/hashem.sh", "/usr/local/bin/gre.sh")
 }
 
-const scriptURL = "https://raw.githubusercontent.com/pdnczone/hashem-panel/main/hashem.sh"
+const scriptURL = "https://raw.githubusercontent.com/Dark-modem/quantum/main/hashem.sh"
 
 // greScriptURL stays as an alias: releases before the rename shipped gre.sh,
 // and external tools may import the name.
