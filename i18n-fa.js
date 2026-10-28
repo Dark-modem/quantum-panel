@@ -2922,5 +2922,12 @@ window.FA_TEXT = {
 "Remove Token": "حذف توکن",
 "Token saved — update checks use it from now on.": "توکن ذخیره شد — بررسی آپدیت از این به بعد از آن استفاده می‌کند.",
 "Token removed.": "توکن حذف شد.",
-"saved": "ذخیره شده"
+"saved": "ذخیره شده",
+"Name": "نام",
+"Server address": "آدرس سرور",
+"Engine": "موتور",
+"Status": "وضعیت",
+"Actions": "عملیات",
+"New Tunnel": "تونل جدید",
+"Click a tunnel's name to open its full settings — status details, carrier, health and every action.": "روی نام هر تونل کلیک کنید تا تنظیمات کاملش باز شود — جزئیات وضعیت، حامل، سلامت و همه‌ی عملیات."
 };

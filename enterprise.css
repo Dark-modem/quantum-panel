@@ -1111,3 +1111,33 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 #tab-tunnel.td-peer #tunnelStatusCard > .tc-header { display: none !important; }
 #tab-tunnel.td-peer #peerCards > .peer-card { display: none !important; }
 #tab-tunnel.td-peer #peerCards > .peer-card.td-keep { display: block !important; }
+
+/* Tunnels table: Arvan-style columns — name (opens the tunnel) · address · engine · ports · status · actions */
+.tnl-table { margin-top: 6px; }
+.tnl-head, .tnl-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1.4fr) minmax(0, 1fr) 64px minmax(0, 1fr) auto;
+  gap: 10px; align-items: center;
+}
+.tnl-head { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--tx2); padding: 6px 10px; border-bottom: 1px solid var(--ln); }
+.tnl-head-acts { text-align: end; }
+.tnl-row { padding: 10px; border-bottom: 1px solid var(--ln); border-radius: 10px; }
+.tnl-row:last-child { border-bottom: none; }
+.tnl-row:hover { background: var(--s2); }
+.tnl-name { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.tnl-name-col { display: flex; flex-direction: column; min-width: 0; }
+.tnl-link { background: none; border: none; padding: 0; color: var(--tx); font-weight: 600; font-size: 14px; cursor: pointer; text-align: start; font-family: inherit; }
+.tnl-link:hover { color: var(--ac); text-decoration: underline; }
+.tnl-name-col small { color: var(--tx2); font-size: 12px; }
+.tnl-ip, .tnl-ports { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tnl-state { display: flex; }
+.tnl-acts { display: flex; gap: 6px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
+.tnl-acts .hashem-btn { display: inline-flex; align-items: center; }
+.tnl-acts svg.i { width: 16px; height: 16px; }
+@media (max-width: 900px) {
+  .tnl-head { display: none; }
+  .tnl-row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name state" "ip ip" "acts acts"; row-gap: 8px; }
+  .tnl-name { grid-area: name; } .tnl-ip { grid-area: ip; } .tnl-state { grid-area: state; justify-self: end; }
+  .tnl-acts { grid-area: acts; justify-content: flex-start; }
+  .tnl-eng, .tnl-ports { display: none; }
+}

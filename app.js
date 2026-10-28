@@ -887,6 +887,14 @@ const I18N = {
     ghtok_unset: "not set",
     tunnels_title: "Tunnels",
     tunnels_hint: "One row per tunnel: its live status, its full settings and its remove button.",
+    tunnels_col_name: "Name",
+    tunnels_col_ip: "Server address",
+    tunnels_col_engine: "Engine",
+    tunnels_col_ports: "Ports",
+    tunnels_col_status: "Status",
+    tunnels_col_acts: "Actions",
+    tunnels_new: "New Tunnel",
+    tunnels_hint2: "Click a tunnel's name to open its full settings — status details, carrier, health and every action.",
     tunnels_view: "View",
     tunnels_delete: "Delete",
     tunnels_back: "Back to tunnels",
@@ -1452,17 +1460,40 @@ function renderTunnelsList() {
   const badge = $('tunnelsCountBadge');
   if (badge) badge.textContent = rows.length ? String(rows.length) : '—';
   if (!rows.length) { box.innerHTML = ''; return; }
+  const ICO_TRASH = '<svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H8a2 2 0 01-2-2V6"/></svg>';
   box.innerHTML = rows.map(r => {
-    const eng = { frp: 'GRE + FRP', backhaul: 'Backhaul', 'gre-backhaul': 'Backhaul + GRE', bagher: 'Bagher' }[r.engine] || '';
+    const eng = { frp: 'GRE + FRP', backhaul: 'Backhaul', 'gre-backhaul': 'Backhaul + GRE', bagher: 'Bagher' }[r.engine] || '—';
     const arg = typeof r.kind === 'number' ? String(r.kind) : JSON.stringify(r.kind);
-    return `<div class="cr-row cr-${r.state}">
-      <span class="cr-dot" aria-hidden="true"></span>
-      <div class="cr-id"><b>${esc(r.name)}</b><small class="mono" data-no-i18n>${esc(r.ip || '—')}</small></div>
-      <div class="cr-car"><span class="cr-eng" data-no-i18n>${esc(eng)}</span><span class="cr-tags" data-no-i18n>${r.ports ? `<span class="cr-tag">${r.ports} ${esc(tr('', 'ports'))}</span>` : ''}</span></div>
-      <span class="tnl-acts">
-        <button type="button" class="hashem-btn hashem-btn-secondary u-btn-30" onclick="openTunnelDetail(${arg})" title="${esc(tr('', 'View'))}">${esc(tr('', 'View'))}</button>
-        <button type="button" class="hashem-btn hashem-btn-danger u-btn-30" onclick="tunnelListRemove(${arg}, ${jsArg(String(r.name))})" title="${esc(tr('', 'Delete'))}">${esc(tr('', 'Delete'))}</button>
-      </span>
+    const stTxt = r.state === 'ok' ? 'active' : r.state === 'warn' ? 'degraded' : 'down';
+    const acts = [];
+    if (r.kind === 'main') {
+      acts.push(`<button type="button" class="hashem-btn hashem-btn-secondary u-btn-30" data-peer-act="restart-frps-0" onclick="peerAct('restart-frps', 0)">${esc(tr('', 'Restart'))}</button>`);
+    } else if (r.kind === 'bagher') {
+      acts.push(b.is_active
+        ? `<button type="button" class="hashem-btn hashem-btn-secondary u-btn-30" onclick="bagherStopTunnelClick()">${esc(tr('', 'Stop'))}</button>`
+        : `<button type="button" class="hashem-btn hashem-btn-primary u-btn-30" onclick="bagherStartClick()">${esc(tr('', 'Start'))}</button>`);
+    } else {
+      if (r.engine !== 'backhaul') acts.push(`<button type="button" class="hashem-btn hashem-btn-secondary u-btn-30" data-peer-act="ping-${r.kind}" onclick="peerAct('ping', ${r.kind})">${esc(tr('', 'Ping'))}</button>`);
+      acts.push(`<button type="button" class="hashem-btn hashem-btn-secondary u-btn-30" data-peer-act="restart-frps-${r.kind}" onclick="peerAct('restart-frps', ${r.kind})">${esc(tr('', 'Restart'))}</button>`);
+    }
+    const sub = r.kind === 'bagher' ? 'SSH + FRP' : (typeof r.kind === 'number' ? '#' + r.kind : '');
+    return `<div class="tnl-row tnl-${r.state}">
+      <div class="tnl-name">
+        <span class="status-indicator ${r.state === 'ok' ? 'active' : 'offline'}"><span class="dot"></span></span>
+        <span class="tnl-name-col">
+          <button type="button" class="tnl-link" onclick="openTunnelDetail(${arg})" title="${esc(tr('', 'Tunnel settings'))}">${esc(r.name)}</button>
+          ${sub ? `<small data-no-i18n>${esc(sub)}</small>` : ''}
+        </span>
+      </div>
+      <div class="tnl-ip mono" data-no-i18n>${esc(r.ip || '—')}</div>
+      <div class="tnl-eng"><span class="badge info" data-no-i18n>${esc(eng)}</span></div>
+      <div class="tnl-ports mono" data-no-i18n>${r.ports || '—'}</div>
+      <div class="tnl-state"><span class="badge ${r.state === 'ok' ? 'ok' : r.state === 'warn' ? 'warn' : 'err'}"><span class="dot"></span>${esc(tr('', stTxt))}</span></div>
+      <div class="tnl-acts">
+        ${acts.join('')}
+        <button type="button" class="hashem-btn hashem-btn-ghost u-btn-30" onclick="openTunnelDetail(${arg})" title="${esc(tr('', 'View'))}" aria-label="${esc(tr('', 'View'))}"><svg class="i" aria-hidden="true"><use href="#i-eye"/></svg></button>
+        <button type="button" class="hashem-btn hashem-btn-danger u-btn-30" onclick="tunnelListRemove(${arg}, ${jsArg(String(r.name))})" title="${esc(tr('', 'Delete'))}" aria-label="${esc(tr('', 'Delete'))}">${ICO_TRASH}</button>
+      </div>
     </div>`;
   }).join('');
 }

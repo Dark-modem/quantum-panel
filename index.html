@@ -1591,11 +1591,26 @@
           <div class="rsc-ban-t"><b data-i18n="rsc_ban_t">This server cannot connect to its peer</b><span data-i18n="rsc_ban_d">Ping works but every TCP connection is dropped on the way. A one-click fix reverses the connection direction.</span></div>
           <button type="button" class="hashem-btn hashem-btn-primary" id="rscBanGo" data-i18n="rsc_ban_go">Fix It</button>
         </div>
-        <!-- Tunnels: one horizontal row per tunnel — live status, full settings, remove -->
+        <!-- Tunnels: a real table — one row per tunnel, quick actions, click the name for full settings -->
         <div class="tunnel-card" id="tunnelsListCard" hidden>
-          <div class="tc-header"><p class="tc-title" data-i18n="tunnels_title">Tunnels</p><span class="badge dim" id="tunnelsCountBadge">—</span></div>
-          <p class="qs-hint" data-i18n="tunnels_hint">One row per tunnel: its live status, its full settings and its remove button.</p>
-          <div class="cr-list" id="tunnelsList"></div>
+          <div class="tc-header u-flex-wrap-gap8">
+            <p class="tc-title" data-i18n="tunnels_title">Tunnels</p>
+            <span class="badge dim" id="tunnelsCountBadge">—</span>
+            <span class="u-flex-1"></span>
+            <button type="button" class="hashem-btn hashem-btn-primary u-btn-30" id="tunnelsAddBtn" onclick="goTab('setup')">+ <span data-i18n="tunnels_new">New Tunnel</span></button>
+          </div>
+          <div class="tnl-table" role="table" aria-label="Tunnels">
+            <div class="tnl-head" role="row">
+              <span data-i18n="tunnels_col_name">Name</span>
+              <span data-i18n="tunnels_col_ip">Server address</span>
+              <span data-i18n="tunnels_col_engine">Engine</span>
+              <span data-i18n="tunnels_col_ports">Ports</span>
+              <span data-i18n="tunnels_col_status">Status</span>
+              <span class="tnl-head-acts" data-i18n="tunnels_col_acts">Actions</span>
+            </div>
+            <div id="tunnelsList" role="rowgroup"></div>
+          </div>
+          <div class="qs-hint u-mt-8" data-i18n="tunnels_hint2">Click a tunnel's name to open its full settings — status details, carrier, health and every action.</div>
         </div>
         <!-- Detail mode bar: shown while a single tunnel's settings are open -->
         <div class="tunnel-card td-bar" id="tunnelDetailBar">
