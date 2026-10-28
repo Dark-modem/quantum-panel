@@ -1470,7 +1470,8 @@ function renderTunnelsList() {
   const ICO_TRASH = '<svg class="i" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H8a2 2 0 01-2-2V6"/></svg>';
   box.innerHTML = rows.map(r => {
     const eng = { frp: 'GRE + FRP', backhaul: 'Backhaul', 'gre-backhaul': 'Backhaul + GRE', bagher: 'Bagher' }[r.engine] || '—';
-    const arg = typeof r.kind === 'number' ? String(r.kind) : JSON.stringify(r.kind);
+    // string args must be esc()aped like jsArg: raw JSON quotes break the attribute
+    const arg = typeof r.kind === 'number' ? String(r.kind) : esc(JSON.stringify(r.kind));
     const stTxt = r.state === 'ok' ? 'active' : r.state === 'warn' ? 'degraded' : 'down';
     const acts = [];
     if (r.kind === 'main') {
