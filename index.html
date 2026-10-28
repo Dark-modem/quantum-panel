@@ -1567,6 +1567,16 @@
             <div class="det-grid" id="dashDetails"></div>
           </div>
         </div>
+
+        <!-- Traffic usage (kept 7 days) — usage.go; lives on the dashboard -->
+        <div class="tunnel-card" id="usageCard">
+          <div class="tc-header"><p class="tc-title" data-i18n="usage_title">Traffic usage (kept 7 days)</p>
+            <select class="hashem-input u-max-w-180" id="usageRange" aria-label="Range">
+              <option value="1h">1 h</option><option value="6h">6 h</option><option value="24h">24 h</option><option value="7d" selected>7 days</option>
+            </select></div>
+          <p class="qs-hint" data-i18n="usage_hint">Saved on disk every minute, so it survives restarts, updates and reboots. Per foreign server, plus the hub total.</p>
+          <div id="usageBody"><p class="qs-hint">…</p></div>
+        </div>
       </section>
       <section id="tab-tunnel" role="tabpanel" hidden>
         <div class="tunnel-card rsc-banner" id="rscBanner" hidden role="alert">
@@ -1661,14 +1671,6 @@
           <div class="rsc-acts" id="rscActs"></div>
         </div>
 
-        <div class="tunnel-card" id="usageCard">
-          <div class="tc-header"><p class="tc-title" data-i18n="usage_title">Traffic usage (kept 7 days)</p>
-            <select class="hashem-input u-max-w-180" id="usageRange" aria-label="Range">
-              <option value="1h">1 h</option><option value="6h">6 h</option><option value="24h">24 h</option><option value="7d" selected>7 days</option>
-            </select></div>
-          <p class="qs-hint" data-i18n="usage_hint">Saved on disk every minute, so it survives restarts, updates and reboots. Per foreign server, plus the hub total.</p>
-          <div id="usageBody"><p class="qs-hint">…</p></div>
-        </div>
         <!-- Speed and volume limits per foreign server (limits.go; loadLimits in app.js) -->
         <div class="tunnel-card" id="limitsCard">
           <div class="tc-header"><p class="tc-title">Speed and volume limits</p><span class="badge dim" id="limitsBadge">—</span></div>

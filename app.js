@@ -281,7 +281,8 @@ function goTab(name) {
     loadClusterStatus();
   }
   if (name === 'perf') loadPerf();
-  if (name === 'tunnel') { loadCarrier(); loadFleet(); loadTunnelHealth(); loadUsage(); loadLimits(); loadXray(true); }
+  if (name === 'tunnel') { loadCarrier(); loadFleet(); loadTunnelHealth(); loadLimits(); loadXray(true); }
+  if (name === 'dashboard') loadUsage();
   if (name === 'watchdog') loadWatchdog();
   if (name === 'doctor') loadDoctor();
   if (name === 'benchmark') { loadBenchmark(); loadPathTest(); }
@@ -1540,13 +1541,11 @@ function applyTunnelDetail(scroll) {
   // list mode hides every tunnel-specific card — the table is the overview.
   // All of them open with View on the main tunnel: status, rescue, fleet
   // health, tunnel health, carriers and the GRE wrap.
-  const hide = !m
-    ? ['tunnelStatusCard', 'rescueCard', 'fleetCard', 'tunnelHealthCard', 'carriersCard', 'carrierCard']
-    : (m === 'main'
-      ? ['tunnelsListCard', 'usageCard', 'limitsCard', 'dialCard']
-      : ['tunnelsListCard', 'fleetCard', 'usageCard', 'limitsCard', 'tunnelHealthCard', 'carriersCard', 'carrierCard', 'dialCard', 'rescueCard']);
+  const hide = !m ? ['tunnelStatusCard', 'rescueCard', 'fleetCard', 'tunnelHealthCard', 'carriersCard', 'carrierCard'] : (m === 'main'
+    ? ['tunnelsListCard', 'limitsCard', 'dialCard']
+    : ['tunnelsListCard', 'fleetCard', 'limitsCard', 'tunnelHealthCard', 'carriersCard', 'carrierCard', 'dialCard', 'rescueCard']);
   hide.forEach(id => { const c = $(id); if (c) c.classList.add('td-hide'); });
-  ['tunnelsListCard', 'tunnelStatusCard', 'rescueCard', 'fleetCard', 'usageCard', 'limitsCard', 'tunnelHealthCard', 'carriersCard', 'carrierCard', 'dialCard']
+  ['tunnelsListCard', 'tunnelStatusCard', 'rescueCard', 'fleetCard', 'limitsCard', 'tunnelHealthCard', 'carriersCard', 'carrierCard', 'dialCard']
     .filter(id => !hide.includes(id)).forEach(id => { const c = $(id); if (c) c.classList.remove('td-hide'); });
   // the active peer card is marked on every rebuild (renderPeers rebuilds the DOM)
   document.querySelectorAll('#peerCards > .peer-card.td-keep').forEach(c => c.classList.remove('td-keep'));
@@ -7428,7 +7427,7 @@ async function loadUsage() {
   const sel = $('usageRange');
   if (sel) sel.addEventListener('change', loadUsage);
   if (!usageTimer) usageTimer = setInterval(() => {
-    const t = $('tab-tunnel');
+    const t = document.getElementById("usageCard")?.closest("section");
     if (t && !t.hidden && !document.hidden) loadUsage();
   }, 60000);
 })();
