@@ -1537,12 +1537,14 @@ function applyTunnelDetail(scroll) {
   tab.classList.toggle('td-mode', !!m);
   tab.classList.toggle('td-main', m === 'main');
   tab.classList.toggle('td-peer', !!m && m !== 'main');
-  // list mode hides the full status card, the rescue card and the fleet
-  // health card — all three belong to the View drill-in of the main tunnel;
-  // the table is the overview.
-  const hide = !m ? ['tunnelStatusCard', 'rescueCard', 'fleetCard'] : (m === 'main'
-    ? ['tunnelsListCard', 'usageCard', 'limitsCard', 'dialCard']
-    : ['tunnelsListCard', 'fleetCard', 'usageCard', 'limitsCard', 'tunnelHealthCard', 'carriersCard', 'carrierCard', 'dialCard', 'rescueCard']);
+  // list mode hides every tunnel-specific card — the table is the overview.
+  // All of them open with View on the main tunnel: status, rescue, fleet
+  // health, tunnel health, carriers and the GRE wrap.
+  const hide = !m
+    ? ['tunnelStatusCard', 'rescueCard', 'fleetCard', 'tunnelHealthCard', 'carriersCard', 'carrierCard']
+    : (m === 'main'
+      ? ['tunnelsListCard', 'usageCard', 'limitsCard', 'dialCard']
+      : ['tunnelsListCard', 'fleetCard', 'usageCard', 'limitsCard', 'tunnelHealthCard', 'carriersCard', 'carrierCard', 'dialCard', 'rescueCard']);
   hide.forEach(id => { const c = $(id); if (c) c.classList.add('td-hide'); });
   ['tunnelsListCard', 'tunnelStatusCard', 'rescueCard', 'fleetCard', 'usageCard', 'limitsCard', 'tunnelHealthCard', 'carriersCard', 'carrierCard', 'dialCard']
     .filter(id => !hide.includes(id)).forEach(id => { const c = $(id); if (c) c.classList.remove('td-hide'); });
