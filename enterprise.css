@@ -1088,3 +1088,26 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 .lm-chips button { border: 1px solid var(--ln); background: var(--s2); color: var(--tx2); border-radius: 999px; padding: 4px 12px; font-size: 12px; cursor: pointer; font-variant-numeric: tabular-nums; }
 .lm-chips button:hover, .lm-chips button:focus-visible { border-color: var(--ac); color: var(--tx); }
 @media (prefers-reduced-motion: reduce) { .lm-meter i { transition: none; } }
+
+/* ---- Tunnels list (one horizontal row per tunnel) + detail (drill-in) mode ---- */
+.tnl-acts { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
+@media (max-width: 900px) { .tnl-acts { flex-direction: column; align-items: stretch; } }
+#tunnelDetailBar { display: none; align-items: center; gap: 12px; }
+#tab-tunnel.td-mode #tunnelDetailBar { display: flex; }
+#tab-tunnel.td-mode .td-hide { display: none !important; }
+/* main tunnel drill-in: the tunnel's own settings cards only, peers have their rows */
+#tab-tunnel.td-main #tunXrayCards,
+#tab-tunnel.td-main #peerCards,
+#tab-tunnel.td-main #peerCardsLabel { display: none !important; }
+/* a single tunnel's card: neutralize the status shell around it */
+#tab-tunnel.td-peer #tunnelStatusCard { background: none; border: none; padding: 0; box-shadow: none; }
+#tab-tunnel.td-peer #tunnel,
+#tab-tunnel.td-peer #tunChips,
+#tab-tunnel.td-peer #tunXrayCards,
+#tab-tunnel.td-peer #tunnelActs,
+#tab-tunnel.td-peer #actOutWrap,
+#tab-tunnel.td-peer #tuneHint,
+#tab-tunnel.td-peer #peerCardsLabel,
+#tab-tunnel.td-peer #tunnelStatusCard > .tc-header { display: none !important; }
+#tab-tunnel.td-peer #peerCards > .peer-card { display: none !important; }
+#tab-tunnel.td-peer #peerCards > .peer-card.td-keep { display: block !important; }

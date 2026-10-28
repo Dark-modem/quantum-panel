@@ -876,7 +876,16 @@ const I18N = {
     err_peerlink: "Peer link status failed",
     err_bundle: "Bundle lookup failed",
     err_retry: "Retry failed",
-    carrier_switch_confirm: "Switch both Iran & Foreign servers to carrier \"{id}\"?"
+    carrier_switch_confirm: "Switch both Iran & Foreign servers to carrier \"{id}\"?",
+    tunnels_title: "Tunnels",
+    tunnels_hint: "One row per tunnel: its live status, its full settings and its remove button.",
+    tunnels_view: "View",
+    tunnels_delete: "Delete",
+    tunnels_back: "Back to tunnels",
+    tunnels_detail_main: "Main tunnel settings",
+    tunnels_detail_bagher: "Bagher tunnel settings",
+    tunnels_detail_peer: "Tunnel settings",
+    tunnels_ports: "ports"
   },
 };
 
@@ -1205,6 +1214,9 @@ function renderPeers(peers) {
   const box = $('peerCards');
   if (!box) return;
   tunPeerCache = peers || null;
+  // The horizontal tunnels list + the drill-in detail mode follow the same data.
+  renderTunnelsList();
+  applyTunnelDetail(false);
   try { renderTunChips(window._lastLocal || null); } catch(_){ /* chips are cosmetic; cards still render */ }
   const b = (_sshfwdData || (window._lastDash && window._lastDash.bagher) || window._lastBagher || {});
   // Running is the service; linked is the session to the other server. "enabled"
@@ -1386,6 +1398,108 @@ function renderPeers(peers) {
         .catch(() => toastWarn('copy failed', v));
     };
   });
+}
+
+// ---- Tunnels list: one horizontal row per tunnel (status · view · delete) ----
+let _tunnelDetail = null;   // null | 'main' | 'bagher' | peer id (number)
+
+function renderTunnelsList() {
+  const card = $('tunnelsListCard'), box = $('tunnelsList');
+  if (!card || !box) return;
+  const L = window._lastLocal || {};
+  const peers = tunPeerCache || [];
+  const b = (_sshfwdData || (window._lastDash && window._lastDash.bagher) || window._lastBagher || {});
+  const bagherHasCfg = !!(b.is_active || b.has_config || (b.remote_host && b.remote_host.length) || (Array.isArray(b.ports) && b.ports.length));
+  const hasMain = !!(L.frp_up || L.frp_svc || (L.gre && L.gre.exists) || (L.proxies || []).length);
+  const rows = [];
+  if (hasMain) {
+    rows.push({
+      kind: 'main',
+      name: tr('', /iran/i.test(L.role || '') || L.frp_svc === 'frps' ? 'Main tunnel' : 'Tunnel to Iran'),
+      ip: L.remote_pub || L.local_pub || '',
+      state: vizState(L) || (L.frp_up ? 'ok' : 'down'),
+      engine: tunEngine(L),
+      ports: (L.proxies || []).length || null,
+    });
+  }
+  peers.forEach(p => rows.push({
+    kind: p.id,
+    name: p.name || ('peer-' + p.id),
+    ip: p.remote_pub || '',
+    state: vizState(p) || ((p.frp_up || p.gre_up) ? 'ok' : 'down'),
+    engine: p.engine || (p.frps_svc && p.frps_svc.includes('backhaul') ? (p.no_gre ? 'backhaul' : 'gre-backhaul') : 'frp'),
+    ports: [].concat(p.raw_ports || p.ports || []).filter(Boolean).length || null,
+  }));
+  if (bagherHasCfg) {
+    rows.push({
+      kind: 'bagher',
+      name: 'Bagher' + (b.name ? ' · ' + b.name : ''),
+      ip: b.remote_host || '',
+      state: (b.is_active && b.connected) ? 'ok' : (b.is_active ? 'warn' : 'down'),
+      engine: 'bagher',
+      ports: Array.isArray(b.ports) ? b.ports.length : null,
+    });
+  }
+  card.classList.toggle('hidden', !rows.length);
+  const badge = $('tunnelsCountBadge');
+  if (badge) badge.textContent = rows.length ? String(rows.length) : '—';
+  if (!rows.length) { box.innerHTML = ''; return; }
+  box.innerHTML = rows.map(r => {
+    const eng = { frp: 'GRE + FRP', backhaul: 'Backhaul', 'gre-backhaul': 'Backhaul + GRE', bagher: 'Bagher' }[r.engine] || '';
+    const arg = typeof r.kind === 'number' ? String(r.kind) : JSON.stringify(r.kind);
+    return `<div class="cr-row cr-${r.state}">
+      <span class="cr-dot" aria-hidden="true"></span>
+      <div class="cr-id"><b>${esc(r.name)}</b><small class="mono" data-no-i18n>${esc(r.ip || '—')}</small></div>
+      <div class="cr-car"><span class="cr-eng" data-no-i18n>${esc(eng)}</span><span class="cr-tags" data-no-i18n>${r.ports ? `<span class="cr-tag">${r.ports} ${esc(tr('', 'ports'))}</span>` : ''}</span></div>
+      <span class="tnl-acts">
+        <button type="button" class="hashem-btn hashem-btn-secondary u-btn-30" onclick="openTunnelDetail(${arg})" title="${esc(tr('', 'View'))}">${esc(tr('', 'View'))}</button>
+        <button type="button" class="hashem-btn hashem-btn-danger u-btn-30" onclick="tunnelListRemove(${arg}, ${jsArg(String(r.name))})" title="${esc(tr('', 'Delete'))}">${esc(tr('', 'Delete'))}</button>
+      </span>
+    </div>`;
+  }).join('');
+}
+
+// Delete from the list reuses the exact same flows as the cards themselves.
+function tunnelListRemove(kind, name) {
+  if (kind === 'main') { const b = $('removeTunnelBtn'); if (b) b.click(); return; }
+  if (kind === 'bagher') { if (typeof cleanBagherTunnelClick === 'function') cleanBagherTunnelClick(); return; }
+  peerRemoveClick(kind, name);
+}
+
+// Detail (drill-in) mode: View opens one tunnel's full settings and hides the rest.
+function openTunnelDetail(kind) { _tunnelDetail = kind; applyTunnelDetail(true); }
+function closeTunnelDetail() { _tunnelDetail = null; applyTunnelDetail(false); }
+
+function applyTunnelDetail(scroll) {
+  const tab = $('tab-tunnel'); if (!tab) return;
+  const mode = _tunnelDetail;
+  // auto-close when the open tunnel no longer exists (removed / not set up)
+  if (mode && typeof mode === 'number' && !(tunPeerCache || []).some(p => p.id === mode)) _tunnelDetail = null;
+  if (mode === 'main') {
+    const L = window._lastLocal || {};
+    if (!(L.frp_up || L.frp_svc || (L.gre && L.gre.exists) || (L.proxies || []).length)) _tunnelDetail = null;
+  }
+  const m = _tunnelDetail;
+  tab.classList.toggle('td-mode', !!m);
+  tab.classList.toggle('td-main', m === 'main');
+  tab.classList.toggle('td-peer', !!m && m !== 'main');
+  const hide = !m ? [] : (m === 'main'
+    ? ['tunnelsListCard', 'fleetCard', 'usageCard', 'limitsCard', 'dialCard']
+    : ['tunnelsListCard', 'fleetCard', 'usageCard', 'limitsCard', 'tunnelHealthCard', 'carriersCard', 'carrierCard', 'dialCard']);
+  hide.forEach(id => { const c = $(id); if (c) c.classList.add('td-hide'); });
+  ['tunnelsListCard', 'fleetCard', 'usageCard', 'limitsCard', 'tunnelHealthCard', 'carriersCard', 'carrierCard', 'dialCard']
+    .filter(id => !hide.includes(id)).forEach(id => { const c = $(id); if (c) c.classList.remove('td-hide'); });
+  // the active peer card is marked on every rebuild (renderPeers rebuilds the DOM)
+  document.querySelectorAll('#peerCards > .peer-card.td-keep').forEach(c => c.classList.remove('td-keep'));
+  if (m && m !== 'main') { const c = $('peer-card-' + m); if (c) c.classList.add('td-keep'); }
+  const bar = $('tunnelDetailBar'); if (bar) bar.classList.toggle('td-keep', !!m);
+  const ttl = $('tunnelDetailTitle');
+  if (ttl) {
+    ttl.textContent = m === 'main' ? tr('', 'Main tunnel settings')
+      : m === 'bagher' ? tr('', 'Bagher tunnel settings')
+      : (m ? tr('', 'Tunnel settings') + ' — ' + String(((tunPeerCache || []).find(p => p.id === m) || {}).name || ('peer-' + m)) : '');
+  }
+  if (m && scroll && bar && bar.scrollIntoView) bar.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 // Two-step remove (inline confirm, no modal): 1st click arms 5s + Undo,
 // 2nd click while armed deletes. Same from Tunnel tab or Dashboard summary.
@@ -3662,6 +3776,7 @@ $('toggle').addEventListener('click', () => {
 })();
 $('logoutBtn').onclick = async () => { try { await api('/api/logout', {}); } catch(e){ /* logout best-effort: always fall through to login screen */ } showLogin(); };
 $('refreshBtn').onclick = refresh;
+if ($('tunnelDetailBack')) $('tunnelDetailBack').onclick = () => closeTunnelDetail();
 $('removeTunnelBtn').onclick = async () => {
   if (!await entConfirm(tr('', 'Remove Tunnel?'), tr('', 'The tunnel on this server is deleted: its GRE interface, tunnel service and their configs. The other server keeps its side until you remove it there. The panel stays.'), tr('', 'Remove Tunnel'))) return;
   const b = $('removeTunnelBtn');

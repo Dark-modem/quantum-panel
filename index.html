@@ -1591,6 +1591,17 @@
           <div class="rsc-ban-t"><b data-i18n="rsc_ban_t">This server cannot connect to its peer</b><span data-i18n="rsc_ban_d">Ping works but every TCP connection is dropped on the way. A one-click fix reverses the connection direction.</span></div>
           <button type="button" class="hashem-btn hashem-btn-primary" id="rscBanGo" data-i18n="rsc_ban_go">Fix It</button>
         </div>
+        <!-- Tunnels: one horizontal row per tunnel — live status, full settings, remove -->
+        <div class="tunnel-card" id="tunnelsListCard" hidden>
+          <div class="tc-header"><p class="tc-title" data-i18n="tunnels_title">Tunnels</p><span class="badge dim" id="tunnelsCountBadge">—</span></div>
+          <p class="qs-hint" data-i18n="tunnels_hint">One row per tunnel: its live status, its full settings and its remove button.</p>
+          <div class="cr-list" id="tunnelsList"></div>
+        </div>
+        <!-- Detail mode bar: shown while a single tunnel's settings are open -->
+        <div class="tunnel-card td-bar" id="tunnelDetailBar">
+          <button type="button" class="hashem-btn hashem-btn-secondary u-btn-30" id="tunnelDetailBack"><span data-i18n="tunnels_back">Back to tunnels</span></button>
+          <b id="tunnelDetailTitle" data-no-i18n></b>
+        </div>
         <div class="tunnel-card" id="dialCard" hidden>
           <div class="tc-header"><p class="tc-title" data-i18n="dial_title">Route to the Iran hub</p><span class="badge" id="dialBadge"><span class="dot"></span><span id="dialBadgeTxt">—</span></span></div>
           <p class="qs-hint" id="dialInfo" data-i18n="dial_hint">How this server reaches Iran: over the GRE inner IP, directly to the hub's public IP, or Auto (GRE when it works, public IP otherwise).</p>

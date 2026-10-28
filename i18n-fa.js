@@ -2909,5 +2909,11 @@ window.FA_TEXT = {
 "Remove the limits?": "محدودیت‌ها حذف شوند؟",
 "This server gets unlimited speed and volume. If its links were cut, they come back now.": "این سرور سرعت و حجم نامحدود می‌گیرد. اگر لینک‌هایش قطع بودند، همین حالا وصل می‌شوند.",
 "Usage reset": "مصرف صفر شد",
-"Limits removed": "محدودیت‌ها حذف شد"
+"Limits removed": "محدودیت‌ها حذف شد",
+"View": "مشاهده",
+"Back to tunnels": "بازگشت به تونل‌ها",
+"Main tunnel settings": "تنظیمات تونل اصلی",
+"Bagher tunnel settings": "تنظیمات تونل باقر",
+"Tunnel settings": "تنظیمات تونل",
+"One row per tunnel: its live status, its full settings and its remove button.": "برای هر تونل یک ردیف: وضعیت زنده، تنظیمات کامل و دکمه‌ی حذف."
 };
