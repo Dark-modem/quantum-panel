@@ -1457,7 +1457,8 @@ function renderTunnelsList() {
       ports: Array.isArray(b.ports) ? b.ports.length : null,
     });
   }
-  card.classList.toggle('hidden', !rows.length);
+  // the markup ships with the hidden ATTRIBUTE — clear it, not just the class
+  card.hidden = !rows.length;
   const badge = $('tunnelsCountBadge');
   if (badge) badge.textContent = rows.length ? String(rows.length) : '—';
   if (!rows.length) { box.innerHTML = ''; return; }
