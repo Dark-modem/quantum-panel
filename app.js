@@ -1506,11 +1506,18 @@ function renderTunnelsList() {
   }).join('');
 }
 
-// Delete from the list reuses the exact same flows as the cards themselves.
-function tunnelListRemove(kind, name) {
+// Delete from the table reuses the same backend flows. Peer rows confirm with
+// the global modal: the inline arm/undo box lives inside the status card,
+// which is hidden while the table is the active view.
+async function tunnelListRemove(kind, name) {
   if (kind === 'main') { const b = $('removeTunnelBtn'); if (b) b.click(); return; }
   if (kind === 'bagher') { if (typeof cleanBagherTunnelClick === 'function') cleanBagherTunnelClick(); return; }
-  peerRemoveClick(kind, name);
+  const ok = await entConfirm(
+    tr('', 'Remove tunnel?'),
+    docTpl('Remove {0} (#{1})? GRE + frps go away; other tunnels keep running. The panel stays.', [name, String(kind)]),
+    tr('', 'Remove')
+  );
+  if (ok) removePeer(kind, name);
 }
 
 // Detail (drill-in) mode: View opens one tunnel's full settings and hides the rest.
