@@ -1094,7 +1094,7 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 @media (max-width: 900px) { .tnl-acts { flex-direction: column; align-items: stretch; } }
 #tunnelDetailBar { display: none; align-items: center; gap: 12px; }
 #tab-tunnel.td-mode #tunnelDetailBar { display: flex; }
-#tab-tunnel.td-mode .td-hide { display: none !important; }
+#tab-tunnel .td-hide { display: none !important; }
 /* main tunnel drill-in: the tunnel's own settings cards only, peers have their rows */
 #tab-tunnel.td-main #tunXrayCards,
 #tab-tunnel.td-main #peerCards,
