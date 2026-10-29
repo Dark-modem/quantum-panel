@@ -29,6 +29,7 @@ type Topology struct {
 	Role      string   `json:"role"`
 	LocalIP   string   `json:"local_ip"`
 	RemoteIP  string   `json:"remote_ip"`
+	Country   string   `json:"country"`
 	TunnelIDs []string `json:"tunnel_ids"`
 	CreatedAt int64    `json:"created_at"`
 }
@@ -59,6 +60,7 @@ var (
 	// "matrix" is the legacy first Matrix instance; matrix2, matrix3, ... are
 	// additional independent instances hosted on the same server.
 	topologyTunnelRE  = regexp.MustCompile(`^(main|matrix(?:[2-9][0-9]*)?|bagher|peer:[1-9][0-9]*|xray:[1-9][0-9]*|bagher:[1-9][0-9]*)$`)
+	topologyCountryRE = regexp.MustCompile(`^[a-z]{2}$`)
 	topologyInventory = readTopologyInventory // injectable, deterministic inventory for tests
 )
 
@@ -180,6 +182,8 @@ func decodeTopologyEdit(w http.ResponseWriter, r *http.Request, t *Topology) (ma
 			dst = &t.LocalIP
 		case "remote_ip":
 			dst = &t.RemoteIP
+		case "country":
+			dst = &t.Country
 		case "tunnel_ids":
 			dst = &t.TunnelIDs
 		default:
@@ -209,6 +213,12 @@ func validateTopologyFields(t *Topology) error {
 			}
 			*value = ip.String()
 		}
+	}
+	// Country labels the foreign endpoint (ISO 3166-1 alpha-2, lowercase) and is
+	// optional: the zero value falls back to a generic globe flag in the UI.
+	t.Country = strings.ToLower(strings.TrimSpace(t.Country))
+	if t.Country != "" && !topologyCountryRE.MatchString(t.Country) {
+		return fmt.Errorf("country must be a two-letter ISO 3166-1 alpha-2 code or empty")
 	}
 	if len(t.TunnelIDs) > topologyMaxIDs {
 		return fmt.Errorf("too many tunnel_ids")

@@ -1492,7 +1492,7 @@
             </div>
           </div>
           <div class="topo-list-wrap"><table class="topo-list-table" id="topologyListTable" role="table">
-            <thead role="rowgroup"><tr class="topo-list-head" role="row"><th scope="col" role="columnheader" data-i18n="topology_list_name">Name</th><th scope="col" role="columnheader" data-i18n="topology_list_servers">Server pair</th><th scope="col" role="columnheader" data-i18n="tunnels_title">Tunnels</th><th scope="col" role="columnheader" data-i18n="topology_list_status">Status</th><th scope="col" role="columnheader" data-i18n="topology_list_actions">Actions</th></tr></thead>
+            <thead role="rowgroup"><tr class="topo-list-head" role="row"><th scope="col" role="columnheader" data-i18n="topology_list_name">Name</th><th scope="col" role="columnheader" data-i18n="topology_list_iran">Iran</th><th scope="col" role="columnheader" data-i18n="topology_list_foreign">Foreign</th><th scope="col" role="columnheader" data-i18n="tunnels_title">Tunnels</th><th scope="col" role="columnheader" data-i18n="topology_list_actions">Actions</th></tr></thead>
             <tbody id="topologiesList" role="rowgroup"></tbody>
           </table></div>
         </div>
@@ -1505,6 +1505,7 @@
             <div class="fg"><span id="topologyRoleLabel" class="qs-label" data-i18n="topology_role">This server's role</span><input type="hidden" id="topologyRole" value="iran"><div class="qs-seg" role="group" aria-labelledby="topologyRoleLabel"><button type="button" data-topo-role="iran" aria-pressed="true" data-i18n="x002">Iran</button><button type="button" data-topo-role="foreign" aria-pressed="false" data-i18n="x003">Foreign</button></div></div>
             <div class="fg"><label for="topologyLocalIP" data-i18n="topology_local">This server's IP</label><input id="topologyLocalIP" class="hashem-input u-mono" dir="ltr"></div>
             <div class="fg"><label for="topologyRemoteIP" data-i18n="topology_remote">Other server's IP</label><input id="topologyRemoteIP" class="hashem-input u-mono" dir="ltr" placeholder="IPv4 / IPv6"></div>
+            <div class="fg"><label for="topologyCountry" data-i18n="topology_country">Foreign server country</label><select id="topologyCountry" class="hashem-input"></select></div>
           </div>
           <button type="button" id="topologyAddTunnelBtn" class="hashem-btn hashem-btn-primary" data-i18n="tunnels_new">New Tunnel</button>
           <button type="button" id="topologySaveBtn" class="hashem-btn hashem-btn-primary" data-i18n="topology_save">Save topology</button>

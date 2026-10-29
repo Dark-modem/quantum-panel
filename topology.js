@@ -21,16 +21,25 @@ function topologyExistingTunnels(topo) {
 function topologyExistingTunnelCount(topo) {
   return topologyExistingTunnels(topo).length;
 }
-function topologyListStatus(tunnels) {
-  if (!tunnels.length) return { key: 'empty', label: tr('', 'Empty') };
-  const states = tunnels.map(t => String(t.state || '').toLowerCase());
-  if (states.every(s => ['healthy', 'ok', 'up', 'connected'].includes(s))) {
-    return { key: 'healthy', label: tr('', 'Healthy') };
-  }
-  if (states.every(s => ['down', 'err', 'error', 'failed', 'stopped', 'off'].includes(s))) {
-    return { key: 'down', label: tr('', 'Down') };
-  }
-  return { key: 'degraded', label: tr('', 'Degraded') };
+// Foreign endpoint country, chosen by the user (ISO 3166-1 alpha-2). The Iran
+// side is always the home server; an empty country falls back to a globe icon.
+const TOPO_COUNTRIES = [
+  ['de', 'Germany'], ['fi', 'Finland'], ['nl', 'Netherlands'], ['fr', 'France'],
+  ['gb', 'United Kingdom'], ['us', 'USA'], ['tr', 'Turkey'], ['ru', 'Russia'],
+  ['ua', 'Ukraine'], ['pl', 'Poland'], ['se', 'Sweden'], ['ch', 'Switzerland'],
+  ['at', 'Austria'], ['ca', 'Canada'], ['jp', 'Japan'], ['sg', 'Singapore'],
+  ['ae', 'UAE'], ['am', 'Armenia'], ['ge', 'Georgia'], ['az', 'Azerbaijan'],
+  ['in', 'India'], ['cn', 'China'], ['', 'Other']
+];
+function topologyFlagIcon(country) {
+  const cc = String(country || '').toLowerCase();
+  if (!/^[a-z]{2}$/.test(cc)) return '🌐';
+  return String.fromCodePoint(...[...cc.toUpperCase()].map(c => 0x1f1e6 + c.charCodeAt(0) - 65));
+}
+function topologyCountryOptions(current) {
+  return TOPO_COUNTRIES.map(([cc, label]) =>
+    `<option value="${esc(cc)}"${cc === (current || '') ? ' selected' : ''}>${topologyFlagIcon(cc)} ${esc(tr('', label))}</option>`
+  ).join('');
 }
 function topologyDeleteNotice(count) {
   return tr('', '{n} tunnel(s) still exist. Delete all tunnels in this topology first, including stopped tunnels.').replace('{n}', String(count));
@@ -97,7 +106,7 @@ function topologySearchMatches(t, tunnels) {
   const query = topologySearchQuery.trim().toLowerCase();
   if (!query) return true;
   const endpoints = topologyEndpointPair(t);
-  return [t.name, endpoints.iran, endpoints.foreign, topologyListStatus(tunnels).label]
+  return [t.name, endpoints.iran, endpoints.foreign]
     .some(value => String(value || '').toLowerCase().includes(query));
 }
 function topologyRender() {
@@ -118,22 +127,20 @@ function topologyRender() {
   if (listTable && listTable.classList) listTable.classList.toggle('topo-grid', topologyViewMode === 'grid');
   const searching = topologySearchQuery.trim() !== '';
   const visible = topologyData.topologies.filter(t => topologySearchMatches(t, topologyExistingTunnels(t)));
-  const swapIcon = '<svg class="topo-icon topo-swap" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4 3 8l4 4"/><path d="M3 8h17"/><path d="M17 20l4-4-4-4"/><path d="M21 16H4"/></svg>';
-  const pairLabel = `${tr('', 'Iran')} – ${tr('', 'Foreign')}`;
   $('topologiesList').innerHTML = visible.length
     ? visible.map(t => {
         const tunnels = topologyExistingTunnels(t);
         const remaining = tunnels.length;
-        const status = topologyListStatus(tunnels);
         const endpoints = topologyEndpointPair(t);
         const countLabel = tr('', '{n} existing tunnel(s)').replace('{n}', String(remaining));
         const deleteTitle = remaining ? topologyDeleteNotice(remaining) : tr('', 'Delete topology');
-        return `<tr class="topo-list-row" role="row" data-topo-id="${esc(t.id)}">
-        <td role="cell" class="topo-cell-name" data-label="${esc(tr('', 'Name'))}"><button type="button" class="topo-name" data-topo-open="${esc(t.id)}"><span class="topo-dot" data-topo-status="${status.key}" aria-hidden="true"></span><bdi>${esc(t.name)}</bdi></button></td>
-        <td role="cell" class="topo-cell-servers" data-label="${esc(tr('', 'Server pair'))}"><div class="topo-server-pair"><span class="topo-location">${esc(pairLabel)}</span><span class="topo-ips"><bdi class="u-mono" dir="ltr">${esc(endpoints.iran || '—')}</bdi>${swapIcon}<bdi class="u-mono" dir="ltr">${esc(endpoints.foreign || '—')}</bdi></span></div></td>
+        const serverCell = (flag, ip) => `<span class="topo-server"><span class="topo-flag" aria-hidden="true">${topologyFlagIcon(flag)}</span><bdi class="u-mono" dir="ltr">${esc(ip || '—')}</bdi></span>`;
+        return `<tr class="topo-list-row" role="row" tabindex="0" data-topo-id="${esc(t.id)}" aria-label="${esc(t.name)}">
+        <td role="cell" class="topo-cell-name" data-label="${esc(tr('', 'Name'))}"><button type="button" class="topo-name" data-topo-open="${esc(t.id)}"><bdi>${esc(t.name)}</bdi></button></td>
+        <td role="cell" class="topo-cell-iran" data-label="${esc(tr('', 'Iran'))}">${serverCell('ir', endpoints.iran)}</td>
+        <td role="cell" class="topo-cell-foreign" data-label="${esc(tr('', 'Foreign'))}">${serverCell(t.country, endpoints.foreign)}</td>
         <td role="cell" class="topo-cell-tunnels" data-label="${esc(tr('', 'Tunnels'))}"><span class="topo-count" aria-label="${esc(countLabel)}">${remaining}</span></td>
-        <td role="cell" class="topo-cell-status" data-label="${esc(tr('', 'Status'))}"><span class="topo-status" data-topo-status="${status.key}"><i aria-hidden="true"></i>${esc(status.label)}</span></td>
-        <td role="cell" class="topo-cell-actions" data-label="${esc(tr('', 'Actions'))}"><div class="topo-actions"><button type="button" class="hashem-btn hashem-btn-primary topo-view" data-topo-open="${esc(t.id)}">${esc(tr('', 'View'))}</button><span class="topo-delete-wrap" title="${esc(deleteTitle)}"><button type="button" class="hashem-btn topo-delete" data-topo-delete="${esc(t.id)}" aria-label="${esc(tr('', 'Delete topology'))}"${remaining ? ` disabled title="${esc(tr('', 'Delete all tunnels in this topology first'))}"` : ''}><svg class="topo-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg>${esc(tr('', 'Delete'))}</button></span></div></td>
+        <td role="cell" class="topo-cell-actions" data-label="${esc(tr('', 'Actions'))}"><div class="topo-actions"><button type="button" class="hashem-btn hashem-btn-primary topo-view" data-topo-open="${esc(t.id)}">${esc(tr('', 'View'))}</button><span class="topo-delete-wrap" title="${esc(deleteTitle)}"><button type="button" class="hashem-btn hashem-btn-danger topo-delete" data-topo-delete="${esc(t.id)}" aria-label="${esc(tr('', 'Delete topology'))}"${remaining ? ` title="${esc(tr('', 'Delete all tunnels in this topology first'))}"` : ''}><svg class="topo-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg>${esc(tr('', 'Delete'))}</button></span></div></td>
       </tr>`;
       }).join('')
     : searching
@@ -149,6 +156,7 @@ function topologyRender() {
     $('topologyName').value = topo.name;
     $('topologyLocalIP').value = topo.local_ip || '';
     $('topologyRemoteIP').value = topo.remote_ip || '';
+    $('topologyCountry').innerHTML = topologyCountryOptions(topo.country);
     topologyChooseRole(topo.role || 'iran');
   }
   const candidates = topologyData.tunnels.filter(t => !assigned.has(t.id) && (!t.remote_ip || t.remote_ip === topo.remote_ip || (t.remote_ips || []).includes(topo.remote_ip)));
@@ -196,7 +204,7 @@ async function topologySave() {
   const topo = topologyCurrent(); if (!topo || topologyBusy) return;
   topologyBusy = true; $('topologySaveBtn').disabled = true;
   try {
-    await api('/api/topologies/' + encodeURIComponent(topo.id), {name: $('topologyName').value.trim(), role: $('topologyRole').value, local_ip: $('topologyLocalIP').value.trim(), remote_ip: $('topologyRemoteIP').value.trim()}, 'PATCH');
+    await api('/api/topologies/' + encodeURIComponent(topo.id), {name: $('topologyName').value.trim(), role: $('topologyRole').value, local_ip: $('topologyLocalIP').value.trim(), remote_ip: $('topologyRemoteIP').value.trim(), country: $('topologyCountry').value.trim().toLowerCase()}, 'PATCH');
     await topologyReload(); toastOk(tr('', 'Topology saved'));
   } catch(e) { toastErr(tr('', 'Topology save failed'), e.message); }
   finally { topologyBusy = false; $('topologySaveBtn').disabled = false; }
@@ -219,9 +227,12 @@ async function topologyDetach(id) {
 async function topologyDelete(id) {
   const topo = topologyData.topologies.find(t => t.id === id);
   const remaining = topologyExistingTunnelCount(topo);
-  // No visible toast: the disabled delete button's title (topologyDeleteNotice)
-  // is the only delivery of the "tunnels still exist" message.
-  if (remaining) return;
+  if (remaining) {
+    // The delete button is never disabled; existing tunnels block the deletion
+    // with a visible warning instead of a silent no-op.
+    toastWarn(tr('', 'Delete topology'), topologyDeleteNotice(remaining));
+    return;
+  }
   if (!await entConfirm(tr('', 'Delete topology?'), tr('', 'This empty topology will be removed.'), tr('', 'Delete topology'))) return;
   try { await api('/api/topologies/' + encodeURIComponent(id), {}, 'DELETE'); await topologyReload(); }
   catch(e) { toastErr(tr('', 'Topology save failed'), e.message); }
@@ -582,6 +593,17 @@ $('tab-tunnel').addEventListener('click', e => {
     if (target.dataset.topoViewTunnel.startsWith('bagher:')) { openTunnelDetail('bagher'); return; }
     openTunnelDetail(kind);
   }
+});
+// The whole row opens the topology: clicks anywhere except the action buttons.
+$('topologiesList').addEventListener('click', e => {
+  if (e.target.closest('.topo-actions')) return; // View/Delete keep their own behaviour
+  const row = e.target.closest('.topo-list-row');
+  if (row && row.dataset.topoId) topologyOpen(row.dataset.topoId);
+});
+$('topologiesList').addEventListener('keydown', e => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const row = e.target.closest ? e.target.closest('.topo-list-row') : null;
+  if (row && row.dataset.topoId) { e.preventDefault(); topologyOpen(row.dataset.topoId); }
 });
 setInterval(() => {
   const tab = $('tab-tunnel');

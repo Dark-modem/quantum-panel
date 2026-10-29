@@ -172,6 +172,36 @@ func TestTopologyPendingDefaultsAndPartialEdit(t *testing.T) {
 	}
 }
 
+// The foreign endpoint's country is optional metadata: accepted on create and
+// PATCH, normalized to lowercase, persisted and returned in every JSON view.
+func TestTopologyCountryFieldRoundTrip(t *testing.T) {
+	topologyFixture(t)
+	group := topologyCreated(t, `{"name":"Pair","remote_ip":"203.0.113.2","country":"DE"}`)
+	if group.Country != "de" {
+		t.Fatalf("country must normalize to lowercase ISO code: %+v", group)
+	}
+	stored, err := loadTopologies()
+	if err != nil || len(stored) != 1 || stored[0].Country != "de" {
+		t.Fatalf("country persistence: %+v %v", stored, err)
+	}
+	w := topologyRequest(http.MethodPatch, group.ID, `{"country":"fi"}`)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"country":"fi"`) {
+		t.Fatalf("PATCH country: %d %s", w.Code, w.Body.String())
+	}
+	w = topologyRequest(http.MethodPatch, group.ID, `{"country":""}`)
+	if w.Code != http.StatusOK {
+		t.Fatalf("clearing country must stay valid: %d %s", w.Code, w.Body.String())
+	}
+	stored, _ = loadTopologies()
+	if stored[0].Country != "" {
+		t.Fatalf("country must be clearable: %+v", stored[0])
+	}
+	get := topologyRequest(http.MethodGet, "", "")
+	if !strings.Contains(get.Body.String(), `"country":""`) {
+		t.Fatalf("GET must return the country field: %s", get.Body.String())
+	}
+}
+
 func TestTopologyRejectsInvalidEdits(t *testing.T) {
 	cases := []string{
 		`null`, `[]`, `"text"`, `{`, `{} {}`, `{"name":""}`, `{"name":"   "}`,
@@ -182,6 +212,7 @@ func TestTopologyRejectsInvalidEdits(t *testing.T) {
 		`{"tunnel_ids":[1]}`, `{"tunnel_ids":"main"}`, `{"tunnel_ids":["../main"]}`,
 		`{"tunnel_ids":["peer:0"]}`, `{"tunnel_ids":["xray:-1"]}`, `{"tunnel_ids":["peer:01"]}`,
 		`{"tunnel_ids":["main","main"]}`, `{"tunnel_ids":["peer:999"]}`,
+		`{"country":"ger"}`, `{"country":"d1"}`, `{"country":"d"}`, `{"country":12}`, `{"country":null}`,
 		`{"id":"chosen"}`, `{"created_at":1}`, `{"engine":"matrix"}`, `{"detach":true}`,
 		fmt.Sprintf(`{"name":%q}`, strings.Repeat("x", 121)),
 		fmt.Sprintf(`{"name":%q}`, strings.Repeat("x", 70000)),

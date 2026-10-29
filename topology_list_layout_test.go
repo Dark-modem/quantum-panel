@@ -26,7 +26,7 @@ func TestTopologyListSemanticTable(t *testing.T) {
 		t.Error("generated topology rows must remain inside the table body")
 	}
 	headers := regexp.MustCompile(`(?s)<th\b([^>]*)>(.*?)</th>`).FindAllStringSubmatch(table[1], -1)
-	want := []string{"Name", "Server pair", "Tunnels", "Status", "Actions"}
+	want := []string{"Name", "Iran", "Foreign", "Tunnels", "Actions"}
 	if len(headers) != len(want) {
 		t.Fatalf("got %d topology columns, want %d", len(headers), len(want))
 	}
@@ -40,24 +40,53 @@ func TestTopologyListSemanticTable(t *testing.T) {
 			t.Errorf("topology overview must keep %s on the list card", id)
 		}
 	}
+	if !strings.Contains(html, `id="topologyCountry"`) {
+		t.Error("topology form must offer a foreign country selector")
+	}
+	if strings.Contains(html, `data-i18n="topology_list_status"`) || strings.Contains(html, "topology_list_servers") {
+		t.Error("status and server-pair columns must be gone from the header row")
+	}
+	js := topologyListTestSource(t, "topology.js")
+	for _, want := range []string{
+		`country: $('topologyCountry').value`,       // PATCH persists the country
+		`topologyFlagIcon(flag)`,                    // flag icon per server column
+		`tabindex="0"`,                              // rows are keyboard reachable
+		`$('topologiesList').addEventListener`,      // whole-row click opens the topology
+		`toastWarn(tr('', 'Delete topology'), topologyDeleteNotice(remaining))`, // delete explains blocked state
+		`hashem-btn-danger topo-delete`,             // delete is a danger button, never disabled
+	} {
+		if !strings.Contains(js, want) {
+			t.Errorf("topology.js lacks %q", want)
+		}
+	}
+	if strings.Contains(js, "topologyListStatus") {
+		t.Error("topologyListStatus must be removed with the status column")
+	}
 }
 
 func TestTopologyListModernChrome(t *testing.T) {
 	css := topologyListTestSource(t, "enterprise.css")
 	for _, rule := range []struct{ name, pattern string }{
 		{"uppercase column headers", `\.topo-list-head\s+th\s*\{[^}]*text-transform\s*:\s*uppercase`},
-		{"circular tunnel count badge", `\.topo-count\s*\{[^}]*border-radius\s*:\s*50%`},
-		{"status dot next to the name", `\.topo-dot\s*\{[^}]*border-radius\s*:\s*50%`},
-		{"healthy dot color", `\.topo-dot\[data-topo-status="healthy"\]\s*\{[^}]*background\s*:\s*var\(--ok\)`},
-		{"degraded dot color", `\.topo-dot\[data-topo-status="degraded"\]\s*\{[^}]*background\s*:\s*var\(--wr\)`},
-		{"down dot color", `\.topo-dot\[data-topo-status="down"\]\s*\{[^}]*background\s*:\s*var\(--er\)`},
-		{"accent location label", `\.topo-location\s*\{[^}]*color\s*:\s*var\(--ac\)`},
+		{"plain blue tunnel count", `\.topo-count\s*\{[^}]*color\s*:\s*var\(--ac\)`},
+		{"no circular count badge", `^//`},
+		{"clickable rows", `\.topo-list-row\s*\{[^}]*cursor\s*:\s*pointer`},
+		{"keyboard focus ring on rows", `\.topo-list-row:focus-visible\s*\{[^}]*outline\s*:\s*2px\s+solid\s+var\(--ent-focus\)`},
+		{"flag plus IP server cell", `\.topo-server\s*\{[^}]*display\s*:\s*flex`},
 		{"pill action buttons", `\.topo-actions\s+\.hashem-btn\s*\{[^}]*border-radius\s*:\s*999px`},
+		{"red danger delete button", `\.topo-actions\s+\.topo-delete\s*\{[^}]*border\s*:\s*1px\s+solid\s+var\(--er\)`},
 		{"search box styling", `\.topo-search\s*\{[^}]*min-height\s*:`},
 		{"view toggle active state", `\.topo-view-toggle\s+button\[aria-pressed="true"\]`},
 		{"grid card mode", `\.topo-list-table\.topo-grid\s+\.topo-list-row\s*\{[^}]*border-radius\s*:\s*var\(--r-md\)`},
 		{"subtle row hover", `\.topo-list-row:hover\s*\{[^}]*background\s*:\s*var\(--sunk\)\s*;?\s*\}`},
 	} {
+		if rule.name == "no circular count badge" {
+			// The count is plain bold blue text: no border, circle or background.
+			if regexp.MustCompile(`\.topo-count\s*\{[^}]*border-radius\s*:\s*50%`).MatchString(css) {
+				t.Error("topology count must not render as a circular badge")
+			}
+			continue
+		}
 		if !regexp.MustCompile(rule.pattern).MatchString(css) {
 			t.Errorf("topology list CSS lacks %s", rule.name)
 		}
@@ -94,7 +123,7 @@ func TestTopologyListSharedResponsiveColumns(t *testing.T) {
 			t.Errorf("narrow-screen topology layout lacks %s", rule)
 		}
 	}
-	for _, selector := range []string{".topo-name bdi", ".topo-ips bdi"} {
+	for _, selector := range []string{".topo-name bdi", ".topo-server bdi"} {
 		rule := regexp.MustCompile(`(?s)` + regexp.QuoteMeta(selector) + `\s*\{[^}]*overflow-wrap\s*:\s*anywhere`)
 		if !rule.MatchString(css) {
 			t.Errorf("long names and IPv6 endpoints must wrap: %s", selector)
