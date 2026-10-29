@@ -1483,9 +1483,11 @@
       <section id="tab-tunnel" role="tabpanel" hidden>
         <div class="xr-err" id="topologyError" role="alert" hidden></div>
         <div class="tunnel-card" id="topologyListCard">
-          <div class="tc-header"><p class="tc-title" data-i18n="nav_topology">Topology</p><span class="badge info" id="topologyCount">0</span><button type="button" class="hashem-btn hashem-btn-primary" id="topologyCreateBtn" data-i18n="topology_create">Add topology</button></div>
-          <p class="qs-hint" data-i18n="topology_hint">A topology groups tunnels between two servers. Create the topology first, then add or attach tunnels.</p>
-          <div id="topologiesList"></div>
+          <div class="tc-header topo-list-toolbar"><div class="topo-list-title"><p class="tc-title" data-i18n="nav_topology">Topology</p><span class="badge dim" id="topologyCount">0</span></div><button type="button" class="hashem-btn hashem-btn-primary" id="topologyCreateBtn"><svg class="topo-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span data-i18n="topology_create">Add topology</span></button></div>
+          <div class="topo-list-wrap"><table class="topo-list-table" role="table">
+            <thead role="rowgroup"><tr class="topo-list-head" role="row"><th scope="col" role="columnheader" data-i18n="topology_list_name">Name</th><th scope="col" role="columnheader" data-i18n="topology_list_servers">Server pair</th><th scope="col" role="columnheader" data-i18n="tunnels_title">Tunnels</th><th scope="col" role="columnheader" data-i18n="topology_list_status">Status</th><th scope="col" role="columnheader" data-i18n="topology_list_actions">Actions</th></tr></thead>
+            <tbody id="topologiesList" role="rowgroup"></tbody>
+          </table></div>
         </div>
         <div class="tunnel-card" id="topologyDetailCard" hidden>
           <div class="tc-header"><button type="button" id="topologyBackBtn" class="hashem-btn hashem-btn-secondary" data-i18n="topology_back">Back to topologies</button><b id="topologyNameHeading"></b></div>

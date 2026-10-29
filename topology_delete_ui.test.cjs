@@ -52,6 +52,18 @@ function deleteButton(h, id = 'pair') {
   assert.ok(button, 'delete button rendered');
   return { button: button[0], html };
 }
+function assertCount(html, count, label = `${count} existing tunnel(s)`) {
+  const tag = html.match(/<span\b[^>]*class="topo-count"[^>]*>\s*(\d+)\s*<\/span>/);
+  assert.ok(tag, 'existing-tunnel counter rendered');
+  assert.equal(Number(tag[1]), count);
+  assert.ok(tag[0].includes(`aria-label="${label}"`), 'numeric count has a meaningful accessible name');
+}
+function assertNoticeTooltip(html, message) {
+  const wrapper = html.match(/<span\b[^>]*class="topo-delete-wrap"[^>]*>/);
+  assert.ok(wrapper, 'disabled delete retains a hoverable wrapper');
+  assert.ok(wrapper[0].includes(`title="${message}"`), 'wrapper explains all existing tunnels, including stopped');
+  assert.ok(!html.replace(/<[^>]*>/g, '').includes(message), 'verbose notice is not repeated in visible row content');
+}
 
 for (const state of ['healthy', 'up', 'down', 'stopped']) {
   test(`inventory tunnel in ${state} state disables delete and blocks the actual function`, async () => {
@@ -59,8 +71,8 @@ for (const state of ['healthy', 'up', 'down', 'stopped']) {
     const { button, html } = deleteButton(h);
     assert.match(button, / disabled /);
     assert.ok(button.includes(`title="${title}"`));
-    assert.ok(html.includes('1 tunnels'));
-    assert.ok(html.includes(notice.replace('{n}', '1')));
+    assertCount(html, 1);
+    assertNoticeTooltip(html, notice.replace('{n}', '1'));
     await h.sandbox.topologyDelete('pair');
     assert.deepEqual(h.warnings, [notice.replace('{n}', '1')]);
     assert.equal(h.confirms.length, 0, 'guard runs before confirmation');
@@ -73,8 +85,8 @@ test('mixed live/down inventory is counted, while stale and unrelated IDs are ig
     tunnel('matrix', 'healthy'), tunnel('peer:2', 'down'), tunnel('unassigned', 'stopped')
   ]);
   const { html } = deleteButton(h);
-  assert.ok(html.includes('2 tunnels'));
-  assert.ok(html.includes(notice.replace('{n}', '2')));
+  assertCount(html, 2);
+  assertNoticeTooltip(html, notice.replace('{n}', '2'));
   await h.sandbox.topologyDelete('pair');
   assert.deepEqual(h.warnings, [notice.replace('{n}', '2')]);
   assert.equal(h.confirms.length, 0);
@@ -104,7 +116,8 @@ for (const ids of [[], ['deleted-matrix', 'peer:99']]) {
     const h = harness([topo(ids)], [tunnel('unassigned', 'healthy')]);
     const { button, html } = deleteButton(h);
     assert.doesNotMatch(button, / disabled(?: |>|$)/);
-    assert.ok(html.includes('0 tunnels'));
+    assertCount(html, 0);
+    assert.match(html, /data-topo-status="empty"/);
     assert.ok(!html.includes(title));
     await h.sandbox.topologyDelete('pair');
     assert.deepEqual(h.confirms, [['Delete topology?', emptyBody, 'Delete topology']]);
@@ -115,6 +128,26 @@ for (const ids of [[], ['deleted-matrix', 'peer:99']]) {
     assert.equal(Object.keys(h.calls[0].body).length, 0);
   });
 }
+
+test('guard rechecks current inventory when a tunnel appears after an enabled row was rendered', async () => {
+  const h = harness([topo(['peer:2'])], []);
+  const { button } = deleteButton(h);
+  assert.doesNotMatch(button, / disabled(?: |>|$)/);
+  vm.runInContext(`topologyData.tunnels = ${JSON.stringify([tunnel('peer:2', 'stopped')])}`, h.sandbox);
+  await h.sandbox.topologyDelete('pair');
+  assert.deepEqual(h.warnings, [notice.replace('{n}', '1')]);
+  assert.equal(h.confirms.length, 0, 'late inventory guard runs before confirmation');
+  assert.deepEqual(h.calls, [], 'a stale enabled row cannot send a DELETE');
+});
+
+test('duplicate and stale bindings do not inflate the existing inventory count', async () => {
+  const h = harness([topo(['matrix', 'matrix', 'deleted'])], [tunnel('matrix', 'stopped')]);
+  assert.equal(h.sandbox.topologyExistingTunnelCount(topo(['matrix', 'matrix', 'deleted'])), 1);
+  await h.sandbox.topologyDelete('pair');
+  assert.deepEqual(h.warnings, [notice.replace('{n}', '1')]);
+  assert.equal(h.confirms.length, 0);
+  assert.deepEqual(h.calls, []);
+});
 
 test('cancelled empty-group confirmation sends no DELETE request', async () => {
   const h = harness([topo()], [], { confirm: false });
@@ -139,7 +172,8 @@ test('Persian title, count notice and empty confirmation are translated with uni
   }
   const { button, html } = deleteButton(h);
   assert.ok(button.includes(`title="${map[title]}"`));
-  assert.ok(html.includes(map[notice].replace('{n}', '1')));
+  assertNoticeTooltip(html, map[notice].replace('{n}', '1'));
+  assertCount(html, 1, (map['{n} existing tunnel(s)'] || '{n} existing tunnel(s)').replace('{n}', '1'));
   await h.sandbox.topologyDelete('pair');
   assert.deepEqual(h.warnings, [map[notice].replace('{n}', '1')]);
   assert.equal(h.confirms.length, 0);

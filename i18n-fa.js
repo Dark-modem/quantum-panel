@@ -3056,5 +3056,8 @@ window.FA_TEXT = {
 "Foreign node": "نود خارج",
 "Tunnel details": "جزئیات تونل",
 "Link status": "وضعیت ارتباط",
-"SSH port": "پورت SSH"
+"SSH port": "پورت SSH",
+"Server pair": "سرورهای دو طرف",
+"Empty": "خالی",
+"{n} existing tunnel(s)": "{n} تونل موجود"
 };

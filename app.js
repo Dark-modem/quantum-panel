@@ -399,6 +399,10 @@ const I18N = {
   en: {
     nav_dashboard: "Dashboard",
     topology_return_tunnel: "Back to topology",
+    topology_list_name: "Name",
+    topology_list_servers: "Server pair",
+    topology_list_status: "Status",
+    topology_list_actions: "Actions",
     nav_topology: "Topology",
     topology_create: "Add topology",
     topology_hint: "A topology groups tunnels between two servers. Create the topology first, then add or attach tunnels.",
