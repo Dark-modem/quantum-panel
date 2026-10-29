@@ -3007,5 +3007,14 @@ window.FA_TEXT = {
 "Not verified": "تأیید نشده",
 "Foreign node (not registered)": "نود خارج (ثبت نشده)",
 "Waiting for foreign node": "در انتظار نود خارج",
-"Matrix (tinc mesh)": "ماتریکس (شبکه tinc)"
+"Matrix (tinc mesh)": "ماتریکس (شبکه tinc)",
+"Connect a local service to Matrix": "اتصال سرویس محلی به ماتریکس",
+"For Xray listening only on 127.0.0.1:443, connect Matrix port 443 to local port 443. TLS/Reality keys and Xray configuration stay unchanged. This bridge supports TCP only.": "اگر Xray فقط روی 127.0.0.1:443 گوش می‌دهد، پورت 443 ماتریکس را به پورت محلی 443 متصل کنید. کلیدهای TLS/Reality و کانفیگ Xray تغییر نمی‌کنند. این پل فقط TCP را پشتیبانی می‌کند.",
+"Matrix user port": "پورت کاربر در ماتریکس",
+"Local service port": "پورت سرویس محلی",
+"Connect local service": "اتصال سرویس محلی",
+"Remove local bridge": "حذف پل محلی",
+"Connecting local service…": "در حال اتصال سرویس محلی…",
+"Local bridge removed.": "پل محلی حذف شد.",
+"Local service connected to Matrix. Xray configuration unchanged.": "سرویس محلی به ماتریکس متصل شد. کانفیگ Xray تغییر نکرد."
 };

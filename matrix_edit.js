@@ -27,11 +27,34 @@ window.matrixEditPanelOpen = async function() {
     });
   } else {
     body.innerHTML = `<p class="qs-hint">${help('Edit settings on the Iran hub first. Paste its updated Matrix bundle here; existing keys and node identity are kept.')}</p>
-      <div class="fg"><label for="mxEditBundle">${help('Updated Matrix bundle')}</label><textarea id="mxEditBundle" rows="4" class="hashem-input u-mono" dir="ltr" placeholder="hmx1_…" spellcheck="false" autocomplete="off"></textarea></div>`;
+      <div class="fg"><label for="mxEditBundle">${help('Updated Matrix bundle')}</label><textarea id="mxEditBundle" rows="4" class="hashem-input u-mono" dir="ltr" placeholder="hmx1_…" spellcheck="false" autocomplete="off"></textarea></div>
+      <hr>
+      <b>${help('Connect a local service to Matrix')}</b>
+      <p class="qs-hint">${help('For Xray listening only on 127.0.0.1:443, connect Matrix port 443 to local port 443. TLS/Reality keys and Xray configuration stay unchanged. This bridge supports TCP only.')}</p>
+      <div class="fg"><label for="mxLocalPort">${help('Matrix user port')}</label><input class="hashem-input u-mono" id="mxLocalPort" inputmode="numeric" value="${esc(String((st.ports || [443])[0] || 443))}" dir="ltr"></div>
+      <div class="fg"><label for="mxLocalTarget">${help('Local service port')}</label><input class="hashem-input u-mono" id="mxLocalTarget" inputmode="numeric" value="443" dir="ltr"></div>
+      <button type="button" class="hashem-btn hashem-btn-primary" id="mxConnectLocal">${help('Connect local service')}</button>
+      <button type="button" class="hashem-btn hashem-btn-ghost" id="mxDisconnectLocal">${help('Remove local bridge')}</button>
+      <div class="qs-hint u-mt-8" id="mxLocalStatus" role="status" aria-live="polite"></div>`;
+    $('mxConnectLocal').onclick = () => matrixLocalServiceSave(false);
+    $('mxDisconnectLocal').onclick = () => matrixLocalServiceSave(true);
+    const links = await api('/api/matrix/local-service');
+    $('mxLocalStatus').textContent = (links.services || []).map(s => s.port + ' → 127.0.0.1:' + s.target_port).join(' · ');
   }
   $('matrixEditMsg').textContent = '';
   $('matrixEditSave').disabled = false;
   modalShow($('matrixEditModal'), matrixEditClose);
+}
+async function matrixLocalServiceSave(remove) {
+  const status = $('mxLocalStatus'), connect = $('mxConnectLocal'), disconnect = $('mxDisconnectLocal');
+  const port = Number($('mxLocalPort').value), target = Number($('mxLocalTarget').value);
+  connect.disabled = disconnect.disabled = true;
+  status.textContent = tr('', 'Connecting local service…');
+  try {
+    await api('/api/matrix/local-service', {port, target_port: target, remove});
+    status.textContent = tr('', remove ? 'Local bridge removed.' : 'Local service connected to Matrix. Xray configuration unchanged.');
+  } catch(e) { status.textContent = e.message; }
+  finally { connect.disabled = disconnect.disabled = false; }
 }
 function matrixEditFamily(family) {
   if (!matrixEditState || !['ipv4', 'ipv6'].includes(family)) return;

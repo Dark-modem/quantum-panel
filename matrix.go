@@ -460,6 +460,9 @@ func matrixRemove(st matrixState) error {
 	if st.Network != matrixNetname {
 		return fmt.Errorf("refusing to remove an unowned legacy Matrix network")
 	}
+	if err := matrixRemoveLocalServices(); err != nil {
+		return err
+	}
 	if _, err := os.Stat(matrixUnitPath()); err == nil {
 		if _, e := matrixExec("systemctl", "stop", matrixUnit); e != nil {
 			return e
