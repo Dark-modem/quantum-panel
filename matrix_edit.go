@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -15,6 +16,7 @@ import (
 
 type matrixEditRequest struct {
 	Ports    *[]int `json:"ports,omitempty"`
+	Port     *int   `json:"port,omitempty"`
 	Family   string `json:"family,omitempty"`
 	Addr     string `json:"addr,omitempty"`
 	Bundle   string `json:"bundle,omitempty"`
@@ -165,6 +167,19 @@ func matrixApplyEdit(old matrixState, q matrixEditRequest) (matrixState, error) 
 	if q.Ports != nil {
 		next.Ports = append([]int(nil), (*q.Ports)...)
 	}
+	if q.Port != nil {
+		// An absent port keeps the current mesh port; an explicit 0 asks for a
+		// free one — the same auto-allocation the setup handler performs.
+		if *q.Port == 0 {
+			p, e := matrixAutoMeshPort(in, next.Ports)
+			if e != nil {
+				return old, e
+			}
+			next.Port = p
+		} else {
+			next.Port = *q.Port
+		}
+	}
 	if q.Addr != "" {
 		next.Addr = strings.TrimSpace(q.Addr)
 	} else if next.Family != old.Family {
@@ -179,6 +194,19 @@ func matrixApplyEdit(old matrixState, q matrixEditRequest) (matrixState, error) 
 	}
 	if e := matrixEditPortConflicts(old.Ports, next.Ports); e != nil {
 		return old, e
+	}
+	// A changed mesh port must be free for TCP+UDP here and unclaimed by other
+	// Matrix instances or topologies (the setup preflight checks the same set).
+	if next.Port != old.Port {
+		if e := matrixProbeMeshPort(next.Port); e != nil {
+			return old, e
+		}
+		if owner := matrixInstancePortsBusy(in, []int{next.Port}); owner != "" {
+			return old, fmt.Errorf("port is already used by Matrix instance %s", owner)
+		}
+		if owner := matrixTopologyPortOwner([]int{next.Port}); owner != "" {
+			return old, fmt.Errorf("port is already owned by another topology's tunnel (%s)", owner)
+		}
 	}
 	added := []int{}
 	oldPorts := map[int]bool{}
@@ -196,7 +224,7 @@ func matrixApplyEdit(old matrixState, q matrixEditRequest) (matrixState, error) 
 	if owner := matrixTopologyPortOwner(added); owner != "" {
 		return old, fmt.Errorf("port is already owned by another topology's tunnel (%s)", owner)
 	}
-	if next.Family != old.Family || next.Addr != old.Addr {
+	if next.Family != old.Family || next.Addr != old.Addr || next.Port != old.Port {
 		next.Revision = randHex(16)
 		next.PeerSyncRequired = len(old.Peers) > 0
 	}
@@ -296,9 +324,14 @@ func handleMatrixEdit(w http.ResponseWriter, r *http.Request) {
 	}
 	st, e := matrixApplyEdit(old, q)
 	if e != nil {
-		writeAPIError(w, r, "E-MATRIX-07", e.Error())
+		var busy *matrixPortBusyError
+		if errors.As(e, &busy) {
+			writeAPIError(w, r, "E-MATRIX-10", e.Error())
+		} else {
+			writeAPIError(w, r, "E-MATRIX-07", e.Error())
+		}
 		return
 	}
 	LogSecurityAudit("matrix_edit", cfg.Username, ClientIP(r), "instance="+in.ID+" hub settings saved")
-	writeJSON(w, map[string]any{"status": "ok", "instance": in.ID, "bundle": matrixBundle(in, st, r), "peer_sync_required": st.PeerSyncRequired})
+	writeJSON(w, map[string]any{"status": "ok", "instance": in.ID, "port": st.Port, "bundle": matrixBundle(in, st, r), "peer_sync_required": st.PeerSyncRequired})
 }

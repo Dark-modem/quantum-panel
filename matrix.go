@@ -343,6 +343,13 @@ func matrixInstallTinc() error {
 }
 
 func writeMatrixSetupError(w http.ResponseWriter, r *http.Request, err error) {
+	var busy *matrixPortBusyError
+	if errors.As(err, &busy) {
+		// A taken port is a user-fixable request problem, not a broken setup:
+		// its own code keeps it apart from the generic E-MATRIX-07 failure.
+		writeAPIError(w, r, "E-MATRIX-10", err.Error())
+		return
+	}
 	if errors.Is(err, errMatrixPackageBusy) {
 		writeAPIError(w, r, "E-MATRIX-09", "")
 		return
@@ -395,6 +402,37 @@ func matrixDetectV6() string {
 	}
 	return ""
 }
+// matrixPortBusyError marks a port another program already holds on this
+// server. It maps to its own API code (E-MATRIX-10) so the UI can tell
+// "pick another port" apart from a genuine setup failure (E-MATRIX-07).
+type matrixPortBusyError struct {
+	proto string // "TCP" or "UDP"
+	port  int
+}
+
+func (e *matrixPortBusyError) Error() string {
+	return e.proto + " port " + strconv.Itoa(e.port) + " is occupied"
+}
+
+// matrixProbeMeshPort verifies one port is free for both TCP and UDP — the
+// protocols tinc binds on the mesh port. A failure is a matrixPortBusyError.
+func matrixProbeMeshPort(p int) error {
+	l, e := net.Listen("tcp", net.JoinHostPort("", strconv.Itoa(p)))
+	if e != nil {
+		return &matrixPortBusyError{proto: "TCP", port: p}
+	}
+	l.Close()
+	u, e := net.ListenPacket("udp", net.JoinHostPort("", strconv.Itoa(p)))
+	if e != nil {
+		return &matrixPortBusyError{proto: "UDP", port: p}
+	}
+	u.Close()
+	return nil
+}
+
+// matrixPortFree reports whether the mesh-port probe passes for p.
+func matrixPortFree(p int) bool { return matrixProbeMeshPort(p) == nil }
+
 func matrixCheckResources(in matrixInstance, st matrixState) error {
 	for _, p := range []string{matrixDirOf(in), matrixUnitPathOf(in)} {
 		if _, e := os.Lstat(p); e == nil {
@@ -448,16 +486,9 @@ func matrixCheckResources(in matrixInstance, st matrixState) error {
 		checkPorts = append(checkPorts, st.Ports...)
 	}
 	for _, p := range checkPorts {
-		l, e := net.Listen("tcp", net.JoinHostPort("", strconv.Itoa(p)))
-		if e != nil {
-			return fmt.Errorf("TCP port %d is occupied", p)
+		if e := matrixProbeMeshPort(p); e != nil {
+			return e
 		}
-		l.Close()
-		u, e := net.ListenPacket("udp", net.JoinHostPort("", strconv.Itoa(p)))
-		if e != nil {
-			return fmt.Errorf("UDP port %d is occupied", p)
-		}
-		u.Close()
 	}
 	return nil
 }
@@ -811,6 +842,46 @@ func matrixPortClash(ports []int) string {
 	return ""
 }
 
+// matrixMeshPortCandidates is the ordered scan list for matrixAutoMeshPort:
+// 2097 first, then 21000-21999. A variable so tests can shrink the range.
+var matrixMeshPortCandidates = func() []int {
+	out := make([]int, 0, 1001)
+	out = append(out, 2097)
+	for p := 21000; p <= 21999; p++ {
+		out = append(out, p)
+	}
+	return out
+}
+
+// matrixAutoMeshPort picks a free tinc mesh port for `in`: the classic 2097
+// first, then a scan of 21000-21999. Ports already owned by any Matrix
+// instance state (st.Port / st.Ports), ports bound to another topology's
+// tunnel, the panel port and the caller's own forwarded ports are skipped, as
+// is every port failing the TCP+UDP occupancy probe. extraPorts lists the
+// forwarded ports the same setup request asks for (a mesh port may not
+// duplicate one). Errors only when the whole range is exhausted.
+func matrixAutoMeshPort(in matrixInstance, extraPorts []int) (int, error) {
+	reserved := matrixReservedPorts()
+	topologyOwned := topologyBoundTunnelPorts()
+	skip := map[int]bool{cfg.Port: true}
+	for _, p := range extraPorts {
+		skip[p] = true
+	}
+	for _, p := range matrixMeshPortCandidates() {
+		if skip[p] || reserved[p] {
+			continue
+		}
+		if _, owned := topologyOwned[p]; owned {
+			continue
+		}
+		if !matrixPortFree(p) {
+			continue
+		}
+		return p, nil
+	}
+	return 0, fmt.Errorf("no free mesh port found (tried 2097 and 21000-21999); pick a free port manually")
+}
+
 func handleMatrixSetupPost(w http.ResponseWriter, r *http.Request) {
 	var q struct {
 		Family   string `json:"family"`
@@ -843,6 +914,18 @@ func handleMatrixSetupPost(w http.ResponseWriter, r *http.Request) {
 			q.Addr = getOutboundIP()
 		}
 	}
+	// Port 0 (also what an absent port field decodes to) means "choose a free
+	// mesh port for me" — it never falls back to a hardcoded default, which
+	// would fail with E-MATRIX-10 wherever that default is taken. Allocated
+	// before validation, which requires a concrete port in range.
+	if q.Port == 0 {
+		p, e := matrixAutoMeshPort(in, q.Ports)
+		if e != nil {
+			writeAPIError(w, r, "E-MATRIX-10", e.Error())
+			return
+		}
+		q.Port = p
+	}
 	if e := validateMatrixSettings(q.Family, q.Addr, q.Port, q.Ports); e != nil {
 		writeAPIError(w, r, "E-MATRIX-02", e.Error())
 		return
@@ -862,7 +945,7 @@ func handleMatrixSetupPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	LogSecurityAudit("matrix_setup", cfg.Username, ClientIP(r), "instance="+in.ID+" family="+st.Family)
-	writeJSON(w, map[string]any{"status": "ok", "instance": in.ID, "bundle": matrixBundle(in, st, r), "state": matrixPublicState(in, st)})
+	writeJSON(w, map[string]any{"status": "ok", "instance": in.ID, "port": st.Port, "bundle": matrixBundle(in, st, r), "state": matrixPublicState(in, st)})
 }
 
 // handleMatrixInstancesGet lists every Matrix instance hosted on this server.

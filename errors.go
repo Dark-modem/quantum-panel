@@ -184,6 +184,7 @@ var errCatalog = map[string]errInfo{
 	"E-MATRIX-07":  {500, "matrix setup failed", "See the detail: the server log (journalctl -u gre-panel) carries the exact step that failed."},
 	"E-MATRIX-09":  {409, "another package installation is still running", "Matrix waited for apt/dpkg without deleting locks or stopping processes. Wait for the other installation to finish, then retry."},
 	"E-MATRIX-08":  {502, "hub registration failed", "The foreign panel could not register with the Iran panel — check that the Iran panel is reachable from this server, then try again."},
+	"E-MATRIX-10":  {400, "matrix port occupied", "The mesh port must be a free TCP+UDP port — 443 is usually taken by your web/Xray traffic. Pick another port or leave it automatic."},
 	"E-CLUSTER-08": {502, "cannot link with the other Iran hub", "Both panels need the same version, the panel port open between the hubs, and correct clocks (NTP)."},
 	"E-CLUSTER-10": {502, "DNS provider refused the request", "Use a Cloudflare API token with Zone > DNS > Edit for the zone, and a DNS-only (grey cloud) record."},
 	"E-CLUSTER-11": {500, "quantum could not change the hub links", "Read the message; the full log is in journalctl -u gre-panel."},

@@ -215,6 +215,11 @@ function topologyGraph(topo, tunnels) {
   const cc = String(topo.country || '').toLowerCase();
   const countryLabel = (TOPO_COUNTRIES.find(c => c[0] === cc) || ['', 'Other'])[1];
   const top = cy - NH / 2;
+  // RTL pages read from the right, so the home (Iran) card sits on the right
+  // and the foreign card opposite; LTR keeps Iran on the left. The cables are
+  // symmetric between the two facing edges, so only the cards trade places.
+  const rtl = typeof currentLang !== 'undefined' && currentLang === 'fa';
+  const iranX = rtl ? fx : ix, foreignX = rtl ? ix : fx;
   // No tunnels means there is no health to show: the dot stays hidden and a
   // quiet dashed placeholder links the pair instead of an empty void.
   const dot = x => nodeKind ? `<circle class="topo-dot ${nodeKind}" cx="${x + 20}" cy="${top + 27}" r="5"/>` : '';
@@ -234,8 +239,8 @@ function topologyGraph(topo, tunnels) {
     (n ? '' : `<g class="topo-cable topo-idle"><path class="topo-e-line" d="M ${ix + NW} ${cy} C ${ix + NW + GAP} ${cy}, ${fx - GAP} ${cy}, ${fx} ${cy}"/></g>` +
       `<text class="topo-empty" x="${W / 2}" y="${cy - 10}" text-anchor="middle">${text(tr('', 'No tunnel attached yet'))}</text>`) +
     cables +
-    node(ix, esc(tr('', 'Iran')), tr('', 'Iran server'), iran, 'ir') +
-    node(fx, esc(tr('', countryLabel)), tr('', 'Foreign server'), foreign, topo.country) +
+    node(iranX, esc(tr('', 'Iran')), tr('', 'Iran server'), iran, 'ir') +
+    node(foreignX, esc(tr('', countryLabel)), tr('', 'Foreign server'), foreign, topo.country) +
     `</svg></div>` +
     `<div class="cl-legend">` +
     `<span><i class="ok"></i>${esc(tr('', 'Connected'))}</span>` +
@@ -445,7 +450,8 @@ function topoWizPick(id) {
   if (!topoWiz) return;
   topoWiz.type = id;
   // seed the type's default port so the review never shows an empty one
-  const dflt = { frp: 7000, backhaul: 7000, bagher: 55400, matrix: 2097, xray: 443 }[id];
+  // (Matrix seeds none: a blank mesh port means "pick a free one automatically")
+  const dflt = { frp: 7000, backhaul: 7000, bagher: 55400, xray: 443 }[id];
   if (dflt && !topoWiz.values.port) topoWiz.values.port = dflt;
   if (topoWiz.step === 1) { topoWiz.step = 2; topoWizRender(); }
   else topoWizRender();
@@ -518,7 +524,8 @@ function topoWizRenderFields() {
   } else if (t.id === 'matrix') {
     html = topoWizSelect('topoWizFFamily', tr('', 'Family'), v.family || 'ipv4', [['ipv4', 'IPv4'], ['ipv6', 'IPv6']])
       + (v.family === 'ipv6' ? topoWizInput('topoWizFAddr', tr('', 'This server\'s IPv6 address'), v.addr || '', 'dir="ltr"') : '')
-      + topoWizInput('topoWizFPort', tr('', 'Port'), String(v.port || 2097), 'type="number" min="1" inputmode="numeric"')
+      + topoWizInput('topoWizFPort', tr('', 'Mesh port'), String(v.port || ''), 'type="number" min="0" inputmode="numeric" placeholder="0"')
+      + `<p class="qs-hint u-m-0">${esc(tr('', 'A free TCP+UDP port for the tinc mesh — NOT the traffic port. Leave empty/0 to pick automatically.'))}</p>`
       + topoWizInput('topoWizFPorts', tr('', 'Forwarded ports'), v.ports || '', 'dir="ltr" placeholder="443, 2083"');
   } else {
     html = topoWizInput('topoWizFName', tr('', 'Tunnel name'), v.name || '')
@@ -554,13 +561,23 @@ function topoWizRead() {
   str('topoWizFMode', 'mode');
   str('topoWizFFamily', 'family');
   chk('topoWizFUdp', 'udp');
+  // A blank Matrix mesh port reads as 0: the backend then picks a free port
+  // instead of silently forcing a default that may be occupied.
+  const portEl = $('topoWizFPort');
+  const wt = topoWizType();
+  if (portEl && wt && wt.id === 'matrix' && String(portEl.value).trim() === '') v.port = 0;
 }
 function topoWizValidate() {
   const t = topoWizType(), v = topoWiz.values;
   if (!t) return tr('', 'Choose the tunnel type');
   if (t.id !== 'matrix' && !v.remote) return tr('', 'Enter the foreign server public IP.');
   if ((t.id === 'bagher' || t.id === 'xray') && !v.ports) return tr('', 'Enter at least one port to forward, for example 443, 8443.');
-  if (!v.port || v.port < 1) return tr('', 'Enter a port number.');
+  // The Matrix mesh port is optional: blank/0 asks the server to pick a free one.
+  if (t.id === 'matrix') {
+    if (v.port && (v.port < 0 || v.port > 65535)) return tr('', 'Enter a port number.');
+  } else if (!v.port || v.port < 1) {
+    return tr('', 'Enter a port number.');
+  }
   return '';
 }
 function topoWizRow(k, val) {
@@ -587,7 +604,7 @@ function topoWizRenderReview() {
   } else if (t.id === 'matrix') {
     rows.push([tr('', 'Family'), (v.family || 'ipv4').toUpperCase()]);
     if (v.family === 'ipv6' && v.addr) rows.push([tr('', 'This server\'s IPv6 address'), v.addr]);
-    rows.push([tr('', 'Port'), String(v.port || 2097)]);
+    rows.push([tr('', 'Mesh port'), v.port ? String(v.port) : tr('', 'Automatic')]);
     if (v.ports) rows.push([tr('', 'Forwarded ports'), v.ports]);
   } else {
     if (v.name) rows.push([tr('', 'Tunnel name'), v.name]);
@@ -644,6 +661,7 @@ async function topoWizCreate() {
   const oldTxt = btn.textContent;
   btn.innerHTML = '<span class="ent-spinner"></span> ' + esc(tr('', 'Applying…'));
   const v = topoWiz.values;
+  let mxResult = null;
   try {
     if (t.id === 'frp' || t.id === 'backhaul') {
       const withGre = t.id === 'frp' || v.gre;
@@ -675,12 +693,14 @@ async function topoWizCreate() {
         const list = Array.isArray(st) ? st : ((st && st.instances) || []);
         if (list.length) instance = 'next';
       } catch (_) { /* endpoint unavailable: keep the legacy first-instance path */ }
+      // port 0 = "pick a free mesh port automatically": 443-style defaults
+      // made setups fail wherever the default port was already taken.
       const mxBody = {
-        family: v.family || 'ipv4', port: v.port || 2097,
+        family: v.family || 'ipv4', port: Number(v.port) || 0,
         ports: topoWizPortsList(), addr: v.family === 'ipv6' ? (v.addr || '') : ''
       };
       if (instance) mxBody.instance = instance;
-      await api('/api/matrix/setup', mxBody);
+      mxResult = await api('/api/matrix/setup', mxBody);
     } else {
       const profile = typeof xrPresetOf === 'function' ? xrPresetOf('reality') : { security: 'reality' };
       await api('/api/xray', {
@@ -697,11 +717,19 @@ async function topoWizCreate() {
     }
     await topologyReload();
     toastOk(tr('', 'Tunnel created'), tr('', 'The new tunnel is attached to this topology.'));
+    // The server answers with the mesh port it picked (or accepted); showing
+    // it spares the user a round-trip to the Matrix card to look it up.
+    if (t.id === 'matrix' && mxResult && mxResult.port) {
+      toastOk(tr('', 'Matrix mesh port: {port}').replace('{port}', String(mxResult.port)));
+    }
     topoWiz = null;
     topoWizHide();
   } catch(e) {
     topoWizError(e.message);
-    toastErr(tr('', 'Setup failed'), e.message);
+    // Self-explanatory API errors (the mesh-port code already names the port
+    // and the fix) surface as-is instead of wrapped in a generic toast title.
+    if (e && e.code === 'E-MATRIX-10') toastErr(e.message);
+    else toastErr(tr('', 'Setup failed'), e.message);
   } finally {
     topoWizBusy = false;
     btn.disabled = false;

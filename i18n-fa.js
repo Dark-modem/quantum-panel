@@ -3128,5 +3128,8 @@ window.FA_TEXT = {
 "Enter a port number.": "شماره‌ی پورت وارد کنید.",
 "The new tunnel is attached to this topology.": "تونل تازه به این توپولوژی متصل شد.",
 "Mesh tunnel (tinc): the servers join one virtual network.": "تونل مش (tinc): سرورها به یک شبکه‌ی مجازی می‌پیوندند.",
+"Mesh port": "پورت مش",
+"A free TCP+UDP port for the tinc mesh — NOT the traffic port. Leave empty/0 to pick automatically.": "یک پورت آزاد TCP+UDP برای مش tinc — پورت ترافیک نیست. برای انتخاب خودکار، خالی بگذارید یا 0 وارد کنید.",
+"Matrix mesh port: {port}": "پورت مش ماتریکس: {port}",
 "Stealth tunnel over an SSH connection pool.": "تونل پنهان‌کار روی استخر اتصال SSH."
 };

@@ -7,7 +7,7 @@ const test = require('node:test');
 const source = fs.readFileSync(path.join(__dirname, 'topology.js'), 'utf8');
 const faSource = fs.readFileSync(path.join(__dirname, 'i18n-fa.js'), 'utf8');
 
-function harness({ fa = false, topologies, tunnels, failOn, instances = [] } = {}) {
+function harness({ fa = false, topologies, tunnels, failOn, failCode, failMessage, instances = [] } = {}) {
   const elements = new Map();
   const calls = [], toasts = [];
   let created = null;
@@ -23,7 +23,7 @@ function harness({ fa = false, topologies, tunnels, failOn, instances = [] } = {
   const NEW_BY_URL = {
     '/api/setup': body => ({ id: 'main', name: body.name || 'main', engine: body.engine || 'frp', state: 'healthy' }),
     '/api/sshfwd': body => ({ id: 'bagher-1', name: body.name || 'bagher-1', engine: 'bagher', state: 'healthy' }),
-    '/api/matrix/setup': () => ({ id: 'matrix', name: 'Matrix', engine: 'matrix', state: 'healthy' }),
+    '/api/matrix/setup': body => ({ id: 'matrix', name: 'Matrix', engine: 'matrix', state: 'healthy', port: body.port || 21007 }),
     '/api/xray': () => ({ id: 'xray:1', name: 'xr', engine: 'xray', state: 'healthy' })
   };
   const sandbox = {
@@ -34,14 +34,18 @@ function harness({ fa = false, topologies, tunnels, failOn, instances = [] } = {
     entConfirm: async () => true,
     api: async (url, body, method) => {
       calls.push({ url, body, method: method || 'POST' });
-      if (failOn && failOn(url, body, method)) throw new Error('boom');
+      if (failOn && failOn(url, body, method)) {
+        const err = new Error(failMessage || 'boom');
+        if (failCode) err.code = failCode;
+        throw err;
+      }
       if (url === '/api/matrix/instances') return { instances };
       if (url === '/api/topologies' && !body) {
         if (created && !tunnels.some(t => t.id === created.id)) tunnels = [...tunnels, created];
         return { topologies, tunnels };
       }
       const mk = (!method || method === 'POST') && NEW_BY_URL[url];
-      if (mk) created = mk(body || {});
+      if (mk) { created = mk(body || {}); return created; }
       return {};
     }
   };
@@ -169,8 +173,11 @@ for (const [type, expect] of [
     h.sandbox.topoWizNext();
     const review = h.el('topoWizBody').innerHTML;
     assert.ok(review.includes('Pair'), 'review shows the topology name');
-    if (type === 'matrix') assert.ok(review.includes('2097'), 'matrix review shows its port');
-    else assert.ok(review.includes('198.51.100.9'), 'review shows the remote endpoint');
+    if (type === 'matrix') {
+      assert.ok(review.includes('Automatic'), 'blank mesh port: the review shows it is picked automatically');
+    } else {
+      assert.ok(review.includes('198.51.100.9'), 'review shows the remote endpoint');
+    }
     await h.sandbox.topoWizNext(); // Create
     const setup = h.calls.find(c => c.url === expect[0]);
     assert.ok(setup, `${expect[0]} called`);
@@ -180,6 +187,7 @@ for (const [type, expect] of [
     if (type === 'bagher') assert.equal(body.mode, 'bagher');
     if (type === 'matrix') {
       assert.equal(body.family, 'ipv4');
+      assert.equal(body.port, 0, 'a blank mesh port is sent as 0 (auto)');
       assert.equal(body.instance, undefined, 'no existing instances: legacy body without the instance field');
     }
     if (type === 'xray') assert.equal(body.action, 'create');
@@ -203,13 +211,94 @@ test('a failed create keeps the modal open and surfaces the error inline', async
   assert.ok(h.el('topoWizErr').textContent.includes('boom'), 'inline error shows the API message');
 });
 
+test('the Matrix mesh port is labelled, hinted, and optional (auto pick)', () => {
+  const h = harness({ topologies: [topo()], tunnels: [] });
+  h.sandbox.topologyNewTunnel();
+  h.sandbox.topoWizPick('matrix');
+  const body = h.el('topoWizBody').innerHTML;
+  assert.ok(body.includes('Mesh port'), 'the field is labelled Mesh port, not just Port');
+  assert.ok(body.includes('A free TCP+UDP port for the tinc mesh'), 'a hint says the mesh port is not the traffic port');
+  assert.ok(body.includes('Leave empty/0 to pick automatically'), 'the hint tells how to auto-pick');
+  assert.ok(!body.includes('>2097<'), 'no 2097 default is forced into the field');
+  assert.ok(body.includes('value=""'), 'the mesh port starts blank');
+  h.sandbox.topoWizRead();
+  h.sandbox.topoWizNext();
+  assert.equal(h.wiz('topoWiz.step'), 3, 'a blank mesh port passes validation');
+  assert.ok(h.el('topoWizBody').innerHTML.includes('Automatic'), 'the review announces the automatic pick');
+});
+
+test('wizard sends the typed mesh port, and 0 when the field is blank', async () => {
+  const typed = harness({ topologies: [topo()], tunnels: [] });
+  typed.sandbox.topologyNewTunnel();
+  typed.sandbox.topoWizPick('matrix');
+  typed.el('topoWizFPort').value = '4430';
+  typed.sandbox.topoWizRead();
+  typed.sandbox.topoWizNext();
+  await typed.sandbox.topoWizNext();
+  const call = typed.calls.find(c => c.url === '/api/matrix/setup');
+  assert.ok(call, 'matrix setup called');
+  assert.equal(call.body.port, 4430, 'the typed mesh port is sent as-is');
+
+  const blank = harness({ topologies: [topo()], tunnels: [] });
+  blank.sandbox.topologyNewTunnel();
+  blank.sandbox.topoWizPick('matrix');
+  blank.sandbox.topoWizRead();
+  blank.sandbox.topoWizNext();
+  await blank.sandbox.topoWizNext();
+  const auto = blank.calls.find(c => c.url === '/api/matrix/setup');
+  assert.ok(auto, 'matrix setup called');
+  assert.equal(auto.body.port, 0, 'a blank mesh port is sent as 0 so the server picks a free one');
+});
+
+test('success reports the mesh port the server chose', async () => {
+  const h = harness({ topologies: [topo()], tunnels: [] });
+  h.sandbox.topologyNewTunnel();
+  h.sandbox.topoWizPick('matrix');
+  h.sandbox.topoWizRead();
+  h.sandbox.topoWizNext();
+  await h.sandbox.topoWizNext();
+  const toast = h.toasts.find(t => t[0] === 'ok' && String(t[1]).includes('Matrix mesh port: 21007'));
+  assert.ok(toast, 'a success toast names the chosen mesh port, got ' + JSON.stringify(h.toasts));
+  // A typed port is echoed back, not replaced by the auto fallback.
+  const typed = harness({ topologies: [topo()], tunnels: [] });
+  typed.sandbox.topologyNewTunnel();
+  typed.sandbox.topoWizPick('matrix');
+  typed.el('topoWizFPort').value = '4430';
+  typed.sandbox.topoWizRead();
+  typed.sandbox.topoWizNext();
+  await typed.sandbox.topoWizNext();
+  assert.ok(typed.toasts.some(t => t[0] === 'ok' && String(t[1]).includes('Matrix mesh port: 4430')), 'the returned port is shown');
+});
+
+test('a mesh-port conflict surfaces the API error as-is, unwrapped', async () => {
+  const h = harness({
+    topologies: [topo()], tunnels: [],
+    failOn: url => url === '/api/matrix/setup',
+    failCode: 'E-MATRIX-10',
+    failMessage: '[E-MATRIX-10] TCP port 443 is occupied'
+  });
+  h.sandbox.topologyNewTunnel();
+  h.sandbox.topoWizPick('matrix');
+  h.sandbox.topoWizRead();
+  h.sandbox.topoWizNext();
+  await h.sandbox.topoWizNext();
+  assert.equal(h.el('topoWizModal').hidden, false, 'modal stays open');
+  assert.ok(h.el('topoWizErr').textContent.includes('TCP port 443 is occupied'), 'inline error shows the API message');
+  const toast = h.toasts.find(t => t[0] === 'err');
+  assert.ok(toast, 'error toast shown');
+  assert.equal(toast.length, 2, 'the self-explanatory message is the whole toast, not wrapped in a generic title');
+  assert.ok(String(toast[1]).includes('TCP port 443 is occupied'), 'the toast carries the raw API message');
+});
+
 test('wizard strings carry unique Persian translations', () => {
   const h = harness({ fa: true, topologies: [topo()], tunnels: [] });
   const map = h.sandbox.window.FA_TEXT;
   const keys = ['Step {x} of {n}', 'Choose the tunnel type', 'Tunnel name', 'Local public IP',
     'Remote public IP', 'GRE under the tunnel', 'FRP bind port', 'Pool size', 'Enter a port number.',
     'The new tunnel is attached to this topology.', 'Mesh tunnel (tinc): the servers join one virtual network.',
-    "This server's IPv6 address", 'Stealth tunnel over an SSH connection pool.', 'Type'];
+    "This server's IPv6 address", 'Stealth tunnel over an SSH connection pool.', 'Type',
+    'Mesh port', 'A free TCP+UDP port for the tinc mesh — NOT the traffic port. Leave empty/0 to pick automatically.',
+    'Matrix mesh port: {port}'];
   for (const key of keys) {
     assert.equal(faSource.split(JSON.stringify(key) + ':').length - 1, 1, `unique translation: ${key}`);
     assert.ok(map[key], `Persian entry exists: ${key}`);
@@ -218,6 +307,8 @@ test('wizard strings carry unique Persian translations', () => {
   h.sandbox.topologyNewTunnel();
   h.sandbox.topoWizRender();
   assert.equal(h.el('topoWizProgress').textContent, map['Step {x} of {n}'].replace('{x}', '1').replace('{n}', '3'));
+  h.sandbox.topoWizPick('matrix');
+  assert.ok(h.el('topoWizBody').innerHTML.includes('پورت مش'), 'the mesh-port label renders in Persian');
 });
 
 test('with existing Matrix instances the wizard requests a fresh isolated one', async () => {
