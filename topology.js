@@ -248,24 +248,35 @@ function topologyGraph(topo, tunnels) {
   const iranX = rtl ? fx : ix, foreignX = rtl ? ix : fx;
   // No tunnels means there is no health to show: the dot stays hidden and a
   // quiet dashed placeholder links the pair instead of an empty void.
-  const dot = x => nodeKind ? `<circle class="topo-dot ${nodeKind}" cx="${x + 20}" cy="${top + 27}" r="5"/>` : '';
-  const flagX = x => nodeKind ? x + 34 : x + 20;
-  const capX = x => nodeKind ? x + 62 : x + 48;
-  const node = (x, caption, title, ip, flag) =>
-    `<g class="topo-node"><title>${text(title)} · ${text(ip)}</title>` +
+  // LTR cards flow from the left edge; RTL cards mirror — the status dot and
+  // flag start at the right edge, every text anchors its right edge there and
+  // the rack moves to the opposite corner, so Persian reads naturally.
+  const dot = (x, m) => nodeKind ? `<circle class="topo-dot ${nodeKind}" cx="${m ? x + NW - 20 : x + 20}" cy="${top + 27}" r="5"/>` : '';
+  const node = (x, caption, title, ip, flag) => {
+    const m = rtl;
+    const head = m
+      ? dot(x, true) +
+        topologyFlagSvg(flag, `x="${x + NW - 54}" y="${top + 20}"`) +
+        `<text class="topo-cap" x="${x + NW - 58}" y="${top + 31}" text-anchor="start" style="direction:rtl">${caption}</text>`
+      : dot(x) +
+        topologyFlagSvg(flag, `x="${nodeKind ? x + 34 : x + 20}" y="${top + 20}"`) +
+        `<text class="topo-cap" x="${nodeKind ? x + 62 : x + 48}" y="${top + 31}">${caption}</text>`;
+    return `<g class="topo-node"><title>${text(title)} · ${text(ip)}</title>` +
     `<rect class="topo-n-bg" x="${x}" y="${top}" width="${NW}" height="${NH}" rx="12"/>` +
-    dot(x) +
-    topologyFlagSvg(flag, `x="${flagX(x)}" y="${top + 20}"`) +
-    `<text class="topo-cap" x="${capX(x)}" y="${top + 31}">${caption}</text>` +
-    `<text class="topo-t1" x="${x + 18}" y="${top + 60}">${text(title)}</text>` +
-    `<text class="topo-ip" x="${x + 18}" y="${top + 84}">${text(ip)}</text>` +
+    head +
+    (m
+      ? `<text class="topo-t1" x="${x + NW - 18}" y="${top + 60}" text-anchor="start" style="direction:rtl">${text(title)}</text>` +
+        `<text class="topo-ip" x="${x + NW - 18}" y="${top + 84}" text-anchor="start" style="direction:rtl">${text(ip)}</text>`
+      : `<text class="topo-t1" x="${x + 18}" y="${top + 60}">${text(title)}</text>` +
+        `<text class="topo-ip" x="${x + 18}" y="${top + 84}">${text(ip)}</text>`) +
     // A little rack at the card's end; its LEDs mirror the tunnel health.
-    `<g class="topo-srv led-${nodeKind || 'off'}" transform="translate(${x + NW - 42} ${top + 34})">` +
+    `<g class="topo-srv led-${nodeKind || 'off'}" transform="translate(${m ? x + 18 : x + NW - 42} ${top + 34})">` +
     `<rect x="0" y="0" width="24" height="36" rx="6"/>` +
     `<path d="M8 9h11M8 18h11M8 27h11"/>` +
     `<circle cx="4.5" cy="9" r="1.5"/><circle cx="4.5" cy="18" r="1.5"/><circle cx="4.5" cy="27" r="1.5"/>` +
     `</g>` +
     `</g>`;
+  };
   return `<div class="topo-map"><div class="topo-map-scroll">` +
     `<svg class="topo-graph" viewBox="0 0 ${W} ${H}" role="img" aria-label="${text(tr('', 'Topology connections'))}" dir="ltr">` +
     (n ? '' : `<g class="topo-cable topo-idle"><path class="topo-e-wire" d="M ${ix + NW} ${cy} L ${fx} ${cy}"/><path class="topo-e-dots" d="M ${ix + NW} ${cy} L ${fx} ${cy}"/></g>` +
