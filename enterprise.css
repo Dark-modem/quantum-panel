@@ -1295,14 +1295,31 @@ html[dir="rtl"] .topo-back .topo-back-ic { transform:scaleX(-1); }
 .topo-dot.ok { fill:var(--ok); } .topo-dot.warn { fill:var(--wr); }
 .topo-dot.err { fill:var(--er); }
 .topo-e-hit { fill:none; stroke:transparent; stroke-width:16; }
-.topo-cable .topo-e-line { fill:none; stroke-linecap:round; stroke-width:3; transition:stroke var(--dur-fast) ease; }
-.topo-cable.topo-ok .topo-e-line { stroke:var(--ok); }
-.topo-cable.topo-warn .topo-e-line { stroke:var(--wr); stroke-dasharray:8 6; }
-.topo-cable.topo-err .topo-e-line { stroke:var(--er); stroke-dasharray:3 7; }
-.topo-cable.topo-idle .topo-e-line { stroke:var(--mu); stroke-dasharray:2 7; opacity:.5; }
-.topo-cable:hover .topo-e-line, .topo-cable:focus-visible .topo-e-line { stroke:var(--ac); }
-.topo-e-flow { fill:none; stroke:var(--tx); stroke-opacity:.45; stroke-width:2; stroke-dasharray:3 13; animation:cl-flow 1s linear infinite; pointer-events:none; }
-@media (prefers-reduced-motion: reduce) { .topo-e-flow { display:none; } }
+/* The beam: a thin base wire with evenly spaced beacon dots (a 0 13 dasharray
+   with round caps), colored by tunnel health; live beams march a soft pulse
+   along the dots, stopped ones show a broken dashed wire with no dots. */
+.topo-cable .topo-e-wire { fill:none; stroke-width:1.5; opacity:.35; }
+.topo-cable .topo-e-dots { fill:none; stroke-width:3.5; stroke-linecap:round; stroke-dasharray:0 13; transition:stroke var(--dur-fast) ease; }
+.topo-cable.topo-ok .topo-e-wire { stroke:var(--ok); }
+.topo-cable.topo-ok .topo-e-dots { stroke:var(--ok); }
+.topo-cable.topo-warn .topo-e-wire { stroke:var(--wr); }
+.topo-cable.topo-warn .topo-e-dots { stroke:var(--wr); }
+.topo-cable.topo-err .topo-e-wire { stroke:var(--er); stroke-dasharray:6 6; opacity:.7; }
+.topo-cable.topo-err .topo-e-dots { display:none; }
+.topo-cable.topo-idle .topo-e-wire { stroke:var(--mu); }
+.topo-cable.topo-idle .topo-e-dots { stroke:var(--mu); opacity:.45; }
+.topo-cable:hover .topo-e-dots, .topo-cable:focus-visible .topo-e-dots { stroke:var(--ac); }
+.topo-e-pulse { fill:none; stroke:var(--tx); stroke-opacity:.5; stroke-width:3.5; stroke-linecap:round; stroke-dasharray:0 13; animation:topo-march 1.1s linear infinite; pointer-events:none; }
+@keyframes topo-march { to { stroke-dashoffset:-13; } }
+@media (prefers-reduced-motion: reduce) { .topo-e-pulse { display:none; } }
+/* The little rack on each card; its LEDs mirror the tunnel health. */
+.topo-srv rect { fill:var(--s2); stroke:var(--ln2); stroke-width:1; }
+.topo-srv path { fill:none; stroke:var(--mu); stroke-width:1.6; stroke-linecap:round; }
+.topo-srv circle { stroke:none; }
+.topo-srv.led-ok circle { fill:var(--ok); }
+.topo-srv.led-warn circle { fill:var(--wr); }
+.topo-srv.led-err circle { fill:var(--er); }
+.topo-srv.led-off circle { fill:var(--mu); opacity:.5; }
 .topo-e-tag { fill:var(--tx); font-size:12px; font-weight:600; text-anchor:middle; paint-order:stroke; stroke:var(--sunk); stroke-width:4px; pointer-events:none; }
 .topo-empty { fill:var(--mu)!important; font-size:13px; font-weight:600; text-anchor:middle; paint-order:stroke; stroke:var(--sunk); stroke-width:4px; }
 @media(max-width:799px) {
@@ -1355,6 +1372,20 @@ html[dir="rtl"] .topo-back .topo-back-ic { transform:scaleX(-1); }
 .topo-wiz-row > span { color: var(--mu); font-size: var(--fs-caption); font-weight: 600; flex: none; }
 .topo-wiz-row bdi { color: var(--tx); overflow-wrap: anywhere; }
 .topo-wiz-check { flex-direction: row; align-items: center; gap: 10px; }
+/* Matrix bundle screens: the node side pastes the hub bundle into it, the hub
+   side shows the readonly bundle to carry over. Monospace, wrapping, fully
+   selectable so the bundle can be grabbed even without the copy button. */
+.topo-wiz-bundle {
+  width: 100%;
+  min-height: 132px;
+  resize: vertical;
+  font-size: var(--fs-caption);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.topo-wiz-bundle[readonly] { color: var(--tx); background: var(--sunk); }
+.topo-wiz-bundle-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 2px; }
 @media(max-width:799px) {
   .topo-wiz-types { grid-template-columns: 1fr; }
   .topo-wiz-head { align-items: flex-start; flex-direction: column; }

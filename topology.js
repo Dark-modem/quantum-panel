@@ -184,14 +184,15 @@ function topologyGraph(topo, tunnels) {
   const text = value => esc(String(value || '—'));
   const iran = topo.role === 'foreign' ? topo.remote_ip : topo.local_ip;
   const foreign = topo.role === 'foreign' ? topo.local_ip : topo.remote_ip;
-  // Same drawing language as the cluster map: rounded node cards on a sunken
-  // well, cubic cables whose color and dash carry the tunnel health, and a
-  // halo'd label on every cable so it stays readable where lines cross. The
-  // svg never stretches past its natural width (the CSS caps .topo-graph), so
-  // the cards keep their proportions and the type stays crisp on wide screens.
-  const W = 840, NW = 260, NH = 104, ix = 40, fx = W - 40 - NW, GAP = 100;
+  // The connection strip from the classic server view: every tunnel is a
+  // straight horizontal beam between the two cards — a thin base wire with
+  // evenly spaced beacon dots in the tunnel's health color, a marching pulse
+  // on live ones, and a halo'd name above each beam. The svg never stretches
+  // past its natural width, so cards and beams keep their proportions.
+  const W = 840, NW = 260, NH = 104, ix = 40, fx = W - 40 - NW;
   const n = tunnels.length;
-  const H = n ? Math.max(250, 140 + n * 54) : 210;
+  const step = n > 1 ? Math.min(30, 96 / (n - 1)) : 0;
+  const H = n ? Math.max(250, 170 + (n - 1) * step + 80) : 210;
   const cy = H / 2;
   const stateOf = t => {
     const s = String(t.state || '');
@@ -201,14 +202,15 @@ function topologyGraph(topo, tunnels) {
   const kinds = tunnels.map(stateOf);
   const nodeKind = !n ? '' : kinds.every(k => k === 'ok') ? 'ok' : kinds.every(k => k === 'err') ? 'err' : 'warn';
   const cables = tunnels.map((t, i) => {
-    const y = cy + (i - (n - 1) / 2) * 54;
-    const d = `M ${ix + NW} ${cy} C ${ix + NW + GAP} ${y}, ${fx - GAP} ${y}, ${fx} ${cy}`;
-    const midY = (0.25 * cy + 0.75 * y - 10).toFixed(1);
+    const y = (cy + (i - (n - 1) / 2) * step).toFixed(1);
+    const d = `M ${ix + NW} ${y} L ${fx} ${y}`;
     const st = stateOf(t);
     return `<g data-topology-cable="${text(t.id)}" class="topo-cable topo-${st}">` +
-      `<path class="topo-e-hit" d="${d}"/><path class="topo-e-line" d="${d}"/>` +
-      (st === 'ok' ? `<path class="topo-e-flow" d="${d}"/>` : '') +
-      `<text class="topo-e-tag" x="${W / 2}" y="${midY}">${text(t.name)} · ${text(t.engine)}</text>` +
+      `<path class="topo-e-hit" d="${d}"/>` +
+      `<path class="topo-e-wire" d="${d}"/>` +
+      `<path class="topo-e-dots" d="${d}"/>` +
+      (st === 'ok' ? `<path class="topo-e-pulse" d="${d}"/>` : '') +
+      `<text class="topo-e-tag" x="${W / 2}" y="${(Number(y) - 12).toFixed(1)}">${text(t.name)} · ${text(t.engine)}</text>` +
       `<title>${text(t.name)} · ${text(t.state)}</title>` +
     `</g>`;
   }).join('');
@@ -233,11 +235,17 @@ function topologyGraph(topo, tunnels) {
     `<text class="topo-cap" x="${capX(x)}" y="${top + 31}">${caption}</text>` +
     `<text class="topo-t1" x="${x + 18}" y="${top + 60}">${text(title)}</text>` +
     `<text class="topo-ip" x="${x + 18}" y="${top + 84}">${text(ip)}</text>` +
+    // A little rack at the card's end; its LEDs mirror the tunnel health.
+    `<g class="topo-srv led-${nodeKind || 'off'}" transform="translate(${x + NW - 42} ${top + 34})">` +
+    `<rect x="0" y="0" width="24" height="36" rx="6"/>` +
+    `<path d="M8 9h11M8 18h11M8 27h11"/>` +
+    `<circle cx="4.5" cy="9" r="1.5"/><circle cx="4.5" cy="18" r="1.5"/><circle cx="4.5" cy="27" r="1.5"/>` +
+    `</g>` +
     `</g>`;
   return `<div class="topo-map"><div class="topo-map-scroll">` +
     `<svg class="topo-graph" viewBox="0 0 ${W} ${H}" role="img" aria-label="${text(tr('', 'Topology connections'))}" dir="ltr">` +
-    (n ? '' : `<g class="topo-cable topo-idle"><path class="topo-e-line" d="M ${ix + NW} ${cy} C ${ix + NW + GAP} ${cy}, ${fx - GAP} ${cy}, ${fx} ${cy}"/></g>` +
-      `<text class="topo-empty" x="${W / 2}" y="${cy - 10}" text-anchor="middle">${text(tr('', 'No tunnel attached yet'))}</text>`) +
+    (n ? '' : `<g class="topo-cable topo-idle"><path class="topo-e-wire" d="M ${ix + NW} ${cy} L ${fx} ${cy}"/><path class="topo-e-dots" d="M ${ix + NW} ${cy} L ${fx} ${cy}"/></g>` +
+      `<text class="topo-empty" x="${W / 2}" y="${cy - 12}" text-anchor="middle">${text(tr('', 'No tunnel attached yet'))}</text>`) +
     cables +
     node(iranX, esc(tr('', 'Iran')), tr('', 'Iran server'), iran, 'ir') +
     node(foreignX, esc(tr('', countryLabel)), tr('', 'Foreign server'), foreign, topo.country) +

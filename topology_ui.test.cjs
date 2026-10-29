@@ -38,8 +38,8 @@ assert.ok(unsafeEndpoints.includes('&lt;foreign&gt;&amp;&quot;'));assert.ok(unsa
 assert.ok(unsafeEndpoints.indexOf('&lt;iran&gt;')<unsafeEndpoints.indexOf('&lt;foreign&gt;'),'foreign local role reverses Iran/foreign graph endpoints');
 const designed=topologyGraph(topo,one);
 assert.ok(designed.includes('topo-map-scroll')&&designed.includes('cl-legend'),'graph keeps the cluster-map chrome: sunken scroll well and legend row');
-assert.ok(designed.includes('topo-e-flow'),'healthy cables carry the flow animation');
-assert.ok(!topologyGraph(topo,five.slice(1)).includes('topo-e-flow'),'down cables never animate flow');
+assert.ok(designed.includes('topo-e-dots')&&designed.includes('topo-e-pulse'),'healthy beams carry beacon dots and the marching pulse');
+assert.ok(!topologyGraph(topo,five.slice(1)).includes('topo-e-pulse'),'down beams never animate the pulse');
 assert.ok(designed.includes('topo-dot ok'),'all-healthy tunnels light the node dot green');
 assert.ok(topologyGraph(topo,five).includes('topo-dot warn'),'mixed tunnel health marks the node dot warn');
 const empty=topologyGraph(topo,[]);
