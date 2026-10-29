@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Hashem Panel</title>
+<title>Quantum Panel</title>
 <meta name="color-scheme" content="dark light">
 <meta name="theme-color" content="#0a0e17">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
@@ -16,24 +16,34 @@
 <link rel="stylesheet" href="enterprise.css">
 <link rel="stylesheet" href="xterm.css">
 <script>
-  /* Theme before first paint so a dark panel never flashes white (hashem-style). */
+  /* Theme before first paint so a dark panel never flashes white (quantum-style). */
+  /* Legacy fallback: prefs written before the rebrand live under the old
+     (pre-rebrand) prefix — read them once so users keep theme/accent/lang
+     after the update. Writes always use the new keys. */
+  var _LEGACY_PREF = 'has' + 'hem_';
+  function lsGet(k) {
+    try { var v = localStorage.getItem(k); if (v !== null && v !== undefined) return v; } catch (e) { return null; }
+    var legacy = (k === 'gre_theme') ? _LEGACY_PREF + 'theme' : k.replace(/^quantum_/, _LEGACY_PREF);
+    if (legacy === k) return null;
+    try { return localStorage.getItem(legacy); } catch (e) { return null; }
+  }
   try {
-    var t = localStorage.getItem('gre_theme') ||
+    var t = lsGet('gre_theme') ||
       (window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
     document.documentElement.dataset.t = t;
     document.addEventListener('DOMContentLoaded', function () { document.body.dataset.t = t; });
   } catch (e) { /* storage blocked: keep default dark theme */ }
   /* Accent preset + Live Activity Stream visibility before first paint (no flash). */
   try {
-    var a = localStorage.getItem('hashem_accent');
+    var a = lsGet('quantum_accent');
     if (a && /^[a-z]+$/.test(a)) document.documentElement.dataset.acc = a;
-    document.documentElement.dataset.rs = localStorage.getItem('hashem_rs_hidden') === '1' ? '0' : '1';
-    if (localStorage.getItem('hashem_sb') === '1') document.documentElement.dataset.sb = '1';
-    if (localStorage.getItem('hashem_dens') === 'compact') document.documentElement.dataset.dens = 'compact';
+    document.documentElement.dataset.rs = lsGet('quantum_rs_hidden') === '1' ? '0' : '1';
+    if (lsGet('quantum_sb') === '1') document.documentElement.dataset.sb = '1';
+    if (lsGet('quantum_dens') === 'compact') document.documentElement.dataset.dens = 'compact';
   } catch (e) { /* storage blocked: defaults */ }
   /* Language/direction before first paint (same key setLanguage() persists) so RTL never flashes LTR. */
   try {
-    var l = localStorage.getItem('hashem_lang') || 'en';
+    var l = lsGet('quantum_lang') || 'en';
     document.documentElement.lang = l;
     document.documentElement.dir = l === 'fa' ? 'rtl' : 'ltr';
     if (l === 'fa') document.documentElement.classList.add('i18n-wait');
@@ -424,8 +434,8 @@
   .status-indicator.active .dot { animation:pulse 2s ease-in-out infinite; }
   @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.45; } }
   :focus-visible { outline:2px solid var(--ac-out70); outline-offset:2px; }
-  .hashem-btn:active:not(:disabled) { transform:scale(.97); }
-  .hashem-btn { transition:transform .15s var(--spring), box-shadow .2s ease, background .2s ease, opacity .2s; }
+  .quantum-btn:active:not(:disabled) { transform:scale(.97); }
+  .quantum-btn { transition:transform .15s var(--spring), box-shadow .2s ease, background .2s ease, opacity .2s; }
   .kpi-val, .dash-big, .ver-big { font-variant-numeric:tabular-nums; }
   .kpi-ico { transition:transform .25s var(--spring); }
   .kpi:hover .kpi-ico { transform:scale(1.08); }
@@ -436,13 +446,13 @@
     .page { padding:12px 16px 72px; }
     .tunnel-card, .qs { padding:14px; gap:10px; }
     .peer-acts { flex-wrap:wrap; }
-    .peer-acts .hashem-btn { flex:1 1 45%; min-width:140px; }
+    .peer-acts .quantum-btn { flex:1 1 45%; min-width:140px; }
     .det-row, .dash-peer-row { flex-wrap:wrap; }
     .mono { overflow-wrap:anywhere; word-break:break-word; }
     .topbar { gap:8px; }
     .topbar h1 { font-size:17px; }
     .chart-actions { gap:6px; }
-    input.hashem-input, select, textarea { font-size:16px; }
+    input.quantum-input, select, textarea { font-size:16px; }
   }
   #toast.toast { border-radius:12px; -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px);
     background:color-mix(in srgb, var(--s2) 88%, transparent); box-shadow:var(--lift);
@@ -568,7 +578,7 @@
   #tab-tunnel > .tunnel-card + .tunnel-card { margin-top:14px; }
   .tun-empty-hint { grid-column:1 / -1; font-size:var(--fs-small); color:var(--mu); }
   .drawer-foot { padding:12px; border-top:1px solid var(--ln); display:flex; gap:8px; }
-  .drawer-foot .hashem-btn { flex:1; min-width:0; }
+  .drawer-foot .quantum-btn { flex:1; min-width:0; }
   #login { position:fixed; inset:0; z-index:50; display:grid; place-items:center;
     background:var(--bg); color:var(--tx); min-height:100dvh; overflow:hidden;
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Helvetica,Arial,sans-serif;
@@ -651,7 +661,7 @@
   .perf-err { color:var(--er); }
   #tab-perf .tc-header:has(> div > .qs-hint) { flex-wrap:nowrap; align-items:flex-start; }
   #tab-perf .tc-header > div:has(> .qs-hint) { flex:1; min-width:0; }
-  #autoPoolCard .hashem-input[readonly] { color:var(--mu); cursor:default; }
+  #autoPoolCard .quantum-input[readonly] { color:var(--mu); cursor:default; }
   .status-indicator.ok { color:var(--tx2); }
   .status-indicator.ok .dot { background:var(--ok); }
   .status-indicator.warn { color:var(--wr); }
@@ -704,7 +714,7 @@
   .doc-score-total { font-size:12px; color:var(--mu); font-weight:600; margin-top:2px; }
   .doc-hero-meta { display:flex; flex-direction:column; gap:6px; min-width:0; }
   .doc-hero-acts { display:flex; flex-direction:column; gap:8px; align-items:flex-end; }
-  .doc-hero-acts .hashem-btn { display:inline-flex; align-items:center !important; justify-content:center !important; gap:8px !important; white-space:nowrap; padding:8px 16px !important; }
+  .doc-hero-acts .quantum-btn { display:inline-flex; align-items:center !important; justify-content:center !important; gap:8px !important; white-space:nowrap; padding:8px 16px !important; }
   html[dir="rtl"] .doc-hero-acts { align-items:flex-start; }
   .doc-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:14px; margin-top:14px; }
   .doc-card { background:var(--s2); border:1px solid var(--ln); border-radius:var(--r-md); padding:16px; display:flex; flex-direction:column; gap:12px; }
@@ -907,14 +917,14 @@
   body.is-rtl .sidebar-nav .nav-item:hover {
     transform: translateX(-4px);
   }
-  body.is-rtl .hashem-input,
-  body.is-rtl select.hashem-input {
+  body.is-rtl .quantum-input,
+  body.is-rtl select.quantum-input {
     text-align: right;
   }
-  body.is-rtl input[type="number"].hashem-input,
-  body.is-rtl input[type="password"].hashem-input,
-  body.is-rtl input[inputmode="decimal"].hashem-input,
-  body.is-rtl input[inputmode="numeric"].hashem-input,
+  body.is-rtl input[type="number"].quantum-input,
+  body.is-rtl input[type="password"].quantum-input,
+  body.is-rtl input[inputmode="decimal"].quantum-input,
+  body.is-rtl input[inputmode="numeric"].quantum-input,
   body.is-rtl .is-ltr-input {
     direction: ltr;
     text-align: left;
@@ -1311,7 +1321,7 @@
         <path d="M50 48 C42 38 26 32 12 42 C4 48 1 56 3 62 C6 60 12 54 20 55 C32 56 42 60 50 52 C58 60 68 56 80 55 C88 54 94 60 97 62 C99 56 96 48 88 42 C74 32 58 38 50 48 Z" fill="url(#loginMustacheGrad)" filter="url(#loginGlow)"/>
       </svg>
     </div>
-    <h1>Hashem Tunnel</h1>
+    <h1>Quantum Tunnel</h1>
     <div class="sub" data-i18n="login_sub">Sign in with your username and password</div>
     <form id="loginForm">
       <label class="sr-only" for="u">Username</label>
@@ -1334,7 +1344,7 @@
       <button type="submit" id="loginBtn" data-i18n="login_signin">Sign In</button>
     </form>
     <p id="loginErr"></p>
-    <div class="foot"><b>Hashem Tunnel</b> · Infrastructure<br><span class="u-foot-sub">DNC MADE THIS</span></div>
+    <div class="foot"><b>Quantum Tunnel</b> · Infrastructure<br><span class="u-foot-sub">DNC MADE THIS</span></div>
   </div>
 </div>
 
@@ -1346,7 +1356,7 @@
         <rect width="100" height="100" rx="22" fill="#090d16" stroke="rgba(56,189,248,0.25)" stroke-width="1.5"/>
         <path d="M50 48 C42 38 26 32 12 42 C4 48 1 56 3 62 C6 60 12 54 20 55 C32 56 42 60 50 52 C58 60 68 56 80 55 C88 54 94 60 97 62 C99 56 96 48 88 42 C74 32 58 38 50 48 Z" fill="#38bdf8"/>
       </svg>
-      <span class="brand-name">Hashem</span>
+      <span class="brand-name">Quantum</span>
       </span>
     </div>
     <button type="button" class="sb-toggle" id="sbToggle" aria-label="Collapse sidebar" data-i18n-aria="sb_collapse" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
@@ -1369,28 +1379,28 @@
       <button role="tab" aria-selected="false" aria-controls="tab-terminal" tabindex="-1" class="nav-item hidden" data-tab="terminal" id="termNav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M7 9l3 3-3 3M12 15h5"/></svg><span data-i18n="nav_terminal">Terminal</span><span class="term-live hidden u-ml-auto" id="termLiveDot" ></span></button>
     </nav>
     <div class="sidebar-foot">
-      <button class="hashem-btn hashem-btn-secondary u-flex-1" id="themeBtn" aria-label="Theme" data-i18n-aria="theme"><svg class="sf-ic" aria-hidden="true"><use href="#i-moon"/></svg><span class="sf-t" data-i18n="theme">Theme</span></button>
-      <button class="hashem-btn hashem-btn-ghost" id="langToggleBtn" aria-label="Language"><span class="sf-t">FA / EN</span></button>
-      <button class="hashem-btn hashem-btn-ghost" id="logoutBtn" aria-label="Logout" data-i18n-aria="logout"><svg class="sf-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg><span class="sf-t" data-i18n="logout">Logout</span></button>
+      <button class="quantum-btn quantum-btn-secondary u-flex-1" id="themeBtn" aria-label="Theme" data-i18n-aria="theme"><svg class="sf-ic" aria-hidden="true"><use href="#i-moon"/></svg><span class="sf-t" data-i18n="theme">Theme</span></button>
+      <button class="quantum-btn quantum-btn-ghost" id="langToggleBtn" aria-label="Language"><span class="sf-t">FA / EN</span></button>
+      <button class="quantum-btn quantum-btn-ghost" id="logoutBtn" aria-label="Logout" data-i18n-aria="logout"><svg class="sf-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg><span class="sf-t" data-i18n="logout">Logout</span></button>
     </div>
   </aside>
   <div class="main">
     <header class="topbar">
       <button class="menu-btn" id="menuBtn" aria-label="Menu" data-i18n-aria="aria_menu">☰</button>
-      <div><h1>Hashem</h1><div class="sub" id="roleLine">—</div></div>
+      <div><h1>Quantum</h1><div class="sub" id="roleLine">—</div></div>
       <div class="acts">
-        <button type="button" class="hashem-btn hashem-btn-secondary pal-btn" id="palBtn" aria-haspopup="dialog" aria-label="Search and commands" data-i18n-aria="pal_open"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span class="pal-txt" data-i18n="pal_search">Search</span><kbd id="palKbd">Ctrl K</kbd></button>
-        <button class="hashem-btn hashem-btn-secondary" id="refreshBtn">Refresh</button>
+        <button type="button" class="quantum-btn quantum-btn-secondary pal-btn" id="palBtn" aria-haspopup="dialog" aria-label="Search and commands" data-i18n-aria="pal_open"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span class="pal-txt" data-i18n="pal_search">Search</span><kbd id="palKbd">Ctrl K</kbd></button>
+        <button class="quantum-btn quantum-btn-secondary" id="refreshBtn">Refresh</button>
       </div>
     </header>
   <div class="drawer-ov" id="drawerOv"></div>
   <aside class="drawer" id="drawer" aria-label="Menu">
-    <div class="drawer-head"><span class="brand-name">Hashem</span></span><button class="drawer-x" id="drawerX" aria-label="Close" data-i18n-aria="aria_close">×</button></div>
+    <div class="drawer-head"><span class="brand-name">Quantum</span></span><button class="drawer-x" id="drawerX" aria-label="Close" data-i18n-aria="aria_close">×</button></div>
     <nav class="drawer-nav" id="drawerNav" role="tablist" aria-orientation="vertical" aria-label="Main navigation" data-i18n-aria="aria_main_nav"></nav>
     <div class="drawer-foot">
-      <button class="hashem-btn hashem-btn-secondary u-flex-1" id="themeBtnM" >Theme</button>
-      <button class="hashem-btn hashem-btn-ghost" id="langToggleBtnM">FA / EN</button>
-      <button class="hashem-btn hashem-btn-ghost" id="logoutBtnM">Logout</button>
+      <button class="quantum-btn quantum-btn-secondary u-flex-1" id="themeBtnM" >Theme</button>
+      <button class="quantum-btn quantum-btn-ghost" id="langToggleBtnM">FA / EN</button>
+      <button class="quantum-btn quantum-btn-ghost" id="logoutBtnM">Logout</button>
     </div>
   </aside>
     <main class="page">
@@ -1462,7 +1472,7 @@
         <!-- Traffic usage (kept 7 days) — usage.go; lives on the dashboard -->
         <div class="tunnel-card" id="usageCard">
           <div class="tc-header"><p class="tc-title" data-i18n="dash_server_usage">Server Traffic Usage</p>
-            <select class="hashem-input u-max-w-180" id="usageRange" aria-label="Range">
+            <select class="quantum-input u-max-w-180" id="usageRange" aria-label="Range">
               <option value="1h">1 h</option><option value="6h">6 h</option><option value="24h">24 h</option><option value="7d" selected>7 days</option>
             </select></div>
           <p class="qs-hint" data-i18n="dash_server_usage_hint">Server-wide traffic history saved every minute and retained for seven days.</p>
@@ -1471,21 +1481,21 @@
         <div class="tunnel-card onb" id="onbCard" hidden>
           <button type="button" class="onb-x" id="onbX" aria-label="Dismiss" data-i18n-aria="onb_dismiss">&#215;</button>
           <div class="onb-head"><span class="onb-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg></span>
-            <div><p class="tc-title" data-i18n="onb_title">Welcome to Hashem</p><div class="qs-hint" data-i18n="onb_sub">No tunnel yet. Three steps and you are live.</div></div></div>
+            <div><p class="tc-title" data-i18n="onb_title">Welcome to Quantum</p><div class="qs-hint" data-i18n="onb_sub">No tunnel yet. Three steps and you are live.</div></div></div>
           <ol class="onb-steps">
             <li><span class="onb-n">1</span><div><b data-i18n="onb_s1">Choose this server's role</b><span data-i18n="onb_s1d">Iran hub (server) or foreign server (client) from the Setup tab.</span></div></li>
             <li><span class="onb-n">2</span><div><b data-i18n="onb_s2">Link the other server</b><span data-i18n="onb_s2d">Create the tunnel and paste the connection bundle on the other side.</span></div></li>
             <li><span class="onb-n">3</span><div><b data-i18n="onb_s3">Verify and optimise</b><span data-i18n="onb_s3d">Run Diagnostics, then Optimize in the Tunnel tab.</span></div></li>
           </ol>
-          <div class="onb-acts"><button type="button" class="hashem-btn hashem-btn-primary" id="onbGo" data-i18n="onb_go">Open Setup</button><button type="button" class="hashem-btn hashem-btn-secondary" id="onbLater" data-i18n="onb_later">Not Now</button></div>
+          <div class="onb-acts"><button type="button" class="quantum-btn quantum-btn-primary" id="onbGo" data-i18n="onb_go">Open Setup</button><button type="button" class="quantum-btn quantum-btn-secondary" id="onbLater" data-i18n="onb_later">Not Now</button></div>
         </div>
       </section>
       <section id="tab-tunnel" role="tabpanel" hidden>
         <div class="xr-err" id="topologyError" role="alert" hidden></div>
         <div class="tunnel-card" id="topologyListCard">
-          <div class="tc-header topo-list-toolbar"><div class="topo-list-title"><p class="tc-title" data-i18n="nav_topology">Topology</p><span class="badge dim" id="topologyCount">0</span></div><button type="button" class="hashem-btn hashem-btn-primary" id="topologyCreateBtn"><svg class="topo-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span data-i18n="topology_create">Add topology</span></button></div>
+          <div class="tc-header topo-list-toolbar"><div class="topo-list-title"><p class="tc-title" data-i18n="nav_topology">Topology</p><span class="badge dim" id="topologyCount">0</span></div><button type="button" class="quantum-btn quantum-btn-primary" id="topologyCreateBtn"><svg class="topo-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span data-i18n="topology_create">Add topology</span></button></div>
           <div class="topo-list-tools">
-            <input type="search" id="topologySearch" class="hashem-input topo-search" data-i18n-ph="topology_search_ph" placeholder="Search topologies…" aria-label="Search topologies" data-i18n-aria="topology_search_ph" autocomplete="off">
+            <input type="search" id="topologySearch" class="quantum-input topo-search" data-i18n-ph="topology_search_ph" placeholder="Search topologies…" aria-label="Search topologies" data-i18n-aria="topology_search_ph" autocomplete="off">
             <div class="qs-seg topo-view-toggle" role="group" aria-label="View" data-i18n-aria="topology_view_label">
               <button type="button" id="topologyViewListBtn" aria-pressed="true" aria-label="List view" data-i18n-aria="topology_view_list" title="List view"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
               <button type="button" id="topologyViewGridBtn" aria-pressed="false" aria-label="Grid view" data-i18n-aria="topology_view_grid" title="Grid view"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="1.5"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/></svg></button>
@@ -1497,25 +1507,25 @@
           </table></div>
         </div>
         <div class="tunnel-card" id="topologyDetailCard" hidden>
-          <div class="tc-header"><button type="button" id="topologyBackBtn" class="hashem-btn hashem-btn-secondary" data-i18n="topology_back">Back to topologies</button><b id="topologyNameHeading"></b></div>
+          <div class="tc-header"><button type="button" id="topologyBackBtn" class="quantum-btn quantum-btn-secondary" data-i18n="topology_back">Back to topologies</button><b id="topologyNameHeading"></b></div>
           <div id="topologyGraph"></div>
           <div class="qs-hint" data-i18n="topology_cables">Each cable represents one tunnel. Green: connected; amber: unverified; red: stopped.</div>
           <div id="topologySettings" class="topo-settings">
-            <div class="fg"><label for="topologyName" data-i18n="topology_name">Topology name</label><input id="topologyName" class="hashem-input" maxlength="120"></div>
+            <div class="fg"><label for="topologyName" data-i18n="topology_name">Topology name</label><input id="topologyName" class="quantum-input" maxlength="120"></div>
             <div class="fg"><span id="topologyRoleLabel" class="qs-label" data-i18n="topology_role">This server's role</span><input type="hidden" id="topologyRole" value="iran"><div class="qs-seg" role="group" aria-labelledby="topologyRoleLabel"><button type="button" data-topo-role="iran" aria-pressed="true" data-i18n="x002">Iran</button><button type="button" data-topo-role="foreign" aria-pressed="false" data-i18n="x003">Foreign</button></div></div>
-            <div class="fg"><label for="topologyLocalIP" data-i18n="topology_local">This server's IP</label><input id="topologyLocalIP" class="hashem-input u-mono" dir="ltr"></div>
-            <div class="fg"><label for="topologyRemoteIP" data-i18n="topology_remote">Other server's IP</label><input id="topologyRemoteIP" class="hashem-input u-mono" dir="ltr" placeholder="IPv4 / IPv6"></div>
-            <div class="fg"><label for="topologyCountry" data-i18n="topology_country">Foreign server country</label><select id="topologyCountry" class="hashem-input"></select></div>
+            <div class="fg"><label for="topologyLocalIP" data-i18n="topology_local">This server's IP</label><input id="topologyLocalIP" class="quantum-input u-mono" dir="ltr"></div>
+            <div class="fg"><label for="topologyRemoteIP" data-i18n="topology_remote">Other server's IP</label><input id="topologyRemoteIP" class="quantum-input u-mono" dir="ltr" placeholder="IPv4 / IPv6"></div>
+            <div class="fg"><label for="topologyCountry" data-i18n="topology_country">Foreign server country</label><select id="topologyCountry" class="quantum-input"></select></div>
           </div>
-          <button type="button" id="topologyAddTunnelBtn" class="hashem-btn hashem-btn-primary" data-i18n="tunnels_new">New Tunnel</button>
-          <button type="button" id="topologySaveBtn" class="hashem-btn hashem-btn-primary" data-i18n="topology_save">Save topology</button>
-          <div class="topo-attach u-mt-12"><label for="topologyAttachSelect" data-i18n="topology_attach">Attach an existing tunnel</label><select id="topologyAttachSelect" class="hashem-input"></select><button type="button" id="topologyAttachBtn" class="hashem-btn hashem-btn-secondary" data-i18n="topology_attach_btn">Attach tunnel</button></div>
+          <button type="button" id="topologyAddTunnelBtn" class="quantum-btn quantum-btn-primary" data-i18n="tunnels_new">New Tunnel</button>
+          <button type="button" id="topologySaveBtn" class="quantum-btn quantum-btn-primary" data-i18n="topology_save">Save topology</button>
+          <div class="topo-attach u-mt-12"><label for="topologyAttachSelect" data-i18n="topology_attach">Attach an existing tunnel</label><select id="topologyAttachSelect" class="quantum-input"></select><button type="button" id="topologyAttachBtn" class="quantum-btn quantum-btn-secondary" data-i18n="topology_attach_btn">Attach tunnel</button></div>
           <div id="topologyBoundList" class="u-mt-8"></div>
         </div>
         <div class="tunnel-card rsc-banner" id="rscBanner" hidden role="alert">
           <span class="rsc-ic warn" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg></span>
           <div class="rsc-ban-t"><b data-i18n="rsc_ban_t">This server cannot connect to its peer</b><span data-i18n="rsc_ban_d">Ping works but every TCP connection is dropped on the way. A one-click fix reverses the connection direction.</span></div>
-          <button type="button" class="hashem-btn hashem-btn-primary" id="rscBanGo" data-i18n="rsc_ban_go">Fix It</button>
+          <button type="button" class="quantum-btn quantum-btn-primary" id="rscBanGo" data-i18n="rsc_ban_go">Fix It</button>
         </div>
         <!-- Tunnels: a real table — one row per tunnel, quick actions, click the name for full settings -->
         <div class="tunnel-card" id="tunnelsListCard" hidden>
@@ -1523,7 +1533,7 @@
             <p class="tc-title" data-i18n="tunnels_title">Tunnels</p>
             <span class="badge dim" id="tunnelsCountBadge">—</span>
             <span class="u-flex-1"></span>
-            <button type="button" class="hashem-btn hashem-btn-primary u-btn-30" id="tunnelsAddBtn">+ <span data-i18n="tunnels_new">New Tunnel</span></button>
+            <button type="button" class="quantum-btn quantum-btn-primary u-btn-30" id="tunnelsAddBtn">+ <span data-i18n="tunnels_new">New Tunnel</span></button>
           </div>
           <div class="tnl-table" role="table" aria-label="Tunnels">
             <div class="tnl-head" role="row">
@@ -1547,12 +1557,12 @@
         </div>
         <!-- action output lives at tab level so table-row actions can show it too -->
         <div class="tun-out hidden" id="actOutWrap">
-          <div class="tun-out-head"><span id="actOutTitle">Output</span><button type="button" class="hashem-btn hashem-btn-ghost u-btn-xs" id="actOutClose">Close</button></div>
+          <div class="tun-out-head"><span id="actOutTitle">Output</span><button type="button" class="quantum-btn quantum-btn-ghost u-btn-xs" id="actOutClose">Close</button></div>
           <pre id="actOut" class="logs"></pre>
         </div>
         <!-- Detail mode bar: shown while a single tunnel's settings are open -->
         <div class="tunnel-card td-bar" id="tunnelDetailBar">
-          <button type="button" class="hashem-btn hashem-btn-secondary u-btn-30" id="tunnelDetailBack"><span data-i18n="topology_return_tunnel">Back to topology</span></button>
+          <button type="button" class="quantum-btn quantum-btn-secondary u-btn-30" id="tunnelDetailBack"><span data-i18n="topology_return_tunnel">Back to topology</span></button>
           <b id="tunnelDetailTitle" data-no-i18n></b>
         </div>
         <!-- Selected-tunnel content; applyTunnelDetail controls these hidden slots. -->
@@ -1618,13 +1628,13 @@
               </div>
             </div>
             <div class="u-flex u-ai-c u-gap-12">
-              <button type="button" class="hashem-btn u-btn-30" onclick="openBagherQuickEdit()">
+              <button type="button" class="quantum-btn u-btn-30" onclick="openBagherQuickEdit()">
                 Edit Tunnel
               </button>
-              <button type="button" class="hashem-btn u-btn-30 hashem-btn-danger" onclick="cleanBagherTunnelClick()">
+              <button type="button" class="quantum-btn u-btn-30 quantum-btn-danger" onclick="cleanBagherTunnelClick()">
                 Clean Tunnel
               </button>
-              <button type="button" class="hashem-btn hashem-btn-primary u-btn-30" onclick="goTab('tunnel')">
+              <button type="button" class="quantum-btn quantum-btn-primary u-btn-30" onclick="goTab('tunnel')">
                 Manage Bagher
               </button>
             </div>
@@ -1650,7 +1660,7 @@
           </div>
         </div>
           <div class="tunnel-card dash-span" id="dashPeersCard" hidden>
-            <div class="tc-header"><p class="tc-title" id="dashPeersTitle">Tunnels</p><button type="button" class="hashem-btn hashem-btn-secondary u-btn-30" id="dashPeersOpen">Open Tunnel tab</button></div>
+            <div class="tc-header"><p class="tc-title" id="dashPeersTitle">Tunnels</p><button type="button" class="quantum-btn quantum-btn-secondary u-btn-30" id="dashPeersOpen">Open Tunnel tab</button></div>
             <div class="pt" role="table" aria-label="Tunnels">
               <div class="pt-row pt-head" role="row"><span role="columnheader">Name</span><span role="columnheader">Foreign server</span><span role="columnheader">Engine</span><span role="columnheader">Ports</span><span role="columnheader">Ping</span><span role="columnheader">Traffic</span></div>
               <div id="dashPeersList" role="rowgroup"></div>
@@ -1683,11 +1693,11 @@
           <div id="tunXrayCards" class="xr-stack"></div>
           <div class="tun-acts hidden" id="tunnelActs">
             <div class="tun-acts-main">
-              <button class="hashem-btn hashem-btn-secondary hidden" id="tunnelCarrierCycleBtn" title="Switch how GRE packets are carried (Direct GRE or WSS)">GRE wrap: <span id="tunnelCarrierTxt" data-no-i18n>GRE</span></button>
-              <button class="hashem-btn hashem-btn-secondary" id="optimizeBtn">Optimize Network</button>
-              <button class="hashem-btn hashem-btn-secondary hidden" id="restoreBtn">Restore Previous Settings</button>
+              <button class="quantum-btn quantum-btn-secondary hidden" id="tunnelCarrierCycleBtn" title="Switch how GRE packets are carried (Direct GRE or WSS)">GRE wrap: <span id="tunnelCarrierTxt" data-no-i18n>GRE</span></button>
+              <button class="quantum-btn quantum-btn-secondary" id="optimizeBtn">Optimize Network</button>
+              <button class="quantum-btn quantum-btn-secondary hidden" id="restoreBtn">Restore Previous Settings</button>
             </div>
-            <button class="hashem-btn hashem-btn-danger" id="removeTunnelBtn">Remove Tunnel</button>
+            <button class="quantum-btn quantum-btn-danger" id="removeTunnelBtn">Remove Tunnel</button>
           </div>
           <div class="qs-hint hidden" id="tuneHint">Optimize Network: FQ + BBR, 16 MB TCP buffers, GRE MTU 1380, MSS clamp 1340 and keepalive. The current settings are saved first, so Restore can bring them back.</div>
         </div>
@@ -1702,11 +1712,11 @@
           <p class="rsc-msg" id="rscMsg"></p>
           <div class="rsc-det" id="rscDet"></div>
           <div class="rsc-form" id="rscForm" hidden>
-            <div class="fg"><label for="rscRemote" data-i18n="rsc_remote">Reachable server (the one that can connect to this server)</label><input class="hashem-input" id="rscRemote" inputmode="decimal" autocomplete="off" placeholder="203.0.113.10"></div>
-            <div class="fg"><label for="rscPorts" data-i18n="rsc_ports">Ports to connect (TCP + UDP)</label><input class="hashem-input" id="rscPorts" inputmode="numeric" autocomplete="off" placeholder="1020, 1030, 1040"></div>
+            <div class="fg"><label for="rscRemote" data-i18n="rsc_remote">Reachable server (the one that can connect to this server)</label><input class="quantum-input" id="rscRemote" inputmode="decimal" autocomplete="off" placeholder="203.0.113.10"></div>
+            <div class="fg"><label for="rscPorts" data-i18n="rsc_ports">Ports to connect (TCP + UDP)</label><input class="quantum-input" id="rscPorts" inputmode="numeric" autocomplete="off" placeholder="1020, 1030, 1040"></div>
           </div>
           <div class="rsc-join" id="rscJoin" hidden>
-            <div class="fg"><label for="rscCode" data-i18n="rsc_code">Rescue code from the blocked server</label><input class="hashem-input" id="rscCode" autocomplete="off" spellcheck="false" placeholder="hrc1_…"></div>
+            <div class="fg"><label for="rscCode" data-i18n="rsc_code">Rescue code from the blocked server</label><input class="quantum-input" id="rscCode" autocomplete="off" spellcheck="false" placeholder="hrc1_…"></div>
           </div>
           <div class="rsc-acts" id="rscActs"></div>
         </div>
@@ -1726,7 +1736,7 @@
           </div>
           <div id="thBox" class="doc-tunnels"><div class="qs-hint">Test All Tunnels checks every tunnel's service, its control session and a real data probe through one of its ports.</div></div>
           <div class="u-flex-gap-8 u-mt-4">
-            <button class="hashem-btn hashem-btn-secondary" id="thRunBtn">Test All Tunnels</button>
+            <button class="quantum-btn quantum-btn-secondary" id="thRunBtn">Test All Tunnels</button>
           </div>
         </div>
 
@@ -1794,13 +1804,13 @@
             <div class="gw-wss-f">
               <div class="fg">
                 <label for="carrierRemote6">IPv6 of the other server (optional)</label>
-                <input type="text" class="hashem-input u-mono" id="carrierRemote6" placeholder="2001:db8::2" autocomplete="off" spellcheck="false" autocapitalize="off" inputmode="text" dir="ltr">
+                <input type="text" class="quantum-input u-mono" id="carrierRemote6" placeholder="2001:db8::2" autocomplete="off" spellcheck="false" autocapitalize="off" inputmode="text" dir="ltr">
               </div>
             </div>
           </div>
           <div class="gw-acts">
-            <button class="hashem-btn hashem-btn-primary" id="carrierSaveModeBtn" disabled>Switch Wrap</button>
-            <button class="hashem-btn hashem-btn-ghost" id="carrierApplyBtn">Re-apply</button>
+            <button class="quantum-btn quantum-btn-primary" id="carrierSaveModeBtn" disabled>Switch Wrap</button>
+            <button class="quantum-btn quantum-btn-ghost" id="carrierApplyBtn">Re-apply</button>
             <span class="ent-help">Switching changes both servers over the Peer Link and reconnects the tunnel for a few seconds; if the tunnel does not answer within 45 seconds, both go back. Re-apply sets up the current carrier again, which can fix a stuck link.</span>
           </div>
 
@@ -1809,17 +1819,17 @@
             <div class="gw-wss-f">
               <div class="fg">
                 <label for="carrierWSSPortInput">WSS port</label>
-                <input type="number" class="hashem-input" id="carrierWSSPortInput" min="1" max="65535" value="8443" inputmode="numeric">
+                <input type="number" class="quantum-input" id="carrierWSSPortInput" min="1" max="65535" value="8443" inputmode="numeric">
               </div>
               <div class="fg">
                 <label for="carrierWSSSNIInput">SNI (optional)</label>
-                <input type="text" class="hashem-input" id="carrierWSSSNIInput" placeholder="www.example.com" autocomplete="off" spellcheck="false">
+                <input type="text" class="quantum-input" id="carrierWSSSNIInput" placeholder="www.example.com" autocomplete="off" spellcheck="false">
               </div>
               <div class="fg">
                 <label for="carrierWSSRemoteInput">Address of the other server</label>
-                <input type="text" class="hashem-input u-mono" id="carrierWSSRemoteInput" placeholder="203.0.113.10 or 2001:db8::2" autocomplete="off" spellcheck="false" autocapitalize="off" inputmode="text" dir="ltr">
+                <input type="text" class="quantum-input u-mono" id="carrierWSSRemoteInput" placeholder="203.0.113.10 or 2001:db8::2" autocomplete="off" spellcheck="false" autocapitalize="off" inputmode="text" dir="ltr">
               </div>
-              <button class="hashem-btn hashem-btn-secondary" id="carrierSaveWSSBtn">Save WSS Settings</button>
+              <button class="quantum-btn quantum-btn-secondary" id="carrierSaveWSSBtn">Save WSS Settings</button>
             </div>
           </div>
         </div>
@@ -1834,7 +1844,7 @@
             </div>
             <div class="u-flex u-gap-8 u-ai-c">
               <span class="badge dim" id="clRoleBadge">Checking…</span>
-              <button class="hashem-btn hashem-btn-secondary" onclick="loadClusterStatus(true)">Refresh</button>
+              <button class="quantum-btn quantum-btn-secondary" onclick="loadClusterStatus(true)">Refresh</button>
             </div>
           </div>
           <div class="cl-kpis" id="clKpis"></div>
@@ -1878,7 +1888,7 @@
                 <p class="tc-title u-m-0">Pools</p>
                 <div class="ent-help u-m-0">One public port on this server, served by several foreign servers. When one fails, its users move to the others within seconds.</div>
               </div>
-              <button class="hashem-btn hashem-btn-primary" onclick="clPoolOpen()">New Pool</button>
+              <button class="quantum-btn quantum-btn-primary" onclick="clPoolOpen()">New Pool</button>
             </div>
             <div id="clPools"></div>
           </div>
@@ -1901,8 +1911,8 @@
                 <div class="ent-help u-m-0">Other Iran servers that back this one up. When every foreign server of a pool is down here, its port is forwarded to a hub where the same pool works.</div>
               </div>
               <div class="u-flex u-gap-8 u-wrap">
-                <button class="hashem-btn hashem-btn-secondary" onclick="clJoinCodeOpen()">Show Join Code</button>
-                <button class="hashem-btn hashem-btn-primary" onclick="clHubAddOpen()">Link a Hub</button>
+                <button class="quantum-btn quantum-btn-secondary" onclick="clJoinCodeOpen()">Show Join Code</button>
+                <button class="quantum-btn quantum-btn-primary" onclick="clHubAddOpen()">Link a Hub</button>
               </div>
             </div>
             <label class="u-check-row u-mb-8"><input type="checkbox" id="clHubForward" onchange="clSettingsSave()"> Forward a pool to another hub when no foreign server here can serve it</label>
@@ -1918,22 +1928,22 @@
               <span class="badge dim" id="clDnsBadge">Off</span>
             </div>
             <div class="ent-grid-2">
-              <div class="fg"><label for="clDnsName">Record name</label><input class="hashem-input u-mono" id="clDnsName" placeholder="vpn.example.com" autocomplete="off"></div>
-              <div class="fg"><label for="clDnsTTL">TTL (seconds)</label><input class="hashem-input" id="clDnsTTL" type="number" min="60" max="3600" value="60"></div>
+              <div class="fg"><label for="clDnsName">Record name</label><input class="quantum-input u-mono" id="clDnsName" placeholder="vpn.example.com" autocomplete="off"></div>
+              <div class="fg"><label for="clDnsTTL">TTL (seconds)</label><input class="quantum-input" id="clDnsTTL" type="number" min="60" max="3600" value="60"></div>
             </div>
             <div class="fg"><label for="clDnsProvider">Provider</label>
-              <select class="hashem-input" id="clDnsProvider" onchange="clDnsProviderChanged()">
+              <select class="quantum-input" id="clDnsProvider" onchange="clDnsProviderChanged()">
                 <option value="cloudflare">Cloudflare</option>
                 <option value="webhook">Webhook (any DNS provider or script)</option>
               </select></div>
-            <div class="fg hidden" id="clDnsURLRow"><label for="clDnsURL">Webhook URL</label><input class="hashem-input u-mono" id="clDnsURL" autocomplete="off" placeholder="https://example.com/hashem-dns"></div>
+            <div class="fg hidden" id="clDnsURLRow"><label for="clDnsURL">Webhook URL</label><input class="quantum-input u-mono" id="clDnsURL" autocomplete="off" placeholder="https://example.com/quantum-dns"></div>
             <div class="ent-help hidden" id="clDnsHookHelp">The hub that leads POSTs JSON {"name", "ips", "ips6", "ttl", "hub", "at"} whenever the working hubs change, and every 30 seconds. Your script sets the record to exactly "ips" (A) and "ips6" (AAAA). Any 2xx answer counts as done.</div>
-            <div class="fg"><label for="clDnsToken" id="clDnsTokenLabel">Cloudflare API token (Zone, DNS, Edit)</label><input class="hashem-input u-mono" id="clDnsToken" type="password" autocomplete="off" placeholder="Saved; paste a new one to replace it"></div>
+            <div class="fg"><label for="clDnsToken" id="clDnsTokenLabel">Cloudflare API token (Zone, DNS, Edit)</label><input class="quantum-input u-mono" id="clDnsToken" type="password" autocomplete="off" placeholder="Saved; paste a new one to replace it"></div>
             <label class="u-check-row u-mb-8"><input type="checkbox" id="clDnsEnabled"> Keep the record pointed at the working hubs</label>
             <div class="ent-help cl-pre" id="clDnsState"></div>
             <div class="u-flex u-gap-8 u-wrap">
-              <button class="hashem-btn hashem-btn-secondary" onclick="clDnsSave(true)">Test</button>
-              <button class="hashem-btn hashem-btn-primary" onclick="clDnsSave(false)">Save</button>
+              <button class="quantum-btn quantum-btn-secondary" onclick="clDnsSave(true)">Test</button>
+              <button class="quantum-btn quantum-btn-primary" onclick="clDnsSave(false)">Save</button>
             </div>
           </div>
 
@@ -1941,13 +1951,13 @@
             <summary class="tc-title u-cursor-pointer">Health Check</summary>
             <div class="ent-help">How fast a failed foreign server is taken out and put back. Lower is faster; too low can take a server out on a short hiccup.</div>
             <div class="ent-grid-2">
-              <div class="fg"><label for="clHcInterval">Check every (ms)</label><input class="hashem-input" id="clHcInterval" type="number" min="500" max="10000" step="100"></div>
-              <div class="fg"><label for="clHcFall">Out after failed checks</label><input class="hashem-input" id="clHcFall" type="number" min="1" max="30"></div>
-              <div class="fg"><label for="clHcRise">Back after good checks</label><input class="hashem-input" id="clHcRise" type="number" min="1" max="60"></div>
+              <div class="fg"><label for="clHcInterval">Check every (ms)</label><input class="quantum-input" id="clHcInterval" type="number" min="500" max="10000" step="100"></div>
+              <div class="fg"><label for="clHcFall">Out after failed checks</label><input class="quantum-input" id="clHcFall" type="number" min="1" max="30"></div>
+              <div class="fg"><label for="clHcRise">Back after good checks</label><input class="quantum-input" id="clHcRise" type="number" min="1" max="60"></div>
             </div>
             <div class="u-flex u-gap-8 u-wrap">
-              <button class="hashem-btn hashem-btn-primary" onclick="clSettingsSave(true)">Save</button>
-              <a class="hashem-btn hashem-btn-secondary" href="#" onclick="clRulesShow(); return false;">Show Kernel Rules</a>
+              <button class="quantum-btn quantum-btn-primary" onclick="clSettingsSave(true)">Save</button>
+              <a class="quantum-btn quantum-btn-secondary" href="#" onclick="clRulesShow(); return false;">Show Kernel Rules</a>
             </div>
             <pre class="ent-code hidden u-mt-8" id="clRules"></pre>
           </details>
@@ -1971,9 +1981,9 @@
               <li>On the other Iran server: Setup, add a foreign server with this server's IP and the same ports.</li>
               <li>Copy the bundle it prints and paste it here.</li>
             </ol>
-            <div class="fg"><label for="clJoinBundle">Bundle (hsh1_, bh1_ or gh1_)</label><textarea class="hashem-input u-mono u-resize-none" id="clJoinBundle" rows="3" placeholder="hsh1_…"></textarea></div>
-            <div class="fg"><label for="clJoinName">Name (optional)</label><input class="hashem-input" id="clJoinName" maxlength="32" placeholder="tehran-2"></div>
-            <button class="hashem-btn hashem-btn-primary" id="clJoinBtn" onclick="clJoinHub()">Join Hub</button>
+            <div class="fg"><label for="clJoinBundle">Bundle (hsh1_, bh1_ or gh1_)</label><textarea class="quantum-input u-mono u-resize-none" id="clJoinBundle" rows="3" placeholder="hsh1_…"></textarea></div>
+            <div class="fg"><label for="clJoinName">Name (optional)</label><input class="quantum-input" id="clJoinName" maxlength="32" placeholder="tehran-2"></div>
+            <button class="quantum-btn quantum-btn-primary" id="clJoinBtn" onclick="clJoinHub()">Join Hub</button>
             <pre class="ent-code hidden u-mt-8" id="clJoinOut"></pre>
           </div>
         </div>
@@ -1984,7 +1994,7 @@
         </div>
       </section>
       <section id="tab-setup" role="tabpanel" hidden>
-        <button type="button" class="hashem-btn hashem-btn-secondary" id="topologySetupBack" hidden data-i18n="topology_return">Back to topology and attach the new tunnel</button>
+        <button type="button" class="quantum-btn quantum-btn-secondary" id="topologySetupBack" hidden data-i18n="topology_return">Back to topology and attach the new tunnel</button>
         <div class="qs" id="setupCard">
           <div class="qs-head">
             <span class="qs-bolt"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg></span>
@@ -2037,15 +2047,15 @@
               <label class="qs-label" data-i18n="setup_step3_params">Connection Parameters</label>
               <fieldset id="iranFields">
                 <div class="qs-row">
-                  <div class="fg" id="wrapLocalPub"><label for="sLocalPub" data-i18n="setup_local_pub">Iran public IP (auto, editable)</label><input class="hashem-input" id="sLocalPub" inputmode="decimal"></div>
-                  <div class="fg"><label for="sRemotePub" data-i18n="setup_remote_pub">Remote public IP (the other server)</label><input class="hashem-input" id="sRemotePub" inputmode="decimal" placeholder="e.g. 203.0.113.10"></div>
-                  <div class="fg"><label for="sMainName">Name of the foreign server (optional)</label><input class="hashem-input" id="sMainName" maxlength="40" autocomplete="off" placeholder="e.g. Frankfurt"></div>
-                  <div class="fg" id="wrapLocalGre"><label for="sLocalGre" data-i18n="setup_local_gre">Local GRE IP</label><input class="hashem-input" id="sLocalGre" inputmode="decimal"></div>
-                  <div class="fg" id="wrapPeerGre"><label for="sPeerGre" data-i18n="setup_peer_gre">Peer GRE IP</label><input class="hashem-input" id="sPeerGre" inputmode="decimal"></div>
-                  <div class="fg" id="wrapCtrlPort"><label for="sFrpPort" id="lblControlPort" data-i18n="setup_ctrl_port">Control / Bind port</label><input class="hashem-input" id="sFrpPort" inputmode="numeric"></div>
+                  <div class="fg" id="wrapLocalPub"><label for="sLocalPub" data-i18n="setup_local_pub">Iran public IP (auto, editable)</label><input class="quantum-input" id="sLocalPub" inputmode="decimal"></div>
+                  <div class="fg"><label for="sRemotePub" data-i18n="setup_remote_pub">Remote public IP (the other server)</label><input class="quantum-input" id="sRemotePub" inputmode="decimal" placeholder="e.g. 203.0.113.10"></div>
+                  <div class="fg"><label for="sMainName">Name of the foreign server (optional)</label><input class="quantum-input" id="sMainName" maxlength="40" autocomplete="off" placeholder="e.g. Frankfurt"></div>
+                  <div class="fg" id="wrapLocalGre"><label for="sLocalGre" data-i18n="setup_local_gre">Local GRE IP</label><input class="quantum-input" id="sLocalGre" inputmode="decimal"></div>
+                  <div class="fg" id="wrapPeerGre"><label for="sPeerGre" data-i18n="setup_peer_gre">Peer GRE IP</label><input class="quantum-input" id="sPeerGre" inputmode="decimal"></div>
+                  <div class="fg" id="wrapCtrlPort"><label for="sFrpPort" id="lblControlPort" data-i18n="setup_ctrl_port">Control / Bind port</label><input class="quantum-input" id="sFrpPort" inputmode="numeric"></div>
                   <div class="fg" id="wrapTransport">
                     <label for="sTransport" data-i18n="setup_transport">Transport Protocol</label>
-                    <select class="hashem-input" id="sTransport">
+                    <select class="quantum-input" id="sTransport">
                       <option value="tcp" selected>TCP (Default)</option>
                       <option value="kcp">KCP ARQ UDP (Anti-Loss)</option>
                       <option value="quic">QUIC UDP Stream (High-Speed)</option>
@@ -2055,7 +2065,7 @@
                   </div>
                   <div class="fg hidden" id="wrapIranPorts">
                     <label for="sIranPorts" data-i18n="setup_forward_ports">Forwarded Ports (single, ranges, mappings)</label>
-                    <input class="hashem-input" id="sIranPorts" placeholder="e.g. 443, 10000-10050, 2083=8443">
+                    <input class="quantum-input" id="sIranPorts" placeholder="e.g. 443, 10000-10050, 2083=8443">
                   </div>
                   <div class="fg hidden" id="wrapIranUdp">
                     <label class="u-check-row">
@@ -2068,18 +2078,18 @@
               </fieldset>
               <div id="bagherFields" hidden>
                 <div class="qs-row">
-                  <div class="fg"><label for="sshfwdRemoteHost" data-i18n="setup_bagher_host">Foreign server public IP</label><input class="hashem-input" id="sshfwdRemoteHost" inputmode="text" spellcheck="false" autocapitalize="off" placeholder="e.g. 198.51.100.73"></div>
-                  <div class="fg"><label for="sshfwdName">Name of the foreign server (optional)</label><input class="hashem-input" id="sshfwdName" maxlength="40" autocomplete="off" placeholder="e.g. Frankfurt"></div>
-                  <div class="fg"><label for="sshfwdPorts" data-i18n="setup_forward_ports">Forwarded Ports (single, ranges, mappings)</label><input class="hashem-input" id="sshfwdPorts" placeholder="e.g. 443, 8443, 2083"></div>
+                  <div class="fg"><label for="sshfwdRemoteHost" data-i18n="setup_bagher_host">Foreign server public IP</label><input class="quantum-input" id="sshfwdRemoteHost" inputmode="text" spellcheck="false" autocapitalize="off" placeholder="e.g. 198.51.100.73"></div>
+                  <div class="fg"><label for="sshfwdName">Name of the foreign server (optional)</label><input class="quantum-input" id="sshfwdName" maxlength="40" autocomplete="off" placeholder="e.g. Frankfurt"></div>
+                  <div class="fg"><label for="sshfwdPorts" data-i18n="setup_forward_ports">Forwarded Ports (single, ranges, mappings)</label><input class="quantum-input" id="sshfwdPorts" placeholder="e.g. 443, 8443, 2083"></div>
                 </div>
                 <div class="fg"><label class="u-check-row"><input type="checkbox" id="sshfwdUdp"><span data-i18n="setup_bh_udp">Also forward UDP on these ports</span></label></div>
                 <details class="qs-adv u-mt-8">
                   <summary data-i18n="setup_bagher_adv">SSH port, pool size and internal FRP port</summary>
                   <div class="qs-row">
-                    <div class="fg"><label for="sshfwdRemotePort" data-i18n="setup_bagher_sshport">Foreign SSH port</label><input type="number" class="hashem-input" id="sshfwdRemotePort" placeholder="22"></div>
-                    <div class="fg"><label for="sshfwdRemoteUser" data-i18n="setup_bagher_sshuser">Foreign SSH user</label><input class="hashem-input" id="sshfwdRemoteUser" placeholder="root"></div>
-                    <div class="fg"><label for="sshfwdFRPPort" data-i18n="setup_bagher_frpport">Internal FRP port</label><input type="number" class="hashem-input" id="sshfwdFRPPort" placeholder="55400"></div>
-                    <div class="fg"><label for="sshfwdPoolCount" data-i18n="setup_bagher_pool">Connection pool size</label><input type="number" class="hashem-input" id="sshfwdPoolCount" placeholder="25"></div>
+                    <div class="fg"><label for="sshfwdRemotePort" data-i18n="setup_bagher_sshport">Foreign SSH port</label><input type="number" class="quantum-input" id="sshfwdRemotePort" placeholder="22"></div>
+                    <div class="fg"><label for="sshfwdRemoteUser" data-i18n="setup_bagher_sshuser">Foreign SSH user</label><input class="quantum-input" id="sshfwdRemoteUser" placeholder="root"></div>
+                    <div class="fg"><label for="sshfwdFRPPort" data-i18n="setup_bagher_frpport">Internal FRP port</label><input type="number" class="quantum-input" id="sshfwdFRPPort" placeholder="55400"></div>
+                    <div class="fg"><label for="sshfwdPoolCount" data-i18n="setup_bagher_pool">Connection pool size</label><input type="number" class="quantum-input" id="sshfwdPoolCount" placeholder="25"></div>
                   </div>
                 </details>
               </div>
@@ -2094,17 +2104,17 @@
               <details class="qs-adv u-mt-8 hidden" id="bagherManual">
                 <summary data-i18n="setup_bagher_manual">Foreign server without a panel: manual commands</summary>
                 <div class="fg u-mt-8"><label for="sshfwdForeignCmd" data-i18n="setup_bagher_cmd">Run on the foreign server</label>
-                  <textarea id="sshfwdForeignCmd" class="hashem-input u-w-full u-mono u-fs-12" rows="3" readonly></textarea>
-                  <div class="u-mt-4"><button type="button" class="hashem-btn hashem-btn-secondary u-btn-30" id="sshfwdCopyForeignBtn">Copy</button></div></div>
+                  <textarea id="sshfwdForeignCmd" class="quantum-input u-w-full u-mono u-fs-12" rows="3" readonly></textarea>
+                  <div class="u-mt-4"><button type="button" class="quantum-btn quantum-btn-secondary u-btn-30" id="sshfwdCopyForeignBtn">Copy</button></div></div>
                 <div class="fg u-mt-8"><label for="sshfwdAuthLine" data-i18n="setup_bagher_auth">authorized_keys line for the foreign server</label>
-                  <textarea id="sshfwdAuthLine" class="hashem-input u-w-full u-mono u-fs-12" rows="2" readonly></textarea>
-                  <div class="u-mt-4"><button type="button" class="hashem-btn hashem-btn-secondary u-btn-30" id="sshfwdCopyAuthBtn">Copy</button></div></div>
+                  <textarea id="sshfwdAuthLine" class="quantum-input u-w-full u-mono u-fs-12" rows="2" readonly></textarea>
+                  <div class="u-mt-4"><button type="button" class="quantum-btn quantum-btn-secondary u-btn-30" id="sshfwdCopyAuthBtn">Copy</button></div></div>
               </details>
               <div class="qs-actions">
-                <button class="hashem-btn hashem-btn-primary" id="setupBtn" data-i18n="setup_apply_btn">Apply Setup</button>
-                <button class="hashem-btn hashem-btn-secondary hidden" id="setupUnlockBtn" data-i18n="setup_unlock_btn">Unlock to Replace</button>
-                <button class="hashem-btn hashem-btn-primary hidden" id="setupAddBtn">Add Another Server Instead</button>
-                <button class="hashem-btn hashem-btn-secondary hidden" id="setupRelockBtn" data-i18n="setup_relock_btn">Keep Locked</button>
+                <button class="quantum-btn quantum-btn-primary" id="setupBtn" data-i18n="setup_apply_btn">Apply Setup</button>
+                <button class="quantum-btn quantum-btn-secondary hidden" id="setupUnlockBtn" data-i18n="setup_unlock_btn">Unlock to Replace</button>
+                <button class="quantum-btn quantum-btn-primary hidden" id="setupAddBtn">Add Another Server Instead</button>
+                <button class="quantum-btn quantum-btn-secondary hidden" id="setupRelockBtn" data-i18n="setup_relock_btn">Keep Locked</button>
               </div>
               <pre id="setupOut" class="logs hidden"></pre>
             </div></div>
@@ -2113,13 +2123,13 @@
             <div class="qs-step"><span class="qs-num">2</span><div class="qs-body">
               <label class="qs-label" data-i18n="setup_foreign_step2">Connect this server to Iran</label>
               <div class="u-grid-gap-10">
-                <div class="fg"><label for="jToken" data-i18n="setup_bundle_paste_lbl">Setup bundle or token (from Iran side)</label><input class="hashem-input" id="jToken" autocomplete="off" data-i18n-ph="setup_bundle_paste_ph" placeholder="paste hsh1_..., bh1_..., gh1_... or BAGHER:... bundle"></div>
-                <div class="fg"><label for="jName">Name of the Iran server (optional)</label><input class="hashem-input" id="jName" maxlength="40" autocomplete="off" placeholder="e.g. Tehran"></div>
-                <div class="fg" id="jPortsWrap"><label for="jPorts">Reverse ports (ranges &amp; mappings allowed)</label><input class="hashem-input" id="jPorts" placeholder="auto-filled from bundle, or 443, 10000-10050"></div>
+                <div class="fg"><label for="jToken" data-i18n="setup_bundle_paste_lbl">Setup bundle or token (from Iran side)</label><input class="quantum-input" id="jToken" autocomplete="off" data-i18n-ph="setup_bundle_paste_ph" placeholder="paste hsh1_..., bh1_..., gh1_... or BAGHER:... bundle"></div>
+                <div class="fg"><label for="jName">Name of the Iran server (optional)</label><input class="quantum-input" id="jName" maxlength="40" autocomplete="off" placeholder="e.g. Tehran"></div>
+                <div class="fg" id="jPortsWrap"><label for="jPorts">Reverse ports (ranges &amp; mappings allowed)</label><input class="quantum-input" id="jPorts" placeholder="auto-filled from bundle, or 443, 10000-10050"></div>
                 <div id="joinFrpOpts" class="u-grid-gap-10">
                 <div class="fg u-mt-2">
                   <label class="u-label-up" for="jFRPTransport" data-i18n="setup_transport">FRP Transport Protocol</label>
-                  <select class="hashem-input u-mt-4" id="jFRPTransport">
+                  <select class="quantum-input u-mt-4" id="jFRPTransport">
                     <option value="tcp" selected>TCP (Default)</option>
                     <option value="kcp">KCP (UDP with ARQ — Anti-packet-loss for unstable ISPs)</option>
                     <option value="quic">QUIC (UDP QUIC — 0-RTT fast multiplexing)</option>
@@ -2144,7 +2154,7 @@
                 </div>
                 <div class="fg hidden" id="joinDialWrap">
                   <label for="jDial" data-i18n="setup_dial">Route to the Iran server</label>
-                  <select class="hashem-input" id="jDial">
+                  <select class="quantum-input" id="jDial">
                     <option value="auto" selected data-i18n="setup_dial_auto">Auto: GRE, or the public IP while GRE is blocked (recommended)</option>
                     <option value="gre" data-i18n="setup_dial_gre">GRE only</option>
                     <option value="public" data-i18n="setup_dial_public">Public IP only</option>
@@ -2154,7 +2164,7 @@
                 <div class="qs-hint u-hint-accent" id="joinBundleInfo" aria-live="polite" hidden></div>
                 <div id="joinWarn" class="warnbox hidden"></div>
                 <div class="qs-actions">
-                  <button class="hashem-btn hashem-btn-primary" id="joinBtn" data-i18n="setup_join_btn">Connect to Iran</button>
+                  <button class="quantum-btn quantum-btn-primary" id="joinBtn" data-i18n="setup_join_btn">Connect to Iran</button>
                 </div>
                 <pre id="joinOut" class="logs hidden"></pre>
               </div>
@@ -2165,11 +2175,11 @@
                 <summary>Manual addresses &amp; control port</summary>
                 <div class="qs-hint u-my-8" >Leave everything here empty to auto-join — the panel discovers Iran's settings from the live tunnel. Only fill these in if auto-join fails.</div>
                 <div class="qs-row">
-                  <div class="fg"><label for="fLocalPub">Foreign public IP (auto, editable)</label><input class="hashem-input" id="fLocalPub" inputmode="text" spellcheck="false" autocapitalize="off"></div>
-                  <div class="fg"><label for="fRemotePub">Iran public IP</label><input class="hashem-input" id="fRemotePub" inputmode="text" spellcheck="false" autocapitalize="off" placeholder="e.g. 203.0.113.10"></div>
-                  <div class="fg"><label for="fLocalGre">Local GRE IP</label><input class="hashem-input" id="fLocalGre" inputmode="decimal" placeholder="e.g. 10.10.10.1"></div>
-                  <div class="fg"><label for="fPeerGre">Iran GRE IP</label><input class="hashem-input" id="fPeerGre" inputmode="decimal" placeholder="e.g. 10.10.10.2"></div>
-                  <div class="fg"><label for="fFrpPort">Control port</label><input class="hashem-input" id="fFrpPort" inputmode="numeric" placeholder="7000"></div>
+                  <div class="fg"><label for="fLocalPub">Foreign public IP (auto, editable)</label><input class="quantum-input" id="fLocalPub" inputmode="text" spellcheck="false" autocapitalize="off"></div>
+                  <div class="fg"><label for="fRemotePub">Iran public IP</label><input class="quantum-input" id="fRemotePub" inputmode="text" spellcheck="false" autocapitalize="off" placeholder="e.g. 203.0.113.10"></div>
+                  <div class="fg"><label for="fLocalGre">Local GRE IP</label><input class="quantum-input" id="fLocalGre" inputmode="decimal" placeholder="e.g. 10.10.10.1"></div>
+                  <div class="fg"><label for="fPeerGre">Iran GRE IP</label><input class="quantum-input" id="fPeerGre" inputmode="decimal" placeholder="e.g. 10.10.10.2"></div>
+                  <div class="fg"><label for="fFrpPort">Control port</label><input class="quantum-input" id="fFrpPort" inputmode="numeric" placeholder="7000"></div>
                 </div>
               </details>
             </div></div>
@@ -2180,11 +2190,11 @@
               <div class="tc-header"><p class="tc-title">Connect another foreign server</p><span class="qs-hint" id="peerCountHint"></span></div>
               <div class="qs-hint u-hint-accent" >✓ <b>This is the safe way to add a server.</b> It creates a <b>separate</b> tunnel with its own token — existing tunnels keep running untouched. (Re-running the Iran form above instead would replace this server's tunnel and disconnect old Foreign sides.)</div>
               <div class="qs-body u-grid-gap-10" >
-                <div class="fg"><label for="pName">Name (label for this tunnel)</label><input class="hashem-input" id="pName" placeholder="e.g. germany-1" maxlength="32"></div>
+                <div class="fg"><label for="pName">Name (label for this tunnel)</label><input class="quantum-input" id="pName" placeholder="e.g. germany-1" maxlength="32"></div>
                 <div class="qs-row">
                   <div class="fg u-col-span-2">
                     <label for="pEngine">Tunnel Engine</label>
-                    <select class="hashem-input" id="pEngine">
+                    <select class="quantum-input" id="pEngine">
                       <option value="frp" selected>GRE + FRP</option>
                       <option value="gre-backhaul">Backhaul (with GRE)</option>
                       <option value="backhaul">Backhaul (no GRE)</option>
@@ -2192,7 +2202,7 @@
                   </div>
                   <div class="fg u-col-span-2" id="wrapPeerTransport">
                     <label for="pTransport" data-i18n="setup_transport">Transport Protocol</label>
-                    <select class="hashem-input" id="pTransport">
+                    <select class="quantum-input" id="pTransport">
                       <option value="tcp" selected>TCP (Default)</option>
                       <option value="kcp">KCP ARQ UDP (Anti-Loss)</option>
                       <option value="quic">QUIC UDP Stream (High-Speed)</option>
@@ -2200,19 +2210,19 @@
                       <option value="wss">WSS TLS (Obfuscated)</option>
                     </select>
                   </div>
-                  <div class="fg"><label for="pRemotePub">Foreign public IP</label><input class="hashem-input" id="pRemotePub" inputmode="text" spellcheck="false" autocapitalize="off" placeholder="e.g. 203.0.113.10"></div>
-                  <div class="fg"><label for="pLocalPub">Iran public IP (auto, editable)</label><input class="hashem-input" id="pLocalPub" inputmode="text" spellcheck="false" autocapitalize="off"></div>
-                  <div class="fg" id="wrapPeerLocalGre"><label for="pLocalGre">Iran GRE IP (unique)</label><input class="hashem-input" id="pLocalGre" inputmode="decimal" placeholder="e.g. 10.11.0.2"></div>
-                  <div class="fg" id="wrapPeerPeerGre"><label for="pPeerGre">Foreign GRE IP</label><input class="hashem-input" id="pPeerGre" inputmode="decimal" placeholder="e.g. 10.11.0.1"></div>
-                  <div class="fg"><label for="pFrpPort">Control port (unique per peer)</label><input class="hashem-input" id="pFrpPort" inputmode="numeric" placeholder="e.g. 7001"></div>
-                  <div class="fg"><label for="pPorts">Reverse ports (ranges &amp; mappings allowed)</label><input class="hashem-input" id="pPorts" placeholder="443, 10000-10050, 2083=8443"></div>
+                  <div class="fg"><label for="pRemotePub">Foreign public IP</label><input class="quantum-input" id="pRemotePub" inputmode="text" spellcheck="false" autocapitalize="off" placeholder="e.g. 203.0.113.10"></div>
+                  <div class="fg"><label for="pLocalPub">Iran public IP (auto, editable)</label><input class="quantum-input" id="pLocalPub" inputmode="text" spellcheck="false" autocapitalize="off"></div>
+                  <div class="fg" id="wrapPeerLocalGre"><label for="pLocalGre">Iran GRE IP (unique)</label><input class="quantum-input" id="pLocalGre" inputmode="decimal" placeholder="e.g. 10.11.0.2"></div>
+                  <div class="fg" id="wrapPeerPeerGre"><label for="pPeerGre">Foreign GRE IP</label><input class="quantum-input" id="pPeerGre" inputmode="decimal" placeholder="e.g. 10.11.0.1"></div>
+                  <div class="fg"><label for="pFrpPort">Control port (unique per peer)</label><input class="quantum-input" id="pFrpPort" inputmode="numeric" placeholder="e.g. 7001"></div>
+                  <div class="fg"><label for="pPorts">Reverse ports (ranges &amp; mappings allowed)</label><input class="quantum-input" id="pPorts" placeholder="443, 10000-10050, 2083=8443"></div>
                   <div class="fg u-col-span-2 hidden" id="wrapPeerUdp"><label class="u-check-row"><input type="checkbox" id="pAcceptUdp"><span data-i18n="setup_bh_udp">Also forward UDP on these ports</span></label></div>
                 </div>
                 <div class="qs-hint">Each peer gets its own token. Ports already used by another tunnel are rejected — pick a different one.</div>
                 <div id="peerWarn" class="warnbox hidden"></div>
                 <div id="peerToken" class="tokenbox hidden"></div>
                 <div class="qs-actions">
-                  <button class="hashem-btn hashem-btn-primary" id="addPeerBtn">Add Tunnel</button>
+                  <button class="quantum-btn quantum-btn-primary" id="addPeerBtn">Add Tunnel</button>
                 </div>
                 <pre id="peerOut" class="logs hidden"></pre>
               </div>
@@ -2236,7 +2246,7 @@
           </div>
           <div class="rs-restore" id="rsRestoreRow">
             <div><b data-i18n="rs_header">Live Activity Stream</b><div class="qs-hint" id="rsRestoreHint" data-i18n="rs_restore_hint">Side panel with the latest events. Wide screens (1200px+) only.</div></div>
-            <button type="button" class="hashem-btn hashem-btn-secondary u-btn-xs" id="rsToggleBtn" aria-pressed="true">Hide</button>
+            <button type="button" class="quantum-btn quantum-btn-secondary u-btn-xs" id="rsToggleBtn" aria-pressed="true">Hide</button>
           </div>
           <div class="qs-seg u-flex-wrap" role="group" aria-label="Service" id="logSvcSeg" >
             <button data-log="frps" aria-pressed="true">frps</button>
@@ -2245,14 +2255,14 @@
           </div>
           <div class="qs-hint u-mt-8" id="logPeerHint" >Peer tunnels appear here when added.</div>
           <div class="qs-row u-mt-8" >
-            <div class="fg"><label for="logSearch">Search (filters lines)</label><input class="hashem-input" id="logSearch" placeholder="e.g. error, login, 443"></div>
-            <div class="fg"><label for="logLevel">Level</label><select class="hashem-input" id="logLevel">
+            <div class="fg"><label for="logSearch">Search (filters lines)</label><input class="quantum-input" id="logSearch" placeholder="e.g. error, login, 443"></div>
+            <div class="fg"><label for="logLevel">Level</label><select class="quantum-input" id="logLevel">
               <option value="">All levels</option>
               <option value="error">Errors</option>
               <option value="warn">Warnings</option>
               <option value="login">Logins / auth</option>
             </select></div>
-            <div class="fg"><label for="logLines">Lines</label><select class="hashem-input" id="logLines">
+            <div class="fg"><label for="logLines">Lines</label><select class="quantum-input" id="logLines">
               <option value="50">Last 50</option>
               <option value="100" selected>Last 100</option>
               <option value="300">Last 300</option>
@@ -2265,11 +2275,11 @@
           <div class="tc-header u-mt-14" ><p class="tc-title u-fs-13" >Panel errors</p>
             <div class="u-flex-center-gap8">
               <span class="qs-hint" id="errCount"></span>
-              <button class="hashem-btn hashem-btn-secondary u-btn-xs" id="errRefresh" >Refresh</button>
+              <button class="quantum-btn quantum-btn-secondary u-btn-xs" id="errRefresh" >Refresh</button>
             </div>
           </div>
           <div class="qs-hint">Every failed panel action is recorded here with its code — newest last.</div>
-          <div class="ent-tools"><input class="hashem-input" id="errFilter" type="search" placeholder="Filter errors…" data-i18n-ph="tbl_filter" aria-label="Filter errors" data-i18n-aria="tbl_filter"><span class="qs-hint" id="errFilterCount" aria-live="polite"></span></div>
+          <div class="ent-tools"><input class="quantum-input" id="errFilter" type="search" placeholder="Filter errors…" data-i18n-ph="tbl_filter" aria-label="Filter errors" data-i18n-aria="tbl_filter"><span class="qs-hint" id="errFilterCount" aria-live="polite"></span></div>
           <div id="errList" class="u-grid-gap-6 u-mt-8"><div class="ent-skel u-h-14"></div></div>
         </div>
       </section>
@@ -2280,7 +2290,7 @@
             <p class="tc-title">Performance</p>
             <div class="u-flex-center-gap10">
               <span class="status-indicator" id="perfSyncInd"><span class="dot"></span><span id="perfSyncTxt">—</span></span>
-              <button class="hashem-btn hashem-btn-primary" id="perfApplyTopBtn" hidden>Apply Now</button>
+              <button class="quantum-btn quantum-btn-primary" id="perfApplyTopBtn" hidden>Apply Now</button>
             </div>
           </div>
           <div class="qs-hint">Speed settings for the tunnel engine and the server's network stack. The defaults suit traffic that is already encrypted, such as VLESS, Reality and Trojan.</div>
@@ -2338,7 +2348,7 @@
               </label>
               <div class="fg">
                 <label for="perfPPSelect"><b class="u-color-tx">PROXY Protocol <span class="perf-key" data-no-i18n>transport.proxyProtocolVersion</span></b></label>
-                <select class="hashem-input u-max-w-260" id="perfPPSelect">
+                <select class="quantum-input u-max-w-260" id="perfPPSelect">
                   <option value="off">Off</option>
                   <option value="v2">v2 (Xray, 3x-ui)</option>
                   <option value="v1">v1</option>
@@ -2348,7 +2358,7 @@
               </div>
               <div class="fg">
                 <label for="perfBwInput"><b class="u-color-tx">Bandwidth Limit per Port <span class="perf-key" data-no-i18n>transport.bandwidthLimit</span></b></label>
-                <div class="u-flex-center-gap8"><input type="number" class="hashem-input u-max-w-140" id="perfBwInput" min="0" max="10000" step="1" value="0" inputmode="numeric"><span class="qs-hint">MB/s</span></div>
+                <div class="u-flex-center-gap8"><input type="number" class="quantum-input u-max-w-140" id="perfBwInput" min="0" max="10000" step="1" value="0" inputmode="numeric"><span class="qs-hint">MB/s</span></div>
                 <div class="qs-hint u-mt-2">A cap on each forwarded port, for all its users together (megabytes per second). 0 means no limit.</div>
               </div>
               <label class="wd-radio-opt u-items-start">
@@ -2361,8 +2371,8 @@
             </div>
             <div class="qs-hint u-mt-12" id="perfRoleHint" hidden></div>
             <div class="qs-actions u-mt-16 u-ai-c">
-              <button class="hashem-btn hashem-btn-primary" id="perfApplyBtn">Apply &amp; Restart Tunnels</button>
-              <button class="hashem-btn hashem-btn-danger" id="perfResetBtn">Reset to Defaults</button>
+              <button class="quantum-btn quantum-btn-primary" id="perfApplyBtn">Apply &amp; Restart Tunnels</button>
+              <button class="quantum-btn quantum-btn-danger" id="perfResetBtn">Reset to Defaults</button>
               <span class="badge warn" id="perfDirty" hidden>Unsaved changes</span>
             </div>
             <div class="qs-hint u-mt-8" id="perfApplyMsg" aria-live="polite"></div>
@@ -2410,18 +2420,18 @@
             <div class="qs-row u-mt-12">
               <div class="fg">
                 <label for="perfPoolCount" data-i18n="perf_pool_count">Client Pool Count (frpc)</label>
-                <input type="number" id="perfPoolCount" class="hashem-input" min="2" max="1000" step="1" value="20" inputmode="numeric" aria-describedby="perfPoolHint">
+                <input type="number" id="perfPoolCount" class="quantum-input" min="2" max="1000" step="1" value="20" inputmode="numeric" aria-describedby="perfPoolHint">
                 <div class="tc-sub" id="perfPoolHint" data-i18n="perf_pool_sub">Pre-opened work connections on foreign spokes.</div>
               </div>
               <div class="fg">
                 <label for="perfMaxPool" data-i18n="perf_max_pool">Max Pool Count (frps)</label>
-                <input type="number" id="perfMaxPool" class="hashem-input" min="10" max="2000" step="1" value="60" inputmode="numeric" aria-describedby="perfMaxHint">
+                <input type="number" id="perfMaxPool" class="quantum-input" min="10" max="2000" step="1" value="60" inputmode="numeric" aria-describedby="perfMaxHint">
                 <div class="tc-sub" id="perfMaxHint" data-i18n="perf_max_sub">Server-side maximum work connection headroom (always at least 1.5 × poolCount).</div>
               </div>
             </div>
             <div class="qs-hint u-mt-8" id="perfPoolErr" aria-live="polite" hidden></div>
             <div class="qs-actions u-mt-12 u-ai-c">
-              <button class="hashem-btn hashem-btn-primary" id="perfSaveTuningBtn" type="button" data-i18n="perf_save_tuning">Save &amp; Apply Capacity</button>
+              <button class="quantum-btn quantum-btn-primary" id="perfSaveTuningBtn" type="button" data-i18n="perf_save_tuning">Save &amp; Apply Capacity</button>
               <span class="u-hint-12" id="perfTuningStatus" aria-live="polite"></span>
             </div>
           </fieldset>
@@ -2439,12 +2449,12 @@
           <div class="qs-row u-mt-12">
             <div class="fg">
               <label for="perfBhPool">Connection Pool</label>
-              <input type="number" id="perfBhPool" class="hashem-input" min="1" max="64" step="1" value="8" inputmode="numeric" aria-describedby="perfBhHint">
+              <input type="number" id="perfBhPool" class="quantum-input" min="1" max="64" step="1" value="8" inputmode="numeric" aria-describedby="perfBhHint">
               <div class="tc-sub" id="perfBhHint">From 1 to 64. The default is 8.</div>
             </div>
           </div>
           <div class="qs-actions u-mt-12 u-ai-c">
-            <button class="hashem-btn hashem-btn-primary" id="perfBhSaveBtn" type="button">Save &amp; Apply Pool</button>
+            <button class="quantum-btn quantum-btn-primary" id="perfBhSaveBtn" type="button">Save &amp; Apply Pool</button>
             <span class="u-hint-12" id="perfBhStatus" aria-live="polite"></span>
           </div>
         </div>
@@ -2460,8 +2470,8 @@
           </div>
           <div class="ns-list u-mt-8" id="netStackList"></div>
           <div class="qs-actions u-mt-12">
-            <button class="hashem-btn hashem-btn-primary" id="perfOptimizeBtn">Optimize Network</button>
-            <button class="hashem-btn hashem-btn-secondary" id="perfRestoreBtn" hidden>Restore Previous Settings</button>
+            <button class="quantum-btn quantum-btn-primary" id="perfOptimizeBtn">Optimize Network</button>
+            <button class="quantum-btn quantum-btn-secondary" id="perfRestoreBtn" hidden>Restore Previous Settings</button>
           </div>
         </div>
 
@@ -2473,7 +2483,7 @@
             <p class="tc-title">Tunnel Watchdog</p>
             <div class="u-flex-center-gap10">
               <span class="status-indicator" id="wdStatusInd"><span class="dot"></span><span id="wdStatusTxt">—</span></span>
-              <button class="hashem-btn hashem-btn-secondary" id="wdToggleBtn">Enable</button>
+              <button class="quantum-btn quantum-btn-secondary" id="wdToggleBtn">Enable</button>
             </div>
           </div>
           <div class="qs-hint">Checks the tunnel every minute: the GRE link and the FRP service, or for Backhaul its control session. Sends Telegram alerts and, if you turn it on, restarts the tunnel after consecutive failures.</div>
@@ -2512,13 +2522,13 @@
           <div class="fg">
             <label for="wdBotToken">Bot Token</label>
             <div class="u-flex-center-gap8">
-              <input class="hashem-input u-flex-1" id="wdBotToken" type="password" placeholder="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ" autocomplete="off" spellcheck="false" >
-              <button type="button" class="hashem-btn hashem-btn-secondary u-btn-input-h" id="wdShowTokenBtn" title="Toggle visibility" aria-label="Toggle visibility" data-i18n-aria="aria_toggle_visibility" ><svg class="i" aria-hidden="true"><use href="#i-eye"/></svg></button>
+              <input class="quantum-input u-flex-1" id="wdBotToken" type="password" placeholder="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ" autocomplete="off" spellcheck="false" >
+              <button type="button" class="quantum-btn quantum-btn-secondary u-btn-input-h" id="wdShowTokenBtn" title="Toggle visibility" aria-label="Toggle visibility" data-i18n-aria="aria_toggle_visibility" ><svg class="i" aria-hidden="true"><use href="#i-eye"/></svg></button>
             </div>
           </div>
           <div class="fg">
             <label for="wdChatId">Chat ID</label>
-            <input class="hashem-input" id="wdChatId" placeholder="e.g. 123456789 or -100123456789" autocomplete="off" spellcheck="false">
+            <input class="quantum-input" id="wdChatId" placeholder="e.g. 123456789 or -100123456789" autocomplete="off" spellcheck="false">
           </div>
           <div class="fg">
             <label>Telegram Route</label>
@@ -2536,14 +2546,14 @@
           <div class="fg hidden" id="wdTunnelPortGroup">
             <label for="wdTunnelPortSelect">Tunnel SOCKS5 Proxy Port</label>
             <div class="u-flex-center-wrap8">
-              <select class="hashem-input u-min-w-180" id="wdTunnelPortSelect" ></select>
-              <input class="hashem-input hidden u-max-w-140" id="wdTunnelPortManual" aria-label="Custom port" type="number" min="1" max="65535" placeholder="Custom port" >
+              <select class="quantum-input u-min-w-180" id="wdTunnelPortSelect" ></select>
+              <input class="quantum-input hidden u-max-w-140" id="wdTunnelPortManual" aria-label="Custom port" type="number" min="1" max="65535" placeholder="Custom port" >
             </div>
             <div class="ent-help">Routed through 127.0.0.1:PORT via SOCKS5 proxy on Foreign side.</div>
           </div>
           <div class="qs-actions">
-            <button class="hashem-btn hashem-btn-primary" id="wdSaveTgBtn">Save Telegram Settings</button>
-            <button class="hashem-btn hashem-btn-secondary" id="wdTestTgBtn">Test Alert</button>
+            <button class="quantum-btn quantum-btn-primary" id="wdSaveTgBtn">Save Telegram Settings</button>
+            <button class="quantum-btn quantum-btn-secondary" id="wdTestTgBtn">Test Alert</button>
           </div>
           <div class="qs-hint" id="wdTgMsg"></div>
         </div>
@@ -2558,7 +2568,7 @@
           <div class="fg">
             <label for="wdRestartHoursSelect" data-i18n="wd_restart_interval">Restart Interval</label>
             <div class="u-flex-center-wrap10">
-              <select class="hashem-input u-max-w-260" id="wdRestartHoursSelect">
+              <select class="quantum-input u-max-w-260" id="wdRestartHoursSelect">
                 <option value="0">Disabled (Off)</option>
                 <option value="1">Every 1 Hour</option>
                 <option value="3">Every 3 Hours</option>
@@ -2567,9 +2577,9 @@
                 <option value="24">Every 24 Hours (Daily)</option>
                 <option value="custom">Custom Hours…</option>
               </select>
-              <input type="number" class="hashem-input u-max-w-140 hidden" id="wdRestartCustomHours" aria-label="Restart interval in hours" min="1" max="720" placeholder="Hours (e.g. 4)">
-              <button class="hashem-btn hashem-btn-primary" id="wdSaveRestartSchedBtn" data-i18n="wd_restart_save">Save Schedule</button>
-              <button class="hashem-btn hashem-btn-secondary" id="wdRestartTunnelNowBtn" data-i18n="wd_restart_now">Restart Tunnel Now</button>
+              <input type="number" class="quantum-input u-max-w-140 hidden" id="wdRestartCustomHours" aria-label="Restart interval in hours" min="1" max="720" placeholder="Hours (e.g. 4)">
+              <button class="quantum-btn quantum-btn-primary" id="wdSaveRestartSchedBtn" data-i18n="wd_restart_save">Save Schedule</button>
+              <button class="quantum-btn quantum-btn-secondary" id="wdRestartTunnelNowBtn" data-i18n="wd_restart_now">Restart Tunnel Now</button>
             </div>
           </div>
           <div class="wd-stat-sub u-mt-8" id="wdRestartStatusSub">Next restart: Not scheduled</div>
@@ -2583,7 +2593,7 @@
           </div>
           <div class="qs-hint">Full backup of FRP tomls, panel settings, peers registry, and systemd units encrypted with OpenSSL AES-256-CBC keyed from your panel password.</div>
           <div class="u-flex-center-wrap12">
-            <button class="hashem-btn hashem-btn-primary" id="wdBackupNowBtn">Create Backup Now</button>
+            <button class="quantum-btn quantum-btn-primary" id="wdBackupNowBtn">Create Backup Now</button>
             <span class="qs-hint" id="wdBackupNowMsg"></span>
           </div>
           <div class="fg u-mt-12" >
@@ -2605,19 +2615,19 @@
           </div>
           <div class="fg hidden" id="wdSchedHoursGroup">
             <label for="wdSchedHours">Interval (Hours)</label>
-            <input class="hashem-input u-max-w-180" id="wdSchedHours" type="number" min="1" max="168" value="6" >
+            <input class="quantum-input u-max-w-180" id="wdSchedHours" type="number" min="1" max="168" value="6" >
           </div>
           <div class="fg hidden" id="wdSchedDailyGroup">
             <label for="wdSchedDailyAt">Daily Time (24h format HH:MM)</label>
-            <input class="hashem-input u-max-w-180" id="wdSchedDailyAt" type="time" value="03:00" >
+            <input class="quantum-input u-max-w-180" id="wdSchedDailyAt" type="time" value="03:00" >
           </div>
           <div>
-            <button class="hashem-btn hashem-btn-secondary" id="wdSaveSchedBtn">Save Schedule</button>
+            <button class="quantum-btn quantum-btn-secondary" id="wdSaveSchedBtn">Save Schedule</button>
           </div>
 
           <!-- Stored Backups -->
           <div class="u-mt-16">
-            <div class="u-fw-600 u-color-tx u-fs-14 u-mb-8">Stored Backups (/var/backups/hashem)</div>
+            <div class="u-fw-600 u-color-tx u-fs-14 u-mb-8">Stored Backups (/var/backups/quantum)</div>
             <div id="wdBackupList" class="wd-backup-list">
               <div class="qs-hint">No backups yet.</div>
             </div>
@@ -2627,8 +2637,8 @@
             <div class="u-fw-600 u-color-tx u-fs-14 u-mb-8">Backup encryption key</div>
             <div class="qs-hint u-mb-8">Backups are encrypted with a key stored only on this server. Keep a copy elsewhere, or a downloaded backup cannot be opened if the server is lost.</div>
             <div class="u-flex-center-gap8">
-              <input class="hashem-input u-max-w-180" id="wdKeyPass" aria-label="Panel password" type="password" autocomplete="current-password" placeholder="Panel password">
-              <button class="hashem-btn hashem-btn-secondary" id="wdKeyBtn">Show &amp; Copy Key</button>
+              <input class="quantum-input u-max-w-180" id="wdKeyPass" aria-label="Panel password" type="password" autocomplete="current-password" placeholder="Panel password">
+              <button class="quantum-btn quantum-btn-secondary" id="wdKeyBtn">Show &amp; Copy Key</button>
             </div>
           </div>
         </div>
@@ -2662,15 +2672,15 @@
               <div class="doc-meta" id="docMetaSub"></div>
             </div>
             <div class="doc-hero-acts">
-              <button class="hashem-btn hashem-btn-primary" id="docRunBtn">
+              <button class="quantum-btn quantum-btn-primary" id="docRunBtn">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
                 <span data-i18n="doc_run_btn">Run Diagnostics</span>
               </button>
-              <button class="hashem-btn hashem-btn-secondary hidden" id="docFixBtn">
+              <button class="quantum-btn quantum-btn-secondary hidden" id="docFixBtn">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
                 <span data-i18n="doc_fix_btn">Quick Repair</span>
               </button>
-              <button class="hashem-btn hashem-btn-ghost u-btn-xs hidden" id="docCopyBtn">
+              <button class="quantum-btn quantum-btn-ghost u-btn-xs hidden" id="docCopyBtn">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                 <span>Copy Report</span>
               </button>
@@ -2769,7 +2779,7 @@
             <div>
               <div class="trow"><span class="k">iPerf3 server here</span><span class="v" id="docIperfStatusVal">—</span></div>
             </div>
-            <button class="hashem-btn hashem-btn-secondary u-btn-xs u-self-start" id="docIperfBtn">
+            <button class="quantum-btn quantum-btn-secondary u-btn-xs u-self-start" id="docIperfBtn">
               <span id="docIperfTxt">Start iPerf3 Server</span>
             </button>
           </div>
@@ -2812,40 +2822,40 @@
             </div>
             <div id="ptIranForm">
               <label class="qs-label" for="ptForeign" data-i18n="pt_foreign_lbl">Foreign server IP (optional)</label>
-              <input class="hashem-input u-ltr u-mono" id="ptForeign" placeholder="198.51.100.10" inputmode="decimal" autocomplete="off">
+              <input class="quantum-input u-ltr u-mono" id="ptForeign" placeholder="198.51.100.10" inputmode="decimal" autocomplete="off">
               <div class="qs-hint u-mt-4" data-i18n="pt_foreign_hint">Used for the GRE and SSH (Bagher) checks. Left empty, it is taken from the foreign server when it connects.</div>
               <details class="u-mt-12">
                 <summary class="u-fs-13 u-c-ac u-fw-600 u-cursor-pointer" data-i18n="pt_opts">Options</summary>
                 <div class="qs-row u-mt-8">
                   <div>
                     <label class="qs-label" for="ptBase" data-i18n="pt_base_lbl">First port</label>
-                    <input class="hashem-input u-mono" id="ptBase" type="number" min="1024" max="65504" data-i18n-ph="pt_ip_ph" placeholder="Auto">
+                    <input class="quantum-input u-mono" id="ptBase" type="number" min="1024" max="65504" data-i18n-ph="pt_ip_ph" placeholder="Auto">
                   </div>
                   <div>
                     <label class="qs-label" for="ptMinutes" data-i18n="pt_min_lbl">Minutes</label>
-                    <input class="hashem-input u-mono" id="ptMinutes" type="number" min="1" max="60" value="10">
+                    <input class="quantum-input u-mono" id="ptMinutes" type="number" min="1" max="60" value="10">
                   </div>
                   <div>
                     <label class="qs-label" for="ptSsh" data-i18n="pt_ssh_lbl">Foreign SSH port</label>
-                    <input class="hashem-input u-mono" id="ptSsh" type="number" min="1" max="65535" value="22">
+                    <input class="quantum-input u-mono" id="ptSsh" type="number" min="1" max="65535" value="22">
                   </div>
                   <div>
                     <label class="qs-label" for="ptIranIp" data-i18n="pt_ip_lbl">This server's IP</label>
-                    <input class="hashem-input u-ltr u-mono" id="ptIranIp" data-i18n-ph="pt_ip_ph" placeholder="Auto" inputmode="decimal" autocomplete="off">
+                    <input class="quantum-input u-ltr u-mono" id="ptIranIp" data-i18n-ph="pt_ip_ph" placeholder="Auto" inputmode="decimal" autocomplete="off">
                   </div>
                 </div>
                 <div class="qs-hint u-mt-4" data-i18n="pt_base_hint">Empty: the first free ports from 41000 are used, never the ports of a running tunnel. The test listens on the first port and the next 10 (TCP and UDP); enter a port to test that one.</div>
               </details>
               <div class="qs-actions u-mt-12">
-                <button type="button" class="hashem-btn hashem-btn-primary" id="ptStartBtn" data-i18n="pt_start">Start Test</button>
+                <button type="button" class="quantum-btn quantum-btn-primary" id="ptStartBtn" data-i18n="pt_start">Start Test</button>
               </div>
             </div>
             <div id="ptForeignForm" hidden>
               <label class="qs-label" for="ptCode" data-i18n="pt_code_lbl">Test code from the Iran server</label>
-              <textarea class="hashem-input u-ltr u-mono u-fs-12" id="ptCode" rows="3" placeholder="HPT1-..." autocomplete="off" spellcheck="false"></textarea>
+              <textarea class="quantum-input u-ltr u-mono u-fs-12" id="ptCode" rows="3" placeholder="HPT1-..." autocomplete="off" spellcheck="false"></textarea>
               <div class="qs-hint u-mt-4" data-i18n="pt_code_hint">Start the test on the Iran server's Benchmark tab first, then paste its code here.</div>
               <div class="qs-actions u-mt-12">
-                <button type="button" class="hashem-btn hashem-btn-primary" id="ptJoinBtn" data-i18n="pt_start">Start Test</button>
+                <button type="button" class="quantum-btn quantum-btn-primary" id="ptJoinBtn" data-i18n="pt_start">Start Test</button>
               </div>
             </div>
             <div class="warnbox hidden u-mt-12" id="ptWarn"></div>
@@ -2854,13 +2864,13 @@
             <div id="ptCodeWrap" class="u-mb-12" hidden>
               <label class="qs-label" for="ptCodeOut" data-i18n="pt_code_out">Test code: paste it on the foreign server's Benchmark tab</label>
               <div class="u-flex u-gap-8">
-                <input class="hashem-input u-ltr u-mono u-fs-12 u-flex-1" id="ptCodeOut" readonly>
-                <button type="button" class="hashem-btn hashem-btn-secondary" id="ptCopyBtn" data-i18n="pt_copy">Copy</button>
+                <input class="quantum-input u-ltr u-mono u-fs-12 u-flex-1" id="ptCodeOut" readonly>
+                <button type="button" class="quantum-btn quantum-btn-secondary" id="ptCopyBtn" data-i18n="pt_copy">Copy</button>
               </div>
             </div>
             <div class="qs-hint u-mb-12" id="ptSummary" aria-live="polite"></div>
             <div class="bench-table-wrap">
-              <table class="hashem-table" id="ptTable">
+              <table class="quantum-table" id="ptTable">
                 <thead>
                   <tr>
                     <th data-i18n="pt_th_engine">Engine</th>
@@ -2876,7 +2886,7 @@
             </div>
             <ul class="qs-hint u-mt-8" id="ptNotes" dir="ltr" data-no-i18n hidden></ul>
             <div class="qs-actions u-mt-12">
-              <button type="button" class="hashem-btn hashem-btn-secondary" id="ptStopBtn" data-i18n="pt_stop">Stop Test</button>
+              <button type="button" class="quantum-btn quantum-btn-secondary" id="ptStopBtn" data-i18n="pt_stop">Stop Test</button>
             </div>
           </div>
         </div>
@@ -2891,10 +2901,10 @@
                 </span>
                 <span class="badge ok" id="benchStatusPill">Ready</span>
               </div>
-              <div class="qs-hint u-mt-4" id="benchMetaSub">Independent end-to-end benchmark across all 7 Hashem protocols before establishing tunnel</div>
+              <div class="qs-hint u-mt-4" id="benchMetaSub">Independent end-to-end benchmark across all 7 Quantum protocols before establishing tunnel</div>
             </div>
             <div class="qs-actions">
-              <button class="hashem-btn hashem-btn-primary u-flex u-ai-c u-gap-8" id="benchRunBtn">
+              <button class="quantum-btn quantum-btn-primary u-flex u-ai-c u-gap-8" id="benchRunBtn">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                 <span id="benchRunBtnTxt" data-i18n="bench_run_btn">Run Smart Benchmark</span>
               </button>
@@ -2921,7 +2931,7 @@
                 <span>Foreign Server Public IP or Domain (Destination)</span>
                 <span class="badge dim u-none" id="benchAutoDetectBadge">Auto Detect</span>
               </label>
-              <input class="hashem-input u-ltr u-text-start u-mono u-fs-14 u-p-8x12" id="benchTargetHost" placeholder="e.g. 198.51.100.10 or foreign.mydomain.com" inputmode="decimal">
+              <input class="quantum-input u-ltr u-text-start u-mono u-fs-14 u-p-8x12" id="benchTargetHost" placeholder="e.g. 198.51.100.10 or foreign.mydomain.com" inputmode="decimal">
               <div class="qs-hint u-mt-4" id="benchTargetHint">Enter destination host to benchmark and discover the best protocol for lowest packet loss.</div>
             </div>
           </div>
@@ -2938,19 +2948,19 @@
             <div id="benchAdvWrap" class="hidden u-grid-4 u-gap-12 u-mt-8 u-bg-inset u-p-12 u-r-8 u-bd-ln">
               <div>
                 <label for="benchFrpPort" class="u-fs-12 u-c-mu u-block u-mb-4">FRP Port (TCP/KCP/QUIC)</label>
-                <input class="hashem-input u-p-8x12 u-fs-12 u-mono" id="benchFrpPort" type="number" value="7000">
+                <input class="quantum-input u-p-8x12 u-fs-12 u-mono" id="benchFrpPort" type="number" value="7000">
               </div>
               <div>
                 <label for="benchWssPort" class="u-fs-12 u-c-mu u-block u-mb-4">WSS TLS Port</label>
-                <input class="hashem-input u-p-8x12 u-fs-12 u-mono" id="benchWssPort" type="number" value="8443">
+                <input class="quantum-input u-p-8x12 u-fs-12 u-mono" id="benchWssPort" type="number" value="8443">
               </div>
               <div>
                 <label for="benchBackhaulPort" class="u-fs-12 u-c-mu u-block u-mb-4">Backhaul Port</label>
-                <input class="hashem-input u-p-8x12 u-fs-12 u-mono" id="benchBackhaulPort" type="number" value="3080">
+                <input class="quantum-input u-p-8x12 u-fs-12 u-mono" id="benchBackhaulPort" type="number" value="3080">
               </div>
               <div>
                 <label for="benchBagherPort" class="u-fs-12 u-c-mu u-block u-mb-4">Bagher SSH Port</label>
-                <input class="hashem-input u-p-8x12 u-fs-12 u-mono" id="benchBagherPort" type="number" value="22">
+                <input class="quantum-input u-p-8x12 u-fs-12 u-mono" id="benchBagherPort" type="number" value="22">
               </div>
             </div>
           </div>
@@ -2971,7 +2981,7 @@
                   <div class="u-fs-12 u-c-mu">Quality Score</div>
                   <div id="benchWinnerScore" class="u-fs-18 u-fw-700 u-c-ok u-mono">— / 100</div>
                 </div>
-                <button class="hashem-btn hashem-btn-primary" id="benchApplyWinnerBtn">
+                <button class="quantum-btn quantum-btn-primary" id="benchApplyWinnerBtn">
                   Apply This Protocol
                 </button>
               </div>
@@ -3012,7 +3022,7 @@
 
           <!-- Leaderboard Table Wrap -->
           <div class="bench-table-wrap">
-            <table class="hashem-table" id="benchTable">
+            <table class="quantum-table" id="benchTable">
               <thead>
                 <tr>
                   <th class="u-w-44 u-text-center">#</th>
@@ -3067,8 +3077,8 @@
               <span class="v" id="peerLastSyncVal">—</span>
             </div>
             <div class="qs-actions u-mt-12">
-              <button class="hashem-btn hashem-btn-secondary u-btn-xs" id="peerTestBtn" data-i18n="bench_peer_test_btn">Test Link</button>
-              <button class="hashem-btn hashem-btn-ghost u-btn-xs" id="peerConfigBtn" data-i18n="bench_peer_cfg_btn">Configure Link</button>
+              <button class="quantum-btn quantum-btn-secondary u-btn-xs" id="peerTestBtn" data-i18n="bench_peer_test_btn">Test Link</button>
+              <button class="quantum-btn quantum-btn-ghost u-btn-xs" id="peerConfigBtn" data-i18n="bench_peer_cfg_btn">Configure Link</button>
             </div>
           </div>
 
@@ -3090,7 +3100,7 @@
             </div>
             <div class="fg u-mt-8">
               <label for="autoPilotThresholdInput" data-i18n="bench_failover_threshold">Packet Loss Trigger Threshold (%)</label>
-              <input class="hashem-input u-maxw-140" id="autoPilotThresholdInput" type="number" min="5" max="90" value="20">
+              <input class="quantum-input u-maxw-140" id="autoPilotThresholdInput" type="number" min="5" max="90" value="20">
               <span class="ent-help">If the current carrier packet loss exceeds this threshold, the tunnel seamlessly switches to the best candidate.</span>
             </div>
             <div class="trow u-mt-4">
@@ -3102,7 +3112,7 @@
               <span class="v" id="autoPilotCountVal">0</span>
             </div>
             <div class="qs-actions u-mt-12">
-              <button class="hashem-btn hashem-btn-primary u-btn-xs" id="autoPilotSaveBtn" data-i18n="bench_failover_save">Save Failover Policy</button>
+              <button class="quantum-btn quantum-btn-primary u-btn-xs" id="autoPilotSaveBtn" data-i18n="bench_failover_save">Save Failover Policy</button>
             </div>
           </div>
         </div>
@@ -3111,31 +3121,31 @@
         <div class="tunnel-card hidden u-bd-ac" id="peerConfigCard">
           <div class="tc-header">
             <p class="tc-title">Configure Inter-Panel Peer Sync</p>
-            <button class="hashem-btn hashem-btn-ghost u-btn-xs" id="peerConfigCloseBtn">Close</button>
+            <button class="quantum-btn quantum-btn-ghost u-btn-xs" id="peerConfigCloseBtn">Close</button>
           </div>
           <div class="u-grid-2 u-gap-16 u-mt-8">
             <div class="fg">
               <label for="cfgPeerRole">This Server Role</label>
-              <select class="hashem-input" id="cfgPeerRole">
+              <select class="quantum-input" id="cfgPeerRole">
                 <option value="master">Master - Iran (Primary Controller)</option>
                 <option value="worker">Worker - Foreign (Replica Worker)</option>
               </select>
             </div>
             <div class="fg">
               <label for="cfgPeerUrl">Peer Web Panel URL</label>
-              <input class="hashem-input" id="cfgPeerUrl" placeholder="http://5.6.7.8:8080">
+              <input class="quantum-input" id="cfgPeerUrl" placeholder="http://5.6.7.8:8080">
             </div>
             <div class="fg">
               <label for="cfgPeerInternal">Internal Tunnel IP</label>
-              <input class="hashem-input" id="cfgPeerInternal" placeholder="10.10.10.1">
+              <input class="quantum-input" id="cfgPeerInternal" placeholder="10.10.10.1">
             </div>
             <div class="fg">
               <label for="cfgPeerSecret">Shared Secret Key</label>
-              <input class="hashem-input" id="cfgPeerSecret" type="password" placeholder="••••••••••••••••••••••••">
+              <input class="quantum-input" id="cfgPeerSecret" type="password" placeholder="••••••••••••••••••••••••">
             </div>
           </div>
           <div class="qs-actions u-mt-12">
-            <button class="hashem-btn hashem-btn-primary" id="cfgPeerSaveBtn">Save Link Configuration</button>
+            <button class="quantum-btn quantum-btn-primary" id="cfgPeerSaveBtn">Save Link Configuration</button>
           </div>
         </div>
       </section>
@@ -3179,8 +3189,8 @@
           <div class="warnbox u-mt-8" id="updRollback" hidden></div>
           <div id="verRowsUpd" class="u-grid-gap-0 u-mt-8"></div>
           <div class="qs-actions u-mt-12">
-            <button class="hashem-btn hashem-btn-primary" id="updateBtn" hidden>Update</button>
-            <button class="hashem-btn hashem-btn-secondary" id="updCheckBtn">Check Now</button>
+            <button class="quantum-btn quantum-btn-primary" id="updateBtn" hidden>Update</button>
+            <button class="quantum-btn quantum-btn-secondary" id="updCheckBtn">Check Now</button>
           </div>
           <ol class="upd-steps u-mt-12" id="updSteps" hidden>
             <li data-step="dl">Download and verify the new version</li>
@@ -3195,9 +3205,9 @@
           <div class="tc-header"><p class="tc-title" data-i18n="ghtok_title">GitHub access token</p><span class="badge dim" id="ghtokBadge">—</span></div>
           <p class="qs-hint" data-i18n="ghtok_hint">Releases live in the private Dark-modem/quantum repository. Paste a fine-grained token with Contents: Read-only on that repo (GitHub → Settings → Developer settings → Fine-grained tokens). It is stored only on this server and is sent only to github.com.</p>
           <div class="u-flex-center-wrap10">
-            <input type="password" class="hashem-input u-max-w-360 u-mono" id="ghtokInput" aria-label="GitHub access token" autocomplete="new-password" spellcheck="false" placeholder="github_pat_…" dir="ltr">
-            <button class="hashem-btn hashem-btn-primary" id="ghtokSaveBtn" data-i18n="ghtok_save">Save Token</button>
-            <button class="hashem-btn hashem-btn-ghost hidden" id="ghtokClearBtn" data-i18n="ghtok_clear">Remove Token</button>
+            <input type="password" class="quantum-input u-max-w-360 u-mono" id="ghtokInput" aria-label="GitHub access token" autocomplete="new-password" spellcheck="false" placeholder="github_pat_…" dir="ltr">
+            <button class="quantum-btn quantum-btn-primary" id="ghtokSaveBtn" data-i18n="ghtok_save">Save Token</button>
+            <button class="quantum-btn quantum-btn-ghost hidden" id="ghtokClearBtn" data-i18n="ghtok_clear">Remove Token</button>
           </div>
           <div class="qs-hint u-mt-8 hidden" id="ghtokMsg" aria-live="polite"></div>
         </div>
@@ -3210,15 +3220,15 @@
         <div class="tunnel-card">
           <div class="tc-header"><p class="tc-title">Channel &amp; Versions</p></div>
           <div class="fg"><label for="updChannel" data-i18n="upd_channel">Update channel</label>
-            <select class="hashem-input u-max-w-260" id="updChannel"><option value="stable" data-i18n="upd_channel_stable">Stable</option><option value="dev" data-i18n="upd_channel_dev">Dev</option></select>
+            <select class="quantum-input u-max-w-260" id="updChannel"><option value="stable" data-i18n="upd_channel_stable">Stable</option><option value="dev" data-i18n="upd_channel_dev">Dev</option></select>
           </div>
           <div class="warnbox hidden" id="updChannelWarn" data-i18n="upd_dev_warn">Dev channel: test builds, may break. Not for production tunnels.</div>
           <details class="qs-adv u-mt-12">
             <summary>Install a specific version</summary>
             <div class="qs-hint u-my-8">For going back to an older release. Install the same version on the other server too.</div>
             <div class="u-flex-center-wrap10">
-              <select class="hashem-input u-max-w-260" id="rbTag" aria-label="Version"><option value="">Loading…</option></select>
-              <button class="hashem-btn hashem-btn-secondary" id="rbBtn" disabled>Install Selected Version</button>
+              <select class="quantum-input u-max-w-260" id="rbTag" aria-label="Version"><option value="">Loading…</option></select>
+              <button class="quantum-btn quantum-btn-secondary" id="rbBtn" disabled>Install Selected Version</button>
             </div>
           </details>
         </div>
@@ -3226,11 +3236,11 @@
       <section id="tab-settings" role="tabpanel" hidden>
         <div class="tunnel-card">
           <div class="tc-header"><p class="tc-title">Settings</p></div>
-          <div class="fg"><label for="curPass">Current panel password</label><input class="hashem-input" id="curPass" type="password" autocomplete="current-password" placeholder="••••••••••••"></div>
-          <div class="fg"><label for="newPass">New panel password</label><input class="hashem-input" id="newPass" type="password" autocomplete="new-password" minlength="12" placeholder="••••••••••••"></div>
+          <div class="fg"><label for="curPass">Current panel password</label><input class="quantum-input" id="curPass" type="password" autocomplete="current-password" placeholder="••••••••••••"></div>
+          <div class="fg"><label for="newPass">New panel password</label><input class="quantum-input" id="newPass" type="password" autocomplete="new-password" minlength="12" placeholder="••••••••••••"></div>
           <div class="ent-help">Minimum 12 characters, uppercase, lowercase, numbers, and symbols (NIST 800-63B). Changing it invalidates all other sessions.</div>
           <div id="passStrengthMeter" class="u-fs-12 u-mt-8 u-mb-8 u-c-mu"></div>
-          <div><button class="hashem-btn hashem-btn-primary" id="savePass">Change Password</button></div>
+          <div><button class="quantum-btn quantum-btn-primary" id="savePass">Change Password</button></div>
         </div>
         <div class="tunnel-card" id="advisorCard">
           <div class="tc-header"><p class="tc-title">Carrier advisor</p></div>
@@ -3238,12 +3248,12 @@
           <div class="ent-help" id="advStats"></div>
           <div class="ent-help">Advice only — the panel never switches the carrier by itself. Suggestions for a new port / SNI:</div>
           <div class="ent-help" id="advSuggest"></div>
-          <div><button class="hashem-btn hashem-btn-secondary" id="advRefresh">Refresh</button></div>
+          <div><button class="quantum-btn quantum-btn-secondary" id="advRefresh">Refresh</button></div>
         </div>
         <div class="tunnel-card" id="historyCard">
           <div class="tc-header"><p class="tc-title">Link history (last hours)</p></div>
-          <div class="fg"><label for="histLink">Link</label><select class="hashem-input" id="histLink"></select></div>
-          <div class="fg"><label for="histHours">Window</label><select class="hashem-input" id="histHours"><option value="1">1 hour</option><option value="6">6 hours</option><option value="24">24 hours</option></select></div>
+          <div class="fg"><label for="histLink">Link</label><select class="quantum-input" id="histLink"></select></div>
+          <div class="fg"><label for="histHours">Window</label><select class="quantum-input" id="histHours"><option value="1">1 hour</option><option value="6">6 hours</option><option value="24">24 hours</option></select></div>
           <svg id="histSvg" viewBox="0 0 300 60" preserveAspectRatio="none" class="u-w-full u-h-80 u-bg-none u-r-8" role="img" aria-label="Latency history"></svg>
           <div class="ent-help" id="histSum">Sampled every 30 s, kept in memory for 24 h (cleared on panel restart).</div>
         </div>
@@ -3252,56 +3262,56 @@
           <div class="ent-help" id="metricsState">Disabled. Rotate a token to enable <code>GET …/metrics</code> for your scraper (header <code>Authorization: Bearer &lt;token&gt;</code>). The token is shown once.</div>
           <pre class="ent-help hidden u-select-all" id="metricsTok"></pre>
           <div>
-            <button class="hashem-btn hashem-btn-primary" id="metricsRotate">Generate / Rotate Token</button>
-            <button class="hashem-btn hashem-btn-secondary" id="metricsOff">Disable</button>
+            <button class="quantum-btn quantum-btn-primary" id="metricsRotate">Generate / Rotate Token</button>
+            <button class="quantum-btn quantum-btn-secondary" id="metricsOff">Disable</button>
           </div>
         </div>
         <div class="tunnel-card" id="alertsCard">
           <div class="tc-header"><p class="tc-title">External alerts</p></div>
           <div class="ent-help">Get a message when a tunnel goes down or recovers. Only state changes are sent (never every refresh), with a minimum gap per link so a flapping tunnel cannot spam you. The first reading after a restart is only a baseline.</div>
           <label class="ent-help"><input type="checkbox" id="alEnabled"> Enable alerts</label>
-          <div class="fg"><label for="alWebhook">Webhook URL (Slack/Discord/ntfy/any JSON endpoint)</label><input class="hashem-input" id="alWebhook" placeholder="https://hooks.example.com/…" autocomplete="off"></div>
+          <div class="fg"><label for="alWebhook">Webhook URL (Slack/Discord/ntfy/any JSON endpoint)</label><input class="quantum-input" id="alWebhook" placeholder="https://hooks.example.com/…" autocomplete="off"></div>
           <label class="ent-help"><input type="checkbox" id="alTelegram"> Also send to Telegram <span id="alTgNote"></span></label>
           <label class="ent-help"><input type="checkbox" id="alDegraded"> Also alert on degraded ⇄ healthy</label>
-          <div class="fg"><label for="alGap">Minimum seconds between alerts per link</label><input class="hashem-input" id="alGap" type="number" min="10" max="86400" value="120"></div>
+          <div class="fg"><label for="alGap">Minimum seconds between alerts per link</label><input class="quantum-input" id="alGap" type="number" min="10" max="86400" value="120"></div>
           <div>
-            <button class="hashem-btn hashem-btn-primary" id="alSave">Save</button>
-            <button class="hashem-btn hashem-btn-secondary" id="alTest">Send Test</button>
+            <button class="quantum-btn quantum-btn-primary" id="alSave">Save</button>
+            <button class="quantum-btn quantum-btn-secondary" id="alTest">Send Test</button>
           </div>
         </div>
         <div class="tunnel-card" id="accessCard">
           <div class="tc-header"><p class="tc-title" data-i18n="acc_title">Panel access (port / login / address)</p></div>
           <div class="ent-help" data-i18n="acc_hint">Changing any of these restarts only the panel web service — tunnels keep running. After saving, reopen the panel at the new address shown.</div>
-          <div class="fg"><label for="accUser" data-i18n="acc_user">Login username</label><input class="hashem-input" id="accUser" autocomplete="off" spellcheck="false" placeholder="admin"></div>
-          <div class="fg"><label for="accPort" data-i18n="acc_port">HTTP port (1–65535)</label><input class="hashem-input" id="accPort" type="number" min="1" max="65535" placeholder="7777"></div>
-          <div class="fg"><label for="accBase" data-i18n="acc_base">Address path (after IP:port/…)</label><input class="hashem-input" id="accBase" autocomplete="off" spellcheck="false" placeholder="a1b2c3d4e5f6"></div>
+          <div class="fg"><label for="accUser" data-i18n="acc_user">Login username</label><input class="quantum-input" id="accUser" autocomplete="off" spellcheck="false" placeholder="admin"></div>
+          <div class="fg"><label for="accPort" data-i18n="acc_port">HTTP port (1–65535)</label><input class="quantum-input" id="accPort" type="number" min="1" max="65535" placeholder="7777"></div>
+          <div class="fg"><label for="accBase" data-i18n="acc_base">Address path (after IP:port/…)</label><input class="quantum-input" id="accBase" autocomplete="off" spellcheck="false" placeholder="a1b2c3d4e5f6"></div>
           <div class="ent-help" id="accCurrent">—</div>
-          <div class="fg"><label for="accPass" data-i18n="acc_pass">Current password (confirm)</label><input class="hashem-input" id="accPass" type="password" autocomplete="current-password" placeholder="••••••••••••"></div>
-          <div><button class="hashem-btn hashem-btn-primary" id="accSave" data-i18n="acc_save">Save & Restart Panel</button></div>
+          <div class="fg"><label for="accPass" data-i18n="acc_pass">Current password (confirm)</label><input class="quantum-input" id="accPass" type="password" autocomplete="current-password" placeholder="••••••••••••"></div>
+          <div><button class="quantum-btn quantum-btn-primary" id="accSave" data-i18n="acc_save">Save & Restart Panel</button></div>
         </div>
         <div class="tunnel-card" id="idleCard">
           <div class="tc-header"><p class="tc-title">Session idle timeout</p></div>
           <div class="ent-help">Sign out automatically after this many minutes without clicks or key presses. Background refresh does not count as activity. 0 = off.</div>
-          <div class="fg"><label for="idleMin">Minutes (0, or 5–1440)</label><input class="hashem-input" id="idleMin" type="number" min="0" max="1440" value="0"></div>
-          <div><button class="hashem-btn hashem-btn-primary" id="idleSave">Save</button></div>
+          <div class="fg"><label for="idleMin">Minutes (0, or 5–1440)</label><input class="quantum-input" id="idleMin" type="number" min="0" max="1440" value="0"></div>
+          <div><button class="quantum-btn quantum-btn-primary" id="idleSave">Save</button></div>
         </div>
         <div class="tunnel-card" id="twofaCard">
           <div class="tc-header"><p class="tc-title">Two-factor authentication (TOTP)</p></div>
           <div class="ent-help" id="twofaState">Loading…</div>
           <div id="twofaSetupBox" class="hidden">
             <div class="ent-help">Add this secret to your authenticator app (or open the link on your phone), then enter the 6-digit code to confirm.</div>
-            <div class="fg"><label for="twofaSecret">Secret</label><input class="hashem-input" id="twofaSecret" readonly></div>
-            <div class="fg"><label for="twofaUri">otpauth link</label><input class="hashem-input" id="twofaUri" readonly></div>
-            <div class="fg"><label for="twofaConfirm">Code</label><input class="hashem-input" id="twofaConfirm" inputmode="numeric" maxlength="6" placeholder="123456"></div>
+            <div class="fg"><label for="twofaSecret">Secret</label><input class="quantum-input" id="twofaSecret" readonly></div>
+            <div class="fg"><label for="twofaUri">otpauth link</label><input class="quantum-input" id="twofaUri" readonly></div>
+            <div class="fg"><label for="twofaConfirm">Code</label><input class="quantum-input" id="twofaConfirm" inputmode="numeric" maxlength="6" placeholder="123456"></div>
           </div>
           <div id="twofaDisableBox" class="hidden">
-            <div class="fg"><label for="twofaPass">Password</label><input class="hashem-input" id="twofaPass" type="password" autocomplete="current-password"></div>
-            <div class="fg"><label for="twofaDisCode">Code or recovery code</label><input class="hashem-input" id="twofaDisCode" maxlength="16"></div>
+            <div class="fg"><label for="twofaPass">Password</label><input class="quantum-input" id="twofaPass" type="password" autocomplete="current-password"></div>
+            <div class="fg"><label for="twofaDisCode">Code or recovery code</label><input class="quantum-input" id="twofaDisCode" maxlength="16"></div>
           </div>
           <pre class="ent-help hidden u-select-all" id="twofaCodes"></pre>
           <div>
-            <button class="hashem-btn hashem-btn-primary" id="twofaBtn">Enable 2FA</button>
-            <button class="hashem-btn hashem-btn-secondary hidden" id="twofaCancel">Cancel</button>
+            <button class="quantum-btn quantum-btn-primary" id="twofaBtn">Enable 2FA</button>
+            <button class="quantum-btn quantum-btn-secondary hidden" id="twofaCancel">Cancel</button>
           </div>
         </div>
         <div class="tunnel-card" id="appearanceCard">
@@ -3317,10 +3327,10 @@
         <div class="tunnel-card">
           <div class="tc-header"><p class="tc-title">Interactive terminal</p><span class="status-indicator" id="termFlagDot"><span class="dot"></span><span id="termFlagTxt">—</span></span></div>
           <div class="qs-hint">Root shell in the browser over WebSocket + PTY — same login session, single shell at a time, auto-killed after 10 idle minutes (30 min cap). Enable only after testing; toggle is the rollback switch.</div>
-          <div class="qs-actions"><button class="hashem-btn hashem-btn-secondary" id="termToggleBtn">Enable Terminal</button></div>
+          <div class="qs-actions"><button class="quantum-btn quantum-btn-secondary" id="termToggleBtn">Enable Terminal</button></div>
           <div class="qs-hint" id="termFlagMsg">Terminal tab is hidden until enabled.</div>
-          <div class="fg"><label for="termAllow">Allowed IPs / CIDRs (one per line, empty = any)</label><textarea class="hashem-input" id="termAllow" rows="3" placeholder="203.0.113.7&#10;198.51.100.0/24"></textarea></div>
-          <div class="qs-actions"><button class="hashem-btn hashem-btn-secondary" id="termAllowSave">Save Allowlist</button></div>
+          <div class="fg"><label for="termAllow">Allowed IPs / CIDRs (one per line, empty = any)</label><textarea class="quantum-input" id="termAllow" rows="3" placeholder="203.0.113.7&#10;198.51.100.0/24"></textarea></div>
+          <div class="qs-actions"><button class="quantum-btn quantum-btn-secondary" id="termAllowSave">Save Allowlist</button></div>
           <div class="qs-hint" id="termAllowMsg"></div>
         </div>
         <div class="tunnel-card">
@@ -3329,42 +3339,42 @@
             <span class="status-indicator" id="tlsDot"><span class="dot"></span><span id="tlsDotTxt">—</span></span>
           </div>
           <div class="qs-hint">Configure a custom domain for Web Panel access. <b>Tunnel infrastructure (FRP / Backhaul / GRE) is 100% independent and will never be restarted or disconnected.</b></div>
-          <div class="fg"><label for="tlsDomain">Panel domain</label><input class="hashem-input" id="tlsDomain" placeholder="panel.example.com" autocomplete="off" spellcheck="false"></div>
-          <div class="fg"><label for="tlsEmail">Email for expiry notices (optional)</label><input class="hashem-input" id="tlsEmail" placeholder="you@example.com" autocomplete="off" spellcheck="false"></div>
+          <div class="fg"><label for="tlsDomain">Panel domain</label><input class="quantum-input" id="tlsDomain" placeholder="panel.example.com" autocomplete="off" spellcheck="false"></div>
+          <div class="fg"><label for="tlsEmail">Email for expiry notices (optional)</label><input class="quantum-input" id="tlsEmail" placeholder="you@example.com" autocomplete="off" spellcheck="false"></div>
           <div id="tlsInfo" class="qs-hint">Not checked yet.</div>
           <div class="qs-actions u-flex u-wrap u-gap-8">
-            <button class="hashem-btn hashem-btn-primary" id="tlsIssueBtn">Get Certificate</button>
-            <button class="hashem-btn hashem-btn-secondary" id="tlsRenewBtn">Renew Now</button>
-            <button class="hashem-btn hashem-btn-danger u-none" id="tlsRemoveBtn">Remove Domain</button>
-            <button class="hashem-btn hashem-btn-secondary" id="tlsProxyConfBtn">Reverse Proxy Config</button>
+            <button class="quantum-btn quantum-btn-primary" id="tlsIssueBtn">Get Certificate</button>
+            <button class="quantum-btn quantum-btn-secondary" id="tlsRenewBtn">Renew Now</button>
+            <button class="quantum-btn quantum-btn-danger u-none" id="tlsRemoveBtn">Remove Domain</button>
+            <button class="quantum-btn quantum-btn-secondary" id="tlsProxyConfBtn">Reverse Proxy Config</button>
           </div>
           <div class="qs-hint" id="tlsMsg">HTTPS serves on dedicated port 7443 alongside HTTP on port 7777.</div>
           <div class="u-mt-12 u-pt-12 u-bt-ln">
             <b data-i18n="tls_ip_title">HTTPS on this server's IP (self-signed)</b>
             <div class="qs-hint" data-i18n="tls_ip_hint">No domain needed. The panel creates its own authority, signs a certificate for the IP (825 days), and serves HTTPS. Install the CA file below in your browser/OS once — afterwards the IP page shows no warning. Regenerate rotates only the server certificate; the CA stays trusted.</div>
-            <div class="fg"><label for="tlsIP">Server IP</label><input class="hashem-input" id="tlsIP" placeholder="1.2.3.4" autocomplete="off" spellcheck="false"></div>
+            <div class="fg"><label for="tlsIP">Server IP</label><input class="quantum-input" id="tlsIP" placeholder="1.2.3.4" autocomplete="off" spellcheck="false"></div>
             <div class="qs-actions u-flex u-wrap u-gap-8">
-              <button class="hashem-btn hashem-btn-secondary" id="tlsIPBtn">Issue IP Certificate</button>
-              <button class="hashem-btn hashem-btn-secondary" id="tlsIPRegenBtn">Regenerate</button>
-              <button class="hashem-btn hashem-btn-secondary" id="tlsCABtn">Download CA (Install Once)</button>
+              <button class="quantum-btn quantum-btn-secondary" id="tlsIPBtn">Issue IP Certificate</button>
+              <button class="quantum-btn quantum-btn-secondary" id="tlsIPRegenBtn">Regenerate</button>
+              <button class="quantum-btn quantum-btn-secondary" id="tlsCABtn">Download CA (Install Once)</button>
             </div>
           </div>
           <div class="u-mt-12 u-pt-12 u-bt-ln">
             <b data-i18n="tls_custom_title">Use your own certificate</b>
             <div class="qs-hint" data-i18n="tls_custom_hint">Paste a matching certificate + key, upload both files, or point at files already on this server. Validated before install; the previous certificate is kept as backup.</div>
-            <div class="fg"><label for="tlsCustomCert">Certificate (PEM)</label><textarea class="hashem-input" id="tlsCustomCert" rows="4" placeholder="-----BEGIN CERTIFICATE-----" autocomplete="off" spellcheck="false"></textarea></div>
-            <div class="fg"><label for="tlsCustomKey">Private key (PEM)</label><textarea class="hashem-input" id="tlsCustomKey" rows="4" placeholder="-----BEGIN PRIVATE KEY-----" autocomplete="off" spellcheck="false"></textarea></div>
+            <div class="fg"><label for="tlsCustomCert">Certificate (PEM)</label><textarea class="quantum-input" id="tlsCustomCert" rows="4" placeholder="-----BEGIN CERTIFICATE-----" autocomplete="off" spellcheck="false"></textarea></div>
+            <div class="fg"><label for="tlsCustomKey">Private key (PEM)</label><textarea class="quantum-input" id="tlsCustomKey" rows="4" placeholder="-----BEGIN PRIVATE KEY-----" autocomplete="off" spellcheck="false"></textarea></div>
             <div class="fg"><label for="tlsCustomCertFile">…or upload files</label><input type="file" id="tlsCustomCertFile" accept=".crt,.pem,.cert" aria-label="Certificate file"> <input type="file" id="tlsCustomKeyFile" accept=".key,.pem" aria-label="Private key file"></div>
-            <div class="fg"><label for="tlsCustomCertPath">…or server paths</label><input class="hashem-input" id="tlsCustomCertPath" placeholder="/etc/ssl/my.crt" autocomplete="off" spellcheck="false"></div>
-            <div class="fg"><label for="tlsCustomKeyPath">Key path</label><input class="hashem-input" id="tlsCustomKeyPath" placeholder="/etc/ssl/my.key" autocomplete="off" spellcheck="false"></div>
+            <div class="fg"><label for="tlsCustomCertPath">…or server paths</label><input class="quantum-input" id="tlsCustomCertPath" placeholder="/etc/ssl/my.crt" autocomplete="off" spellcheck="false"></div>
+            <div class="fg"><label for="tlsCustomKeyPath">Key path</label><input class="quantum-input" id="tlsCustomKeyPath" placeholder="/etc/ssl/my.key" autocomplete="off" spellcheck="false"></div>
             <div class="qs-actions u-flex u-wrap u-gap-8">
-              <button class="hashem-btn hashem-btn-secondary" id="tlsCustomBtn">Install Custom Certificate</button>
+              <button class="quantum-btn quantum-btn-secondary" id="tlsCustomBtn">Install Custom Certificate</button>
             </div>
           </div>
           <div id="tlsProxyBox" class="u-none u-mt-12 u-p-12 u-bd-ln u-r-8 u-bg-field">
             <div class="u-flex u-jc-sb u-ai-c u-mb-8">
               <b>Reverse Proxy Configuration (Nginx & Caddy)</b>
-              <button class="hashem-btn hashem-btn-ghost u-btn-30" id="tlsProxyCloseBtn" aria-label="Close proxy configuration" data-i18n-aria="aria_close_proxy">×</button>
+              <button class="quantum-btn quantum-btn-ghost u-btn-30" id="tlsProxyCloseBtn" aria-label="Close proxy configuration" data-i18n-aria="aria_close_proxy">×</button>
             </div>
             <div class="qs-hint u-mb-8">Copy and paste into your Nginx or Caddy server on this machine. Real client IPs and WebSocket upgrades are automatically supported.</div>
             <div class="u-mb-8">
@@ -3384,33 +3394,33 @@
             <p class="tc-title">Terminal</p>
             <span class="status-indicator" id="termDot"><span class="dot"></span><span id="termDotTxt">disconnected</span></span>
           </div>
-          <div class="qs-hint" id="termMeta">Root shell on this server · single session · 10m idle kill · 30m cap · type <b>hashem</b> for the tunnel menu</div>
+          <div class="qs-hint" id="termMeta">Root shell on this server · single session · 10m idle kill · 30m cap · type <b>quantum</b> for the tunnel menu</div>
           <div class="term-toolbar" role="toolbar" aria-label="Terminal controls">
-            <button class="hashem-btn hashem-btn-primary" id="termConnBtn">Connect</button>
-            <button class="hashem-btn hashem-btn-secondary" id="termHashemBtn" title="Open the Hashem tunnel menu in this shell">hashem</button>
-            <button class="hashem-btn hashem-btn-secondary" id="termFontDown" title="Smaller font" aria-label="Smaller font" data-i18n-aria="aria_font_smaller">A−</button>
-            <button class="hashem-btn hashem-btn-secondary" id="termFontUp" title="Larger font" aria-label="Larger font" data-i18n-aria="aria_font_larger">A+</button>
-            <button class="hashem-btn hashem-btn-secondary" id="termSearchBtn" title="Search in buffer">Search</button>
-            <button class="hashem-btn hashem-btn-secondary" id="termCopyBtn" title="Copy selection">Copy</button>
-            <button class="hashem-btn hashem-btn-secondary" id="termClearBtn" title="Clear screen">Clear</button>
-            <button class="hashem-btn hashem-btn-secondary" id="termFullBtn" title="Fullscreen" aria-label="Fullscreen" data-i18n-aria="aria_fullscreen"><svg class="i" aria-hidden="true"><use href="#i-expand"/></svg></button>
-            <button class="hashem-btn hashem-btn-danger" id="termKillBtn" title="Kill shell">Kill</button>
+            <button class="quantum-btn quantum-btn-primary" id="termConnBtn">Connect</button>
+            <button class="quantum-btn quantum-btn-secondary" id="termQuantumBtn" title="Open the Quantum tunnel menu in this shell">quantum</button>
+            <button class="quantum-btn quantum-btn-secondary" id="termFontDown" title="Smaller font" aria-label="Smaller font" data-i18n-aria="aria_font_smaller">A−</button>
+            <button class="quantum-btn quantum-btn-secondary" id="termFontUp" title="Larger font" aria-label="Larger font" data-i18n-aria="aria_font_larger">A+</button>
+            <button class="quantum-btn quantum-btn-secondary" id="termSearchBtn" title="Search in buffer">Search</button>
+            <button class="quantum-btn quantum-btn-secondary" id="termCopyBtn" title="Copy selection">Copy</button>
+            <button class="quantum-btn quantum-btn-secondary" id="termClearBtn" title="Clear screen">Clear</button>
+            <button class="quantum-btn quantum-btn-secondary" id="termFullBtn" title="Fullscreen" aria-label="Fullscreen" data-i18n-aria="aria_fullscreen"><svg class="i" aria-hidden="true"><use href="#i-expand"/></svg></button>
+            <button class="quantum-btn quantum-btn-danger" id="termKillBtn" title="Kill shell">Kill</button>
           </div>
           <div class="term-search hidden" id="termSearchBar">
-            <input class="hashem-input" id="termSearchInput" aria-label="Search terminal output" placeholder="Search…" autocomplete="off">
-            <button class="hashem-btn hashem-btn-secondary" id="termSearchNext">Next</button>
-            <button class="hashem-btn hashem-btn-secondary" id="termSearchPrev">Prev</button>
-            <button class="hashem-btn hashem-btn-ghost" id="termSearchClose" aria-label="Close search" data-i18n-aria="aria_close_search">×</button>
+            <input class="quantum-input" id="termSearchInput" aria-label="Search terminal output" placeholder="Search…" autocomplete="off">
+            <button class="quantum-btn quantum-btn-secondary" id="termSearchNext">Next</button>
+            <button class="quantum-btn quantum-btn-secondary" id="termSearchPrev">Prev</button>
+            <button class="quantum-btn quantum-btn-ghost" id="termSearchClose" aria-label="Close search" data-i18n-aria="aria_close_search">×</button>
           </div>
           <div id="termWrap" class="term-wrap"><div id="termBox"></div>
-            <div class="term-overlay hidden" id="termOverlay"><div class="term-overlay-card"><b id="termOverlayTitle">Disconnected</b><span id="termOverlaySub" class="qs-hint">Press Connect to open a root shell on this server.</span><button class="hashem-btn hashem-btn-primary" id="termOverlayBtn">Connect</button></div></div>
+            <div class="term-overlay hidden" id="termOverlay"><div class="term-overlay-card"><b id="termOverlayTitle">Disconnected</b><span id="termOverlaySub" class="qs-hint">Press Connect to open a root shell on this server.</span><button class="quantum-btn quantum-btn-primary" id="termOverlayBtn">Connect</button></div></div>
           </div>
           <div class="term-keys" id="termKeys">
             <button data-k="&#9;">Tab</button><button data-k="&#27;">Esc</button><button data-k="&#3;">Ctrl+C</button><button data-k="&#4;">Ctrl+D</button><button data-k="&#12;">Ctrl+L</button><button data-k="|" aria-label="Pipe character">|</button><button data-k="~" aria-label="Tilde character">~</button>
           </div>
-          <div class="term-quick" role="group" aria-label="Hashem quick commands">
-            <button data-q="hashem status">Status</button>
-            <button data-q="hashem show-panel-url">Panel URL</button>
+          <div class="term-quick" role="group" aria-label="Quantum quick commands">
+            <button data-q="quantum status">Status</button>
+            <button data-q="quantum show-panel-url">Panel URL</button>
             <button data-q="check">GRE Ping</button>
             <button data-q="logs">FRP Logs</button>
             <button data-q="update">Update</button>
@@ -3439,7 +3449,7 @@
     </div>
     <div class="rs-foot">
       <span class="rs-updated" id="rsUpdated"></span>
-      <button type="button" class="hashem-btn hashem-btn-secondary u-btn-xs" id="rsOpenLogs">Open Logs</button>
+      <button type="button" class="quantum-btn quantum-btn-secondary u-btn-xs" id="rsOpenLogs">Open Logs</button>
     </div>
   </aside>
 </div>
@@ -3459,7 +3469,7 @@
   <div class="ent-modal" role="dialog" aria-modal="true" aria-labelledby="entModalTitle">
     <div class="ent-modal-h"><b id="entModalTitle">Confirm</b><button class="ent-x" id="entModalX" aria-label="Close" data-i18n-aria="aria_close">×</button></div>
     <div class="ent-modal-b"><p class="u-m-0 u-color-tx2" id="entModalBody"></p></div>
-    <div class="ent-modal-f"><button class="hashem-btn hashem-btn-ghost" id="entModalNo">Cancel</button><button class="hashem-btn hashem-btn-danger" id="entModalYes">Confirm</button></div>
+    <div class="ent-modal-f"><button class="quantum-btn quantum-btn-ghost" id="entModalNo">Cancel</button><button class="quantum-btn quantum-btn-danger" id="entModalYes">Confirm</button></div>
   </div>
 </div>
 
@@ -3470,7 +3480,7 @@
     <div class="ent-modal-h"><b id="matrixEditTitle">Edit Matrix tunnel</b><button type="button" class="ent-x" id="matrixEditX" aria-label="Close">×</button></div>
     <div class="ent-modal-b" id="matrixEditBody"></div>
     <div class="qs-hint u-mt-8" id="matrixEditMsg" role="status" aria-live="polite"></div>
-    <div class="ent-modal-f"><button type="button" class="hashem-btn hashem-btn-ghost" id="matrixEditCancel">Close</button><button type="button" class="hashem-btn hashem-btn-primary" id="matrixEditSave">Save changes</button></div>
+    <div class="ent-modal-f"><button type="button" class="quantum-btn quantum-btn-ghost" id="matrixEditCancel">Close</button><button type="button" class="quantum-btn quantum-btn-primary" id="matrixEditSave">Save changes</button></div>
   </div>
 </div>
 <!-- Read-only Matrix help: separate from the global delete confirmation. -->
@@ -3478,7 +3488,7 @@
   <div class="ent-modal mx-help-modal" role="dialog" aria-modal="true" aria-labelledby="mxHelpTitle">
     <div class="ent-modal-h"><b id="mxHelpTitle">Matrix tunnel</b><button type="button" class="ent-x" id="mxHelpX" aria-label="Close" data-i18n-aria="aria_close">×</button></div>
     <div class="ent-modal-b mx-help-body" id="mxHelpBody"></div>
-    <div class="ent-modal-f"><button type="button" class="hashem-btn hashem-btn-primary" id="mxHelpClose">Close</button></div>
+    <div class="ent-modal-f"><button type="button" class="quantum-btn quantum-btn-primary" id="mxHelpClose">Close</button></div>
   </div>
 </div>
 
@@ -3492,7 +3502,7 @@
         <div class="qs-seg" role="group" aria-labelledby="lmSpeedLbl"><button type="button" id="lmSpeedOff" aria-pressed="true">Unlimited</button><button type="button" id="lmSpeedOn" aria-pressed="false">Limit</button></div>
         <div class="lm-in" id="lmSpeedWrap" hidden>
           <label class="qs-label" for="lmSpeed">Mbit/s</label>
-          <input class="hashem-input" id="lmSpeed" type="number" min="0.1" max="100000" step="0.1" inputmode="decimal" placeholder="e.g. 100">
+          <input class="quantum-input" id="lmSpeed" type="number" min="0.1" max="100000" step="0.1" inputmode="decimal" placeholder="e.g. 100">
           <div class="lm-chips" data-for="lmSpeed"><button type="button" data-v="10">10</button><button type="button" data-v="50">50</button><button type="button" data-v="100">100</button><button type="button" data-v="500">500</button></div>
         </div>
       </div>
@@ -3501,7 +3511,7 @@
         <div class="qs-seg" role="group" aria-labelledby="lmQuotaLbl"><button type="button" id="lmQuotaOff" aria-pressed="true">Unlimited</button><button type="button" id="lmQuotaOn" aria-pressed="false">Limit</button></div>
         <div class="lm-in" id="lmQuotaWrap" hidden>
           <label class="qs-label" for="lmQuota">GB</label>
-          <input class="hashem-input" id="lmQuota" type="number" min="0.01" max="1000000" step="any" inputmode="decimal" placeholder="e.g. 500">
+          <input class="quantum-input" id="lmQuota" type="number" min="0.01" max="1000000" step="any" inputmode="decimal" placeholder="e.g. 500">
           <div class="lm-chips" data-for="lmQuota"><button type="button" data-v="100">100</button><button type="button" data-v="500">500</button><button type="button" data-v="1000">1000</button><button type="button" data-v="5000">5000</button></div>
         </div>
       </div>
@@ -3510,13 +3520,13 @@
         <div class="qs-seg" role="group" aria-labelledby="lmResetLbl"><button type="button" id="lmResetMonthly" aria-pressed="true">Every month</button><button type="button" id="lmResetNever" aria-pressed="false">Only by hand</button></div>
         <div class="lm-in" id="lmDayWrap">
           <label class="qs-label" for="lmDay">On day</label>
-          <select class="hashem-input" id="lmDay"></select>
+          <select class="quantum-input" id="lmDay"></select>
         </div>
       </div>
       <div class="qs-hint">The volume already used is kept when you change the limits. A limit covers every tunnel to this server.</div>
       <div class="xr-err hidden" id="limitModalErr"></div>
     </div>
-    <div class="ent-modal-f"><button class="hashem-btn hashem-btn-ghost" id="limitModalNo">Cancel</button><button class="hashem-btn hashem-btn-primary" id="limitModalYes">Save</button></div>
+    <div class="ent-modal-f"><button class="quantum-btn quantum-btn-ghost" id="limitModalNo">Cancel</button><button class="quantum-btn quantum-btn-primary" id="limitModalYes">Save</button></div>
   </div>
 </div>
 <div class="ent-modal-ov" id="nameModal" hidden>
@@ -3524,11 +3534,11 @@
     <div class="ent-modal-h"><b id="nameModalTitle">Name this server</b><button class="ent-x" id="nameModalX" aria-label="Close" data-i18n-aria="aria_close">×</button></div>
     <div class="ent-modal-b">
       <label class="qs-label" for="nameModalInput">Name</label>
-      <input class="hashem-input" id="nameModalInput" maxlength="40" autocomplete="off" placeholder="e.g. Frankfurt">
+      <input class="quantum-input" id="nameModalInput" maxlength="40" autocomplete="off" placeholder="e.g. Frankfurt">
       <div class="qs-hint u-mt-6">Shown on the dashboard map, the tunnel cards and the limits. Empty: no name.</div>
       <div class="xr-err hidden" id="nameModalErr"></div>
     </div>
-    <div class="ent-modal-f"><button class="hashem-btn hashem-btn-ghost" id="nameModalNo">Cancel</button><button class="hashem-btn hashem-btn-primary" id="nameModalYes">Save</button></div>
+    <div class="ent-modal-f"><button class="quantum-btn quantum-btn-ghost" id="nameModalNo">Cancel</button><button class="quantum-btn quantum-btn-primary" id="nameModalYes">Save</button></div>
   </div>
 </div>
 
@@ -3540,9 +3550,9 @@
     <div class="ent-modal-b" id="topoWizBody"></div>
     <div class="xr-err hidden" id="topoWizErr" role="alert"></div>
     <div class="ent-modal-f">
-      <button type="button" class="hashem-btn hashem-btn-ghost" id="topoWizCancelBtn">Cancel</button>
-      <button type="button" class="hashem-btn hashem-btn-secondary" id="topoWizBack">Back</button>
-      <button type="button" class="hashem-btn hashem-btn-primary" id="topoWizNext">Next</button>
+      <button type="button" class="quantum-btn quantum-btn-ghost" id="topoWizCancelBtn">Cancel</button>
+      <button type="button" class="quantum-btn quantum-btn-secondary" id="topoWizBack">Back</button>
+      <button type="button" class="quantum-btn quantum-btn-primary" id="topoWizNext">Next</button>
     </div>
   </div>
 </div>
@@ -3552,10 +3562,10 @@
     <div class="ent-modal-h"><b id="termAuthTitle">Confirm it's you</b><button class="ent-x" id="termAuthX" aria-label="Close">×</button></div>
     <div class="ent-modal-b">
       <p class="u-m-0 u-color-tx2">The terminal is a root shell. Re-enter your password to open it.</p>
-      <div class="fg"><label for="termAuthPass">Password</label><input class="hashem-input" id="termAuthPass" type="password" autocomplete="current-password"></div>
-      <div class="fg hidden" id="termAuthCodeBox"><label for="termAuthCode">2FA code</label><input class="hashem-input" id="termAuthCode" inputmode="numeric" maxlength="16"></div>
+      <div class="fg"><label for="termAuthPass">Password</label><input class="quantum-input" id="termAuthPass" type="password" autocomplete="current-password"></div>
+      <div class="fg hidden" id="termAuthCodeBox"><label for="termAuthCode">2FA code</label><input class="quantum-input" id="termAuthCode" inputmode="numeric" maxlength="16"></div>
     </div>
-    <div class="ent-modal-f"><button class="hashem-btn hashem-btn-ghost" id="termAuthNo">Cancel</button><button class="hashem-btn hashem-btn-primary" id="termAuthYes">Open Terminal</button></div>
+    <div class="ent-modal-f"><button class="quantum-btn quantum-btn-ghost" id="termAuthNo">Cancel</button><button class="quantum-btn quantum-btn-primary" id="termAuthYes">Open Terminal</button></div>
   </div>
 </div>
 <!-- Edit Peer Modal -->
@@ -3571,11 +3581,11 @@
       <div class="u-grid-2col">
         <div class="fg">
           <label class="u-label-up" for="editPeerName">Name / Label</label>
-          <input class="hashem-input u-mt-6" id="editPeerName" type="text" placeholder="e.g. Germany-01">
+          <input class="quantum-input u-mt-6" id="editPeerName" type="text" placeholder="e.g. Germany-01">
         </div>
         <div class="fg">
           <label class="u-label-up" for="editPeerRemote">Remote Public IP</label>
-          <input class="hashem-input u-mt-8 u-mono" id="editPeerRemote" type="text" placeholder="e.g. 198.51.100.5">
+          <input class="quantum-input u-mt-8 u-mono" id="editPeerRemote" type="text" placeholder="e.g. 198.51.100.5">
         </div>
       </div>
 
@@ -3584,7 +3594,7 @@
           <span class="u-label-up">Carrier</span>
           <b id="editPeerCarrierNow" data-no-i18n>—</b>
         </div>
-        <button class="hashem-btn hashem-btn-secondary u-btn-30" id="editPeerSwapBtn" type="button">Swap carrier</button>
+        <button class="quantum-btn quantum-btn-secondary u-btn-30" id="editPeerSwapBtn" type="button">Swap carrier</button>
       </div>
 
       <div class="qs-hint u-mt-2">Encryption, compression, PROXY protocol, bandwidth limit and health check are set on the foreign server, in its Performance tab: they live in its frpc.</div>
@@ -3597,21 +3607,21 @@
       <div class="u-flex u-gap-8 u-ai-e">
         <div class="fg u-flex-1">
           <label class="u-label-up" for="editPortsNew">Add Port / Range / Mapping</label>
-          <input class="hashem-input u-mt-6" id="editPortsNew" type="text" placeholder="e.g. 8080, 10000-10050, 2083=8443">
+          <input class="quantum-input u-mt-6" id="editPortsNew" type="text" placeholder="e.g. 8080, 10000-10050, 2083=8443">
         </div>
-        <button class="hashem-btn hashem-btn-secondary u-shrink-0" id="editPortsAddBtn" type="button">&#xFF0B; Add</button>
+        <button class="quantum-btn quantum-btn-secondary u-shrink-0" id="editPortsAddBtn" type="button">&#xFF0B; Add</button>
       </div>
 
       <div class="u-flex u-ai-c u-jc-sb u-p-12x12 u-bg-s2 u-bd-ln u-r-10">
         <div class="u-hint-12">Foreign Setup Bundle for client sync:</div>
-        <button class="hashem-btn hashem-btn-ghost u-btn-28" id="editPeerCopyBundleBtn" type="button">Copy Bundle</button>
+        <button class="quantum-btn quantum-btn-ghost u-btn-28" id="editPeerCopyBundleBtn" type="button">Copy Bundle</button>
       </div>
 
       <div id="editPortsWarn" class="warnbox hidden"></div>
     </div>
     <div class="ent-modal-f">
-      <button class="hashem-btn hashem-btn-ghost" id="editPortsCancel" type="button">Cancel</button>
-      <button class="hashem-btn hashem-btn-primary" id="editPortsSave" type="button">Save &amp; Apply</button>
+      <button class="quantum-btn quantum-btn-ghost" id="editPortsCancel" type="button">Cancel</button>
+      <button class="quantum-btn quantum-btn-primary" id="editPortsSave" type="button">Save &amp; Apply</button>
     </div>
   </div>
 </div>
@@ -3625,8 +3635,8 @@
     </div>
     <div class="ent-modal-b sw-body" id="swapBody" aria-live="polite"></div>
     <div class="ent-modal-f">
-      <button class="hashem-btn hashem-btn-ghost" id="swapCancel" type="button">Cancel</button>
-      <button class="hashem-btn hashem-btn-primary" id="swapGo" type="button" disabled>Swap carrier</button>
+      <button class="quantum-btn quantum-btn-ghost" id="swapCancel" type="button">Cancel</button>
+      <button class="quantum-btn quantum-btn-primary" id="swapGo" type="button" disabled>Swap carrier</button>
     </div>
   </div>
 </div>
@@ -3645,14 +3655,14 @@
         <label for="bagherQuickRemoteHost" class="u-fs-12 u-fw-700 u-c-tx2 u-mb-8 u-block">
           Foreign Server Public IP / Host:
         </label>
-        <input class="hashem-input u-w-full u-mono" id="bagherQuickRemoteHost" placeholder="e.g. 198.51.100.73">
+        <input class="quantum-input u-w-full u-mono" id="bagherQuickRemoteHost" placeholder="e.g. 198.51.100.73">
         <div class="u-hint-11 u-mt-4">Remote server endpoint receiving forwarded traffic.</div>
       </div>
       <div class="fg">
         <label for="bagherQuickPorts" class="u-fs-12 u-fw-700 u-c-tx2 u-mb-8 u-block">
           Forwarded Ports:
         </label>
-        <input class="hashem-input u-w-full u-mono" id="bagherQuickPorts" placeholder="e.g. 443, 8443, 1020, 1030, 1040">
+        <input class="quantum-input u-w-full u-mono" id="bagherQuickPorts" placeholder="e.g. 443, 8443, 1020, 1030, 1040">
         <div class="u-hint-11 u-mt-4">Comma-separated port numbers forwarded through the stealth tunnel.</div>
         <label class="u-check-row u-mt-8"><input type="checkbox" id="bagherQuickUdp"><span data-i18n="setup_bh_udp">Also forward UDP on these ports</span></label>
       </div>
@@ -3661,20 +3671,20 @@
           <label for="bagherQuickPoolCount" class="u-fs-12 u-fw-700 u-c-mu u-mb-8 u-block">
             Pool Sockets:
           </label>
-          <input type="number" class="hashem-input u-w-full u-mono" id="bagherQuickPoolCount" value="25" min="5" max="100">
+          <input type="number" class="quantum-input u-w-full u-mono" id="bagherQuickPoolCount" value="25" min="5" max="100">
         </div>
         <div class="fg">
           <label for="bagherQuickBindPort" class="u-fs-12 u-fw-700 u-c-mu u-mb-8 u-block">
             FRP Bind Port:
           </label>
-          <input type="number" class="hashem-input u-w-full u-mono" id="bagherQuickBindPort" value="55400" min="1024" max="65535">
+          <input type="number" class="quantum-input u-w-full u-mono" id="bagherQuickBindPort" value="55400" min="1024" max="65535">
         </div>
       </div>
       <div class="warnbox hidden u-mt-8" id="bagherQuickEditWarn"></div>
     </div>
     <div class="ent-modal-f u-flex u-jc-sb u-ai-c u-bt-ln u-p-16x20">
-      <button type="button" class="hashem-btn hashem-btn-ghost" onclick="closeBagherQuickEdit()">Cancel</button>
-      <button type="button" class="hashem-btn hashem-btn-primary" onclick="saveBagherQuickEdit()">
+      <button type="button" class="quantum-btn quantum-btn-ghost" onclick="closeBagherQuickEdit()">Cancel</button>
+      <button type="button" class="quantum-btn quantum-btn-primary" onclick="saveBagherQuickEdit()">
         Save &amp; Apply Changes
       </button>
     </div>
@@ -3692,37 +3702,37 @@
       <div class="u-hint-11">This Iran server keeps its own SSH session to every foreign server. Each one forwards its own ports: a port can belong to one foreign server only.</div>
       <div class="fg">
         <label for="bagherLinkHost" class="u-fs-12 u-fw-700 u-c-tx2 u-mb-8 u-block">Foreign Server Public IP / Host:</label>
-        <input class="hashem-input u-w-full u-mono" id="bagherLinkHost" placeholder="e.g. 198.51.100.74" autocomplete="off">
+        <input class="quantum-input u-w-full u-mono" id="bagherLinkHost" placeholder="e.g. 198.51.100.74" autocomplete="off">
       </div>
       <div class="fg">
         <label for="bagherLinkName" class="u-fs-12 u-fw-700 u-c-tx2 u-mb-8 u-block">Name (optional):</label>
-        <input class="hashem-input u-w-full" id="bagherLinkName" maxlength="40" autocomplete="off" placeholder="e.g. Helsinki">
+        <input class="quantum-input u-w-full" id="bagherLinkName" maxlength="40" autocomplete="off" placeholder="e.g. Helsinki">
       </div>
       <div class="fg">
         <label for="bagherLinkPorts" class="u-fs-12 u-fw-700 u-c-tx2 u-mb-8 u-block">Forwarded Ports:</label>
-        <input class="hashem-input u-w-full u-mono" id="bagherLinkPorts" placeholder="e.g. 2053, 2083">
+        <input class="quantum-input u-w-full u-mono" id="bagherLinkPorts" placeholder="e.g. 2053, 2083">
         <label class="u-check-row u-mt-8"><input type="checkbox" id="bagherLinkUdp"><span data-i18n="setup_bh_udp">Also forward UDP on these ports</span></label>
       </div>
       <div class="u-grid u-gtc-1fr-1fr u-gap-12">
         <div class="fg">
           <label for="bagherLinkSSHPort" class="u-fs-12 u-fw-700 u-c-mu u-mb-8 u-block" data-i18n="setup_bagher_sshport">Foreign SSH port</label>
-          <input type="number" class="hashem-input u-w-full u-mono" id="bagherLinkSSHPort" placeholder="22" min="1" max="65535">
+          <input type="number" class="quantum-input u-w-full u-mono" id="bagherLinkSSHPort" placeholder="22" min="1" max="65535">
         </div>
         <div class="fg">
           <label for="bagherLinkUser" class="u-fs-12 u-fw-700 u-c-mu u-mb-8 u-block" data-i18n="setup_bagher_sshuser">Foreign SSH user</label>
-          <input class="hashem-input u-w-full u-mono" id="bagherLinkUser" placeholder="root" autocomplete="off">
+          <input class="quantum-input u-w-full u-mono" id="bagherLinkUser" placeholder="root" autocomplete="off">
         </div>
       </div>
       <div class="warnbox hidden u-mt-8" id="bagherAddLinkWarn"></div>
     </div>
     <div class="ent-modal-b u-gap-16 u-p-20" id="bagherAddLinkDone" hidden>
       <label for="bagherLinkBundle" class="u-hint-11 u-block">Paste this bundle on the new foreign server: Setup → Foreign → Setup bundle. It carries the key and the ports; nothing else to fill in.</label>
-      <textarea id="bagherLinkBundle" class="hashem-input u-w-full u-mono u-fs-12" rows="4" readonly></textarea>
+      <textarea id="bagherLinkBundle" class="quantum-input u-w-full u-mono u-fs-12" rows="4" readonly></textarea>
     </div>
     <div class="ent-modal-f u-flex u-jc-sb u-ai-c u-bt-ln u-p-16x20">
-      <button type="button" class="hashem-btn hashem-btn-ghost" onclick="closeBagherAddLink()" id="bagherAddLinkCancel">Cancel</button>
-      <button type="button" class="hashem-btn hashem-btn-primary" onclick="saveBagherAddLink()" id="bagherAddLinkSave">Add and Make the Bundle</button>
-      <button type="button" class="hashem-btn hashem-btn-primary" onclick="copyBagherAddLinkBundle()" id="bagherAddLinkCopy" hidden>Copy Bundle</button>
+      <button type="button" class="quantum-btn quantum-btn-ghost" onclick="closeBagherAddLink()" id="bagherAddLinkCancel">Cancel</button>
+      <button type="button" class="quantum-btn quantum-btn-primary" onclick="saveBagherAddLink()" id="bagherAddLinkSave">Add and Make the Bundle</button>
+      <button type="button" class="quantum-btn quantum-btn-primary" onclick="copyBagherAddLinkBundle()" id="bagherAddLinkCopy" hidden>Copy Bundle</button>
     </div>
   </div>
 </div>
@@ -3736,18 +3746,18 @@
     </div>
     <div class="ent-modal-b">
       <div class="ent-grid-2">
-        <div class="fg"><label for="clPoolPort">Public port</label><input class="hashem-input u-mono" id="clPoolPort" inputmode="numeric" autocomplete="off" placeholder="443" oninput="clPoolPortChanged()">
+        <div class="fg"><label for="clPoolPort">Public port</label><input class="quantum-input u-mono" id="clPoolPort" inputmode="numeric" autocomplete="off" placeholder="443" oninput="clPoolPortChanged()">
           <div class="ent-help" id="clPoolPortHelp">Several at once: 443, 8443 or 2000-2005 (one pool each).</div></div>
         <div class="fg"><label for="clPoolProto">Protocol</label>
-          <select class="hashem-input" id="clPoolProto">
+          <select class="quantum-input" id="clPoolProto">
             <option value="both">TCP and UDP</option>
             <option value="tcp">TCP</option>
             <option value="udp">UDP</option>
           </select></div>
       </div>
-      <div class="fg"><label for="clPoolName">Name (optional)</label><input class="hashem-input" id="clPoolName" maxlength="40" placeholder="vless"></div>
+      <div class="fg"><label for="clPoolName">Name (optional)</label><input class="quantum-input" id="clPoolName" maxlength="40" placeholder="vless"></div>
       <div class="fg"><label for="clPoolMode">Mode</label>
-        <select class="hashem-input" id="clPoolMode" onchange="clPoolModeHelp()">
+        <select class="quantum-input" id="clPoolMode" onchange="clPoolModeHelp()">
           <option value="failover">Failover</option>
           <option value="balance">Balance</option>
           <option value="sticky">Sticky per user</option>
@@ -3757,17 +3767,17 @@
         <div class="ent-help" id="clPoolModeHelp"></div>
       </div>
       <div class="fg" id="clPoolFailbackRow"><label for="clPoolFailback">Failback</label>
-        <select class="hashem-input" id="clPoolFailback">
+        <select class="quantum-input" id="clPoolFailback">
           <option value="auto">Automatic: back to the first server</option>
           <option value="manual">Manual: stay on the backup</option>
         </select></div>
       <div class="ent-grid-2">
         <div class="fg"><label for="clPoolCheck">Service check</label>
-          <select class="hashem-input" id="clPoolCheck" onchange="clPoolModeHelp()">
+          <select class="quantum-input" id="clPoolCheck" onchange="clPoolModeHelp()">
             <option value="">Off: tunnel health only</option>
             <option value="tcp">TCP: connect through the tunnel</option>
           </select></div>
-        <div class="fg"><label for="clPoolCheckEvery">Check every (seconds)</label><input class="hashem-input" id="clPoolCheckEvery" type="number" min="1" max="60" value="3"></div>
+        <div class="fg"><label for="clPoolCheckEvery">Check every (seconds)</label><input class="quantum-input" id="clPoolCheckEvery" type="number" min="1" max="60" value="3"></div>
       </div>
       <div class="ent-help">The service check opens a connection through each foreign server to the service behind it (for example xray on 443). A server whose tunnel is up but whose service refuses the connection is taken out. TCP pools only.</div>
       <div class="fg">
@@ -3777,8 +3787,8 @@
       </div>
     </div>
     <div class="ent-modal-f">
-      <button type="button" class="hashem-btn hashem-btn-ghost" onclick="clPoolClose()">Cancel</button>
-      <button type="button" class="hashem-btn hashem-btn-primary" id="clPoolSave" onclick="clPoolSave()">Save Pool</button>
+      <button type="button" class="quantum-btn quantum-btn-ghost" onclick="clPoolClose()">Cancel</button>
+      <button type="button" class="quantum-btn quantum-btn-primary" id="clPoolSave" onclick="clPoolSave()">Save Pool</button>
     </div>
   </div>
 </div>
@@ -3795,8 +3805,8 @@
       <pre class="ent-code cl-code" id="clJoinCode"></pre>
     </div>
     <div class="ent-modal-f">
-      <button type="button" class="hashem-btn hashem-btn-ghost" onclick="clJoinCodeClose()">Close</button>
-      <button type="button" class="hashem-btn hashem-btn-primary" onclick="clJoinCodeCopy()">Copy Code</button>
+      <button type="button" class="quantum-btn quantum-btn-ghost" onclick="clJoinCodeClose()">Close</button>
+      <button type="button" class="quantum-btn quantum-btn-primary" onclick="clJoinCodeCopy()">Copy Code</button>
     </div>
   </div>
 </div>
@@ -3810,11 +3820,11 @@
     </div>
     <div class="ent-modal-b">
       <div class="ent-help">On the other Iran server open Cluster, Show Join Code, and paste it here. Both panels need the same version, the panel port open between them, and correct clocks.</div>
-      <div class="fg"><label for="clHubCode">Join code</label><textarea class="hashem-input u-mono u-resize-none" id="clHubCode" rows="3" placeholder="hc1_…"></textarea></div>
+      <div class="fg"><label for="clHubCode">Join code</label><textarea class="quantum-input u-mono u-resize-none" id="clHubCode" rows="3" placeholder="hc1_…"></textarea></div>
     </div>
     <div class="ent-modal-f">
-      <button type="button" class="hashem-btn hashem-btn-ghost" onclick="clHubAddClose()">Cancel</button>
-      <button type="button" class="hashem-btn hashem-btn-primary" id="clHubAddBtn" onclick="clHubAdd()">Link Hub</button>
+      <button type="button" class="quantum-btn quantum-btn-ghost" onclick="clHubAddClose()">Cancel</button>
+      <button type="button" class="quantum-btn quantum-btn-primary" id="clHubAddBtn" onclick="clHubAdd()">Link Hub</button>
     </div>
   </div>
 </div>

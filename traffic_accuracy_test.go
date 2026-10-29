@@ -125,7 +125,7 @@ func TestBagherCarrierEnds(t *testing.T) {
 		t.Fatalf("foreign end: %+v", e)
 	}
 	r := carrierRules(bagherCarrierEnds(fo), "eth0")
-	for _, line := range []string{"-A HASHEM_ACCT_IN -i eth0 -s 203.0.113.5/32 -p tcp --dport 22", "-A HASHEM_ACCT_OUT -o eth0 -d 203.0.113.5/32 -p tcp --sport 22"} {
+	for _, line := range []string{"-A QUANTUM_ACCT_IN -i eth0 -s 203.0.113.5/32 -p tcp --dport 22", "-A QUANTUM_ACCT_OUT -o eth0 -d 203.0.113.5/32 -p tcp --sport 22"} {
 		if !strings.Contains(r, line+"\n") {
 			t.Fatalf("missing %q in\n%s", line, r)
 		}
@@ -140,12 +140,12 @@ func TestAcctRuleKey(t *testing.T) {
 		in   bool
 		want acctKey
 	}{
-		{"-A HASHEM_ACCT_IN -i eth0 -p tcp -m tcp --dport 3080", true, acctKey{Listen: true, Port: 3080}},
-		{"-A HASHEM_ACCT_OUT -o eth0 -p udp -m udp --sport 3080", false, acctKey{Listen: true, Port: 3080}},
-		{"-A HASHEM_ACCT_IN -i eth0 -s 203.0.113.5/32 -p tcp -m tcp --dport 22", true, acctKey{Listen: true, Port: 22, Peer: "203.0.113.5"}},
-		{"-A HASHEM_ACCT_OUT -o eth0 -d 203.0.113.5/32 -p tcp -m tcp --sport 22", false, acctKey{Listen: true, Port: 22, Peer: "203.0.113.5"}},
-		{"-A HASHEM_ACCT_IN -i eth0 -s 198.51.100.1/32 -p tcp -m tcp --sport 2222", true, acctKey{Port: 2222, Peer: "198.51.100.1"}},
-		{"-A HASHEM_ACCT_OUT -o eth0 -d 198.51.100.1/32 -p tcp -m tcp --dport 2222", false, acctKey{Port: 2222, Peer: "198.51.100.1"}},
+		{"-A QUANTUM_ACCT_IN -i eth0 -p tcp -m tcp --dport 3080", true, acctKey{Listen: true, Port: 3080}},
+		{"-A QUANTUM_ACCT_OUT -o eth0 -p udp -m udp --sport 3080", false, acctKey{Listen: true, Port: 3080}},
+		{"-A QUANTUM_ACCT_IN -i eth0 -s 203.0.113.5/32 -p tcp -m tcp --dport 22", true, acctKey{Listen: true, Port: 22, Peer: "203.0.113.5"}},
+		{"-A QUANTUM_ACCT_OUT -o eth0 -d 203.0.113.5/32 -p tcp -m tcp --sport 22", false, acctKey{Listen: true, Port: 22, Peer: "203.0.113.5"}},
+		{"-A QUANTUM_ACCT_IN -i eth0 -s 198.51.100.1/32 -p tcp -m tcp --sport 2222", true, acctKey{Port: 2222, Peer: "198.51.100.1"}},
+		{"-A QUANTUM_ACCT_OUT -o eth0 -d 198.51.100.1/32 -p tcp -m tcp --dport 2222", false, acctKey{Port: 2222, Peer: "198.51.100.1"}},
 	} {
 		if got, ok := acctRuleKey(c.rule, c.in); !ok || got != c.want {
 			t.Errorf("%s: %+v %v, want %+v", c.rule, got, ok, c.want)
@@ -165,12 +165,12 @@ func TestCarrierTagCounters(t *testing.T) {
 	sshFwdMu.Lock()
 	_ = saveSSHFwdConfigLocked(cfg)
 	sshFwdMu.Unlock()
-	save := "*filter\n:HASHEM_ACCT_IN - [0:0]\n:HASHEM_ACCT_OUT - [0:0]\n" +
-		"[1:100] -A INPUT -j HASHEM_ACCT_IN\n[1:100] -A OUTPUT -j HASHEM_ACCT_OUT\n" +
-		"[1:1000] -A HASHEM_ACCT_IN -p tcp -m tcp --dport 3080\n[1:10] -A HASHEM_ACCT_IN -p udp -m udp --dport 3080\n" +
-		"[1:2000] -A HASHEM_ACCT_OUT -p tcp -m tcp --sport 3080\n" +
-		"[1:300] -A HASHEM_ACCT_IN -p tcp -m tcp --dport 3090\n[1:400] -A HASHEM_ACCT_OUT -p tcp -m tcp --sport 3090\n" +
-		"[1:50] -A HASHEM_ACCT_IN -s 198.51.100.1/32 -p tcp -m tcp --sport 22\n[1:60] -A HASHEM_ACCT_OUT -d 198.51.100.1/32 -p tcp -m tcp --dport 22\nCOMMIT\n"
+	save := "*filter\n:QUANTUM_ACCT_IN - [0:0]\n:QUANTUM_ACCT_OUT - [0:0]\n" +
+		"[1:100] -A INPUT -j QUANTUM_ACCT_IN\n[1:100] -A OUTPUT -j QUANTUM_ACCT_OUT\n" +
+		"[1:1000] -A QUANTUM_ACCT_IN -p tcp -m tcp --dport 3080\n[1:10] -A QUANTUM_ACCT_IN -p udp -m udp --dport 3080\n" +
+		"[1:2000] -A QUANTUM_ACCT_OUT -p tcp -m tcp --sport 3080\n" +
+		"[1:300] -A QUANTUM_ACCT_IN -p tcp -m tcp --dport 3090\n[1:400] -A QUANTUM_ACCT_OUT -p tcp -m tcp --sport 3090\n" +
+		"[1:50] -A QUANTUM_ACCT_IN -s 198.51.100.1/32 -p tcp -m tcp --sport 22\n[1:60] -A QUANTUM_ACCT_OUT -d 198.51.100.1/32 -p tcp -m tcp --dport 22\nCOMMIT\n"
 	runner = func(ctx context.Context, name string, args ...string) ([]byte, error) {
 		if name == "iptables-save" {
 			return []byte(save), nil

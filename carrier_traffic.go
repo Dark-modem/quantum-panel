@@ -6,7 +6,7 @@ package main
 // public interface, where their bytes are mixed with everything else the
 // server does, so the dashboard chart showed nothing (or the whole NIC) for
 // them. They are counted with iptables instead: two filter chains,
-// HASHEM_ACCT_IN (jumped to from INPUT) and HASHEM_ACCT_OUT (from OUTPUT),
+// QUANTUM_ACCT_IN (jumped to from INPUT) and QUANTUM_ACCT_OUT (from OUTPUT),
 // hold one rule without a target per carrier port. Such a rule only counts;
 // every packet goes on through the firewall unchanged.
 //
@@ -28,8 +28,8 @@ import (
 )
 
 const (
-	acctIn  = "HASHEM_ACCT_IN"
-	acctOut = "HASHEM_ACCT_OUT"
+	acctIn  = "QUANTUM_ACCT_IN"
+	acctOut = "QUANTUM_ACCT_OUT"
 	// carrierKey is the pseudo interface the counters are filed under in the
 	// traffic ledger (no real interface name contains '@').
 	carrierKey = "@carrier"
@@ -347,7 +347,7 @@ func parseAcctSave(out string) (rx, tx uint64, ready bool) {
 }
 
 // acctRuleKey reads which end a counting rule belongs to from its text, as
-// iptables-save prints it ("-A HASHEM_ACCT_IN -i eth0 -s 1.2.3.4/32 -p tcp
+// iptables-save prints it ("-A QUANTUM_ACCT_IN -i eth0 -s 1.2.3.4/32 -p tcp
 // -m tcp --sport 22"). In the IN chain --dport is a port this server listens
 // on and -s the peer; in the OUT chain --sport and -d.
 func acctRuleKey(rule string, in bool) (acctKey, bool) {
@@ -568,7 +568,7 @@ func carrierLoadFam(bin, rules string) error {
 }
 
 // carrierDrop removes both chains and the jumps to them, IPv4 and IPv6
-// (hashem.sh acct_chains_drop does the same on uninstall).
+// (quantum.sh acct_chains_drop does the same on uninstall).
 func carrierDrop() {
 	carrierDropFam("iptables")
 	carrierDropFam("ip6tables")

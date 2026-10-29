@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// Every engine/role the Setup tab offers maps to the matching hashem.sh verb, and
+// Every engine/role the Setup tab offers maps to the matching quantum.sh verb, and
 // the route choice reaches the foreign setups that dial over GRE.
 func TestInstallerArgsEngineMatrix(t *testing.T) {
 	base := setupRequest{LocalPub: "203.0.113.1", RemotePub: "203.0.113.2", LocalGre: "10.10.10.2",

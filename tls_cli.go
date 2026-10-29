@@ -1,7 +1,7 @@
 package main
 
 // gre-panel tls ...: the Settings tab's Domain & HTTPS card for the terminal.
-// hashem.sh calls it, so both run the same checks and fixes (tls_acme.go).
+// quantum.sh calls it, so both run the same checks and fixes (tls_acme.go).
 // The running panel service is restarted by the caller to pick the files up;
 // this process never opens the HTTPS port itself (cliMode).
 
@@ -29,7 +29,7 @@ func cliStart() bool {
 	}
 	cliMode = true
 	if _, err := os.Stat(cfgPath()); err != nil {
-		fmt.Fprintln(os.Stderr, "The panel is not installed on this server ("+cfgPath()+" is missing). Install it first: hashem")
+		fmt.Fprintln(os.Stderr, "The panel is not installed on this server ("+cfgPath()+" is missing). Install it first: quantum")
 		return false
 	}
 	log.SetOutput(io.Discard)

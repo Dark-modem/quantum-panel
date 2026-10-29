@@ -29,17 +29,17 @@ func TestSdNotifyBeat(t *testing.T) {
 	}
 }
 
-// Empty socket path and HASHEM_NO_SDNOTIFY=1 are silent no-ops.
+// Empty socket path and QUANTUM_NO_SDNOTIFY=1 are silent no-ops.
 func TestSdNotifyNoop(t *testing.T) {
 	if err := sdNotifyOnce("", "WATCHDOG=1"); err != nil {
 		t.Fatalf("empty path must be a no-op: %v", err)
 	}
-	t.Setenv("HASHEM_NO_SDNOTIFY", "1")
+	t.Setenv("QUANTUM_NO_SDNOTIFY", "1")
 	prev := sdNotifySocket
 	sdNotifySocket = func() string { return "/nonexistent/notify.sock" }
 	defer func() { sdNotifySocket = prev }()
 	if err := sdNotify("WATCHDOG=1"); err != nil {
-		t.Fatalf("HASHEM_NO_SDNOTIFY=1 must be a no-op: %v", err)
+		t.Fatalf("QUANTUM_NO_SDNOTIFY=1 must be a no-op: %v", err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

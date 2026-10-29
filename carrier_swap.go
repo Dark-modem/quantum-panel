@@ -506,7 +506,7 @@ func switchPeerCarrier(p peerRecord, to carrierChoice) (string, error) {
 		bin = "backhaul"
 	}
 	if !engineBinaryPresent(bin) {
-		return "", fmt.Errorf("%s binary not found (install it with `hashem` first); nothing was changed", bin)
+		return "", fmt.Errorf("%s binary not found (install it with `quantum` first); nothing was changed", bin)
 	}
 	token := p.Token
 	if token == "" {
@@ -602,7 +602,7 @@ func switchPeerCarrier(p peerRecord, to carrierChoice) (string, error) {
 	return out.String(), nil
 }
 
-// frpsServerToml is the frps config hashem.sh peer_write_frps writes.
+// frpsServerToml is the frps config quantum.sh peer_write_frps writes.
 func frpsServerToml(port int, token string) string {
 	_, maxPool := effectivePoolValues()
 	quic := port + 1
@@ -1395,7 +1395,7 @@ func startSwapOn(w http.ResponseWriter, r *http.Request, t swapTunnel, to carrie
 		bin = "backhaul"
 	}
 	if !engineBinaryPresent(bin) {
-		writeAPIError(w, r, "E-ENGINE-01", bin+" is not installed on this server (install it with `hashem` first); nothing was changed")
+		writeAPIError(w, r, "E-ENGINE-01", bin+" is not installed on this server (install it with `quantum` first); nothing was changed")
 		return
 	}
 	if _, err := startSwap(t, to, manual); err != nil {
@@ -1540,7 +1540,7 @@ func relaySwapToIran(w http.ResponseWriter, r *http.Request, to carrierChoice) {
 		bin = "backhaul"
 	}
 	if !engineBinaryPresent(bin) {
-		writeAPIError(w, r, "E-ENGINE-01", bin+" is not installed on this server (install it with `hashem` first); nothing was changed")
+		writeAPIError(w, r, "E-ENGINE-01", bin+" is not installed on this server (install it with `quantum` first); nothing was changed")
 		return
 	}
 	status, data, err := peerCallJSON("POST", "/api/peer/swap-request", map[string]string{"carrier": to.ID()}, 20*time.Second)

@@ -177,8 +177,8 @@ button, a, input, select, textarea, [role="button"], [role="menuitem"] {
 .u-check-row { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; }
 .u-label-up { font-size: 12px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--mu); }
 .u-label-up-block { font-size: 12px; text-transform: uppercase; color: var(--mu); display: block; margin-bottom: 4px; }
-.hashem-btn.u-btn-30 { height: 30px; padding: 0 12px; font-size: 12px; }
-.hashem-btn.u-btn-28 { height: 28px; padding: 0 10px; font-size: 12px; }
+.quantum-btn.u-btn-30 { height: 30px; padding: 0 12px; font-size: 12px; }
+.quantum-btn.u-btn-28 { height: 28px; padding: 0 10px; font-size: 12px; }
 .wd-stat-label.u-stat-label { font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--mu); letter-spacing: .05em; }
 .wd-stat-val.u-stat-val-ok { font-size: 17px; font-weight: 700; color: var(--ok); margin: 8px 0 4px 0; }
 .u-card-tint { border: 1px solid var(--ln); background: color-mix(in srgb, var(--bg) 80%, var(--s1)); }
@@ -189,7 +189,7 @@ button, a, input, select, textarea, [role="button"], [role="menuitem"] {
 
 /* ---- Touch targets: >=44x44 CSS px for every interactive control on coarse pointers ---- */
 @media (pointer: coarse) {
-  button, [role="button"], [role="tab"], .nav-item, .hashem-btn, .det-copy, .ent-x, .drawer-x, .menu-btn, summary, select,
+  button, [role="button"], [role="tab"], .nav-item, .quantum-btn, .det-copy, .ent-x, .drawer-x, .menu-btn, summary, select,
   input:not([type="checkbox"]):not([type="radio"]):not([type="range"]) { min-height: 44px; min-width: 44px; }
   .u-check-row, label:has(> input[type="checkbox"]), label:has(> input[type="radio"]) { min-height: 44px; }
   input[type="checkbox"], input[type="radio"] { min-width: 24px; min-height: 24px; }

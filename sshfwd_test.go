@@ -56,7 +56,7 @@ func TestSSHFwdBuildService(t *testing.T) {
 		RemoteHost:          "1.2.3.4",
 		RemoteUser:          "root",
 		RemoteSSHPort:       22,
-		KeyPath:             "/root/.ssh/hashem-fwd",
+		KeyPath:             "/root/.ssh/quantum-fwd",
 		Ports:               []int{443, 80},
 		BindAddr:            "0.0.0.0",
 		FRPBindPort:         55400,
@@ -68,7 +68,7 @@ func TestSSHFwdBuildService(t *testing.T) {
 	if !strings.Contains(svc, "ExecStart=/usr/local/bin/gre-panel bagher-carrier -link 1\n") {
 		t.Fatalf("bagher service must run the panel's carrier for link 1: %s", svc)
 	}
-	if !strings.Contains(svc, "Hashem Bagher Engine") {
+	if !strings.Contains(svc, "Quantum Bagher Engine") {
 		t.Fatalf("service description missing Bagher Engine: %s", svc)
 	}
 	cfg.Links = []BagherLink{{ID: 3, RemoteHost: "5.6.7.8", Ports: []int{9443}}}
@@ -96,8 +96,8 @@ func TestSSHFwdBuildForeignSetupCommand(t *testing.T) {
 		Ports:       []int{443, 8443},
 	}
 	cmd := buildForeignSetupCommand(cfg)
-	if !strings.Contains(cmd, "hashem-bagher-frpc.service") {
-		t.Fatalf("foreign setup missing hashem-bagher-frpc.service: %s", cmd)
+	if !strings.Contains(cmd, "quantum-bagher-frpc.service") {
+		t.Fatalf("foreign setup missing quantum-bagher-frpc.service: %s", cmd)
 	}
 	if !strings.Contains(cmd, "transport.poolCount = 25") {
 		t.Fatalf("foreign setup missing poolCount: %s", cmd)
@@ -133,7 +133,7 @@ func TestBagherBundleRoundtrip(t *testing.T) {
 		Ports:         []int{443, 8443, 1020},
 		BindAddr:      "127.0.0.1",
 	}
-	pub := "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGo345test hashem-bagher-carrier"
+	pub := "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGo345test quantum-bagher-carrier"
 
 	bundleStr, err := MakeBagherBundle(cfg, pub)
 	if err != nil {
@@ -253,7 +253,7 @@ func TestSSHFwdServiceBackoff(t *testing.T) {
 	if !strings.Contains(svc, "StartLimitIntervalSec=120") {
 		t.Fatalf("expected StartLimitIntervalSec=120 in service unit, got:\n%s", svc)
 	}
-	if !strings.Contains(svc, "After=network-online.target hashem-bagher-frps.service") {
+	if !strings.Contains(svc, "After=network-online.target quantum-bagher-frps.service") {
 		t.Fatalf("the carrier must start after frps, got:\n%s", svc)
 	}
 }
@@ -290,7 +290,7 @@ func TestBagherBundleGeneration(t *testing.T) {
 		FRPBindPort: 55400,
 		PoolCount:   25,
 	}
-	pubKey := "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleKey hashem-fwd"
+	pubKey := "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleKey quantum-fwd"
 	bundleStr, err := MakeBagherBundle(cfg, pubKey)
 	if err != nil {
 		t.Fatalf("failed to make bundle: %v", err)
@@ -432,7 +432,7 @@ func TestMigrateBagherFRPCTLS(t *testing.T) {
 	if string(got) != "transport.tls.enable = false\n"+legacy {
 		t.Fatalf("the key must come first, before any table:\n%s", got)
 	}
-	if len(ran) != 1 || ran[0] != "systemctl try-restart hashem-bagher-frpc.service" {
+	if len(ran) != 1 || ran[0] != "systemctl try-restart quantum-bagher-frpc.service" {
 		t.Fatalf("a running frpc must be restarted once, ran %q", ran)
 	}
 	if ok, _ := migrateBagherFRPCTLS(p); ok {

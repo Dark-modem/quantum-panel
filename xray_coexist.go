@@ -3,7 +3,7 @@ package main
 // Living next to an Xray panel. 3x-ui, Marzban, Hiddify and the like run
 // their own xray; the Xray tunnel must never take their ports, files or units.
 // The tunnel has its own binary (xrayBinPath, never /usr/local/bin/xray, which
-// the official installer uses), its own units (hashem-xray-N) and no API port.
+// the official installer uses), its own units (quantum-xray-N) and no API port.
 // This file finds who listens where and which panels are installed, and
 // refuses a link whose ports are taken.
 
@@ -20,8 +20,8 @@ import (
 
 // Paths are vars so tests point them at temp dirs.
 var (
-	xrayDir     = "/usr/local/lib/hashem/xray" // binary and its geo files
-	xrayBinPath = "/usr/local/lib/hashem/xray/xray"
+	xrayDir     = "/usr/local/lib/quantum/xray" // binary and its geo files
+	xrayBinPath = "/usr/local/lib/quantum/xray/xray"
 	xrayRoot    = "/" // where detectXrayPanels looks
 )
 
@@ -94,7 +94,7 @@ func xrayOwnerLabel(l xrayListener) string {
 	s := strings.ToLower(l.Exe + " " + l.Proc)
 	switch {
 	case xrayOwnPath(l.Exe):
-		return "the Hashem Xray tunnel"
+		return "the Quantum Xray tunnel"
 	case strings.Contains(s, "x-ui") || strings.Contains(s, "xray-linux"):
 		return "3x-ui (x-ui)"
 	case strings.Contains(s, "marzneshin"):

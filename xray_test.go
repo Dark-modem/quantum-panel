@@ -159,7 +159,7 @@ func TestXrayCreateDirectAndImport(t *testing.T) {
 		t.Fatalf("bundle %q", bundle)
 	}
 	link := m["link"].(map[string]any)
-	if link["id"] != float64(1) || link["unit"] != "hashem-xray-1" || link["name"] != "Frankfurt" {
+	if link["id"] != float64(1) || link["unit"] != "quantum-xray-1" || link["name"] != "Frankfurt" {
 		t.Errorf("link %v", link)
 	}
 	if keys := link["keys"].(map[string]any); keys["private_key"] != nil || keys["public_key"] == "" {
@@ -175,7 +175,7 @@ func TestXrayCreateDirectAndImport(t *testing.T) {
 	if !strings.Contains(unit, "ExecStart="+xrayBinPath+" run -c "+xrayLinkConfPath(1)) || !strings.Contains(unit, "XRAY_LOCATION_ASSET="+xrayDir) {
 		t.Errorf("unit:\n%s", unit)
 	}
-	if got := strings.Join(iran.systemctl, ","); got != "daemon-reload,enable hashem-xray-1,restart hashem-xray-1" {
+	if got := strings.Join(iran.systemctl, ","); got != "daemon-reload,enable quantum-xray-1,restart quantum-xray-1" {
 		t.Errorf("systemctl %s", got)
 	}
 	st := loadXrayState()
@@ -211,7 +211,7 @@ func TestXrayCreateDirectAndImport(t *testing.T) {
 		t.Errorf("foreign link %+v", fl)
 	}
 	fcfg := foreign.read(xrayLinkConfPath(1))
-	for _, w := range []string{`"protocol": "vless"`, `"privateKey"`, `"ip": [`, `"127.0.0.1"`, `"full:probe.hashem"`, `"type": "http"`} {
+	for _, w := range []string{`"protocol": "vless"`, `"privateKey"`, `"ip": [`, `"127.0.0.1"`, `"full:probe.quantum"`, `"type": "http"`} {
 		if !strings.Contains(fcfg, w) {
 			t.Errorf("foreign config lacks %s", w)
 		}
@@ -356,7 +356,7 @@ func TestXrayUpdateStopRemove(t *testing.T) {
 	if _, err := os.Stat(xrayUnitPath(1)); err == nil {
 		t.Error("unit left behind")
 	}
-	if got := strings.Join(e.systemctl, ","); got != "disable --now hashem-xray-1,disable --now hashem-xray-1,daemon-reload" {
+	if got := strings.Join(e.systemctl, ","); got != "disable --now quantum-xray-1,disable --now quantum-xray-1,daemon-reload" {
 		t.Errorf("systemctl %s", got)
 	}
 	// IDs are never reused.

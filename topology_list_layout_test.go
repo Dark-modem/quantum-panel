@@ -53,7 +53,7 @@ func TestTopologyListSemanticTable(t *testing.T) {
 		`tabindex="0"`,                              // rows are keyboard reachable
 		`$('topologiesList').addEventListener`,      // whole-row click opens the topology
 		`toastWarn(tr('', 'Delete topology'), topologyDeleteNotice(remaining))`, // delete explains blocked state
-		`hashem-btn-danger topo-delete`,             // delete is a danger button, never disabled
+		`quantum-btn-danger topo-delete`,             // delete is a danger button, never disabled
 		`let topologyLoadedOnce = false`,            // first-load gate: skeleton instead of empty-state flash
 		`if (!topologyLoadedOnce) topologyRender()`, // first load paints the skeleton immediately
 		`topologyLoading && !topologyLoadedOnce`,    // skeleton branch replaces the "No topology yet" row
@@ -77,7 +77,7 @@ func TestTopologyListModernChrome(t *testing.T) {
 		{"clickable rows", `\.topo-list-row\s*\{[^}]*cursor\s*:\s*pointer`},
 		{"keyboard focus ring on rows", `\.topo-list-row:focus-visible\s*\{[^}]*outline\s*:\s*2px\s+solid\s+var\(--ent-focus\)`},
 		{"flag plus IP server cell", `\.topo-server\s*\{[^}]*display\s*:\s*flex`},
-		{"pill action buttons", `\.topo-actions\s+\.hashem-btn\s*\{[^}]*border-radius\s*:\s*999px`},
+		{"pill action buttons", `\.topo-actions\s+\.quantum-btn\s*\{[^}]*border-radius\s*:\s*999px`},
 		{"red danger delete button", `\.topo-actions\s+\.topo-delete\s*\{[^}]*border\s*:\s*1px\s+solid\s+var\(--er\)`},
 		{"search box styling", `\.topo-search\s*\{[^}]*min-height\s*:`},
 		{"view toggle active state", `\.topo-view-toggle\s+button\[aria-pressed="true"\]`},

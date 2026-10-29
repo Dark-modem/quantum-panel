@@ -69,8 +69,8 @@ func TestRecoveryCodesSingleUse(t *testing.T) {
 }
 
 func TestTOTPURI(t *testing.T) {
-	u := totpURI("ABC234", "admin", "Hashem")
-	for _, w := range []string{"otpauth://totp/Hashem:admin", "secret=ABC234", "issuer=Hashem", "period=30"} {
+	u := totpURI("ABC234", "admin", "Quantum")
+	for _, w := range []string{"otpauth://totp/Quantum:admin", "secret=ABC234", "issuer=Quantum", "period=30"} {
 		if !strings.Contains(u, w) {
 			t.Errorf("uri %q missing %q", u, w)
 		}

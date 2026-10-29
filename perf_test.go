@@ -117,7 +117,7 @@ func TestEffectivePoolValues(t *testing.T) {
 	oldConfigDir := configDir
 	configDir = tmpDir
 	defer func() { configDir = oldConfigDir }()
-	t.Setenv("HASHEM_SCRIPT", filepath.Join(tmpDir, "missing.sh")) // force the file-based fallback
+	t.Setenv("QUANTUM_SCRIPT", filepath.Join(tmpDir, "missing.sh")) // force the file-based fallback
 
 	// auto, no state yet
 	pool, maxPool := effectivePoolValues()
@@ -149,7 +149,7 @@ func TestRescueTomlUsesEffectivePool(t *testing.T) {
 	oldConfigDir := configDir
 	configDir = tmpDir
 	defer func() { configDir = oldConfigDir }()
-	t.Setenv("HASHEM_SCRIPT", filepath.Join(tmpDir, "missing.sh"))
+	t.Setenv("QUANTUM_SCRIPT", filepath.Join(tmpDir, "missing.sh"))
 	if err := savePerfConfig(perfConfig{AutoPool: false, FRPPoolCount: 64, FRPMaxPool: 200}); err != nil {
 		t.Fatal(err)
 	}

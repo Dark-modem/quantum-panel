@@ -11,7 +11,7 @@ import (
 )
 
 func TestCurrentIranBundleExtraction(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "hashem_bundle_test_*")
+	tmpDir, err := os.MkdirTemp("", "quantum_bundle_test_*")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
@@ -59,7 +59,7 @@ func TestCurrentIranBundleExtraction(t *testing.T) {
 }
 
 func TestBenchmarkBackhaulCandidates(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "hashem_bh_bench_test_*")
+	tmpDir, err := os.MkdirTemp("", "quantum_bh_bench_test_*")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
@@ -104,7 +104,7 @@ ports = [
 func TestPeerApplyEngineHandler(t *testing.T) {
 	withTempConfig(t)
 	engineLab(t, []string{"backhaul", "frpc", "frps"}, []string{"backhaul-server", "backhaul-client"})
-	tmpDir, err := os.MkdirTemp("", "hashem_peer_engine_test_*")
+	tmpDir, err := os.MkdirTemp("", "quantum_peer_engine_test_*")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}

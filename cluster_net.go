@@ -166,7 +166,7 @@ func icmpEcho(id, seq uint16) []byte {
 	b[0] = 8 // echo request
 	binary.BigEndian.PutUint16(b[4:], id)
 	binary.BigEndian.PutUint16(b[6:], seq)
-	copy(b[8:], "hashemlb")
+	copy(b[8:], "quantumlb")
 	binary.BigEndian.PutUint16(b[2:], icmpChecksum(b))
 	return b
 }

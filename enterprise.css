@@ -1,4 +1,4 @@
-/* Hashem Panel — Enterprise Network Dashboard Design System (Phase 1)
+/* Quantum Panel — Enterprise Network Dashboard Design System (Phase 1)
  * Additive only: no existing selector is redefined here, only new .ent-*
  * components + page density helpers. Works on both dark/light themes
  * via the tokens in tokens.css.
@@ -182,9 +182,9 @@ body[data-t="light"] .ent-topo-node { background: var(--s1); }
 /* ---------- interactive terminal (Phase 3) ---------- */
 .term-live { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 8px color-mix(in srgb, var(--ok) 65%, transparent); animation: entPulse 2s ease-in-out infinite; }
 .term-toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.term-toolbar .hashem-btn { height: 32px; padding: 0 12px; font-size: 12.5px; }
+.term-toolbar .quantum-btn { height: 32px; padding: 0 12px; font-size: 12.5px; }
 .term-search { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.term-search .hashem-input { flex: 1; min-width: 160px; }
+.term-search .quantum-input { flex: 1; min-width: 160px; }
 .term-wrap { position: relative; border: 1px solid var(--ln2); border-radius: var(--r-md); background: var(--bg); min-height: 420px; height: 52dvh; overflow: hidden; }
 .term-wrap.full { position: fixed; inset: 12px; z-index: 140; height: auto; }
 .term-wrap #termBox, .term-wrap .xterm { height: 100%; }
@@ -207,7 +207,7 @@ body[data-t="light"] .ent-topo-node { background: var(--s1); }
 
 /* ---------- shared state blocks (empty / error / loading) — helpers: stateEmpty(), stateError(), skel() ---------- */
 .ent-empty > span:not(.ent-empty-ic) { color: var(--dim); max-width: 46ch; }
-.ent-empty .hashem-btn { margin-top: 4px; }
+.ent-empty .quantum-btn { margin-top: 4px; }
 .ent-empty.ent-empty-sm { padding: 16px 12px; }
 .ent-empty.ent-error { border-color: var(--er-badge-b, var(--er)); background: var(--er-soft, var(--sunk)); }
 .ent-empty.ent-error .ent-empty-ic { color: var(--er); }
@@ -404,7 +404,7 @@ html[data-rs="0"] .right-sidebar { display:none; }
   html[data-sb="1"] .sidebar .term-live { display:none; }
   html[data-sb="1"] .sidebar .nav-badge { position:absolute; top:2px; inset-inline-end:2px; min-width:16px; height:16px; padding:0 4px; font-size:12px; margin:0; box-shadow:0 0 0 2px var(--sidebar-bg); }
   html[data-sb="1"] .sidebar .sidebar-foot { flex-direction:column; padding:10px 8px; }
-  html[data-sb="1"] .sidebar .sidebar-foot .hashem-btn { padding:0; min-height:40px; width:100%; justify-content:center; }
+  html[data-sb="1"] .sidebar .sidebar-foot .quantum-btn { padding:0; min-height:40px; width:100%; justify-content:center; }
   html[data-sb="1"] .sidebar .sidebar-foot .sf-ic { display:block; }
   html[data-sb="1"] .sidebar .sidebar-foot .sf-t { display:none; }
   html[data-sb="1"] .sidebar .sidebar-nav { padding-inline:8px; }
@@ -417,7 +417,7 @@ html[data-rs="0"] .right-sidebar { display:none; }
 
 /* ---- tables: tools, sort, density, phone stacking ---- */
 .ent-tools { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin:10px 0 8px; }
-.ent-tools .hashem-input { flex:1 1 220px; max-width:360px; min-height:40px; }
+.ent-tools .quantum-input { flex:1 1 220px; max-width:360px; min-height:40px; }
 .ent-tbl th[data-sort] { cursor:pointer; user-select:none; position:sticky; }
 .ent-tbl th[data-sort]::after { content:"\2195"; margin-inline-start:6px; opacity:.35; font-size:12px; }
 .ent-tbl th[aria-sort="ascending"]::after { content:"\2191"; opacity:1; color:var(--ac); }
@@ -425,8 +425,8 @@ html[data-rs="0"] .right-sidebar { display:none; }
 .ent-tbl th[data-sort]:focus-visible { outline:2px solid var(--ent-focus); outline-offset:-2px; }
 .ent-tbl-wrap { max-height:min(60dvh, 520px); }
 html[data-dens="compact"] .ent-tbl tbody td, html[data-dens="compact"] .ent-tbl thead th { padding-block:4px; }
-html[data-dens="compact"] .hashem-table th, html[data-dens="compact"] .hashem-table td { padding-block:6px !important; }
-.hashem-table thead th { position:sticky; top:0; z-index:1; }
+html[data-dens="compact"] .quantum-table th, html[data-dens="compact"] .quantum-table td { padding-block:6px !important; }
+.quantum-table thead th { position:sticky; top:0; z-index:1; }
 [dir="rtl"] .ent-tbl thead th, [dir="rtl"] .ent-tbl td.num { text-align:right; }
 @media (max-width:640px) {
   .ent-tbl.ent-stack thead { display:none; }
@@ -461,7 +461,7 @@ html[data-dens="compact"] .hashem-table th, html[data-dens="compact"] .hashem-ta
 .onb-acts { display:flex; gap:10px; flex-wrap:wrap; }
 .onb-x { position:absolute; top:8px; inset-inline-end:8px; width:44px; height:44px; border:0; border-radius:12px; background:transparent; color:var(--tx2); font-size:22px; cursor:pointer; }
 .onb-x:hover { background:var(--sunk); color:var(--tx); }
-@media (max-width:640px) { .onb-acts .hashem-btn { flex:1 1 100%; min-height:48px; } }
+@media (max-width:640px) { .onb-acts .quantum-btn { flex:1 1 100%; min-height:48px; } }
 
 @media (hover:none), (max-width:640px) {
   .pal-esc { width:44px; height:44px; padding:0; font-size:0; border-radius:12px; display:grid; place-items:center; }
@@ -489,15 +489,15 @@ html[data-dens="compact"] .hashem-table th, html[data-dens="compact"] .hashem-ta
 .rsc-form[hidden], .rsc-join[hidden] { display:none; }
 .rsc-acts { display:flex; gap:10px; flex-wrap:wrap; }
 .rsc-code { display:flex; gap:8px; align-items:stretch; flex-wrap:wrap; }
-.rsc-code .hashem-input { flex:1 1 240px; min-width:0; font-size:12px; direction:ltr; text-align:left; }
+.rsc-code .quantum-input { flex:1 1 240px; min-width:0; font-size:12px; direction:ltr; text-align:left; }
 .rsc-ban-t { display:grid; gap:2px; min-width:0; text-align:start; }
 .rsc-ban-t b { color:var(--tx); }
 .rsc-ban-t span { color:var(--tx2); font-size:var(--fs-small); line-height:1.6; }
 @media (max-width:640px) {
   .tunnel-card.rsc-banner { grid-template-columns:auto minmax(0,1fr); }
-  .tunnel-card.rsc-banner .hashem-btn { grid-column:1 / -1; width:100%; min-height:48px; }
-  .rsc-acts .hashem-btn { flex:1 1 100%; min-height:48px; }
-  .rsc-code .hashem-btn { flex:1 1 100%; min-height:44px; }
+  .tunnel-card.rsc-banner .quantum-btn { grid-column:1 / -1; width:100%; min-height:48px; }
+  .rsc-acts .quantum-btn { flex:1 1 100%; min-height:48px; }
+  .rsc-code .quantum-btn { flex:1 1 100%; min-height:44px; }
 }
 
 
@@ -820,7 +820,7 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 .sw-result.warn { border-color: color-mix(in srgb, var(--wr) 50%, transparent); background: color-mix(in srgb, var(--wr) 9%, var(--s2)); }
 .sw-result.err { border-color: color-mix(in srgb, var(--er) 50%, transparent); background: color-mix(in srgb, var(--er) 9%, var(--s2)); }
 .sw-bundle { width: 100%; min-height: 64px; font-family: var(--font-mono); font-size: 12px; direction: ltr; resize: vertical; }
-.sw-result .hashem-btn { justify-self: start; }
+.sw-result .quantum-btn { justify-self: start; }
 
 @media (max-width: 600px) {
   .sw-route { padding: 12px 8px; gap: 8px; }
@@ -912,7 +912,7 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 @media (max-width: 700px) {
   .gw-stats, .gw-opts { grid-template-columns: 1fr; }
   .gw-wss-f { grid-template-columns: 1fr 1fr; }
-  .gw-wss-f .hashem-btn { grid-column: 1 / -1; }
+  .gw-wss-f .quantum-btn { grid-column: 1 / -1; }
 }
 
 /* Forwarded port count on tunnel cards (portCount in app.js) */
@@ -931,11 +931,11 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 .sp-row3 { grid-template-columns: 1fr 1fr 1fr; }
 .sp-ips { resize: vertical; min-height: 60px; }
 .sp-acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
-.sp-acts .hashem-btn { flex: 0 0 auto; }
+.sp-acts .quantum-btn { flex: 0 0 auto; }
 .sp-sub { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--ln); }
 .sp-sub > b { display: block; color: var(--tx); font-size: var(--fs-body); font-weight: 700; margin-bottom: 4px; }
 .sp-sub .qs-hint { margin-bottom: 10px; }
-.sp-sub .hashem-input { margin-bottom: 8px; }
+.sp-sub .quantum-input { margin-bottom: 8px; }
 .sp-tester { background: var(--sunk); border-radius: var(--r-md); padding: 14px; border-top: none; margin-top: 18px; }
 .sp-trun { display: flex; align-items: center; gap: 8px; color: var(--mu); font-size: var(--fs-small); margin-top: 10px; }
 .sp-ttable { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: var(--fs-small); }
@@ -1169,8 +1169,8 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 .tnl-ip, .tnl-ports { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tnl-state { display: flex; }
 .tnl-acts { display: flex; gap: 6px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
-.tnl-acts .hashem-btn { display: inline-flex; align-items: center; }
-.tnl-acts .hashem-btn svg.i, .tnl-acts svg.i { width: 18px; height: 18px; stroke-width: 2; flex: none; }
+.tnl-acts .quantum-btn { display: inline-flex; align-items: center; }
+.tnl-acts .quantum-btn svg.i, .tnl-acts svg.i { width: 18px; height: 18px; stroke-width: 2; flex: none; }
 @media (max-width: 900px) {
   .tnl-head { display: none; }
   .tnl-row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name state" "ip ip" "acts acts"; row-gap: 8px; }
@@ -1183,7 +1183,7 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 .topo-list-toolbar { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:16px; }
 .topo-list-title { display:flex; align-items:center; gap:10px; min-width:0; }
 .topo-list-title .tc-title { margin:0; }
-.topo-list-toolbar .hashem-btn { min-height:36px; gap:8px; }
+.topo-list-toolbar .quantum-btn { min-height:36px; gap:8px; }
 .topo-icon { width:18px; height:18px; flex:none; fill:none; stroke:currentColor; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
 .topo-list-wrap { min-width:0; max-width:100%; border:1px solid var(--ln); border-radius:var(--r-md); overflow:hidden; background:var(--s1); }
 .topo-list-table { display:block; width:100%; border-collapse:collapse; font-size:var(--fs-small); text-align:start; }
@@ -1205,7 +1205,7 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 .topo-server bdi { min-width:0; overflow-wrap:anywhere; }
 .topo-count { color:var(--ac); font-weight:700; font-variant-numeric:tabular-nums; }
 .topo-actions { display:flex; align-items:center; justify-content:flex-end; gap:8px; }
-.topo-actions .hashem-btn { height:30px; min-height:30px; padding:0 12px; border-radius:999px; font-size:var(--fs-caption); white-space:nowrap; gap:6px; }
+.topo-actions .quantum-btn { height:30px; min-height:30px; padding:0 12px; border-radius:999px; font-size:var(--fs-caption); white-space:nowrap; gap:6px; }
 .topo-actions .topo-view .topo-icon, .topo-actions .topo-delete .topo-icon { width:14px; height:14px; }
 .topo-delete-wrap { display:inline-flex; }
 .topo-actions .topo-delete { color:var(--er); background:transparent; border:1px solid var(--er); box-shadow:none; cursor:pointer; }

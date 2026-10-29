@@ -45,7 +45,7 @@ func handlePeersGet(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if _, ok := resp["bundle"]; !ok {
-			// old hashem.sh prints token only: rebuild the bundle from the
+			// old quantum.sh prints token only: rebuild the bundle from the
 			// registry record (live Iran pub + port fill the rest).
 			if p := findPeer(id); p != nil {
 				resp["bundle"] = MakeBundle(p.LocalPub, p.FrpPort, p.LocalGre, p.PeerGre, resp["token"], p.Ports, p.FRPTransport)
@@ -60,7 +60,7 @@ func handlePeersGet(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{"peers": peers, "peer_count": len(peers), "max": maxPeers(), "snapshot_age_ms": snap.AgeMs()})
 }
 
-// maxPeers is the foreign-server cap; hashem.sh enforces the same value
+// maxPeers is the foreign-server cap; quantum.sh enforces the same value
 // (MAX_PEERS, also overridable with GRE_MAX_PEERS).
 func maxPeers() int {
 	if v := os.Getenv("GRE_MAX_PEERS"); v != "" {
@@ -73,7 +73,7 @@ func maxPeers() int {
 
 // POST /api/peers just proxies validation errors from /api/setup role=add-peer.
 // The real creation path is /api/setup (role add-peer) so only one code path
-// shells out to hashem.sh. This endpoint exists for future per-peer edits.
+// shells out to quantum.sh. This endpoint exists for future per-peer edits.
 func handlePeersPost(w http.ResponseWriter, r *http.Request) {
 	writeAPIError(w, r, "E-PEER-06", "")
 }
@@ -81,7 +81,7 @@ func handlePeersPost(w http.ResponseWriter, r *http.Request) {
 // PATCH /api/peers — edit the configuration of an existing peer tunnel or main tunnel.
 // Body: { "id": N, "name": "...", "remote_pub": "...", "carrier": "...", "ports": [443, 2083] }
 // Strategy (graceful degradation):
-//  1. Try hashem.sh edit-peer --id N ... (or edit-peer-ports).
+//  1. Try quantum.sh edit-peer --id N ... (or edit-peer-ports).
 //  2. Fallback to direct edit: update peers.json, adjust kernel GRE remote endpoint,
 //     persist systemd unit, apply carrier mode, rewrite TOML proxy blocks, reload service, and allow UFW.
 type peerPatchRequest struct {
@@ -690,7 +690,7 @@ func editMainTunnelDirect(req peerPatchRequest, legacyPeer *peerRecord) (string,
 	// 3. Carrier mode change
 	if req.Carrier != "" {
 		_ = applyPeerCarrierDirect("gre-tunnel", req.Carrier)
-		_, _ = runHashemCarrierCmd("set", req.Carrier)
+		_, _ = runQuantumCarrierCmd("set", req.Carrier)
 	}
 
 	// 4. Ports change
@@ -879,12 +879,12 @@ func generateMainBundle(req peerPatchRequest, legacyPeer *peerRecord) string {
 	return MakeBundle(iranPub, frpPort, iranGre, foreignGre, token, ports, frpTrans)
 }
 
-// applyPeerCarrierDirect switches one tunnel interface: hashem.sh's
+// applyPeerCarrierDirect switches one tunnel interface: quantum.sh's
 // carrier_apply does the device, encap, firewall and MTU (it used to switch
 // every GRE interface, then this patched the encap by hand with the wrong
 // WSS port).
 func applyPeerCarrierDirect(greIf string, carrier string) error {
-	_, err := runHashemCarrierCmd("set", carrier, "--if", greIf)
+	_, err := runQuantumCarrierCmd("set", carrier, "--if", greIf)
 	return err
 }
 

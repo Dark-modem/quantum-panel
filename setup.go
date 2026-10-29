@@ -1,10 +1,10 @@
 package main
 
-// Setup API: validate the web form, then run the SAME hashem.sh install
+// Setup API: validate the web form, then run the SAME quantum.sh install
 // functions the CLI/menu use (single source of truth). The request fields
 // map 1:1 to the setup-iran / setup-foreign CLI flags at the bottom of
-// hashem.sh, and the installer script path is resolved next to the binary so it
-// works both in dev (./hashem.sh) and on servers (/usr/local/bin/).
+// quantum.sh, and the installer script path is resolved next to the binary so it
+// works both in dev (./quantum.sh) and on servers (/usr/local/bin/).
 //
 // Iran side: GRE + frps (token auto-generated, shown for copy to Foreign).
 // Foreign side: GRE + frpc (token entered manually, ports like "443, 2083").
@@ -46,20 +46,20 @@ const (
 	bundlePrefixGreBackhaul = "gh1_"
 )
 
-// ---- hashem.sh location ----
+// ---- quantum.sh location ----
 
-// scriptPath finds the installer: HASHEM_SCRIPT env wins, legacy
-// GRE_SCRIPT still accepted, else <bindir>/hashem.sh (servers: alongside
+// scriptPath finds the installer: QUANTUM_SCRIPT env wins, legacy
+// GRE_SCRIPT still accepted, else <bindir>/quantum.sh (servers: alongside
 // /usr/local/bin/gre-panel), else legacy <bindir>/gre.sh or
-// /usr/local/bin/gre.sh, else ./hashem.sh (repo dev).
+// /usr/local/bin/gre.sh, else ./quantum.sh (repo dev).
 // update_all() migrates servers to the new name; old paths are read-only
 // fallbacks so already-installed servers never break.
 func greScriptPath() (string, error) {
-	if p := os.Getenv("HASHEM_SCRIPT"); p != "" {
+	if p := os.Getenv("QUANTUM_SCRIPT"); p != "" {
 		if _, err := os.Stat(p); err == nil {
 			return p, nil
 		}
-		return "", fmt.Errorf("HASHEM_SCRIPT=%s not found", p)
+		return "", fmt.Errorf("QUANTUM_SCRIPT=%s not found", p)
 	}
 	if p := os.Getenv("GRE_SCRIPT"); p != "" {
 		if _, err := os.Stat(p); err == nil {
@@ -68,30 +68,30 @@ func greScriptPath() (string, error) {
 		return "", fmt.Errorf("GRE_SCRIPT=%s not found", p)
 	}
 	if exe, err := os.Executable(); err == nil {
-		if p := filepath.Join(filepath.Dir(exe), "hashem.sh"); fileExists(p) {
+		if p := filepath.Join(filepath.Dir(exe), "quantum.sh"); fileExists(p) {
 			return p, nil
 		}
 		if p := filepath.Join(filepath.Dir(exe), "gre.sh"); fileExists(p) {
 			return p, nil
 		}
 	}
-	if fileExists("/usr/local/bin/hashem.sh") {
-		return "/usr/local/bin/hashem.sh", nil
+	if fileExists("/usr/local/bin/quantum.sh") {
+		return "/usr/local/bin/quantum.sh", nil
 	}
 	if fileExists("/usr/local/bin/gre.sh") {
 		return "/usr/local/bin/gre.sh", nil
 	}
-	if fileExists("/usr/local/bin/hashem") {
-		if abs, err := filepath.Abs("/usr/local/bin/hashem"); err == nil {
+	if fileExists("/usr/local/bin/quantum") {
+		if abs, err := filepath.Abs("/usr/local/bin/quantum"); err == nil {
 			return abs, nil
 		}
-		return "/usr/local/bin/hashem", nil
+		return "/usr/local/bin/quantum", nil
 	}
-	if fileExists("hashem.sh") {
-		if abs, err := filepath.Abs("hashem.sh"); err == nil {
+	if fileExists("quantum.sh") {
+		if abs, err := filepath.Abs("quantum.sh"); err == nil {
 			return abs, nil
 		}
-		return "hashem.sh", nil
+		return "quantum.sh", nil
 	}
 	if fileExists("gre.sh") {
 		if abs, err := filepath.Abs("gre.sh"); err == nil {
@@ -99,7 +99,7 @@ func greScriptPath() (string, error) {
 		}
 		return "gre.sh", nil
 	}
-	return "", fmt.Errorf("hashem.sh not found (set HASHEM_SCRIPT=/path/to/hashem.sh)")
+	return "", fmt.Errorf("quantum.sh not found (set QUANTUM_SCRIPT=/path/to/quantum.sh)")
 }
 
 func fileExists(p string) bool {
@@ -108,10 +108,10 @@ func fileExists(p string) bool {
 }
 
 // greScriptTarget is where syncPanelScript writes the fresh script:
-// same place greScriptPath() reads from (HASHEM_SCRIPT wins, else next to
-// the running binary, else ./hashem.sh for panel/ dev).
+// same place greScriptPath() reads from (QUANTUM_SCRIPT wins, else next to
+// the running binary, else ./quantum.sh for panel/ dev).
 func greScriptTarget() string {
-	if p := os.Getenv("HASHEM_SCRIPT"); p != "" {
+	if p := os.Getenv("QUANTUM_SCRIPT"); p != "" {
 		return p
 	}
 	if p := os.Getenv("GRE_SCRIPT"); p != "" {
@@ -125,7 +125,7 @@ func greScriptTarget() string {
 
 // ensureFreshScript checks the script on disk supports recent features
 // (add-peer CLI verb and --bundle flag in setup-foreign); if not (stale copy),
-// it pulls the latest hashem.sh from main (bash -n verified) and replaces it — so
+// it pulls the latest quantum.sh from main (bash -n verified) and replaces it — so
 // setup requests self-heal instead of failing with E-INSTALL-02.
 func ensureFreshScript(script string) {
 	data, err := os.ReadFile(script)
@@ -523,7 +523,7 @@ type setupRequest struct {
 	Dial           string `json:"dial,omitempty"`            // foreign over GRE: "auto" (default) | "gre" | "public"
 	// OrigBundle holds the raw hsh1_... string when setup-foreign is invoked
 	// via a bundle paste. applyBundle() fills every explicit field AND stores
-	// the bundle here so runInstaller can pass --bundle to hashem.sh (which
+	// the bundle here so runInstaller can pass --bundle to quantum.sh (which
 	// handles carrier/FOU setup that the explicit flags do not cover).
 	OrigBundle string `json:"-"` // internal; not sent by client
 }
@@ -573,7 +573,7 @@ func handleSetupPost(w http.ResponseWriter, r *http.Request) {
 		applyBundle(&body, b)
 	}
 
-	// validation (mirrors hashem.sh prompt_* / validate_setup_common rules)
+	// validation (mirrors quantum.sh prompt_* / validate_setup_common rules)
 	if body.Role != "iran" && body.Role != "foreign" && body.Role != "add-peer" {
 		writeAPIError(w, r, "E-SETUP-02", "")
 		return
@@ -749,12 +749,12 @@ func handleSetupPost(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, out)
 }
 
-// runInstaller shells out to hashem.sh setup-iran|setup-foreign with the same
+// runInstaller shells out to quantum.sh setup-iran|setup-foreign with the same
 // flags the CLI uses, so menu / CLI / panel execute identical steps.
 // Returns the Iran-side token + foreign-setup bundle (bundle holds the
 // token plus all addresses/ports, so one paste configures foreign).
 // ("", "", steps, nil) for foreign (nothing generated there).
-// installerTimeout bounds one hashem.sh setup/add-peer run.
+// installerTimeout bounds one quantum.sh setup/add-peer run.
 const installerTimeout = 15 * time.Minute
 
 func runInstaller(b setupRequest, ports []int, rawPorts []string) (string, string, []string, error) {
@@ -762,7 +762,7 @@ func runInstaller(b setupRequest, ports []int, rawPorts []string) (string, strin
 	if err != nil {
 		return "", "", nil, err
 	}
-	// Self-healing: if setup or add-peer is invoked on a host whose hashem.sh is
+	// Self-healing: if setup or add-peer is invoked on a host whose quantum.sh is
 	// an old version (lacking the "add-peer" CLI verb or "--bundle"), auto-sync the
 	// script before shelling out so the user does not hit E-INSTALL-02.
 	ensureFreshScript(script)
@@ -823,15 +823,15 @@ func runInstaller(b setupRequest, ports []int, rawPorts []string) (string, strin
 			}
 		}
 		if b.Role == "add-peer" && strings.Contains(strings.Join(steps, "\n"), "Unknown command") {
-			errText += " — panel hashem.sh is an old version: run Update to latest, or re-run install.sh on this host"
+			errText += " — panel quantum.sh is an old version: run Update to latest, or re-run install.sh on this host"
 		}
-		return token, bundleStr, steps, fmt.Errorf("hashem.sh %s failed: %s", args[0], errText)
+		return token, bundleStr, steps, fmt.Errorf("quantum.sh %s failed: %s", args[0], errText)
 	}
 
 	return token, bundleStr, steps, nil
 }
 
-// installerArgs builds the hashem.sh command line for a setup request. It fills
+// installerArgs builds the quantum.sh command line for a setup request. It fills
 // b.Transport with the engine default, which the bundle uses afterwards.
 func installerArgs(b *setupRequest, ports []int, rawPorts []string) ([]string, string) {
 	token := ""
@@ -989,7 +989,7 @@ func installerArgs(b *setupRequest, ports []int, rawPorts []string) ([]string, s
 			if b.UseCompression {
 				args = append(args, "--compress")
 			}
-			// Pass --bundle when available so hashem.sh can configure carrier/FOU
+			// Pass --bundle when available so quantum.sh can configure carrier/FOU
 			// ports (carrier_set_fou_ports) that are not covered by explicit flags.
 			if b.OrigBundle != "" {
 				args = append(args, "--bundle", b.OrigBundle)
@@ -1000,7 +1000,7 @@ func installerArgs(b *setupRequest, ports []int, rawPorts []string) ([]string, s
 		}
 	}
 	// UDP on both sides: the Iran server and the foreign client of a TCP-only
-	// transport each run a UDP companion on its own control port (hashem.sh
+	// transport each run a UDP companion on its own control port (quantum.sh
 	// backhaul_udp_apply); the foreign side takes the port from the bundle.
 	if b.AcceptUDP && (b.Engine == "backhaul" || b.Engine == "gre-backhaul") {
 		args = append(args, "--udp")

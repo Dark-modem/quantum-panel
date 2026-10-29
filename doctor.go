@@ -632,7 +632,7 @@ func executePing(ip string, count int) pingSummary {
 // Sizes are whole IP packets: ICMP payload + 28 bytes of headers.
 func executeMTUTest(ip string, ifMTU int) mtuSummary {
 	if ifMTU <= 0 {
-		ifMTU = 1380 // what hashem.sh sets on gre-tunnel
+		ifMTU = 1380 // what quantum.sh sets on gre-tunnel
 	}
 	res := mtuSummary{Tested: true, Interface: ifMTU}
 	fits := func(total int) bool { return doctorDFProbe(ip, total-28) }
@@ -719,7 +719,7 @@ func executeKernelAudit() kernelAudit {
 		}
 	}
 
-	// 3. MSS clamp: any TCPMSS rule in the mangle table (hashem.sh adds
+	// 3. MSS clamp: any TCPMSS rule in the mangle table (quantum.sh adds
 	// --set-mss 1340 in POSTROUTING and per GRE interface in FORWARD)
 	if out, err := runCmdTimeoutOut(3*time.Second, "iptables-save", "-t", "mangle"); err == nil {
 		res.MSSRule = mssRuleFrom(string(out))
@@ -952,7 +952,7 @@ func applyDoctorFixes() map[string]any {
 	// 2. GRE MTU and MSS clamp. When the last Diagnostics found that 1380
 	// does not cross the path, the measured size is saved and applied (and
 	// kept after restarts); otherwise only a missing clamp (1340) is added.
-	// Runs after optimize, which sets 1380 / 1340 on an older hashem.sh.
+	// Runs after optimize, which sets 1380 / 1340 on an older quantum.sh.
 	fixes = append(fixes, pathMTUFixes()...)
 
 	// 3. Ensure IP Forwarding & socket sysctls

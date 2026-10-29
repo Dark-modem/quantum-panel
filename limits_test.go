@@ -182,8 +182,8 @@ func TestLimitsValidate(t *testing.T) {
 func TestLimitsRulesAndParse(t *testing.T) {
 	text := limitsRules([]limitRule{{IP: "198.51.100.2"}, {IP: "203.0.113.7", Blocked: true}})
 	for _, want := range []string{
-		"-A HASHEM_LIMIT -s 198.51.100.2/32\n", "-A HASHEM_LIMIT -d 198.51.100.2/32\n",
-		"-A HASHEM_LIMIT -s 203.0.113.7/32 -j DROP\n", "-A HASHEM_LIMIT -d 203.0.113.7/32 -j DROP\n",
+		"-A QUANTUM_LIMIT -s 198.51.100.2/32\n", "-A QUANTUM_LIMIT -d 198.51.100.2/32\n",
+		"-A QUANTUM_LIMIT -s 203.0.113.7/32 -j DROP\n", "-A QUANTUM_LIMIT -d 203.0.113.7/32 -j DROP\n",
 	} {
 		if !strings.Contains(text, want) {
 			t.Errorf("rules lack %q:\n%s", want, text)
@@ -191,21 +191,21 @@ func TestLimitsRulesAndParse(t *testing.T) {
 	}
 	save := `*filter
 :INPUT ACCEPT [0:0]
-:HASHEM_LIMIT - [0:0]
-[5:500] -A INPUT -j HASHEM_LIMIT
-[5:500] -A OUTPUT -j HASHEM_LIMIT
-[5:500] -A FORWARD -j HASHEM_LIMIT
-[10:1000] -A HASHEM_LIMIT -s 198.51.100.2/32
-[20:2000] -A HASHEM_LIMIT -d 198.51.100.2/32
-[3:300] -A HASHEM_LIMIT -s 203.0.113.7/32 -j DROP
-[4:400] -A HASHEM_ACCT_IN -s 203.0.113.7/32 -p tcp -m tcp --sport 22
+:QUANTUM_LIMIT - [0:0]
+[5:500] -A INPUT -j QUANTUM_LIMIT
+[5:500] -A OUTPUT -j QUANTUM_LIMIT
+[5:500] -A FORWARD -j QUANTUM_LIMIT
+[10:1000] -A QUANTUM_LIMIT -s 198.51.100.2/32
+[20:2000] -A QUANTUM_LIMIT -d 198.51.100.2/32
+[3:300] -A QUANTUM_LIMIT -s 203.0.113.7/32 -j DROP
+[4:400] -A QUANTUM_ACCT_IN -s 203.0.113.7/32 -p tcp -m tcp --sport 22
 COMMIT
 `
 	m, ready := parseLimitsSave(save)
 	if !ready || m["198.51.100.2<"] != 1000 || m["198.51.100.2>"] != 2000 || m["203.0.113.7<"] != 300 || len(m) != 3 {
 		t.Fatalf("ready=%v %v", ready, m)
 	}
-	if _, ready := parseLimitsSave(strings.Replace(save, "[5:500] -A FORWARD -j HASHEM_LIMIT\n", "", 1)); ready {
+	if _, ready := parseLimitsSave(strings.Replace(save, "[5:500] -A FORWARD -j QUANTUM_LIMIT\n", "", 1)); ready {
 		t.Error("ready without the FORWARD jump")
 	}
 
@@ -215,7 +215,7 @@ COMMIT
 		t.Errorf("IPv4 chain:\n%s", v4)
 	}
 	v6 := limitsRules6(rules)
-	for _, want := range []string{"-A HASHEM_LIMIT -s 2001:db8::1/128\n", "-A HASHEM_LIMIT -d 2001:db8::1/128\n", "-A HASHEM_LIMIT -d 2001:db8::7/128 -j DROP\n"} {
+	for _, want := range []string{"-A QUANTUM_LIMIT -s 2001:db8::1/128\n", "-A QUANTUM_LIMIT -d 2001:db8::1/128\n", "-A QUANTUM_LIMIT -d 2001:db8::7/128 -j DROP\n"} {
 		if !strings.Contains(v6, want) {
 			t.Errorf("IPv6 chain lacks %q:\n%s", want, v6)
 		}
@@ -223,7 +223,7 @@ COMMIT
 	if limitsRules6([]limitRule{{IP: "203.0.113.7"}}) != "" {
 		t.Error("an IPv6 chain without IPv6 servers")
 	}
-	m, _ = parseLimitsSave("[1:77] -A HASHEM_LIMIT -d 2001:db8::1/128\n")
+	m, _ = parseLimitsSave("[1:77] -A QUANTUM_LIMIT -d 2001:db8::1/128\n")
 	if m["2001:db8::1>"] != 77 {
 		t.Errorf("IPv6 counter: %v", m)
 	}
@@ -415,7 +415,7 @@ func TestLimitsFirstTickDoesNotRecount(t *testing.T) {
 	if err := os.WriteFile(limitsPath(), data, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	k.rules = strings.Split(strings.TrimSpace(strings.ReplaceAll(strings.ReplaceAll(limitsRules([]limitRule{rule}), "*filter\n:HASHEM_LIMIT - [0:0]\n-F HASHEM_LIMIT\n", ""), "COMMIT\n", "")), "\n")
+	k.rules = strings.Split(strings.TrimSpace(strings.ReplaceAll(strings.ReplaceAll(limitsRules([]limitRule{rule}), "*filter\n:QUANTUM_LIMIT - [0:0]\n-F QUANTUM_LIMIT\n", ""), "COMMIT\n", "")), "\n")
 	for i := range k.rules {
 		k.rules[i] = strings.TrimPrefix(k.rules[i], "-A "+limitsChain+" ")
 	}

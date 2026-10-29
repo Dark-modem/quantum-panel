@@ -81,7 +81,7 @@ assert.ok(!actionText.includes('Delete topology'),'explicit Delete stays compact
 assert.ok(actionCell.includes('aria-label="Delete topology"'));
 const deleteBtn=actionCell.match(/<button[^>]*data-topo-delete[^>]*>/)[0];
 assert.ok(!/\\sdisabled(\\s|>)/.test(deleteBtn),'delete button is never disabled');
-assert.ok(deleteBtn.includes('hashem-btn-danger'),'delete button is styled as a danger action');
+assert.ok(deleteBtn.includes('quantum-btn-danger'),'delete button is styled as a danger action');
 topologyData={topologies:[topo],tunnels:[...one,{...one[0]}, {id:'unrelated',state:'down'}]};topologyRender();
 const populated=$('topologiesList').innerHTML;
 assert.ok(populated.includes('aria-label="1 existing tunnel(s)">1</span>'),'duplicate inventory and deleted IDs do not inflate count');

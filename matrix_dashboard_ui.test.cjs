@@ -19,7 +19,7 @@ async function run(d, empty = true, fallback) {
   const ids = ['kpiStatus', 'kpiStatusSub', 'kpiLinks', 'kpiLinksSub', 'heroLocalName', 'heroRemoteName', 'heroRemoteIp', 'dashDetails', 'onbCard'];
   const elements = Object.fromEntries(ids.map(id => [id, {textContent:'',innerHTML:'',hidden:false}]));
   const context = {
-    window: {_hashemEmpty:empty, _matrixState:fallback},
+    window: {_quantumEmpty:empty, _matrixState:fallback},
     document: {querySelectorAll:()=>[], hidden:false},
     $: id => elements[id] || null,
     api: async()=>d, dashRange:'1h', tunPeerCache:[], _statusCountersAt:null,

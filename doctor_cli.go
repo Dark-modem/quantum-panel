@@ -1,6 +1,6 @@
 package main
 
-// gre-panel doctor: the Diagnostics tab from the terminal. `hashem doctor fix`
+// gre-panel doctor: the Diagnostics tab from the terminal. `quantum doctor fix`
 // runs it so the terminal repair is the panel's Quick Repair (MTU, forwarding,
 // FRP limits, GRE interface, stopped engine), not only the sysctl tuning.
 

@@ -10,7 +10,7 @@ package main
 //   E-AUTH-xx    login / session / password
 //   E-SETUP-xx   setup form validation
 //   E-PEER-xx    multi-peer registry (full / clash / unknown peer)
-//   E-INSTALL-xx hashem.sh missing / installer failed
+//   E-INSTALL-xx quantum.sh missing / installer failed
 //   E-ACTION-xx  tunnel actions (restart/ping/remove/tune)
 //   E-UPDATE-xx  version check / download / install
 //   E-GRE-xx     GRE interface / ping diagnostics (log annotation)
@@ -76,8 +76,8 @@ var errCatalog = map[string]errInfo{
 	"E-ENGINE-01":   {500, "engine switch failed", "See the detail: nothing changed or the previous engine was restored. Check journalctl for the unit it names."},
 	"E-ENGINE-02":   {400, "engine settings are incomplete", "Fill in what the detail names first: on the foreign server paste the bundle from the Iran server (Spoof tab → Bundle); nothing was changed."},
 	// installer
-	"E-INSTALL-01": {500, "hashem.sh installer not found", "Reinstall the panel or set HASHEM_SCRIPT=/path/to/hashem.sh (legacy GRE_SCRIPT still works)."},
-	"E-INSTALL-02": {500, "installer (hashem.sh) failed", "Open the steps output — failing detail is appended. \"Unknown command\" = panel hashem.sh is an old version: run Update to latest."},
+	"E-INSTALL-01": {500, "quantum.sh installer not found", "Reinstall the panel or set QUANTUM_SCRIPT=/path/to/quantum.sh (legacy GRE_SCRIPT still works)."},
+	"E-INSTALL-02": {500, "installer (quantum.sh) failed", "Open the steps output — failing detail is appended. \"Unknown command\" = panel quantum.sh is an old version: run Update to latest."},
 	// actions
 	"E-ACTION-01": {400, "unknown action", "Reload the page; the button may be from an older version."},
 	"E-ACTION-02": {400, "bad action request (invalid JSON)", "Reload the page and try again."},
@@ -88,16 +88,16 @@ var errCatalog = map[string]errInfo{
 	"E-UPDATE-03": {502, "downloaded file failed verification", "Corrupted download or non-ELF binary — retry update."},
 	"E-UPDATE-04": {500, "cannot install new binary (rolled back)", "Disk full or /usr/local/bin not writable — old binary kept."},
 	"E-UPDATE-05": {400, "unsupported arch for update", "Only amd64/arm64 prebuilt binaries are published."},
-	"E-UPDATE-06": {500, "cannot sync hashem.sh installer script", "Panel binary updated, but installer script download failed — check internet or DNS."},
+	"E-UPDATE-06": {500, "cannot sync quantum.sh installer script", "Panel binary updated, but installer script download failed — check internet or DNS."},
 	"E-UPDATE-07": {502, "checksum verification failed", "Downloaded binary or script failed SHA256 checksum check."},
 	"E-UPDATE-08": {400, "invalid update channel", "Channel must be stable or dev."},
 	"E-UPDATE-09": {500, "new version did not start (rolled back)", "The panel went back to the previous version. Check the Logs tab, then try again or pick another version."},
 	// Xray tunnel
 	"E-XRAY-01": {400, "bad Xray tunnel request", "The detail names the field; fix it and try again."},
-	"E-XRAY-02": {409, "Xray-core is not installed", "Install it from the Xray tab (or: hashem xray install)."},
+	"E-XRAY-02": {409, "Xray-core is not installed", "Install it from the Xray tab (or: quantum xray install)."},
 	"E-XRAY-03": {409, "a port the link needs is taken", "The detail names the program that holds it and a free port to use instead."},
 	"E-XRAY-04": {500, "Xray rejected the config", "The detail has Xray's own message. Undo the last expert change, or reset the link to its preset."},
-	"E-XRAY-05": {500, "the Xray link did not stay up", "Check: hashem xray logs"},
+	"E-XRAY-05": {500, "the Xray link did not stay up", "Check: quantum xray logs"},
 	"E-XRAY-06": {404, "no such Xray link", "Reload the page: the link may have been removed."},
 	"E-XRAY-07": {409, "an Xray-core install is already running", "Wait for it to finish; the tab shows its progress."},
 	// speed and volume limits
@@ -116,9 +116,9 @@ var errCatalog = map[string]errInfo{
 	"E-FRP-09":    {0, "yamux stream capacity / buffer overflow", "High stream contention on single TCP mux. Increase poolCount in frpc."},
 	"E-BH-01":     {0, "backhaul authentication failed (token mismatch)", "The client token differs from the server token. Re-copy it from the Iran side; the token shown in logs is masked."},
 	"E-BH-02":     {0, "backhaul control channel failed (EOF)", "Usually a wrong token or a transport mismatch (e.g. tcp vs tcpmux/ws) between hub and spoke. Make both ends use the same transport and token."},
-	"E-BH-03":     {0, "backhaul rejected the config file", "The binary does not understand this config dialect (sectioned premium schema vs flat server/client). Re-run the Backhaul setup in `hashem`."},
+	"E-BH-03":     {0, "backhaul rejected the config file", "The binary does not understand this config dialect (sectioned premium schema vs flat server/client). Re-run the Backhaul setup in `quantum`."},
 	"E-BH-04":     {0, "backhaul transport mismatch: the link is up but carries no data", "The two servers use different Backhaul transports of the same family (tcp vs tcpmux, ws vs wsmux): the control channel connects, every connection fails. Set the same transport on both, or set the foreign side up again from the Iran bundle."},
-	"E-FRP-10":    {0, "frpc login failed with EOF (likely tcpMux mismatch)", "tcpMux mismatch: hub is likely tcpMux=true, run `hashem perf tcpmux on|off` so both ends match (default OFF)."},
+	"E-FRP-10":    {0, "frpc login failed with EOF (likely tcpMux mismatch)", "tcpMux mismatch: hub is likely tcpMux=true, run `quantum perf tcpmux on|off` so both ends match (default OFF)."},
 	"E-SYS-01":    {0, "host tool unavailable", "journalctl/systemctl/ip missing on this host."},
 	"E-SYS-02":    {503, "panel is busy (too many requests in flight)", "Retry in a couple of seconds; /api/selfstats still answers."},
 	"E-RESCUE-01": {400, "bad rescue request", "Reload the page and try again."},
@@ -186,7 +186,7 @@ var errCatalog = map[string]errInfo{
 	"E-MATRIX-08":  {502, "hub registration failed", "The foreign panel could not register with the Iran panel — check that the Iran panel is reachable from this server, then try again."},
 	"E-CLUSTER-08": {502, "cannot link with the other Iran hub", "Both panels need the same version, the panel port open between the hubs, and correct clocks (NTP)."},
 	"E-CLUSTER-10": {502, "DNS provider refused the request", "Use a Cloudflare API token with Zone > DNS > Edit for the zone, and a DNS-only (grey cloud) record."},
-	"E-CLUSTER-11": {500, "hashem could not change the hub links", "Read the message; the full log is in journalctl -u gre-panel."},
+	"E-CLUSTER-11": {500, "quantum could not change the hub links", "Read the message; the full log is in journalctl -u gre-panel."},
 	// panel access settings
 	"E-ACCESS-00": {0, "access settings changed", "Informational: panel port/username/path saved; gre-panel restarts, tunnels unaffected."},
 	"E-ACCESS-01": {400, "bad access-settings request", "Send current_password plus at least one of port, username, base_path."},
@@ -195,7 +195,7 @@ var errCatalog = map[string]errInfo{
 	// watchdog & backup
 	"E-WD-01": {400, "bad watchdog request", "Check request parameters and try again."},
 	"E-WD-02": {502, "telegram alert failed", "Verify bot token, chat ID, and selected route."},
-	"E-WD-03": {500, "backup creation failed", "Check disk space and write permissions in /var/backups/hashem."},
+	"E-WD-03": {500, "backup creation failed", "Check disk space and write permissions in /var/backups/quantum."},
 	"E-WD-04": {500, "backup restore failed", "Decryption failed or backup archive is corrupted."},
 	"E-WD-05": {502, "telegram route unreachable", "Ensure tunnel is up or switch route to direct."},
 	"E-WD-00": {0, "Watchdog settings updated", "Informational: watchdog, backup or schedule settings changed."},

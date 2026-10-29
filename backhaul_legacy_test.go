@@ -18,7 +18,7 @@ func TestMigrateLegacyBackhaul(t *testing.T) {
 	calls := 0
 	legacyBackhaulMigrate = func() ([]byte, error) { calls++; return []byte("\x1b[0;32m[✔️] moved\x1b[0m\n"), nil }
 
-	// Hashem's own units are not legacy: nothing to migrate.
+	// Quantum's own units are not legacy: nothing to migrate.
 	for _, u := range []string{"backhaul-server.service", "backhaul-server-2.service", "backhaul-client.service"} {
 		if err := os.WriteFile(filepath.Join(dir, u), nil, 0644); err != nil {
 			t.Fatal(err)
@@ -26,7 +26,7 @@ func TestMigrateLegacyBackhaul(t *testing.T) {
 	}
 	migrateLegacyBackhaul()
 	if calls != 0 {
-		t.Fatalf("migrate ran for Hashem units (%d calls)", calls)
+		t.Fatalf("migrate ran for Quantum units (%d calls)", calls)
 	}
 
 	if err := os.WriteFile(filepath.Join(dir, "backhaul-iran2020.service"), nil, 0644); err != nil {

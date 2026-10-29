@@ -344,7 +344,7 @@ func applySpoof(s spoofState) (string, error) {
 		return "", err
 	}
 	if !engineBinaryPresent(spoofBinName) {
-		return "", fmt.Errorf("the spoof binary is not installed (install it with `hashem spoof` first); nothing was changed")
+		return "", fmt.Errorf("the spoof binary is not installed (install it with `quantum spoof` first); nothing was changed")
 	}
 	if err := s.writeCoreConfig(); err != nil {
 		return "", fmt.Errorf("write core config: %w", err)

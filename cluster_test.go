@@ -353,19 +353,19 @@ func TestLBRulesText(t *testing.T) {
 	}
 	txt := lbRulesText(plan)
 	for _, want := range []string{
-		"*nat\n:HASHEM-LB-ENTRY - [0:0]\n:HASHEM-LB - [0:0]\n",
-		"-A HASHEM-LB-ENTRY -d 169.254.77.0/24 -j RETURN",
-		"-A HASHEM-LB -p tcp --dport 443 -j HLB-T443",
-		"-A HASHEM-LB -p udp --dport 443 -j HLB-U443",
+		"*nat\n:QUANTUM-LB-ENTRY - [0:0]\n:QUANTUM-LB - [0:0]\n",
+		"-A QUANTUM-LB-ENTRY -d 169.254.77.0/24 -j RETURN",
+		"-A QUANTUM-LB -p tcp --dport 443 -j HLB-T443",
+		"-A QUANTUM-LB -p udp --dport 443 -j HLB-U443",
 		"-A HLB-T443 -m statistic --mode random --probability 0.25000 -p tcp -j DNAT --to-destination 169.254.77.2:443",
 		"-A HLB-T443 -p tcp -j DNAT --to-destination 169.254.77.3:8443",
-		"-A HASHEM-LB -p tcp --dport 2083 -j DNAT --to-destination 169.254.77.2\n",
-		"-A HASHEM-LB -p udp --dport 5000:5010 -j DNAT --to-destination 169.254.77.3\n",
-		"-A HASHEM-LB -p tcp --dport 9000 -j DNAT --to-destination 5.6.7.8:9000",
-		"-A HASHEM-LB-POST -d 5.6.7.8 -p tcp --dport 9000 -j MASQUERADE",
-		"-A HASHEM-LB-FWD -d 5.6.7.8 -m conntrack --ctstate DNAT -j ACCEPT",
-		"-A HASHEM-LB-FILTER -d 169.254.77.0/24 -m conntrack --ctstate DNAT -j ACCEPT",
-		"-A HASHEM-LB-FILTER -d 169.254.77.0/24 ! -i lo -j DROP",
+		"-A QUANTUM-LB -p tcp --dport 2083 -j DNAT --to-destination 169.254.77.2\n",
+		"-A QUANTUM-LB -p udp --dport 5000:5010 -j DNAT --to-destination 169.254.77.3\n",
+		"-A QUANTUM-LB -p tcp --dport 9000 -j DNAT --to-destination 5.6.7.8:9000",
+		"-A QUANTUM-LB-POST -d 5.6.7.8 -p tcp --dport 9000 -j MASQUERADE",
+		"-A QUANTUM-LB-FWD -d 5.6.7.8 -m conntrack --ctstate DNAT -j ACCEPT",
+		"-A QUANTUM-LB-FILTER -d 169.254.77.0/24 -m conntrack --ctstate DNAT -j ACCEPT",
+		"-A QUANTUM-LB-FILTER -d 169.254.77.0/24 ! -i lo -j DROP",
 	} {
 		if !strings.Contains(txt, want) {
 			t.Errorf("missing %q", want)
@@ -667,7 +667,7 @@ func TestClusterPoolAPI(t *testing.T) {
 	if rr := postJSON(handleClusterPoolDelete, `{"port":8443}`); !strings.Contains(rr.Body.String(), "E-CLUSTER-05") {
 		t.Fatal("delete twice")
 	}
-	// lb-ports tells hashem.sh which ports a new peer may claim
+	// lb-ports tells quantum.sh which ports a new peer may claim
 	_ = postJSON(handleClusterPool, `{"port":443,"proto":"both","members":[]}`)
 	if data, _ := os.ReadFile(lbPooledPortsFile()); string(data) != "443/tcp\n443/udp\n" {
 		t.Fatalf("lb-ports %q", data)

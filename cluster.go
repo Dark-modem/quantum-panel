@@ -13,7 +13,7 @@ package main
 //   - DNS failover (cluster_dns.go): a domain whose A records list the healthy
 //     hubs, so users move to a working Iran server when one dies.
 //
-// A foreign server can join several hubs (hashem join-hub), which gives the
+// A foreign server can join several hubs (quantum join-hub), which gives the
 // many-Iran-to-one-foreign shape; pools give one-Iran-to-many-foreign; both
 // together give a full mesh.
 
@@ -283,7 +283,7 @@ func updateClusterConfig(fn func(c *ClusterConfig) error) (ClusterConfig, error)
 	return c, saveClusterConfig(c)
 }
 
-// writeLBSideFiles writes the pool ports for hashem.sh (lb-ports).
+// writeLBSideFiles writes the pool ports for quantum.sh (lb-ports).
 func writeLBSideFiles(c ClusterConfig) {
 	var b strings.Builder
 	for _, p := range c.Pools {
@@ -596,7 +596,7 @@ type clusterRuntime struct {
 	applyErr  string
 	appliedAt time.Time
 	hooksAt   time.Time
-	// hadAddrs: hashem-lb carried addresses after the last check; addrsSeen:
+	// hadAddrs: quantum-lb carried addresses after the last check; addrsSeen:
 	// the interface was checked once since start (it outlives a restart).
 	hadAddrs  bool
 	addrsSeen bool
@@ -1123,7 +1123,7 @@ func nextPriority(p LBPool) int {
 	return n
 }
 
-// lbWriteBinds tells hashem.sh which relays are bound.
+// lbWriteBinds tells quantum.sh which relays are bound.
 func lbWriteBinds(want map[string]string) {
 	if len(want) == 0 {
 		_ = os.Remove(lbBindsFile())
@@ -1239,7 +1239,7 @@ func clusterPrometheus() string {
 	for _, l := range rt.view {
 		up[l.ID] = l.Up
 	}
-	b.WriteString("# HELP hashem_cluster_pool_state Pool state: 2 ok, 1 degraded or forwarded to another hub, 0 down or fail-open.\n# TYPE hashem_cluster_pool_state gauge\n")
+	b.WriteString("# HELP quantum_cluster_pool_state Pool state: 2 ok, 1 degraded or forwarded to another hub, 0 down or fail-open.\n# TYPE quantum_cluster_pool_state gauge\n")
 	for _, p := range cfg.Pools {
 		if p.Disabled {
 			continue
@@ -1251,11 +1251,11 @@ func clusterPrometheus() string {
 		case poolDegraded, poolForward:
 			v = 1
 		}
-		fmt.Fprintf(&b, "hashem_cluster_pool_state{pool=\"%s\"} %d\n", p.key(), v)
+		fmt.Fprintf(&b, "quantum_cluster_pool_state{pool=\"%s\"} %d\n", p.key(), v)
 	}
-	b.WriteString("# HELP hashem_cluster_member_up 1 when the pool member passes its health and service checks.\n# TYPE hashem_cluster_member_up gauge\n")
-	b.WriteString("# HELP hashem_cluster_member_connections Open TCP connections of the pool member.\n# TYPE hashem_cluster_member_connections gauge\n")
-	b.WriteString("# HELP hashem_cluster_member_share Fraction of new connections the member gets now.\n# TYPE hashem_cluster_member_share gauge\n")
+	b.WriteString("# HELP quantum_cluster_member_up 1 when the pool member passes its health and service checks.\n# TYPE quantum_cluster_member_up gauge\n")
+	b.WriteString("# HELP quantum_cluster_member_connections Open TCP connections of the pool member.\n# TYPE quantum_cluster_member_connections gauge\n")
+	b.WriteString("# HELP quantum_cluster_member_share Fraction of new connections the member gets now.\n# TYPE quantum_cluster_member_share gauge\n")
 	for _, p := range cfg.Pools {
 		if p.Disabled {
 			continue
@@ -1271,22 +1271,22 @@ func clusterPrometheus() string {
 				v = 1
 			}
 			lbl := fmt.Sprintf("pool=\"%s\",link=\"%d\"", p.key(), m.Link)
-			fmt.Fprintf(&b, "hashem_cluster_member_up{%s} %d\n", lbl, v)
+			fmt.Fprintf(&b, "quantum_cluster_member_up{%s} %d\n", lbl, v)
 			if seen && mi.Conns >= 0 {
-				fmt.Fprintf(&b, "hashem_cluster_member_connections{%s} %d\n", lbl, mi.Conns)
+				fmt.Fprintf(&b, "quantum_cluster_member_connections{%s} %d\n", lbl, mi.Conns)
 			}
-			fmt.Fprintf(&b, "hashem_cluster_member_share{%s} %g\n", lbl, share[m.Link])
+			fmt.Fprintf(&b, "quantum_cluster_member_share{%s} %g\n", lbl, share[m.Link])
 		}
 	}
 	rt.mu.Unlock()
 	if len(cfg.Hubs) > 0 {
-		b.WriteString("# HELP hashem_cluster_hub_up 1 when the linked Iran hub answers its heartbeat.\n# TYPE hashem_cluster_hub_up gauge\n")
+		b.WriteString("# HELP quantum_cluster_hub_up 1 when the linked Iran hub answers its heartbeat.\n# TYPE quantum_cluster_hub_up gauge\n")
 		for _, h := range meshView(cfg) {
 			v := 0
 			if h.Up {
 				v = 1
 			}
-			fmt.Fprintf(&b, "hashem_cluster_hub_up{hub=\"%s\"} %d\n", promEsc(h.Name), v)
+			fmt.Fprintf(&b, "quantum_cluster_hub_up{hub=\"%s\"} %d\n", promEsc(h.Name), v)
 		}
 	}
 	return b.String()

@@ -32,7 +32,7 @@ function harness(d) {
   const liveText = node(); elements.chartLiveBadge.querySelector = () => liveText;
   const saved = new Map(), calls = [];
   const context = {
-    window: { _hashemEmpty: true }, document: { hidden: false, querySelectorAll: () => [] },
+    window: { _quantumEmpty: true }, document: { hidden: false, querySelectorAll: () => [] },
     $: id => elements[id] || null, api: async () => d, dashRange: '1h', tunPeerCache: [], _tunnelDetail: null,
     tr: (_key, fallback) => fallback, esc: s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'), NA: '—',
     ICO_SRV: '', ICO_GRE: '', ICO_FRP: '', renderMatrixSetup() {}, renderTunnelsList() {}, renderMatrixDetail() {}, renderDashPeers() {},
@@ -62,9 +62,9 @@ const legacy = { online: false, health: 'DOWN', local_pub: '203.0.113.7', role: 
   assert.equal(h.liveText.textContent, 'Live'); // no tunnels/onboarding must not pause host collection
   assert.match(h.elements.roleLine.innerHTML, /This server.*203\.0\.113\.7/);
   assert.doesNotMatch(h.elements.roleLine.innerHTML, /Iran|Foreign|FRP|⇄/);
-  const cache = JSON.parse(h.saved.get('hashem_server_traffic_cache'));
+  const cache = JSON.parse(h.saved.get('quantum_server_traffic_cache'));
   assert.equal(cache.scope, 'server'); assert.equal(cache.traffic.total, 380);
-  assert.equal(h.saved.has('hashem_traffic_cache'), false);
+  assert.equal(h.saved.has('quantum_traffic_cache'), false);
   assert.ok(h.calls.some(c => c[0] === 'overview' && c[1] === null));
 
   for (const fields of [{}, {server_traffic:{known:false,rx:0,tx:0,rx_rate:0,tx_rate:0},server_connections:{known:false,active:0}},
@@ -77,7 +77,7 @@ const legacy = { online: false, health: 'DOWN', local_pub: '203.0.113.7', role: 
   const zero = harness({...d,server_traffic:{known:true,rx:0,tx:0,rx_rate:0,tx_rate:0},server_connections:{known:true,active:0}});
   await zero.context.refreshDash(); assert.equal(zero.elements.kpiTraffic.textContent,'0 B'); assert.equal(zero.elements.kpiConns.textContent,'0');
   const oldCache = harness(legacy);
-  oldCache.saved.set('hashem_traffic_cache',JSON.stringify({traffic:legacy.traffic,history:legacy.history}));
+  oldCache.saved.set('quantum_traffic_cache',JSON.stringify({traffic:legacy.traffic,history:legacy.history}));
   oldCache.context.hydrateCachedTraffic(); assert.equal(oldCache.elements.kpiTraffic.textContent,''); assert.equal(oldCache.calls.length,0);
   h.context.hydrateCachedTraffic(); assert.equal(h.elements.kpiTraffic.textContent,'380 B'); assert.equal(h.elements.kpiDown.textContent,'—');
   h.context._tunnelDetail = 'matrix'; h.context.applyTunnelDetail(false);

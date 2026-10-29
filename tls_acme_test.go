@@ -49,7 +49,7 @@ func TestTLSSourceOfOldMetas(t *testing.T) {
 		m    tlsMeta
 		want string
 	}{
-		{tlsMeta{Domain: "203.0.113.7", Issuer: "Hashem Panel Local CA (self-signed)"}, tlsSourceIP},
+		{tlsMeta{Domain: "203.0.113.7", Issuer: "Quantum Panel Local CA (self-signed)"}, tlsSourceIP},
 		{tlsMeta{Domain: "le.example", Issuer: "R11"}, tlsSourceLE},
 		{tlsMeta{Domain: "own.example", Issuer: "Sectigo"}, tlsSourceCustom},
 		{tlsMeta{Domain: "le.example", Source: tlsSourceCustom}, tlsSourceCustom},

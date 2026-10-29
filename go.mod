@@ -1,4 +1,4 @@
-module github.com/pdnczone/hashem-panel/panel
+module github.com/pdnczone/quantum-panel/panel
 
 go 1.23
 

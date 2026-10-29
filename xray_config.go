@@ -11,7 +11,7 @@ package main
 //	         inbound hands the users' connections back down the link the
 //	         foreign server opened), for when Iran cannot reach it.
 //
-// The panel runs its own Xray binary under its own units (hashem-xray-N) and
+// The panel runs its own Xray binary under its own units (quantum-xray-N) and
 // never touches an Xray panel's binary, units or ports (xray_coexist.go).
 // This file only builds configs: pure functions, no I/O.
 
@@ -55,7 +55,7 @@ const (
 	xrayTagProbe   = "probe"
 
 	// xrayProbeHost is the name the probe asks for; it never leaves Xray.
-	xrayProbeHost = "probe.hashem"
+	xrayProbeHost = "probe.quantum"
 )
 
 // XrayLink is one tunnel between this server and one other server. Both ends
@@ -713,7 +713,7 @@ func buildXrayConfig(l XrayLink) (map[string]any, error) {
 		}
 		rules = append(rules, map[string]any{"inboundTag": []string{xrayTagUsers}, "outboundTag": via})
 		// The panel's probe: a loopback port whose connections ask the other
-		// end for probe.hashem, which its Xray answers itself (xrayTagProbe).
+		// end for probe.quantum, which its Xray answers itself (xrayTagProbe).
 		if l.ProbePort > 0 {
 			inbounds = append(inbounds, map[string]any{
 				"tag": xrayTagProbe, "listen": "127.0.0.1", "port": l.ProbePort, "protocol": "dokodemo-door",
@@ -725,7 +725,7 @@ func buildXrayConfig(l XrayLink) (map[string]any, error) {
 
 	// The VLESS link.
 	if l.serverEnd() {
-		client := map[string]any{"id": l.Keys.UUID, "email": "hashem@link"}
+		client := map[string]any{"id": l.Keys.UUID, "email": "quantum@link"}
 		if f := l.flow(); f != "" {
 			client["flow"] = f
 		}

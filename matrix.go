@@ -669,6 +669,9 @@ func matrixRemove(in matrixInstance, st matrixState) error {
 	return nil
 }
 func matrixSetup(in matrixInstance, st matrixState, mainHost string) error {
+	// Adopt a legacy hashem-matrix* unit from a pre-rebrand install; the new
+	// unit is written below.
+	legacyUnitMigration(in.unit())
 	if e := matrixCheckResources(in, st); e != nil {
 		return e
 	}

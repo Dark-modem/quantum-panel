@@ -80,12 +80,12 @@ func TestPrometheusOutput(t *testing.T) {
 	}}
 	out := renderPrometheus(snap)
 	for _, want := range []string{
-		`hashem_link_state{link="ir \"one\""} 2`,
-		`hashem_link_state{link="peer-3"} 0`,
-		`hashem_link_latency_ms{link="ir \"one\"",kind="tcp"} 12.5`,
-		`hashem_link_rx_bytes_total{link="ir \"one\""} 100`,
-		`hashem_local_session 1`,
-		"# TYPE hashem_link_state gauge",
+		`quantum_link_state{link="ir \"one\""} 2`,
+		`quantum_link_state{link="peer-3"} 0`,
+		`quantum_link_latency_ms{link="ir \"one\"",kind="tcp"} 12.5`,
+		`quantum_link_rx_bytes_total{link="ir \"one\""} 100`,
+		`quantum_local_session 1`,
+		"# TYPE quantum_link_state gauge",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q in:\n%s", want, out)

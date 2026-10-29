@@ -54,7 +54,7 @@ function deleteButton(h, id = 'pair') {
 }
 function assertEnabledDanger(button, message) {
   assert.doesNotMatch(button, / disabled(?: |>|$)/, 'delete is never disabled');
-  assert.ok(button.includes('hashem-btn-danger'), 'delete is styled as a danger action');
+  assert.ok(button.includes('quantum-btn-danger'), 'delete is styled as a danger action');
   assert.ok(message === undefined || button.includes(`title="${message}"`), 'button explains the blocked state');
 }
 function assertCount(html, count, label = `${count} existing tunnel(s)`) {

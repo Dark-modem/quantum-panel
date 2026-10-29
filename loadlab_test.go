@@ -2,14 +2,14 @@ package main
 
 // Load lab: measures what the panel does under N fake spokes and C polling
 // browsers, entirely in-process (stub command runner + httptest + temp dirs).
-// Skipped unless HASHEM_LOADLAB=1. Run with a generous timeout:
+// Skipped unless QUANTUM_LOADLAB=1. Run with a generous timeout:
 //
-//	HASHEM_LOADLAB=1 go test -count=1 -timeout 30m -run LoadLab -v ./...
+//	QUANTUM_LOADLAB=1 go test -count=1 -timeout 30m -run LoadLab -v ./...
 //
-// Knobs: HASHEM_LOADLAB_SECS (cell length, default 8), HASHEM_LOADLAB_SS_LINES
-// (established sockets on the fake hub, default 20000), HASHEM_LOADLAB_PING_MS
+// Knobs: QUANTUM_LOADLAB_SECS (cell length, default 8), QUANTUM_LOADLAB_SS_LINES
+// (established sockets on the fake hub, default 20000), QUANTUM_LOADLAB_PING_MS
 // (how long a dropped ICMP probe blocks, default 2000 like ping -W 2),
-// HASHEM_LOADLAB_OUT (CSV path), HASHEM_LOADLAB_N / _C (comma lists).
+// QUANTUM_LOADLAB_OUT (CSV path), QUANTUM_LOADLAB_N / _C (comma lists).
 //
 // Not modelled: real fork/exec cost (the stub returns instantly, so the
 // numbers understate it), kernel conntrack/GRE load, frps CPU, RAM pressure,
@@ -423,8 +423,8 @@ func (r labResult) csvRow() []string {
 }
 
 func TestLoadLab(t *testing.T) {
-	if os.Getenv("HASHEM_LOADLAB") != "1" {
-		t.Skip("set HASHEM_LOADLAB=1 to run the load lab")
+	if os.Getenv("QUANTUM_LOADLAB") != "1" {
+		t.Skip("set QUANTUM_LOADLAB=1 to run the load lab")
 	}
 	labLowerPriority()
 	oldProcs := runtime.GOMAXPROCS(1) // never starve a live host: one P, nice 19
@@ -438,11 +438,11 @@ func TestLoadLab(t *testing.T) {
 	oldCfg := cfg
 	cfg.BasePath = "labbase"
 	defer func() { cfg = oldCfg }()
-	secs := envInt("HASHEM_LOADLAB_SECS", 8)
-	m := envInt("HASHEM_LOADLAB_SS_LINES", 20000)
-	pingDur := time.Duration(envInt("HASHEM_LOADLAB_PING_MS", 2000)) * time.Millisecond
-	ns := envIntList("HASHEM_LOADLAB_N", []int{1, 3, 6, 10, 20})
-	cs := envIntList("HASHEM_LOADLAB_C", []int{1, 3, 10})
+	secs := envInt("QUANTUM_LOADLAB_SECS", 8)
+	m := envInt("QUANTUM_LOADLAB_SS_LINES", 20000)
+	pingDur := time.Duration(envInt("QUANTUM_LOADLAB_PING_MS", 2000)) * time.Millisecond
+	ns := envIntList("QUANTUM_LOADLAB_N", []int{1, 3, 6, 10, 20})
+	cs := envIntList("QUANTUM_LOADLAB_C", []int{1, 3, 10})
 
 	var scenarios []labScenario
 	for _, n := range ns {
@@ -482,7 +482,7 @@ func TestLoadLab(t *testing.T) {
 			float64(r.heapBase)/1e6, float64(r.heapPeak)/1e6)
 	}
 
-	out := os.Getenv("HASHEM_LOADLAB_OUT")
+	out := os.Getenv("QUANTUM_LOADLAB_OUT")
 	if out == "" {
 		out = filepath.Join(t.TempDir(), "loadlab.csv")
 	}

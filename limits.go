@@ -12,14 +12,14 @@ package main
 //     dst IP and ingress for src IP, one rate for both directions. The root
 //     qdisc (fq for BBR) is not touched. Filters carry pref limitsTCPref
 //     (IPv4) or limitsTCPref6 (IPv6).
-//   - Volume: the HASHEM_LIMIT filter chain (iptables, and ip6tables for
+//   - Volume: the QUANTUM_LIMIT filter chain (iptables, and ip6tables for
 //     IPv6 addresses), jumped to from INPUT, OUTPUT and FORWARD, holds two
 //     counting rules per address (-s IP in, -d IP out). The panel adds the
 //     counters up in limits.json. When a server's quota is used up the rules
 //     become DROP: the server's links are cut until the next reset (monthly
 //     on a day, or by hand). Other servers are untouched.
 //
-// hashem.sh limits_drop removes the chains and the filters on uninstall.
+// quantum.sh limits_drop removes the chains and the filters on uninstall.
 
 import (
 	"encoding/json"
@@ -36,7 +36,7 @@ import (
 )
 
 const (
-	limitsChain   = "HASHEM_LIMIT"
+	limitsChain   = "QUANTUM_LIMIT"
 	limitsTCPref  = "4917"
 	limitsTCPref6 = "4918"
 	gb            = 1e9

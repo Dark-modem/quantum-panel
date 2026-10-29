@@ -60,7 +60,7 @@ func TestWatchdogAPIEndpoints(t *testing.T) {
 	backupDir := t.TempDir()
 	os.Setenv("GRE_BACKUP_DIR", backupDir)
 	defer os.Unsetenv("GRE_BACKUP_DIR")
-	dummyBackup := filepath.Join(backupDir, "hashem-backup-20260927-120000.enc")
+	dummyBackup := filepath.Join(backupDir, "quantum-backup-20260927-120000.enc")
 	_ = os.WriteFile(dummyBackup, []byte("ENCRYPTED-DATA"), 0600)
 	defer os.Remove(dummyBackup)
 
@@ -162,7 +162,7 @@ func TestWatchdogAPIEndpoints(t *testing.T) {
 	}
 
 	// Valid backup download
-	req = httptest.NewRequest("GET", "/api/watchdog/backup-download?f=hashem-backup-20260927-120000.enc", nil)
+	req = httptest.NewRequest("GET", "/api/watchdog/backup-download?f=quantum-backup-20260927-120000.enc", nil)
 	rr = httptest.NewRecorder()
 	handleBackupDownload(rr, req)
 	if rr.Code != http.StatusOK {

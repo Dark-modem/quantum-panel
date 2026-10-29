@@ -203,37 +203,37 @@ func promEsc(s string) string {
 
 func renderPrometheus(s *HubSnapshot) string {
 	var b strings.Builder
-	b.WriteString("# HELP hashem_link_state Link health: 2 healthy, 1 degraded, 0 down.\n# TYPE hashem_link_state gauge\n")
+	b.WriteString("# HELP quantum_link_state Link health: 2 healthy, 1 degraded, 0 down.\n# TYPE quantum_link_state gauge\n")
 	all := s.All()
 	for _, l := range all {
-		fmt.Fprintf(&b, "hashem_link_state{link=\"%s\"} %d\n", promEsc(linkName(l)), stateNum(l.HealthState))
+		fmt.Fprintf(&b, "quantum_link_state{link=\"%s\"} %d\n", promEsc(linkName(l)), stateNum(l.HealthState))
 	}
-	b.WriteString("# HELP hashem_link_latency_ms Latency of the link in milliseconds (absent when unknown).\n# TYPE hashem_link_latency_ms gauge\n")
+	b.WriteString("# HELP quantum_link_latency_ms Latency of the link in milliseconds (absent when unknown).\n# TYPE quantum_link_latency_ms gauge\n")
 	for _, l := range all {
 		if l.LatencyMs >= 0 {
-			fmt.Fprintf(&b, "hashem_link_latency_ms{link=\"%s\",kind=\"%s\"} %g\n", promEsc(linkName(l)), promEsc(l.LatencyKind), l.LatencyMs)
+			fmt.Fprintf(&b, "quantum_link_latency_ms{link=\"%s\",kind=\"%s\"} %g\n", promEsc(linkName(l)), promEsc(l.LatencyKind), l.LatencyMs)
 		}
 	}
-	b.WriteString("# HELP hashem_link_rx_bytes_total Bytes received over the link interface.\n# TYPE hashem_link_rx_bytes_total counter\n")
+	b.WriteString("# HELP quantum_link_rx_bytes_total Bytes received over the link interface.\n# TYPE quantum_link_rx_bytes_total counter\n")
 	for _, l := range all {
 		if l.Rx != nil {
-			fmt.Fprintf(&b, "hashem_link_rx_bytes_total{link=\"%s\"} %d\n", promEsc(linkName(l)), *l.Rx)
+			fmt.Fprintf(&b, "quantum_link_rx_bytes_total{link=\"%s\"} %d\n", promEsc(linkName(l)), *l.Rx)
 		}
 	}
-	b.WriteString("# HELP hashem_link_tx_bytes_total Bytes sent over the link interface.\n# TYPE hashem_link_tx_bytes_total counter\n")
+	b.WriteString("# HELP quantum_link_tx_bytes_total Bytes sent over the link interface.\n# TYPE quantum_link_tx_bytes_total counter\n")
 	for _, l := range all {
 		if l.Tx != nil {
-			fmt.Fprintf(&b, "hashem_link_tx_bytes_total{link=\"%s\"} %d\n", promEsc(linkName(l)), *l.Tx)
+			fmt.Fprintf(&b, "quantum_link_tx_bytes_total{link=\"%s\"} %d\n", promEsc(linkName(l)), *l.Tx)
 		}
 	}
-	b.WriteString("# HELP hashem_local_session 1 when this machine's own tunnel session is up.\n# TYPE hashem_local_session gauge\n")
+	b.WriteString("# HELP quantum_local_session 1 when this machine's own tunnel session is up.\n# TYPE quantum_local_session gauge\n")
 	v := 0
 	if s.LocalSession {
 		v = 1
 	}
-	fmt.Fprintf(&b, "hashem_local_session %d\n", v)
-	b.WriteString("# HELP hashem_snapshot_age_ms Age of the snapshot these values come from.\n# TYPE hashem_snapshot_age_ms gauge\n")
-	fmt.Fprintf(&b, "hashem_snapshot_age_ms %d\n", s.AgeMs())
+	fmt.Fprintf(&b, "quantum_local_session %d\n", v)
+	b.WriteString("# HELP quantum_snapshot_age_ms Age of the snapshot these values come from.\n# TYPE quantum_snapshot_age_ms gauge\n")
+	fmt.Fprintf(&b, "quantum_snapshot_age_ms %d\n", s.AgeMs())
 	b.WriteString(clusterPrometheus())
 	return b.String()
 }
@@ -250,7 +250,7 @@ func handleMetrics(w http.ResponseWriter, r *http.Request) {
 	}
 	got := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 	if got == "" || subtle.ConstantTimeCompare([]byte(got), []byte(tok)) != 1 {
-		w.Header().Set("WWW-Authenticate", `Bearer realm="hashem-metrics"`)
+		w.Header().Set("WWW-Authenticate", `Bearer realm="quantum-metrics"`)
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}

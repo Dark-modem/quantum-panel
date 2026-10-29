@@ -59,7 +59,7 @@ type panelConfig struct {
 	TerminalAllowIPs []string `json:"terminal_allow_ips,omitempty"`
 	// TLSPort is the HTTPS listener port (default 7443). HTTP stays on Port.
 	TLSPort int `json:"tls_port,omitempty"`
-	// DebugEnabled mounts /debug/pprof behind auth (also HASHEM_PPROF=1).
+	// DebugEnabled mounts /debug/pprof behind auth (also QUANTUM_PPROF=1).
 	DebugEnabled bool `json:"debug_enabled,omitempty"`
 	// RevPathAuto enables automatic application of reverse-path fixes
 	// (rate-limited; report-only when false, the default).
@@ -90,8 +90,8 @@ func effectiveTLSPort() int {
 var (
 	cfg panelConfig
 	// panelVersion is set at release build time:
-	// go build -ldflags "-X main.panelVersion=v1.19.1"
-	panelVersion = "v1.19.1"
+	// go build -ldflags "-X main.panelVersion=v1.20.0"
+	panelVersion = "v1.20.0"
 	// panelMux is shared between the HTTP listener and the HTTPS listener.
 	panelMux *http.ServeMux
 )
@@ -216,7 +216,7 @@ func pickFreePort(start int) int {
 	return start
 }
 
-// envPanelPort reads GRE_PANEL_PORT (set by hashem.sh or the admin).
+// envPanelPort reads GRE_PANEL_PORT (set by quantum.sh or the admin).
 // Returns 0 when unset/invalid.
 func envPanelPort() int {
 	v := strings.TrimSpace(os.Getenv("GRE_PANEL_PORT"))
@@ -485,7 +485,7 @@ func cliShowInfo() int {
 	loadOrInit()
 	ip := getOutboundIP()
 	fmt.Println("==================================================")
-	fmt.Println("Hashem GRE-FRP Web Panel Info")
+	fmt.Println("Quantum GRE-FRP Web Panel Info")
 	fmt.Printf("Username:  %s\n", cfg.Username)
 	fmt.Printf("Port:      %d\n", cfg.Port)
 	fmt.Printf("Base Path: /%s\n", cfg.BasePath)

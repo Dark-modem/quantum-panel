@@ -30,7 +30,7 @@ func TestTCPMuxDefaultIsOff(t *testing.T) {
 
 func TestFrpcLoginEOFHint(t *testing.T) {
 	code, hint := matchLogCode("login to the server failed: connect to server error: EOF")
-	if code != "E-FRP-10" || !strings.Contains(hint, "hashem perf tcpmux") {
+	if code != "E-FRP-10" || !strings.Contains(hint, "quantum perf tcpmux") {
 		t.Fatalf("got %q %q", code, hint)
 	}
 }

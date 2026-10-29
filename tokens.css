@@ -1,4 +1,4 @@
-/* Hashem Tunnel — Design Tokens
+/* Quantum Tunnel — Design Tokens
  * Minimal, Premium, Technical, Friendly
  *
  * Color roles (one color, one meaning):
@@ -158,7 +158,7 @@ body{
        --glass-edge:var(--tx)}
 }
 
-/* Hashem Body Ground */
+/* Quantum Body Ground */
 body {
   min-height: 100dvh;
   background: var(--bg);
@@ -175,7 +175,7 @@ body {
   color: inherit;
 }
 
-/* Hashem Dark Theme — Default matte premium feel (#09090B) */
+/* Quantum Dark Theme — Default matte premium feel (#09090B) */
 body[data-t="dark"], body {
   color-scheme: dark;
   --bg: #09090b;
@@ -208,7 +208,7 @@ body[data-t="dark"], body {
   --field: var(--s2);
 }
 
-/* Hashem Light Theme — High-contrast semantic override */
+/* Quantum Light Theme — High-contrast semantic override */
 :root[data-t="light"], body[data-t="light"] {
   color-scheme: light;
   --bg: #f2f2f2;
@@ -255,7 +255,7 @@ body[data-t="dark"], body {
 ::-webkit-scrollbar-thumb:hover { background: var(--ln3); }
 
 /* Global Button & Control Tokens */
-.hashem-btn {
+.quantum-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -271,54 +271,54 @@ body[data-t="dark"], body {
   border: 1px solid transparent;
   text-decoration: none;
 }
-.hashem-btn:focus-visible {
+.quantum-btn:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--ac);
 }
 
-.hashem-btn-primary {
+.quantum-btn-primary {
   background:var(--ac-fill);
   color:var(--ac-on);
   border-color:transparent;
   box-shadow:var(--lift-sm), inset 0 1px 0 rgba(255,255,255,.12);
 }
-.hashem-btn-primary:hover {
+.quantum-btn-primary:hover {
   background:var(--ac-hover);
   box-shadow:var(--lift-sm), inset 0 1px 0 rgba(255,255,255,.12);
 }
 
-.hashem-btn-secondary {
+.quantum-btn-secondary {
   background:var(--s2);
   color:var(--tx2);
   border:1px solid var(--ln2);
   box-shadow:var(--lift-sm);
 }
-.hashem-btn-secondary:hover {
+.quantum-btn-secondary:hover {
   background:var(--s3);
   color:var(--tx);
   border-color:var(--ac-b35-ln2);
 }
 
-.hashem-btn-danger {
+.quantum-btn-danger {
   background: color-mix(in srgb, var(--er) 10%, transparent);
   color: var(--er);
   border: 1px solid var(--er-b25);
 }
-.hashem-btn-danger:hover {
+.quantum-btn-danger:hover {
   background: color-mix(in srgb, var(--er) 20%, transparent);
 }
 
-.hashem-btn-ghost {
+.quantum-btn-ghost {
   background: transparent;
   color: var(--mu);
 }
-.hashem-btn-ghost:hover {
+.quantum-btn-ghost:hover {
   color: var(--tx);
   background: var(--sunk);
 }
 
 /* Form Controls */
-.hashem-input, .hashem-select {
+.quantum-input, .quantum-select {
   height:var(--ctl-h);
   width:100%;
   padding:0 var(--ctl-px);
@@ -330,11 +330,11 @@ body[data-t="dark"], body {
   outline:none;
   transition:border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease, background var(--dur-fast) ease;
 }
-.hashem-input::placeholder {
+.quantum-input::placeholder {
   color:var(--dim);
 }
-.hashem-input:hover { border-color:var(--ln2); }
-.hashem-input:focus, .hashem-select:focus {
+.quantum-input:hover { border-color:var(--ln2); }
+.quantum-input:focus, .quantum-select:focus {
   border-color:var(--ac);
   box-shadow:0 0 0 3px color-mix(in srgb, var(--ac) 18%, transparent);
 }
@@ -450,9 +450,9 @@ body[data-t="dark"], body {
 }
 /* One focus ring for every control, whichever family it belongs to: the
    keyboard path has to look the same on the dashboard and in a dialog. */
-.hashem-btn:focus-visible,
-.hashem-input:focus-visible,
-.hashem-select:focus-visible,
+.quantum-btn:focus-visible,
+.quantum-input:focus-visible,
+.quantum-select:focus-visible,
 .dlg .btn2:focus-visible,
 .dlg .btn6:focus-visible,
 .dlg .nb:focus-visible,

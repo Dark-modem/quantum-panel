@@ -149,7 +149,7 @@ func TestPortConflictDetection(t *testing.T) {
 
 // Test 5: Atomic rollback restores previous certificates on failure
 func TestAtomicRollbackOnFailure(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "hashem-tls-test-*")
+	tmpDir, err := os.MkdirTemp("", "quantum-tls-test-*")
 	if err != nil {
 		t.Fatalf("MkdirTemp failed: %v", err)
 	}
@@ -198,7 +198,7 @@ func TestAtomicRollbackOnFailure(t *testing.T) {
 
 // Test 6: Clean domain removal deletes certs and reverts to HTTP access
 func TestDomainRemoval(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "hashem-tls-remove-*")
+	tmpDir, err := os.MkdirTemp("", "quantum-tls-remove-*")
 	if err != nil {
 		t.Fatalf("MkdirTemp failed: %v", err)
 	}

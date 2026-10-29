@@ -258,7 +258,7 @@ func handleCarrierPost(w http.ResponseWriter, r *http.Request) {
 		} else {
 			_ = stopWSSCarrier()
 		}
-		_, _ = runHashemCarrierCmd("set", m)
+		_, _ = runQuantumCarrierCmd("set", m)
 		_ = saveCarrierConfig(cfg)
 		writeJSON(w, map[string]any{"status": "ok", "mode": cfg.Mode, "active": cfg.ActiveCarrier, "active_carrier": cfg.ActiveCarrier})
 
@@ -287,7 +287,7 @@ func handleCarrierPost(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]any{"status": "ok", "active": cfg.ActiveCarrier, "active_carrier": cfg.ActiveCarrier, "detail": "Applied carrier " + cfg.ActiveCarrier})
 
 	case "cycle_next", "cycle", "next":
-		out, err := runHashemCarrierCmd("cycle")
+		out, err := runQuantumCarrierCmd("cycle")
 		if err == nil && len(out) > 0 {
 			cfg = loadCarrierConfig()
 		} else {
@@ -314,7 +314,7 @@ func handleCarrierPost(w http.ResponseWriter, r *http.Request) {
 				_ = stopWSSCarrier()
 			}
 			_ = saveCarrierConfig(cfg)
-			_, _ = runHashemCarrierCmd("set", cfg.ActiveCarrier)
+			_, _ = runQuantumCarrierCmd("set", cfg.ActiveCarrier)
 		}
 		writeJSON(w, map[string]any{"status": "ok", "active": cfg.ActiveCarrier, "active_carrier": cfg.ActiveCarrier})
 
@@ -334,7 +334,7 @@ func handleCarrierPost(w http.ResponseWriter, r *http.Request) {
 		cfg.FOUPort2 = p2
 		cfg.Candidates = []string{"direct", "wss:" + strconv.Itoa(cfg.WSSPort)}
 		_ = saveCarrierConfig(cfg)
-		_, _ = runHashemCarrierCmd("set-ports", strconv.Itoa(p1), strconv.Itoa(p2))
+		_, _ = runQuantumCarrierCmd("set-ports", strconv.Itoa(p1), strconv.Itoa(p2))
 		writeJSON(w, map[string]any{"status": "ok", "fou_port1": p1, "fou_port2": p2, "fou_ports": []int{p1, p2}})
 
 	case "set_wss", "set-wss":
@@ -383,7 +383,7 @@ func handleCarrierPost(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func runHashemCarrierCmd(args ...string) ([]byte, error) {
+func runQuantumCarrierCmd(args ...string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
@@ -394,13 +394,13 @@ func runHashemCarrierCmd(args ...string) ([]byte, error) {
 		cmd.Env = append(os.Environ(), "GRE_SKIP_PANEL=1", "TERM=dumb", "GRE_PANEL_DIR="+configDir)
 		return cmd.CombinedOutput()
 	}
-	if fileExists("/usr/local/bin/hashem") {
+	if fileExists("/usr/local/bin/quantum") {
 		cmdArgs := append([]string{"carrier"}, args...)
-		cmd := exec.CommandContext(ctx, "/usr/local/bin/hashem", cmdArgs...)
+		cmd := exec.CommandContext(ctx, "/usr/local/bin/quantum", cmdArgs...)
 		cmd.Env = append(os.Environ(), "GRE_SKIP_PANEL=1", "TERM=dumb", "GRE_PANEL_DIR="+configDir)
 		return cmd.CombinedOutput()
 	}
-	return nil, fmt.Errorf("hashem script not found")
+	return nil, fmt.Errorf("quantum script not found")
 }
 
 func updateFrpcTransport(proto string) error {
@@ -540,7 +540,7 @@ func ensureFrpsUDPListeners() error {
 }
 
 // carrierApplicable reports whether t is a carrier applyCarrierMode can switch
-// to live. Backhaul and Bagher are engines, not GRE carriers: hashem.sh
+// to live. Backhaul and Bagher are engines, not GRE carriers: quantum.sh
 // carrier_apply has no branch for them and used to rebuild the GRE interface
 // and record a meaningless carrier.
 func carrierApplicable(t string) error {
@@ -599,6 +599,6 @@ func applyCarrierModeOpts(t string, o carrier6Opts) (string, error) {
 		}
 		return "switched to " + t, nil
 	}
-	out, err := runHashemCarrierCmd(append([]string{"set", t}, o.args()...)...)
+	out, err := runQuantumCarrierCmd(append([]string{"set", t}, o.args()...)...)
 	return string(out), err
 }

@@ -40,7 +40,7 @@ func TestDoctorHealthyGREIsExcellent(t *testing.T) {
 	}
 }
 
-// The GRE interface MTU is 1380 (hashem.sh). The old doctor probed 1420 and
+// The GRE interface MTU is 1380 (quantum.sh). The old doctor probed 1420 and
 // 1400 and flagged every healthy GRE server as "fragmented".
 func TestDoctorMTUProbeStartsAtInterfaceMTU(t *testing.T) {
 	var asked []int

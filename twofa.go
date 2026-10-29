@@ -37,7 +37,7 @@ func handle2FASetup(w http.ResponseWriter, r *http.Request) {
 	pendingMu.Lock()
 	pendingSecret = s
 	pendingMu.Unlock()
-	writeJSON(w, map[string]any{"secret": s, "uri": totpURI(s, user, "Hashem")})
+	writeJSON(w, map[string]any{"secret": s, "uri": totpURI(s, user, "Quantum")})
 }
 
 // POST /api/2fa/enable {code} — confirm enrolment; returns recovery codes once.

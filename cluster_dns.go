@@ -173,7 +173,7 @@ func dnsWebhook(c ClusterConfig, ips []string, test bool) ([]string, error) {
 		return nil, fmt.Errorf("webhook URL: %v", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", "hashem-panel/"+panelVersion)
+	req.Header.Set("User-Agent", "quantum-panel/"+panelVersion)
 	if c.DNS.Token != "" {
 		req.Header.Set("Authorization", "Bearer "+c.DNS.Token)
 	}

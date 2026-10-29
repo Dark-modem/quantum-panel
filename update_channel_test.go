@@ -266,24 +266,24 @@ func TestFetchScriptPrefersReleaseTag(t *testing.T) {
 		return f.Close()
 	}
 	sum := "e4e8b2ce2e22e6b1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f70819"
-	manifestFetcher = func(string) (map[string]string, error) { return map[string]string{"hashem.sh": sum}, nil }
+	manifestFetcher = func(string) (map[string]string, error) { return map[string]string{"quantum.sh": sum}, nil }
 
 	// checksum mismatch: error, and main is NOT tried
-	if err := fetchScript("v1.0.0", "hashem.sh", scriptURL, dst); err == nil {
+	if err := fetchScript("v1.0.0", "quantum.sh", scriptURL, dst); err == nil {
 		t.Fatal("expected checksum failure")
 	}
-	if len(urls) != 1 || urls[0] != "https://github.com/Dark-modem/quantum/releases/download/v1.0.0/hashem.sh" {
+	if len(urls) != 1 || urls[0] != "https://github.com/Dark-modem/quantum/releases/download/v1.0.0/quantum.sh" {
 		t.Fatalf("urls=%v", urls)
 	}
 
 	// correct checksum passes
 	h, _ := ComputeSHA256(strings.NewReader(body))
-	manifestFetcher = func(string) (map[string]string, error) { return map[string]string{"hashem.sh": h}, nil }
+	manifestFetcher = func(string) (map[string]string, error) { return map[string]string{"quantum.sh": h}, nil }
 	urls = nil
-	if err := fetchScript("dev-r7", "hashem.sh", scriptURL, dst); err != nil {
+	if err := fetchScript("dev-r7", "quantum.sh", scriptURL, dst); err != nil {
 		t.Fatal(err)
 	}
-	if len(urls) != 1 || !strings.Contains(urls[0], "/download/dev-r7/hashem.sh") {
+	if len(urls) != 1 || !strings.Contains(urls[0], "/download/dev-r7/quantum.sh") {
 		t.Fatalf("urls=%v", urls)
 	}
 
@@ -305,7 +305,7 @@ func TestFetchScriptPrefersReleaseTag(t *testing.T) {
 
 	// no tag (source build) => main directly
 	urls = nil
-	if err := fetchScript("", "hashem.sh", scriptURL, dst); err != nil || len(urls) != 1 || urls[0] != scriptURL {
+	if err := fetchScript("", "quantum.sh", scriptURL, dst); err != nil || len(urls) != 1 || urls[0] != scriptURL {
 		t.Fatalf("urls=%v err=%v", urls, err)
 	}
 }
@@ -365,7 +365,7 @@ func TestFetchScriptDevTagNeverFallsBackToMain(t *testing.T) {
 	var urls []string
 	scriptDownloader = func(u string, f *os.File) error { urls = append(urls, u); return errors.New("404") }
 	dst := filepath.Join(t.TempDir(), "h.sh")
-	if err := fetchScript("dev-r5", "hashem.sh", "https://raw.githubusercontent.com/x/main/hashem.sh", dst); err == nil {
+	if err := fetchScript("dev-r5", "quantum.sh", "https://raw.githubusercontent.com/x/main/quantum.sh", dst); err == nil {
 		t.Fatal("expected error")
 	}
 	for _, u := range urls {
@@ -374,7 +374,7 @@ func TestFetchScriptDevTagNeverFallsBackToMain(t *testing.T) {
 		}
 	}
 	urls = nil
-	_ = fetchScript("v1.0.0", "hashem.sh", "https://raw.githubusercontent.com/x/main/hashem.sh", dst)
+	_ = fetchScript("v1.0.0", "quantum.sh", "https://raw.githubusercontent.com/x/main/quantum.sh", dst)
 	if len(urls) != 2 || !strings.Contains(urls[1], "/main/") {
 		t.Fatalf("stable tag should still fall back to main for a missing asset: %v", urls)
 	}

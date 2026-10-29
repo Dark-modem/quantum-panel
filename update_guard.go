@@ -50,7 +50,7 @@ func guardUpdate(exe, from, to string) bool {
 	if err != nil {
 		return false
 	}
-	unit := "hashem-update-guard-" + strconv.FormatInt(m.At, 10)
+	unit := "quantum-update-guard-" + strconv.FormatInt(m.At, 10)
 	cmd := exec.Command(run, "--unit", unit, "--collect", "--quiet", "/bin/sh", "-c", updateGuardScript, "guard",
 		strconv.Itoa(int(updateGuardDelay/time.Second)), exe, updatePendingPath(), updateRollbackPath())
 	return cmd.Run() == nil

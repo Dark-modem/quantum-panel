@@ -40,7 +40,7 @@ func xrayConfDir() string   { return filepath.Join(configDir, "xray") }
 func xrayLinkConfPath(id int) string {
 	return filepath.Join(xrayConfDir(), fmt.Sprintf("link-%d.json", id))
 }
-func xrayUnitName(id int) string { return fmt.Sprintf("hashem-xray-%d", id) }
+func xrayUnitName(id int) string { return fmt.Sprintf("quantum-xray-%d", id) }
 func xrayUnitPath(id int) string { return filepath.Join(engineUnitDir, xrayUnitName(id)+".service") }
 func xrayTag(id int) string      { return fmt.Sprintf("xray-%d", id) }
 
@@ -199,7 +199,7 @@ var (
 
 func xrayUnit(l XrayLink) string {
 	return fmt.Sprintf(`[Unit]
-Description=Hashem Xray tunnel, link %d (%s, %s end)
+Description=Quantum Xray tunnel, link %d (%s, %s end)
 After=network.target network-online.target
 Wants=network-online.target
 
@@ -299,6 +299,10 @@ func applyXrayLink(l XrayLink, others []XrayLink) ([]xrayStep, error) {
 		return fail("ports", "E-XRAY-03", xrayPortsError(l, cs, ls))
 	}
 	steps = append(steps, xrayStep{Key: "ports", OK: true})
+
+	// Adopt a legacy hashem-xray-N unit from a pre-rebrand install; the new
+	// unit is rewritten below, so this mainly stops the old one.
+	legacyUnitMigration(xrayUnitName(l.ID) + ".service")
 
 	cfg, err := buildXrayConfig(l)
 	if err != nil {
@@ -664,8 +668,8 @@ var xrayInstall = struct {
 	Log     string
 }{}
 
-// xrayInstallCmd installs the pinned core through hashem.sh; swappable for tests.
-var xrayInstallCmd = func() (string, error) { return runHashemCluster(15*time.Minute, "xray", "install") }
+// xrayInstallCmd installs the pinned core through quantum.sh; swappable for tests.
+var xrayInstallCmd = func() (string, error) { return runQuantumCluster(15*time.Minute, "xray", "install") }
 
 // startXrayInstall runs the install in the background; GET /api/xray shows it.
 func startXrayInstall() bool {

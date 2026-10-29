@@ -148,7 +148,7 @@ function topologyRender() {
         <td role="cell" class="topo-cell-iran" data-label="${esc(tr('', 'Iran'))}">${serverCell('ir', endpoints.iran)}</td>
         <td role="cell" class="topo-cell-foreign" data-label="${esc(tr('', 'Foreign'))}">${serverCell(t.country, endpoints.foreign)}</td>
         <td role="cell" class="topo-cell-tunnels" data-label="${esc(tr('', 'Tunnels'))}"><span class="topo-count" aria-label="${esc(countLabel)}">${remaining}</span></td>
-        <td role="cell" class="topo-cell-actions" data-label="${esc(tr('', 'Actions'))}"><div class="topo-actions"><button type="button" class="hashem-btn hashem-btn-primary topo-view" data-topo-open="${esc(t.id)}">${esc(tr('', 'View'))}</button><span class="topo-delete-wrap" title="${esc(deleteTitle)}"><button type="button" class="hashem-btn hashem-btn-danger topo-delete" data-topo-delete="${esc(t.id)}" aria-label="${esc(tr('', 'Delete topology'))}"${remaining ? ` title="${esc(tr('', 'Delete all tunnels in this topology first'))}"` : ''}><svg class="topo-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg>${esc(tr('', 'Delete'))}</button></span></div></td>
+        <td role="cell" class="topo-cell-actions" data-label="${esc(tr('', 'Actions'))}"><div class="topo-actions"><button type="button" class="quantum-btn quantum-btn-primary topo-view" data-topo-open="${esc(t.id)}">${esc(tr('', 'View'))}</button><span class="topo-delete-wrap" title="${esc(deleteTitle)}"><button type="button" class="quantum-btn quantum-btn-danger topo-delete" data-topo-delete="${esc(t.id)}" aria-label="${esc(tr('', 'Delete topology'))}"${remaining ? ` title="${esc(tr('', 'Delete all tunnels in this topology first'))}"` : ''}><svg class="topo-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg>${esc(tr('', 'Delete'))}</button></span></div></td>
       </tr>`;
       }).join('')
     : searching
@@ -172,7 +172,7 @@ function topologyRender() {
   const candidates = topologyData.tunnels.filter(t => !assigned.has(t.id) && (!t.remote_ip || t.remote_ip === topo.remote_ip || (t.remote_ips || []).includes(topo.remote_ip)));
   $('topologyAttachSelect').innerHTML = `<option value="">${esc(tr('', 'Select an existing tunnel'))}</option>`
     + candidates.map(t => `<option value="${esc(t.id)}">${esc(t.name)} · ${esc(t.engine)}</option>`).join('');
-  $('topologyBoundList').innerHTML = cables.map(t => `<div class="topo-binding"><b>${esc(t.name)}</b><span>${esc(t.state)}</span><button type="button" class="hashem-btn hashem-btn-ghost" data-topo-detach="${esc(t.id)}">${esc(tr('', 'Detach from topology'))}</button><button type="button" class="hashem-btn hashem-btn-secondary" data-topo-view-tunnel="${esc(t.id)}">${esc(tr('', 'View'))}</button></div>`).join('');
+  $('topologyBoundList').innerHTML = cables.map(t => `<div class="topo-binding"><b>${esc(t.name)}</b><span>${esc(t.state)}</span><button type="button" class="quantum-btn quantum-btn-ghost" data-topo-detach="${esc(t.id)}">${esc(tr('', 'Detach from topology'))}</button><button type="button" class="quantum-btn quantum-btn-secondary" data-topo-view-tunnel="${esc(t.id)}">${esc(tr('', 'View'))}</button></div>`).join('');
   $('tunnelsEmpty').innerHTML = cables.length ? '' : `<p class="qs-hint">${esc(tr('', 'Attach an existing tunnel or add a new tunnel for this server pair.'))}</p>`;
 }
 function topologyChooseRole(role) {
@@ -326,10 +326,10 @@ function topoWizRenderTypes() {
   document.querySelectorAll('#topoWizBody [data-wiz-type]').forEach(b => { b.onclick = () => topoWizPick(b.dataset.wizType); });
 }
 function topoWizInput(id, label, value, extra) {
-  return `<div class="fg"><label class="qs-label" for="${id}">${esc(label)}</label><input class="hashem-input" id="${id}" value="${esc(value)}"${extra ? ' ' + extra : ''}></div>`;
+  return `<div class="fg"><label class="qs-label" for="${id}">${esc(label)}</label><input class="quantum-input" id="${id}" value="${esc(value)}"${extra ? ' ' + extra : ''}></div>`;
 }
 function topoWizSelect(id, label, cur, opts) {
-  return `<div class="fg"><label class="qs-label" for="${id}">${esc(label)}</label><select class="hashem-input" id="${id}">`
+  return `<div class="fg"><label class="qs-label" for="${id}">${esc(label)}</label><select class="quantum-input" id="${id}">`
     + opts.map(o => `<option value="${esc(o[0])}"${o[0] === cur ? ' selected' : ''}>${esc(o[1])}</option>`).join('') + '</select></div>';
 }
 function topoWizCheckbox(id, label, on) {

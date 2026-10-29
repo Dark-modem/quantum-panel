@@ -11,7 +11,7 @@ import (
 
 // Backhaul connection pool: how many connections the foreign server (the
 // Backhaul client) keeps open to the Iran server, ready for new users. Saved in
-// perf.json as backhaul_pool, so a new setup from the panel or hashem.sh
+// perf.json as backhaul_pool, so a new setup from the panel or quantum.sh
 // (backhaul_pool_size) writes the same value.
 const (
 	bhPoolDefault        = 8

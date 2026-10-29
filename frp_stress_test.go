@@ -167,7 +167,7 @@ func runConcurrentStress(t *testing.T, totalClients int) {
 // TestStrictFailoverDefaults verifies that AutoPilot / Automatic Failover
 // is STRICTLY disabled by default on clean installations AND existing installations.
 func TestStrictFailoverDefaults(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "hashem_failover_test_*")
+	tmpDir, err := os.MkdirTemp("", "quantum_failover_test_*")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}

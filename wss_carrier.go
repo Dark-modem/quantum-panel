@@ -200,7 +200,7 @@ func generateSelfSignedCert(domain string) (tls.Certificate, error) {
 	template := x509.Certificate{
 		SerialNumber: serialNumber,
 		Subject: pkix.Name{
-			Organization: []string{"Hashem Tunnel Obfuscated Carrier"},
+			Organization: []string{"Quantum Tunnel Obfuscated Carrier"},
 			CommonName:   domain,
 		},
 		NotBefore:             notBefore,
@@ -409,7 +409,7 @@ func (m *wssCarrierManager) runServer() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/tunnel-stream", func(w http.ResponseWriter, r *http.Request) {
 		// Authenticate token
-		token := r.Header.Get("X-Hashem-Token")
+		token := r.Header.Get("X-Quantum-Token")
 		if token == "" {
 			token = r.URL.Query().Get("token")
 		}
@@ -546,7 +546,7 @@ func (m *wssCarrierManager) runClient() {
 
 		headers := http.Header{}
 		if m.cfg.AuthToken != "" {
-			headers.Set("X-Hashem-Token", m.cfg.AuthToken)
+			headers.Set("X-Quantum-Token", m.cfg.AuthToken)
 		}
 
 		t0 := time.Now()

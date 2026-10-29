@@ -2,7 +2,7 @@ package main
 
 // A foreign server that serves several Iran hubs. The first hub is the
 // server's own tunnel (frpc / backhaul-client); each extra hub gets its own
-// client unit (frpc-hN / backhaul-client-hN), set up by hashem join-hub and
+// client unit (frpc-hN / backhaul-client-hN), set up by quantum join-hub and
 // listed in hubs.json. If one Iran server dies, users who connect through the
 // others keep working.
 
@@ -119,18 +119,18 @@ func joinedHubsView() []joinedHub {
 	return out
 }
 
-// runHashemCluster runs a hashem.sh subcommand for the cluster (join-hub,
+// runQuantumCluster runs a quantum.sh subcommand for the cluster (join-hub,
 // leave-hub), which installs units and may download a core.
-func runHashemCluster(timeout time.Duration, args ...string) (string, error) {
+func runQuantumCluster(timeout time.Duration, args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	var cmd *exec.Cmd
 	if script, err := greScriptPath(); err == nil {
 		cmd = exec.CommandContext(ctx, "bash", append([]string{script}, args...)...)
-	} else if fileExists("/usr/local/bin/hashem") {
-		cmd = exec.CommandContext(ctx, "/usr/local/bin/hashem", args...)
+	} else if fileExists("/usr/local/bin/quantum") {
+		cmd = exec.CommandContext(ctx, "/usr/local/bin/quantum", args...)
 	} else {
-		return "", fmt.Errorf("hashem script not found")
+		return "", fmt.Errorf("quantum script not found")
 	}
 	cmd.Env = append(os.Environ(), "GRE_SKIP_PANEL=1", "TERM=dumb", "GRE_PANEL_DIR="+configDir)
 	out, err := cmd.CombinedOutput()
@@ -159,7 +159,7 @@ func handleClusterJoinHub(w http.ResponseWriter, r *http.Request) {
 		}
 		args = append(args, "--name", n)
 	}
-	out, err := runHashemCluster(4*time.Minute, args...)
+	out, err := runQuantumCluster(4*time.Minute, args...)
 	joinedMu.Lock()
 	joinedAt = time.Time{}
 	joinedMu.Unlock()
@@ -179,7 +179,7 @@ func handleClusterLeaveHub(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, r, "E-CLUSTER-01", "id of an extra hub (2 or more)")
 		return
 	}
-	out, err := runHashemCluster(time.Minute, "leave-hub", "--id", fmt.Sprint(req.ID))
+	out, err := runQuantumCluster(time.Minute, "leave-hub", "--id", fmt.Sprint(req.ID))
 	joinedMu.Lock()
 	joinedAt = time.Time{}
 	joinedMu.Unlock()

@@ -13,7 +13,7 @@ import (
 var legacyBackhaulUnitDir = "/etc/systemd/system"
 
 // legacyBackhaulUnits lists the backhaul-iranN / backhaul-kharejN units made by
-// the old separate Modified Backhaul script (hashem-backhaul.sh).
+// the old separate Modified Backhaul script (quantum-backhaul.sh).
 func legacyBackhaulUnits() []string {
 	var out []string
 	for _, pat := range []string{"backhaul-iran[0-9]*.service", "backhaul-kharej[0-9]*.service"} {
@@ -32,8 +32,8 @@ var legacyBackhaulMigrate = func() ([]byte, error) {
 	return runCmdTimeout(5*time.Minute, "bash", script, "backhaul-migrate")
 }
 
-// migrateLegacyBackhaul runs `hashem.sh backhaul-migrate` once at startup when
-// such units exist, so those tunnels become ordinary Hashem Backhaul tunnels
+// migrateLegacyBackhaul runs `quantum.sh backhaul-migrate` once at startup when
+// such units exist, so those tunnels become ordinary Quantum Backhaul tunnels
 // (backhaul-server / backhaul-client) that the panel, watchdog and backup see.
 func migrateLegacyBackhaul() {
 	if runtime.GOOS == "windows" || len(legacyBackhaulUnits()) == 0 {

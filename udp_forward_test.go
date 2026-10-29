@@ -81,7 +81,7 @@ func TestBackhaulBundleUDPMark(t *testing.T) {
 	}
 }
 
-// The Iran setup's bundle takes the companion port hashem.sh reports.
+// The Iran setup's bundle takes the companion port quantum.sh reports.
 func TestSetupBundleCarriesUDP(t *testing.T) {
 	steps := []string{"[OK] backhaul-server started", "[*] UDP: backhaul-udp-server-3 carries the UDP of the same ports on control port 7002."}
 	if p := udpPortFromSteps(steps); p != 7002 {
@@ -96,7 +96,7 @@ func TestSetupBundleCarriesUDP(t *testing.T) {
 	}
 }
 
-// backhaulUDPPort reads the companion unit hashem.sh writes.
+// backhaulUDPPort reads the companion unit quantum.sh writes.
 func TestBackhaulUDPPort(t *testing.T) {
 	dir := t.TempDir()
 	old := backhaulUnitDir
@@ -116,7 +116,7 @@ func TestBackhaulUDPPort(t *testing.T) {
 	if backhaulUDPPort("backhaul-server") != 0 || backhaulUDPPort("") != 0 {
 		t.Fatal("UDP port reported without a companion unit")
 	}
-	unit := "[Unit]\nPartOf=backhaul-server-3.service\n\n[Service]\nExecCondition=/usr/local/bin/hashem backhaul-udp-conf /etc/backhaul/server-3.toml /etc/backhaul/udp/backhaul-server-3.toml 7002\nExecStart=/usr/local/bin/backhaul -c /etc/backhaul/udp/backhaul-server-3.toml\n"
+	unit := "[Unit]\nPartOf=backhaul-server-3.service\n\n[Service]\nExecCondition=/usr/local/bin/quantum backhaul-udp-conf /etc/backhaul/server-3.toml /etc/backhaul/udp/backhaul-server-3.toml 7002\nExecStart=/usr/local/bin/backhaul -c /etc/backhaul/udp/backhaul-server-3.toml\n"
 	if err := os.WriteFile(filepath.Join(dir, "backhaul-udp-server-3.service"), []byte(unit), 0644); err != nil {
 		t.Fatal(err)
 	}

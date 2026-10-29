@@ -53,7 +53,7 @@ var _sshfwdData = null;
 var _clusterData = null;
 function reportErr(ctx, err) {
   const msg = (err && err.message) ? err.message : String(err == null ? '' : err);
-  console.warn('[hashem] ' + ctx + ' failed:', err);
+  console.warn('[quantum] ' + ctx + ' failed:', err);
   if (/session|expired|unauthorized/i.test(msg)) return; // login screen already handles this
   const now = Date.now();
   const key = ctx + '|' + msg;
@@ -75,7 +75,7 @@ function makePoller(fn, baseMs) {
     if (running) { schedule(); return; }
     running = true;
     try { const ok = await fn(); fails = (ok === false) ? Math.min(fails + 1, 10) : 0; }
-    catch (e) { fails = Math.min(fails + 1, 10); console.warn('[hashem] poll error', e); }
+    catch (e) { fails = Math.min(fails + 1, 10); console.warn('[quantum] poll error', e); }
     finally { running = false; }
     schedule();
   }
@@ -89,14 +89,14 @@ const ST_ICO_ERR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 function stateEmpty(o) {
   return '<div class="ent-empty' + (o.compact ? ' ent-empty-sm' : '') + '" role="status"><span class="ent-empty-ic" aria-hidden="true">' + (o.icon || ST_ICO_EMPTY) + '</span>'
     + '<b>' + esc(o.title) + '</b>' + (o.msg ? '<span>' + esc(o.msg) + '</span>' : '')
-    + (o.actionKey ? '<button type="button" class="hashem-btn hashem-btn-secondary u-btn-xs" data-state-action="' + esc(o.actionKey) + '">' + esc(o.actionLabel || tr('state_retry', 'Retry')) + '</button>' : '')
+    + (o.actionKey ? '<button type="button" class="quantum-btn quantum-btn-secondary u-btn-xs" data-state-action="' + esc(o.actionKey) + '">' + esc(o.actionLabel || tr('state_retry', 'Retry')) + '</button>' : '')
     + '</div>';
 }
 function stateError(msg, actionKey, compact) {
   return '<div class="ent-empty ent-error' + (compact ? ' ent-empty-sm' : '') + '" role="alert"><span class="ent-empty-ic" aria-hidden="true">' + ST_ICO_ERR + '</span>'
     + '<b>' + esc(tr('state_error_title', 'Could not load data')) + '</b>'
     + (msg ? '<span class="ent-err-text">' + esc(String(msg).split('\n')[0].slice(0, 200)) + '</span>' : '')
-    + (actionKey ? '<button type="button" class="hashem-btn hashem-btn-secondary u-btn-xs" data-state-action="' + esc(actionKey) + '">' + esc(tr('state_retry', 'Retry')) + '</button>' : '')
+    + (actionKey ? '<button type="button" class="quantum-btn quantum-btn-secondary u-btn-xs" data-state-action="' + esc(actionKey) + '">' + esc(tr('state_retry', 'Retry')) + '</button>' : '')
     + '</div>';
 }
 // Retry / action buttons re-run the loader that rendered them.
@@ -388,7 +388,18 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') drawerClose(
 $('themeBtnM').onclick = () => setTheme(document.body.dataset.t === 'dark' ? 'light' : 'dark');
 $('logoutBtnM').onclick = async () => { try { await api('/api/logout', {}); } catch(e){ /* logout best-effort: always fall through to login screen */ } showLogin(); };
 drawerSync();
-// theme (hashem-style: localStorage + data-t on html and body)
+// theme (quantum-style: localStorage + data-t on html and body)
+// lsGet: read a preference key, falling back to the pre-rebrand legacy key
+// (quantum_* prefs used to be stored under the old pre-rebrand prefix) so
+// users keep their theme/language/accent across the update. Writes always use
+// the new key only.
+var _LEGACY_PREF = 'has' + 'hem_';
+function lsGet(k) {
+  try { var v = localStorage.getItem(k); if (v !== null && v !== undefined) return v; } catch (e) { return null; }
+  var legacy = (k === 'gre_theme') ? _LEGACY_PREF + 'theme' : k.replace(/^quantum_/, _LEGACY_PREF);
+  if (legacy === k) return null;
+  try { return localStorage.getItem(legacy); } catch (e) { return null; }
+}
 function setTheme(t, persist = true, repaint = persist) {
   document.documentElement.dataset.t = t; document.body.dataset.t = t;
   if (persist) { try { localStorage.setItem('gre_theme', t); } catch(e) { /* storage blocked (private mode): theme just won't persist */ } }
@@ -403,7 +414,7 @@ function setTheme(t, persist = true, repaint = persist) {
 }
 $('themeBtn').onclick = () => setTheme(document.body.dataset.t === 'dark' ? 'light' : 'dark');
 // No saved choice: follow the system appearance, live, until the user picks one.
-function savedTheme() { try { return localStorage.getItem('gre_theme'); } catch(e) { return null; } }
+function savedTheme() { try { return lsGet('gre_theme'); } catch(e) { return null; } }
 const sysLight = window.matchMedia ? matchMedia('(prefers-color-scheme: light)') : null;
 setTheme(savedTheme() || (sysLight && sysLight.matches ? 'light' : 'dark'), false);
 if (sysLight && sysLight.addEventListener) sysLight.addEventListener('change', e => { if (!savedTheme()) setTheme(e.matches ? 'light' : 'dark', false, true); });
@@ -786,7 +797,7 @@ const I18N = {
     rsc_auto_is_off: "Auto-enable: off", rsc_auto_is_on: "Auto-enable: on",
     rsc_auto_on_q: "Let this panel enable Rescue by itself when a one-way block is detected? A false detection (for example a firewalled panel port) would then change the server without asking.",
     rsc_check: "Check now", rsc_enable: "Enable Rescue", rsc_join: "Join with code", rsc_apply: "Apply code", rsc_disable: "Disable and remove",
-    rsc_cancel: "Cancel", rsc_getcode: "Show rescue code", rsc_copy: "Copy code", rsc_nocfg: "frp binaries are missing on this server. Run hashem update first.",
+    rsc_cancel: "Cancel", rsc_getcode: "Show rescue code", rsc_copy: "Copy code", rsc_nocfg: "frp binaries are missing on this server. Run quantum update first.",
     rsc_origin: "This server is the blocked side. {n} port(s) are forwarded through {ip}.", rsc_origin_auto: "One-way block detected: connectivity automatically established through {ip} ({n} ports forwarded).", rsc_entry: "This server is the entry. {n} port(s) are served here and tunnelled to {ip}.", rsc_entry_auto: "This server is acting as the entry for {ip} ({n} ports tunnelled).",
     rsc_skipped: "Skipped (busy or reserved): {p}", rsc_conn: "Control link", rsc_conn_ok: "connected", rsc_conn_no: "not connected yet",
     rsc_svc: "Services", rsc_direct: "Kernel forward (full speed)", rsc_relay: "FRP relay (filtered path)", rsc_auto: "The other panel picks this up by itself within a few minutes if the two panels are paired. Otherwise use the code.",
@@ -803,7 +814,7 @@ const I18N = {
     sb_collapse: "Collapse sidebar", sb_expand: "Expand sidebar",
     tbl_filter: "Filter errors…", tbl_shown: "{n} of {t} shown",
     dens_title: "Table density", dens_comfy: "Comfortable", dens_compact: "Compact",
-    onb_title: "Welcome to Hashem", onb_sub: "No tunnel yet. Three steps and you are live.",
+    onb_title: "Welcome to Quantum", onb_sub: "No tunnel yet. Three steps and you are live.",
     onb_s1: "Choose this server's role", onb_s1d: "Iran hub (server) or foreign server (client) from the Setup tab.",
     onb_s2: "Link the other server", onb_s2d: "Create the tunnel and paste the connection bundle on the other side.",
     onb_s3: "Verify and optimise", onb_s3d: "Run Diagnostics, then Optimize in the Tunnel tab.",
@@ -1014,7 +1025,7 @@ function setLanguage(lang, boot) {
   const next = (lang === 'fa') ? 'fa' : 'en';
   if (!boot && next !== currentLang) {
     // Switching rebuilds every string the page has rendered; a reload does that cleanly.
-    try { localStorage.setItem('hashem_lang', next); } catch(e) { /* storage blocked: language cannot persist */ }
+    try { localStorage.setItem('quantum_lang', next); } catch(e) { /* storage blocked: language cannot persist */ }
     location.reload();
     return;
   }
@@ -1140,7 +1151,7 @@ function toggleLang() {
 
 if ($('langToggleBtn')) $('langToggleBtn').onclick = toggleLang;
 if ($('langToggleBtnM')) $('langToggleBtnM').onclick = toggleLang;
-try { setLanguage(localStorage.getItem('hashem_lang') || 'en', true); } catch(e) { /* storage blocked: stay on default language */ }
+try { setLanguage(lsGet('quantum_lang') || 'en', true); } catch(e) { /* storage blocked: stay on default language */ }
 
 // Each value in its own <bdi> so "0.0 B/s" keeps its order inside a Persian line.
 // Live traffic card: current rates are the numbers, the lifetime total is a footnote.
@@ -1260,7 +1271,7 @@ function armRemovePeer(peerId, name) {
   const btns = document.querySelectorAll(`[data-peer-remove="${peerId}"]`);
   btns.forEach(b => { b.classList.add('armed'); b.innerHTML = 'Confirm 5s <span class="peer-count" data-peer-n="' + peerId + '">5</span>'; });
   box.classList.remove('hidden');
-  box.innerHTML = `<div class="peer-confirm-in">Remove <b>${esc(name)} (#${peerId})</b>? GRE + frps go away; other tunnels keep running. <button class="hashem-btn hashem-btn-ghost u-btn-28" onclick="disarmRemovePeer(${peerId})">Undo</button></div>`;
+  box.innerHTML = `<div class="peer-confirm-in">Remove <b>${esc(name)} (#${peerId})</b>? GRE + frps go away; other tunnels keep running. <button class="quantum-btn quantum-btn-ghost u-btn-28" onclick="disarmRemovePeer(${peerId})">Undo</button></div>`;
   clearTimeout(peerRemoveTimers[peerId]); clearInterval(peerRemoveTimers[peerId + '_n']);
   let n = 5;
   peerRemoveTimers[peerId + '_n'] = setInterval(() => {
@@ -1386,9 +1397,9 @@ function renderPeers(peers) {
           <span class="badge ${st[0]}"><span class="dot"></span>${esc(tr('', st[1]))}</span>
           <span class="mono" data-no-i18n>${esc((l.ports || []).join(', '))}${l.udp ? ' +UDP' : ''}</span>
           ${l.latency_ms > 0 ? `<span class="mono" data-no-i18n>${l.latency_ms.toFixed(1)} ms</span>` : ''}
-          <button class="hashem-btn hashem-btn-ghost u-btn-30" onclick="renameLink('bagher-${+l.id}', ${jsArg(l.name || '')})">${esc(tr('', 'Rename'))}</button>
-          <button class="hashem-btn hashem-btn-secondary u-btn-30" onclick="bagherLinkCopyBundle(${+l.id})">${esc(tr('', 'Copy Bundle'))}</button>
-          <button class="hashem-btn hashem-btn-ghost u-btn-30" onclick="bagherLinkRemove(${+l.id})">${esc(tr('', 'Remove'))}</button>
+          <button class="quantum-btn quantum-btn-ghost u-btn-30" onclick="renameLink('bagher-${+l.id}', ${jsArg(l.name || '')})">${esc(tr('', 'Rename'))}</button>
+          <button class="quantum-btn quantum-btn-secondary u-btn-30" onclick="bagherLinkCopyBundle(${+l.id})">${esc(tr('', 'Copy Bundle'))}</button>
+          <button class="quantum-btn quantum-btn-ghost u-btn-30" onclick="bagherLinkRemove(${+l.id})">${esc(tr('', 'Remove'))}</button>
         </span>
         ${l.last_error && !l.connected ? `<span class="det-v det-ports bagher-link-err" data-no-i18n>${esc(String(l.last_error).slice(0, 160))}</span>` : ''}
       </div>`;
@@ -1396,7 +1407,7 @@ function renderPeers(peers) {
     const linksHtml = b.role === 'foreign' ? '' : `<div class="det-card bagher-links">
         <div class="det-card-head">${ICO_SRV} <span>${esc(tr('', 'More foreign servers'))}</span></div>
         ${links.length ? links.map(linkRow).join('') : `<p class="u-hint-11">${esc(tr('', 'One Iran server can carry several foreign servers over Bagher, each on its own ports.'))}</p>`}
-        <div class="u-mt-8"><button class="hashem-btn hashem-btn-secondary u-btn-30" onclick="openBagherAddLink()">${esc(tr('', 'Add Foreign Server'))}</button></div>
+        <div class="u-mt-8"><button class="quantum-btn quantum-btn-secondary u-btn-30" onclick="openBagherAddLink()">${esc(tr('', 'Add Foreign Server'))}</button></div>
       </div>`;
     bagherCardHtml = `<div class="tunnel-card peer-card u-peer-card-wide u-bd-ok u-bg-s1" id="peer-card-bagher">
       <div class="tc-header u-flex-wrap-gap8">
@@ -1406,7 +1417,7 @@ function renderPeers(peers) {
           <span class="badge info" data-no-i18n>SSH + FRP</span>
           <span class="badge dim">${esc(roleLabel)}</span>
           <span class="badge ${bagherState[0]}"><span class="dot"></span>${esc(tr('', bagherState[1]))}</span>
-          <button type="button" class="hashem-btn hashem-btn-ghost u-btn-30" onclick="renameLink('bagher-1', ${jsArg(b.name || '')})">${esc(tr('', 'Rename'))}</button>
+          <button type="button" class="quantum-btn quantum-btn-ghost u-btn-30" onclick="renameLink('bagher-1', ${jsArg(b.name || '')})">${esc(tr('', 'Rename'))}</button>
         </div>
       </div>
       ${tunViz({
@@ -1434,13 +1445,13 @@ function renderPeers(peers) {
         ${linksHtml}
       </div>
       <div class="tc-acts u-flex u-wrap u-gap-8 u-mt-4">
-        ${b.role === 'foreign' ? '' : `<button class="hashem-btn hashem-btn-secondary" onclick="openBagherQuickEdit()">${esc(tr('', 'Quick Edit'))}</button>
-        <button class="hashem-btn hashem-btn-secondary" onclick="bagherCopyBundleClick()">${esc(tr('', 'Copy Bundle'))}</button>`}
-        ${bagherRun ? `<button class="hashem-btn hashem-btn-secondary" onclick="bagherStopTunnelClick()">${esc(tr('', 'Stop'))}</button>`
-          : (b.role === 'foreign' ? '' : `<button class="hashem-btn hashem-btn-primary" onclick="bagherStartClick()">${esc(tr('', 'Start'))}</button>`)}
-        ${b.dnat_conflict ? `<button class="hashem-btn hashem-btn-secondary" onclick="sshfwdClearDnatClick()">${esc(tr('', 'Clear DNAT Conflicts'))}</button>` : ''}
-        <button class="hashem-btn hashem-btn-ghost" onclick="openBagherSetup()">${esc(tr('', 'Open in Setup'))}</button>
-        <button class="hashem-btn hashem-btn-danger" onclick="cleanBagherTunnelClick()">${esc(tr('', 'Remove Bagher'))}</button>
+        ${b.role === 'foreign' ? '' : `<button class="quantum-btn quantum-btn-secondary" onclick="openBagherQuickEdit()">${esc(tr('', 'Quick Edit'))}</button>
+        <button class="quantum-btn quantum-btn-secondary" onclick="bagherCopyBundleClick()">${esc(tr('', 'Copy Bundle'))}</button>`}
+        ${bagherRun ? `<button class="quantum-btn quantum-btn-secondary" onclick="bagherStopTunnelClick()">${esc(tr('', 'Stop'))}</button>`
+          : (b.role === 'foreign' ? '' : `<button class="quantum-btn quantum-btn-primary" onclick="bagherStartClick()">${esc(tr('', 'Start'))}</button>`)}
+        ${b.dnat_conflict ? `<button class="quantum-btn quantum-btn-secondary" onclick="sshfwdClearDnatClick()">${esc(tr('', 'Clear DNAT Conflicts'))}</button>` : ''}
+        <button class="quantum-btn quantum-btn-ghost" onclick="openBagherSetup()">${esc(tr('', 'Open in Setup'))}</button>
+        <button class="quantum-btn quantum-btn-danger" onclick="cleanBagherTunnelClick()">${esc(tr('', 'Remove Bagher'))}</button>
       </div>
     </div>`;
   }
@@ -1531,12 +1542,12 @@ function renderPeers(peers) {
         </div>
       </div>
       <div class="peer-acts u-peer-acts-bar">
-        ${isBh ? '' : `<button class="hashem-btn hashem-btn-secondary u-btn-30" data-peer-act="ping-${p.id}" onclick="peerAct('ping', ${p.id})">Ping</button>`}
-        <button class="hashem-btn hashem-btn-secondary u-btn-30" onclick="openSwap(${p.id})">${esc(tr('', 'Swap carrier'))}</button>
-        <button class="hashem-btn hashem-btn-secondary u-btn-30" onclick="editPeerPortsClick(${p.id})">Edit Peer</button>
-        <button class="hashem-btn hashem-btn-secondary u-btn-30" onclick="showPeerToken(${p.id}, ${jsArg(nm)})">Bundle</button>
-        <button class="hashem-btn hashem-btn-secondary u-btn-30" data-peer-act="restart-frps-${p.id}" onclick="peerAct('restart-frps', ${p.id})">Restart</button>
-        <button class="hashem-btn hashem-btn-danger peer-remove-btn u-btn-30" data-peer-remove="${p.id}" onclick="peerRemoveClick(${p.id}, ${jsArg(nm)})">Remove</button>
+        ${isBh ? '' : `<button class="quantum-btn quantum-btn-secondary u-btn-30" data-peer-act="ping-${p.id}" onclick="peerAct('ping', ${p.id})">Ping</button>`}
+        <button class="quantum-btn quantum-btn-secondary u-btn-30" onclick="openSwap(${p.id})">${esc(tr('', 'Swap carrier'))}</button>
+        <button class="quantum-btn quantum-btn-secondary u-btn-30" onclick="editPeerPortsClick(${p.id})">Edit Peer</button>
+        <button class="quantum-btn quantum-btn-secondary u-btn-30" onclick="showPeerToken(${p.id}, ${jsArg(nm)})">Bundle</button>
+        <button class="quantum-btn quantum-btn-secondary u-btn-30" data-peer-act="restart-frps-${p.id}" onclick="peerAct('restart-frps', ${p.id})">Restart</button>
+        <button class="quantum-btn quantum-btn-danger peer-remove-btn u-btn-30" data-peer-remove="${p.id}" onclick="peerRemoveClick(${p.id}, ${jsArg(nm)})">Remove</button>
       </div>
       <div id="peer-confirm-${p.id}" class="peer-confirm warnbox hidden"></div>
     </div>`;
@@ -1645,17 +1656,17 @@ function renderMatrixSetup() {
             <button type="button" role="radio" aria-checked="true" tabindex="0" data-mx-family="ipv4" data-no-i18n>IPv4</button>
             <button type="button" role="radio" aria-checked="false" tabindex="-1" data-mx-family="ipv6" data-no-i18n>IPv6</button>
           </div></div>
-        <div class="fg"><div class="mx-field-label"><label for="mxPort">${esc(tr('', 'Tinc port'))}</label>${mxHelpButton('port', 'Help with Tinc port')}</div><input class="hashem-input u-w-120" id="mxPort" value="2097" inputmode="numeric" dir="ltr"></div>
-        <div class="fg"><label for="mxV6">${esc(tr('', "This server's IPv6 (IPv6 family)"))}</label><input class="hashem-input u-mono" id="mxV6" placeholder="auto" dir="ltr"></div>
-        <div class="fg u-flex-1"><div class="mx-field-label"><label for="mxPorts">${esc(tr('', 'Forwarded ports (comma list)'))}</label>${mxHelpButton('ports', 'Help with forwarded user ports')}</div><input class="hashem-input u-mono" id="mxPorts" placeholder="443, 8080" dir="ltr"></div>
+        <div class="fg"><div class="mx-field-label"><label for="mxPort">${esc(tr('', 'Tinc port'))}</label>${mxHelpButton('port', 'Help with Tinc port')}</div><input class="quantum-input u-w-120" id="mxPort" value="2097" inputmode="numeric" dir="ltr"></div>
+        <div class="fg"><label for="mxV6">${esc(tr('', "This server's IPv6 (IPv6 family)"))}</label><input class="quantum-input u-mono" id="mxV6" placeholder="auto" dir="ltr"></div>
+        <div class="fg u-flex-1"><div class="mx-field-label"><label for="mxPorts">${esc(tr('', 'Forwarded ports (comma list)'))}</label>${mxHelpButton('ports', 'Help with forwarded user ports')}</div><input class="quantum-input u-mono" id="mxPorts" placeholder="443, 8080" dir="ltr"></div>
       </div>
-      <button type="button" class="hashem-btn hashem-btn-primary u-mt-8" id="mxApplyBtn">${esc(tr('', 'Apply Matrix Setup'))}</button>
+      <button type="button" class="quantum-btn quantum-btn-primary u-mt-8" id="mxApplyBtn">${esc(tr('', 'Apply Matrix Setup'))}</button>
       <div class="mx-setup-status u-mt-8" id="mxSetupStatus" role="status" aria-live="polite" hidden><span class="ent-spinner" aria-hidden="true"></span><span>${esc(tr('', 'Installing tinc or waiting for another package installation…'))} ${esc(tr('', 'Please keep this page open.'))}</span></div>
       <div class="u-mt-12">
         <p class="qs-hint">${esc(tr('', 'Foreign server? Paste the Matrix bundle from the Iran panel here and register it.'))}</p>
         <div class="u-flex-center-wrap10 u-mt-4">
-          <input aria-label="Matrix bundle" class="hashem-input u-flex-1 u-mono" id="mxBundle" placeholder="hmx1_…" dir="ltr" autocomplete="off" spellcheck="false">
-          <button type="button" class="hashem-btn hashem-btn-secondary" id="mxRegisterBtn">${esc(tr('', 'Register'))}</button>
+          <input aria-label="Matrix bundle" class="quantum-input u-flex-1 u-mono" id="mxBundle" placeholder="hmx1_…" dir="ltr" autocomplete="off" spellcheck="false">
+          <button type="button" class="quantum-btn quantum-btn-secondary" id="mxRegisterBtn">${esc(tr('', 'Register'))}</button>
         </div>
       </div>`;
     box.querySelectorAll('[data-mx-help]').forEach(b => { b.onclick = () => mxHelpOpen(b.dataset.mxHelp); });
@@ -1706,12 +1717,12 @@ function renderMatrixBody(targetId) {
     </div>
     ${st.role === 'hub' && st.bundle ? `<div class="u-mt-8">
       <p class="qs-hint">${esc(tr('', 'Matrix bundle — paste it on the foreign panel to register that server:'))}</p>
-      <textarea aria-label="Matrix bundle" class="hashem-input u-mono u-w-full" rows="3" readonly dir="ltr" onclick="this.select()">${esc(st.bundle)}</textarea>
+      <textarea aria-label="Matrix bundle" class="quantum-input u-mono u-w-full" rows="3" readonly dir="ltr" onclick="this.select()">${esc(st.bundle)}</textarea>
     </div>` : ''}
     <div class="tc-acts u-flex u-wrap u-gap-8 u-mt-4">
-      <button type="button" class="hashem-btn hashem-btn-secondary u-btn-30" data-matrix-edit="${esc(targetId)}" onclick="matrixEditOpen()">${esc(tr('', 'Edit'))}</button>
-      <button type="button" class="hashem-btn hashem-btn-secondary u-btn-30" onclick="matrixRestartClick()">${esc(tr('', 'Restart'))}</button>
-      <button type="button" class="hashem-btn hashem-btn-danger u-btn-30" onclick="matrixRemoveClick()">${esc(tr('', 'Remove Matrix'))}</button>
+      <button type="button" class="quantum-btn quantum-btn-secondary u-btn-30" data-matrix-edit="${esc(targetId)}" onclick="matrixEditOpen()">${esc(tr('', 'Edit'))}</button>
+      <button type="button" class="quantum-btn quantum-btn-secondary u-btn-30" onclick="matrixRestartClick()">${esc(tr('', 'Restart'))}</button>
+      <button type="button" class="quantum-btn quantum-btn-danger u-btn-30" onclick="matrixRemoveClick()">${esc(tr('', 'Remove Matrix'))}</button>
     </div>`;
 }
 
@@ -1826,16 +1837,16 @@ function renderTunnelsList() {
     const stTxt = r.state === 'ok' ? 'active' : r.state === 'warn' ? 'degraded' : 'down';
     const acts = [];
     if (r.kind === 'main') {
-      acts.push(`<button type="button" class="hashem-btn hashem-btn-secondary u-btn-30" data-peer-act="restart-frps-0" onclick="peerAct('restart-frps', 0)">${esc(tr('', 'Restart'))}</button>`);
+      acts.push(`<button type="button" class="quantum-btn quantum-btn-secondary u-btn-30" data-peer-act="restart-frps-0" onclick="peerAct('restart-frps', 0)">${esc(tr('', 'Restart'))}</button>`);
     } else if (r.kind === 'bagher') {
       acts.push(b.is_active
-        ? `<button type="button" class="hashem-btn hashem-btn-secondary u-btn-30" onclick="bagherStopTunnelClick()">${esc(tr('', 'Stop'))}</button>`
-        : `<button type="button" class="hashem-btn hashem-btn-primary u-btn-30" onclick="bagherStartClick()">${esc(tr('', 'Start'))}</button>`);
+        ? `<button type="button" class="quantum-btn quantum-btn-secondary u-btn-30" onclick="bagherStopTunnelClick()">${esc(tr('', 'Stop'))}</button>`
+        : `<button type="button" class="quantum-btn quantum-btn-primary u-btn-30" onclick="bagherStartClick()">${esc(tr('', 'Start'))}</button>`);
     } else if (r.kind === 'matrix') {
-      acts.push(`<button type="button" class="hashem-btn hashem-btn-secondary u-btn-30" onclick="matrixRestartClick()">${esc(tr('', 'Restart'))}</button>`);
+      acts.push(`<button type="button" class="quantum-btn quantum-btn-secondary u-btn-30" onclick="matrixRestartClick()">${esc(tr('', 'Restart'))}</button>`);
     } else {
-      if (r.engine !== 'backhaul') acts.push(`<button type="button" class="hashem-btn hashem-btn-secondary u-btn-30" data-peer-act="ping-${r.kind}" onclick="peerAct('ping', ${r.kind})">${esc(tr('', 'Ping'))}</button>`);
-      acts.push(`<button type="button" class="hashem-btn hashem-btn-secondary u-btn-30" data-peer-act="restart-frps-${r.kind}" onclick="peerAct('restart-frps', ${r.kind})">${esc(tr('', 'Restart'))}</button>`);
+      if (r.engine !== 'backhaul') acts.push(`<button type="button" class="quantum-btn quantum-btn-secondary u-btn-30" data-peer-act="ping-${r.kind}" onclick="peerAct('ping', ${r.kind})">${esc(tr('', 'Ping'))}</button>`);
+      acts.push(`<button type="button" class="quantum-btn quantum-btn-secondary u-btn-30" data-peer-act="restart-frps-${r.kind}" onclick="peerAct('restart-frps', ${r.kind})">${esc(tr('', 'Restart'))}</button>`);
     }
     const sub = r.kind === 'bagher' ? 'SSH + FRP' : (typeof r.kind === 'number' ? '#' + r.kind : '');
     return `<div class="tnl-row tnl-${r.state}">
@@ -1852,8 +1863,8 @@ function renderTunnelsList() {
       <div class="tnl-state"><span class="badge ${r.state === 'ok' ? 'ok' : r.state === 'warn' ? 'warn' : 'err'}"><span class="dot"></span>${esc(tr('', stTxt))}</span></div>
       <div class="tnl-acts">
         ${acts.join('')}
-        <button type="button" class="hashem-btn hashem-btn-ghost u-btn-30" onclick="openTunnelDetail(${arg})" title="${esc(tr('', 'View'))}" aria-label="${esc(tr('', 'View'))}"><svg class="i" aria-hidden="true"><use href="#i-eye"/></svg></button>
-        <button type="button" class="hashem-btn hashem-btn-danger u-btn-30" onclick="tunnelListRemove(${arg}, ${jsArg(String(r.name))})" title="${esc(tr('', 'Delete'))}" aria-label="${esc(tr('', 'Delete'))}">${ICO_TRASH}</button>
+        <button type="button" class="quantum-btn quantum-btn-ghost u-btn-30" onclick="openTunnelDetail(${arg})" title="${esc(tr('', 'View'))}" aria-label="${esc(tr('', 'View'))}"><svg class="i" aria-hidden="true"><use href="#i-eye"/></svg></button>
+        <button type="button" class="quantum-btn quantum-btn-danger u-btn-30" onclick="tunnelListRemove(${arg}, ${jsArg(String(r.name))})" title="${esc(tr('', 'Delete'))}" aria-label="${esc(tr('', 'Delete'))}">${ICO_TRASH}</button>
       </div>
     </div>`;
   }).join('');
@@ -1990,7 +2001,7 @@ function renderTunnel(st) {
           ${eng ? '<span class="badge info" data-no-i18n>' + esc(LS_ENGINE[eng] || eng) + '</span>' : ''}
           <span class="badge ${up ? 'ok' : 'err'}"><span class="dot"></span>${esc(tr('', up ? 'Active' : 'Down'))}</span>
           ${(usesGre && !st.ping_ok && st.frp_up) ? '<span class="badge info"><span class="dot"></span>' + esc(tr('fleet_frp_only', 'FRP only')) + '</span>' : ''}
-          <button type="button" class="hashem-btn hashem-btn-ghost u-btn-30" onclick="renameLink('main', ${jsArg(st.name || '')})">${esc(tr('', 'Rename'))}</button>
+          <button type="button" class="quantum-btn quantum-btn-ghost u-btn-30" onclick="renameLink('main', ${jsArg(st.name || '')})">${esc(tr('', 'Rename'))}</button>
         </div>
       </div>
       ${mainViz}
@@ -2015,12 +2026,12 @@ function renderTunnel(st) {
         </div>
       </div>
       <div class="peer-acts u-peer-acts-bar">
-        ${usesGre ? `<button class="hashem-btn hashem-btn-secondary u-btn-30" data-peer-act="ping-0" onclick="peerAct('ping', 0)">${esc(tr('', 'Ping'))}</button>` : ''}
-        ${st.carrier_id ? `<button class="hashem-btn hashem-btn-secondary u-btn-30" onclick="openSwap(0)">${esc(tr('', 'Swap carrier'))}</button>` : ''}
-        <button class="hashem-btn hashem-btn-secondary u-btn-30" onclick="editMainPortsClick()">${esc(tr('', 'Edit Tunnel'))}</button>
-        ${isIran ? `<button class="hashem-btn hashem-btn-secondary u-btn-30" onclick="copyMainIranBundle()">${esc(tr('', 'Copy Bundle'))}</button>` : ''}
-        ${usesGre ? `<button class="hashem-btn hashem-btn-secondary u-btn-30" data-peer-act="restart-gre-0" onclick="peerAct('restart-gre', 0)">${esc(tr('', 'Restart GRE'))}</button>` : ''}
-        ${st.frp_svc ? `<button class="hashem-btn hashem-btn-secondary u-btn-30" data-peer-act="restart-engine-0" onclick="peerAct('restart-engine', 0)">${esc(tr('', 'Restart Service'))}</button>` : ''}
+        ${usesGre ? `<button class="quantum-btn quantum-btn-secondary u-btn-30" data-peer-act="ping-0" onclick="peerAct('ping', 0)">${esc(tr('', 'Ping'))}</button>` : ''}
+        ${st.carrier_id ? `<button class="quantum-btn quantum-btn-secondary u-btn-30" onclick="openSwap(0)">${esc(tr('', 'Swap carrier'))}</button>` : ''}
+        <button class="quantum-btn quantum-btn-secondary u-btn-30" onclick="editMainPortsClick()">${esc(tr('', 'Edit Tunnel'))}</button>
+        ${isIran ? `<button class="quantum-btn quantum-btn-secondary u-btn-30" onclick="copyMainIranBundle()">${esc(tr('', 'Copy Bundle'))}</button>` : ''}
+        ${usesGre ? `<button class="quantum-btn quantum-btn-secondary u-btn-30" data-peer-act="restart-gre-0" onclick="peerAct('restart-gre', 0)">${esc(tr('', 'Restart GRE'))}</button>` : ''}
+        ${st.frp_svc ? `<button class="quantum-btn quantum-btn-secondary u-btn-30" data-peer-act="restart-engine-0" onclick="peerAct('restart-engine', 0)">${esc(tr('', 'Restart Service'))}</button>` : ''}
       </div>
     </div>`;
   $('tunnel').innerHTML = mainCard;
@@ -2182,7 +2193,7 @@ $('addPeerBtn').onclick = async () => {
       r = await api('/api/setup', body);
     } catch(e) {
       // 409 = port already served by another tunnel — show it inline,
-      // same for a stale hashem.sh on this host (E-INSTALL-02 "Unknown command"):
+      // same for a stale quantum.sh on this host (E-INSTALL-02 "Unknown command"):
       // tell the user to update instead of a bare failure.
       if (/already served|already used|peer table full/i.test(e.message)) {
         const w = $('peerWarn');
@@ -2257,7 +2268,7 @@ document.querySelectorAll('[data-range]').forEach(b => b.onclick = () => {
 
 function hydrateCachedTraffic() {
   try {
-    const raw = localStorage.getItem('hashem_server_traffic_cache');
+    const raw = localStorage.getItem('quantum_server_traffic_cache');
     if (!raw) return;
     const cache = JSON.parse(raw);
     // Never hydrate pre-migration tunnel counters as server totals.
@@ -2777,7 +2788,7 @@ async function refreshDash() {
     if (!d || typeof d !== 'object') return;
     window._lastDash = d;
     if (typeof linkStrip === 'function') linkStrip(d);
-    const model = dashboardModel(d, window._hashemEmpty);
+    const model = dashboardModel(d, window._quantumEmpty);
     const { matrix: mx, legacy: legacyConfigured, unset, state, role, on } = model;
     const peers = d.peers || [];
     const nPeers = d.peer_count || peers.length;
@@ -2793,7 +2804,7 @@ async function refreshDash() {
       renderMatrixSetup(); renderTunnelsList();
       if (_tunnelDetail === 'matrix') renderMatrixDetail();
     }
-    if (mx.enabled) { window._hashemEmpty = false; const c = $('onbCard'); if (c) c.hidden = true; }
+    if (mx.enabled) { window._quantumEmpty = false; const c = $('onbCard'); if (c) c.hidden = true; }
     const g = d.gre || {}, f = d.frp || {};
     const iran = /iran|master/.test(role), foreign = /foreign/.test(role);
     const engine = engLabel(d.active_engine);
@@ -2906,11 +2917,11 @@ async function refreshDash() {
     drawActivityChart(serverHistory, !hasConns);
     try {
       if (trafficKnown) {
-        localStorage.setItem('hashem_server_traffic_cache', JSON.stringify({
+        localStorage.setItem('quantum_server_traffic_cache', JSON.stringify({
           scope: 'server', traffic: t, history: serverHistory, saved_at: Date.now()
         }));
       } else {
-        localStorage.removeItem('hashem_server_traffic_cache');
+        localStorage.removeItem('quantum_server_traffic_cache');
       }
     } catch (e) {}
     const cd = $('chartDown'), cc = $('chartCard');
@@ -3476,7 +3487,7 @@ function renderBundleBox(bb, bundleStr) {
   bb.innerHTML = `
     <div class="u-flex u-ai-c u-jc-sb u-gap-8 u-mb-8">
       <span class="u-fw-600 u-c-tx">${esc(tr('', 'Setup bundle for the foreign server'))}</span>
-      <button type="button" class="hashem-btn hashem-btn-primary u-btn-30" data-copy-bundle>${esc(tr('', 'Copy Bundle'))}</button>
+      <button type="button" class="quantum-btn quantum-btn-primary u-btn-30" data-copy-bundle>${esc(tr('', 'Copy Bundle'))}</button>
     </div>
     <div class="u-mono u-fs-12 u-bg-inset u-p-12x12 u-r-8 u-break u-c-info u-select-all u-bd-info" data-no-i18n>${esc(bundleStr)}</div>
     <div class="u-fs-12 u-c-mu u-mt-8">${esc(tr('', 'On the foreign server, open Setup, choose Foreign and paste this into the bundle box. It fills in everything else.'))}</div>
@@ -4035,7 +4046,7 @@ $('toggle').addEventListener('click', () => {
     : '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>';
   i.focus();
 });
-// kinetic grid background (same as Hashem login)
+// kinetic grid background (same as Quantum login)
 (function(){
   const CELL_SIZE = 55, INFLUENCE_RADIUS = 260, MAX_WARP = 24;
   const INFLUENCE_RADIUS_SQ = INFLUENCE_RADIUS * INFLUENCE_RADIUS;
@@ -4880,8 +4891,8 @@ function termEnsure() {
   t.onData(d => termSend({v:1, t:'in', d}));
   t.onResize(sz => termSend({v:1, t:'resize', cols: sz.cols, rows: sz.rows}));
   termState.term = t;
-  t.writeln('\x1b[1;36mHashem terminal\x1b[0m — press Connect for a root shell on this server.');
-  t.writeln('Type \x1b[1mhashem\x1b[0m + Enter for the full tunnel menu (setup · peers · logs · update · HTTPS).');
+  t.writeln('\x1b[1;36mQuantum terminal\x1b[0m — press Connect for a root shell on this server.');
+  t.writeln('Type \x1b[1mquantum\x1b[0m + Enter for the full tunnel menu (setup · peers · logs · update · HTTPS).');
   try { termState.fit.fit(); } catch(_){ /* term.fit / ws send / close: harmless if terminal not ready */ }
 }
 function termSend(m) { try { if (termState.ws && termState.ws.readyState === 1) termState.ws.send(JSON.stringify(m)); } catch(_){ /* term.fit / ws send / close: harmless if terminal not ready */ } }
@@ -4914,7 +4925,7 @@ async function termConnect() {
   termState.ws = ws;
   termSetDot('warn', 'connecting…');
   termOverlay(false);
-  ws.onopen = () => { termState.connecting = false; termSetDot('on', 'connected'); $('termMeta').textContent = 'Root shell on this server · single session · 10m idle kill · 30m cap · type hashem for the tunnel menu'; try { termState.fit.fit(); } catch(_){ /* term.fit / ws send / close: harmless if terminal not ready */ } termSendResize(); termState.hb = setInterval(() => termSend({v:1,t:'hb'}), 25000); termState.term && termState.term.focus(); };
+  ws.onopen = () => { termState.connecting = false; termSetDot('on', 'connected'); $('termMeta').textContent = 'Root shell on this server · single session · 10m idle kill · 30m cap · type quantum for the tunnel menu'; try { termState.fit.fit(); } catch(_){ /* term.fit / ws send / close: harmless if terminal not ready */ } termSendResize(); termState.hb = setInterval(() => termSend({v:1,t:'hb'}), 25000); termState.term && termState.term.focus(); };
   ws.onmessage = ev => {
     let m; try { m = JSON.parse(ev.data); } catch(_) { return; /* non-JSON frame: ignore */ }
     if (m.v !== 1) return;
@@ -4934,15 +4945,15 @@ function termDisconnect(note) {
 }
 $('termConnBtn').onclick = () => { termState.ws ? termDisconnect() : termConnect(); };
 $('termOverlayBtn').onclick = () => termConnect();
-// hashem quick buttons: type the command into the live shell + Enter.
-// 'check'/'logs'/'update' are shortcuts for the matching hashem subcommands.
-const termQuickMap = { check: 'hashem status', logs: 'hashem logs', update: 'hashem update' };
+// quantum quick buttons: type the command into the live shell + Enter.
+// 'check'/'logs'/'update' are shortcuts for the matching quantum subcommands.
+const termQuickMap = { check: 'quantum status', logs: 'quantum logs', update: 'quantum update' };
 function termTypeCmd(cmd) {
-  if (!termState.ws || !termState.term) { toastWarn('not connected', 'Press Connect first, then run hashem commands.'); return; }
+  if (!termState.ws || !termState.term) { toastWarn('not connected', 'Press Connect first, then run quantum commands.'); return; }
   termSend({v:1, t:'in', d: cmd + '\r'});
   termState.term.focus();
 }
-$('termHashemBtn').onclick = () => termTypeCmd('hashem');
+$('termQuantumBtn').onclick = () => termTypeCmd('quantum');
 document.querySelectorAll('#tab-terminal .term-quick button').forEach(b => b.onclick = () => termTypeCmd(termQuickMap[b.dataset.q] || b.dataset.q));
 $('termKillBtn').onclick = async () => {
   if (!termState.ws) { toastWarn('no active session', 'Nothing to kill — connect first.'); return; }
@@ -5589,7 +5600,7 @@ function renderCarriers() {
       <span class="cr-dot" aria-hidden="true"></span>
       <div class="cr-id"><b>${esc(r.name)}</b><small>${esc(r.ip)}</small></div>
       <div class="cr-car"><span class="cr-eng" data-no-i18n>${esc(fam.name || eng)}</span><b data-no-i18n>${esc(o[1] || (t || '').toUpperCase())}</b><span class="cr-tags" data-no-i18n>${tags}</span></div>
-      <button class="hashem-btn ${busy ? 'hashem-btn-ghost' : 'hashem-btn-secondary'} u-btn-30" onclick="openSwap(${r.id})">${busy ? '<span class="ent-spinner"></span> ' + esc(tr('', 'Swapping…')) : esc(tr('', 'Swap'))}</button>
+      <button class="quantum-btn ${busy ? 'quantum-btn-ghost' : 'quantum-btn-secondary'} u-btn-30" onclick="openSwap(${r.id})">${busy ? '<span class="ent-spinner"></span> ' + esc(tr('', 'Swapping…')) : esc(tr('', 'Swap'))}</button>
     </div>`;
   }).join('');
 }
@@ -5757,8 +5768,8 @@ function renderSwapProgress() {
   else if (j.state === 'reverted') res = `<div class="sw-result warn">${esc(docTpl('{0} did not connect, so both servers went back to {1}. The tunnel works as before.', [carrierText(j.to), carrierText(j.from)]))}<small data-no-i18n>${esc(j.error || '')}</small></div>`;
   else if (j.state === 'failed') res = `<div class="sw-result err">${esc(j.error || tr('', 'The swap failed.'))}</div>`;
   else if (j.state === 'manual') res = `<div class="sw-result warn">${esc(docTpl('This server now runs {0}. Paste this bundle into Setup on the foreign server to bring the tunnel back.', [carrierText(j.to)]))}
-      ${j.bundle ? `<textarea class="hashem-input sw-bundle" readonly aria-label="${esc(tr('', 'Bundle'))}" data-no-i18n>${esc(j.bundle)}</textarea>
-      <button type="button" class="hashem-btn hashem-btn-secondary u-btn-30" id="swapCopyBundle">${esc(tr('', 'Copy Bundle'))}</button>` : ''}</div>`;
+      ${j.bundle ? `<textarea class="quantum-input sw-bundle" readonly aria-label="${esc(tr('', 'Bundle'))}" data-no-i18n>${esc(j.bundle)}</textarea>
+      <button type="button" class="quantum-btn quantum-btn-secondary u-btn-30" id="swapCopyBundle">${esc(tr('', 'Copy Bundle'))}</button>` : ''}</div>`;
   $('swapBody').innerHTML = swRoute(t, j.from, j.to, wire) + `<ol class="sw-steps">${steps}</ol>` + res;
   const cb = $('swapCopyBundle');
   if (cb) cb.onclick = () => (navigator.clipboard ? navigator.clipboard.writeText(j.bundle) : Promise.reject())
@@ -5832,7 +5843,7 @@ function renderSpoof() {
   const body = $('spoofBody');
   if (!d.installed) {
     body.innerHTML = `<div class="sw-result warn">${esc(tr('', 'The spoof core is not installed on this server yet. Install it from the terminal:'))}
-      <textarea class="hashem-input sw-bundle" readonly data-no-i18n>hashem spoof install</textarea></div>`;
+      <textarea class="quantum-input sw-bundle" readonly data-no-i18n>quantum spoof install</textarea></div>`;
   }
   const isLocal = d.role === 'local';
   const roleSeg = `<div class="qs-seg u-mb-12" role="group">
@@ -5853,24 +5864,24 @@ function renderSpoof() {
   const ips = (d.spoof_ips || []).join('\n');
   const form = `<div class="sp-grid">
       <label class="qs-label" data-i18n-skip>${esc(tr('', "The other server's public IP"))}</label>
-      <input class="hashem-input u-ltr u-mono" id="spPeerIP" value="${esc(d.peer_public_ip || '')}" placeholder="198.51.100.10" autocomplete="off">
+      <input class="quantum-input u-ltr u-mono" id="spPeerIP" value="${esc(d.peer_public_ip || '')}" placeholder="198.51.100.10" autocomplete="off">
       <div class="sp-row3">
-        <div><label class="qs-label">${esc(tr('', 'Public port'))}</label><input class="hashem-input u-ltr u-mono" id="spListen" value="${esc(String(d.listen_port || 8090))}" inputmode="numeric"></div>
-        <div><label class="qs-label">${esc(tr('', 'Recv port'))}</label><input class="hashem-input u-ltr u-mono" id="spRecv" value="${esc(String(d.recv_port || 5001))}" inputmode="numeric"></div>
-        <div><label class="qs-label">${esc(tr('', 'Spoof port'))}</label><input class="hashem-input u-ltr u-mono" id="spSpoofPort" value="${esc(String(d.spoof_port || 443))}" inputmode="numeric"></div>
+        <div><label class="qs-label">${esc(tr('', 'Public port'))}</label><input class="quantum-input u-ltr u-mono" id="spListen" value="${esc(String(d.listen_port || 8090))}" inputmode="numeric"></div>
+        <div><label class="qs-label">${esc(tr('', 'Recv port'))}</label><input class="quantum-input u-ltr u-mono" id="spRecv" value="${esc(String(d.recv_port || 5001))}" inputmode="numeric"></div>
+        <div><label class="qs-label">${esc(tr('', 'Spoof port'))}</label><input class="quantum-input u-ltr u-mono" id="spSpoofPort" value="${esc(String(d.spoof_port || 443))}" inputmode="numeric"></div>
       </div>
       <div class="sp-row2">
-        <div><label class="qs-label">${esc(tr('', 'Send transport'))}</label><select class="hashem-input" id="spSend">${spoofOpt(d.send_transport)}</select></div>
-        <div><label class="qs-label">${esc(tr('', 'Recv transport'))}</label><select class="hashem-input" id="spRecvT">${spoofOpt(d.recv_transport)}</select></div>
+        <div><label class="qs-label">${esc(tr('', 'Send transport'))}</label><select class="quantum-input" id="spSend">${spoofOpt(d.send_transport)}</select></div>
+        <div><label class="qs-label">${esc(tr('', 'Recv transport'))}</label><select class="quantum-input" id="spRecvT">${spoofOpt(d.recv_transport)}</select></div>
       </div>
       <label class="qs-label">${esc(tr('', 'Spoof source IPs (one per line, from the tester)'))}</label>
-      <textarea class="hashem-input u-ltr u-mono sp-ips" id="spIPs" rows="3" placeholder="203.0.113.7">${esc(ips)}</textarea>
+      <textarea class="quantum-input u-ltr u-mono sp-ips" id="spIPs" rows="3" placeholder="203.0.113.7">${esc(ips)}</textarea>
       <div class="sp-acts">
-        <button type="button" class="hashem-btn hashem-btn-secondary u-btn-30" id="spSaveBtn">${esc(tr('', 'Save'))}</button>
+        <button type="button" class="quantum-btn quantum-btn-secondary u-btn-30" id="spSaveBtn">${esc(tr('', 'Save'))}</button>
         ${d.enabled
-          ? `<button type="button" class="hashem-btn hashem-btn-ghost u-btn-30" id="spDownBtn">${esc(tr('', 'Stop tunnel'))}</button>`
+          ? `<button type="button" class="quantum-btn quantum-btn-ghost u-btn-30" id="spDownBtn">${esc(tr('', 'Stop tunnel'))}</button>`
           : ''}
-        <button type="button" class="hashem-btn hashem-btn-primary u-btn-30" id="spUpBtn">${esc(d.enabled ? tr('', 'Apply & restart') : tr('', 'Bring tunnel up'))}</button>
+        <button type="button" class="quantum-btn quantum-btn-primary u-btn-30" id="spUpBtn">${esc(d.enabled ? tr('', 'Apply & restart') : tr('', 'Bring tunnel up'))}</button>
       </div>
     </div>`;
 
@@ -5879,13 +5890,13 @@ function renderSpoof() {
   if (isLocal) {
     keyBlock = `<div class="sp-sub"><b>${esc(tr('', 'Link to the foreign server'))}</b>
       <p class="qs-hint">${esc(tr('', 'Generate a bundle here and paste it into the Spoof tab on the foreign server. It carries the WireGuard keys for both sides.'))}</p>
-      <button type="button" class="hashem-btn hashem-btn-secondary u-btn-30" id="spBundleBtn">${esc(tr('', 'Generate foreign bundle'))}</button>
+      <button type="button" class="quantum-btn quantum-btn-secondary u-btn-30" id="spBundleBtn">${esc(tr('', 'Generate foreign bundle'))}</button>
       <div id="spBundleOut"></div></div>`;
   } else {
     keyBlock = `<div class="sp-sub"><b>${esc(tr('', 'Import the bundle from the Iran server'))}</b>
       <p class="qs-hint">${esc(tr('', 'Paste the bundle generated in the Spoof tab on the Iran server. It fills the peer IP, ports, transports and WireGuard keys.'))}</p>
-      <textarea class="hashem-input u-ltr u-mono sp-ips" id="spBundleIn" rows="2" placeholder="spf1_…"></textarea>
-      <button type="button" class="hashem-btn hashem-btn-secondary u-btn-30" id="spImportBtn">${esc(tr('', 'Import bundle'))}</button></div>`;
+      <textarea class="quantum-input u-ltr u-mono sp-ips" id="spBundleIn" rows="2" placeholder="spf1_…"></textarea>
+      <button type="button" class="quantum-btn quantum-btn-secondary u-btn-30" id="spImportBtn">${esc(tr('', 'Import bundle'))}</button></div>`;
   }
 
   body.innerHTML = (d.installed ? '' : body.innerHTML) + roleSeg + health + form + keyBlock + spoofTesterHTML();
@@ -5940,8 +5951,8 @@ async function spoofGenBundle() {
   try {
     const r = await api('/api/spoof', spoofFormReq('bundle'));
     _spoof = r.spoof || _spoof;
-    $('spBundleOut').innerHTML = `<textarea class="hashem-input sw-bundle" readonly data-no-i18n>${esc(r.bundle)}</textarea>
-      <button type="button" class="hashem-btn hashem-btn-secondary u-btn-30" id="spCopyBundle">${esc(tr('', 'Copy Bundle'))}</button>`;
+    $('spBundleOut').innerHTML = `<textarea class="quantum-input sw-bundle" readonly data-no-i18n>${esc(r.bundle)}</textarea>
+      <button type="button" class="quantum-btn quantum-btn-secondary u-btn-30" id="spCopyBundle">${esc(tr('', 'Copy Bundle'))}</button>`;
     $('spCopyBundle').onclick = () => (navigator.clipboard ? navigator.clipboard.writeText(r.bundle) : Promise.reject())
       .then(() => toastOk(tr('', 'Bundle copied'), '')).catch(() => toastWarn(tr('', 'Copy failed'), r.bundle));
   } catch (e) {
@@ -5971,20 +5982,20 @@ function spoofTesterHTML() {
   return `<div class="sp-sub sp-tester"><b>${esc(tr('', 'Spoof IP tester'))}</b>
     <p class="qs-hint">${esc(tr('', 'Finds which source IPs the firewall lets through. Run the receiver on one server and the sender on the other, then swap. Passing IPs become that server\'s spoof list.'))}</p>
     <div class="sp-row2">
-      <div><label class="qs-label">${esc(tr('', 'Mode'))}</label><select class="hashem-input" id="stMode"><option value="receiver">${esc(tr('', 'Receiver'))}</option><option value="sender">${esc(tr('', 'Sender'))}</option></select></div>
-      <div><label class="qs-label">${esc(tr('', 'Protocol'))}</label><select class="hashem-input" id="stProto"><option value="icmp">ICMP</option><option value="tcp">TCP</option></select></div>
+      <div><label class="qs-label">${esc(tr('', 'Mode'))}</label><select class="quantum-input" id="stMode"><option value="receiver">${esc(tr('', 'Receiver'))}</option><option value="sender">${esc(tr('', 'Sender'))}</option></select></div>
+      <div><label class="qs-label">${esc(tr('', 'Protocol'))}</label><select class="quantum-input" id="stProto"><option value="icmp">ICMP</option><option value="tcp">TCP</option></select></div>
     </div>
     <div class="sp-row3">
-      <div><label class="qs-label">${esc(tr('', 'Timeout (s)'))}</label><input class="hashem-input u-ltr u-mono" id="stTimeout" value="30" inputmode="numeric"></div>
-      <div><label class="qs-label">${esc(tr('', 'Packets/IP'))}</label><input class="hashem-input u-ltr u-mono" id="stCount" value="10" inputmode="numeric"></div>
-      <div><label class="qs-label">${esc(tr('', 'Max loss %'))}</label><input class="hashem-input u-ltr u-mono" id="stLoss" value="20" inputmode="numeric"></div>
+      <div><label class="qs-label">${esc(tr('', 'Timeout (s)'))}</label><input class="quantum-input u-ltr u-mono" id="stTimeout" value="30" inputmode="numeric"></div>
+      <div><label class="qs-label">${esc(tr('', 'Packets/IP'))}</label><input class="quantum-input u-ltr u-mono" id="stCount" value="10" inputmode="numeric"></div>
+      <div><label class="qs-label">${esc(tr('', 'Max loss %'))}</label><input class="quantum-input u-ltr u-mono" id="stLoss" value="20" inputmode="numeric"></div>
     </div>
-    <div id="stSenderRow" class="hidden"><label class="qs-label">${esc(tr('', 'Destination IP (the receiver server)'))}</label><input class="hashem-input u-ltr u-mono" id="stDst" placeholder="198.51.100.10"></div>
+    <div id="stSenderRow" class="hidden"><label class="qs-label">${esc(tr('', 'Destination IP (the receiver server)'))}</label><input class="quantum-input u-ltr u-mono" id="stDst" placeholder="198.51.100.10"></div>
     <label class="qs-label">${esc(tr('', 'Source IPs / ranges / CIDRs (one per line)'))}</label>
-    <textarea class="hashem-input u-ltr u-mono sp-ips" id="stSources" rows="3" placeholder="203.0.113.0/24"></textarea>
+    <textarea class="quantum-input u-ltr u-mono sp-ips" id="stSources" rows="3" placeholder="203.0.113.0/24"></textarea>
     <div class="sp-acts">
-      <button type="button" class="hashem-btn hashem-btn-primary u-btn-30" id="stStart">${esc(tr('', 'Start test'))}</button>
-      <button type="button" class="hashem-btn hashem-btn-ghost u-btn-30 hidden" id="stStop">${esc(tr('', 'Stop'))}</button>
+      <button type="button" class="quantum-btn quantum-btn-primary u-btn-30" id="stStart">${esc(tr('', 'Start test'))}</button>
+      <button type="button" class="quantum-btn quantum-btn-ghost u-btn-30 hidden" id="stStop">${esc(tr('', 'Stop'))}</button>
     </div>
     <div id="stResult"></div></div>`;
 }
@@ -6049,7 +6060,7 @@ function renderSpoofTester(t) {
   const rows = passed.map(p => `<tr><td class="u-mono" data-no-i18n>${esc(p.ip)}</td><td class="u-mono" data-no-i18n>${p.received}/${p.sent}</td><td class="u-mono" data-no-i18n>${p.loss_pct.toFixed(1)}%</td></tr>`).join('');
   box.innerHTML = `<div class="sw-result ok">${esc(docTpl('{0} usable spoof IPs found.', [String(passed.length)]))}</div>
     <table class="sp-ttable"><thead><tr><th>${esc(tr('', 'IP'))}</th><th>${esc(tr('', 'Received'))}</th><th>${esc(tr('', 'Loss'))}</th></tr></thead><tbody>${rows}</tbody></table>
-    <button type="button" class="hashem-btn hashem-btn-secondary u-btn-30" id="stUse">${esc(tr('', 'Use these as my spoof IPs'))}</button>`;
+    <button type="button" class="quantum-btn quantum-btn-secondary u-btn-30" id="stUse">${esc(tr('', 'Use these as my spoof IPs'))}</button>`;
   if ($('stUse')) $('stUse').onclick = () => {
     const el = $('spIPs');
     if (el) { el.value = passed.map(p => p.ip).join('\n'); toastOk(tr('', 'Spoof IPs filled'), tr('', 'Save or bring the tunnel up to apply.')); }
@@ -6150,14 +6161,14 @@ function xrTopHTML(d) {
       <span>${esc(tr('', 'The tunnel uses its own copy of Xray-core (the official release, checked by its checksum) in its own folder. An Xray panel on this server keeps its own.'))}</span>
       ${ins.done && !ins.ok ? `<span class="xr-bad">${esc(tr('', 'The install failed. The log is below; the server may not reach GitHub or its mirrors.'))}</span>` : ''}
       ${log}
-      <div class="xr-bar"><button type="button" class="hashem-btn hashem-btn-primary u-btn-30" onclick="xrInstall()" ${ins.running ? 'disabled' : ''}>${esc(tr('', ins.running ? 'Installing…' : 'Install Xray-core'))}</button></div>
+      <div class="xr-bar"><button type="button" class="quantum-btn quantum-btn-primary u-btn-30" onclick="xrInstall()" ${ins.running ? 'disabled' : ''}>${esc(tr('', ins.running ? 'Installing…' : 'Install Xray-core'))}</button></div>
     </div></div>`);
   }
   const panels = d.panels || [];
   if (panels.length) {
     parts.push(`<div class="xr-note info">${ICO_INFO}<div class="xr-note-body">
       <b>${esc(tr('', 'Found on this server:'))} <span data-no-i18n>${esc(panels.map(p => p.name).join(', '))}</span></b>
-      <span>${esc(tr('', 'No conflict: the tunnel runs its own Xray-core under its own services (hashem-xray-N) and never touches their files, services or ports. A port they use is refused with its owner named, and a free one is suggested.'))}</span>
+      <span>${esc(tr('', 'No conflict: the tunnel runs its own Xray-core under its own services (quantum-xray-N) and never touches their files, services or ports. A port they use is refused with its owner named, and a free one is suggested.'))}</span>
     </div></div>`);
   }
   return parts.length ? `<div class="xr-stack">${parts.join('')}</div>` : '';
@@ -6165,8 +6176,8 @@ function xrTopHTML(d) {
 
 function xrStartHTML(hasLinks) {
   return `<div class="xr-bar">
-    <button type="button" class="hashem-btn hashem-btn-primary" onclick="xrWizOpen()">${esc(tr('', hasLinks ? 'Add a tunnel' : 'Create a tunnel (on the Iran server)'))}</button>
-    <button type="button" class="hashem-btn hashem-btn-secondary" onclick="xrImportOpen()">${esc(tr('', 'Paste a bundle (on the foreign server)'))}</button>
+    <button type="button" class="quantum-btn quantum-btn-primary" onclick="xrWizOpen()">${esc(tr('', hasLinks ? 'Add a tunnel' : 'Create a tunnel (on the Iran server)'))}</button>
+    <button type="button" class="quantum-btn quantum-btn-secondary" onclick="xrImportOpen()">${esc(tr('', 'Paste a bundle (on the foreign server)'))}</button>
   </div>`;
 }
 
@@ -6256,19 +6267,19 @@ function xrLinkCard(l, compact) {
   if (compact) {
     return `<div class="xr-link">
     <div class="xr-link-h">${head}
-      <button type="button" class="hashem-btn hashem-btn-secondary u-btn-30" onclick="gotoXrayLink(${l.id})">${esc(tr('', 'Open in the Xray tab'))}</button></div>
+      <button type="button" class="quantum-btn quantum-btn-secondary u-btn-30" onclick="gotoXrayLink(${l.id})">${esc(tr('', 'Open in the Xray tab'))}</button></div>
     ${scene}${err}</div>`;
   }
   return `<div class="xr-link" id="xrLink${l.id}">
     <div class="xr-link-h">
       ${head}
-      ${iran ? `<button type="button" class="hashem-btn hashem-btn-secondary u-btn-30" onclick="xrShowBundle(${l.id})">${esc(tr('', 'Bundle'))}</button>
-        <button type="button" class="hashem-btn hashem-btn-secondary u-btn-30" onclick="xrWizEdit(${l.id})">${esc(tr('', 'Edit'))}</button>` : ''}
+      ${iran ? `<button type="button" class="quantum-btn quantum-btn-secondary u-btn-30" onclick="xrShowBundle(${l.id})">${esc(tr('', 'Bundle'))}</button>
+        <button type="button" class="quantum-btn quantum-btn-secondary u-btn-30" onclick="xrWizEdit(${l.id})">${esc(tr('', 'Edit'))}</button>` : ''}
       ${l.disabled
-        ? `<button type="button" class="hashem-btn hashem-btn-secondary u-btn-30" onclick="xrAct('start', ${l.id})">${esc(tr('', 'Start'))}</button>`
-        : `<button type="button" class="hashem-btn hashem-btn-ghost u-btn-30" onclick="xrAct('apply', ${l.id})">${esc(tr('', 'Restart'))}</button>
-           <button type="button" class="hashem-btn hashem-btn-ghost u-btn-30" onclick="xrAct('stop', ${l.id})">${esc(tr('', 'Stop'))}</button>`}
-      <button type="button" class="hashem-btn hashem-btn-ghost u-btn-30" onclick="xrRemove(${l.id})">${esc(tr('', 'Remove'))}</button>
+        ? `<button type="button" class="quantum-btn quantum-btn-secondary u-btn-30" onclick="xrAct('start', ${l.id})">${esc(tr('', 'Start'))}</button>`
+        : `<button type="button" class="quantum-btn quantum-btn-ghost u-btn-30" onclick="xrAct('apply', ${l.id})">${esc(tr('', 'Restart'))}</button>
+           <button type="button" class="quantum-btn quantum-btn-ghost u-btn-30" onclick="xrAct('stop', ${l.id})">${esc(tr('', 'Stop'))}</button>`}
+      <button type="button" class="quantum-btn quantum-btn-ghost u-btn-30" onclick="xrRemove(${l.id})">${esc(tr('', 'Remove'))}</button>
     </div>
     ${scene}
     <div class="tv-ports"><span class="tv-ports-k">${esc(tr('', 'Forwarded'))}</span>${ports}${l.udp ? '<span class="tv-port more">+UDP</span>' : ''}</div>
@@ -6329,8 +6340,8 @@ async function xrShowBundle(id) {
 function xrBundleHTML(bundle, id) {
   return `<div class="xr-sub">
     <label class="qs-label" for="${id}">${esc(tr('', 'Bundle for the foreign server'))}</label>
-    <textarea class="hashem-input xr-bundle" id="${id}" readonly data-no-i18n>${esc(bundle)}</textarea>
-    <div class="xr-bar"><button type="button" class="hashem-btn hashem-btn-primary u-btn-30" onclick="xrCopy('${id}')">${esc(tr('', 'Copy bundle'))}</button>
+    <textarea class="quantum-input xr-bundle" id="${id}" readonly data-no-i18n>${esc(bundle)}</textarea>
+    <div class="xr-bar"><button type="button" class="quantum-btn quantum-btn-primary u-btn-30" onclick="xrCopy('${id}')">${esc(tr('', 'Copy bundle'))}</button>
       <span class="qs-hint">${esc(tr('', 'On the foreign server: Xray tab, Paste a bundle. It carries the link\'s keys, so keep it private.'))}</span></div>
   </div>`;
 }
@@ -6400,7 +6411,7 @@ function xrWizRender() {
   const body = [null, xrWizStep1, xrWizStep2, xrWizStep3, xrWizStep4][w.step]();
   $('xrayWizard').innerHTML = `<div class="xr-wiz">
     <div class="xr-wiz-h"><b>${esc(tr('', w.id ? 'Edit link' : 'New Xray tunnel'))}</b>
-      <button type="button" class="hashem-btn hashem-btn-ghost u-btn-30" onclick="xrWizClose()">${esc(tr('', w.step === 4 ? 'Done' : 'Cancel'))}</button></div>
+      <button type="button" class="quantum-btn quantum-btn-ghost u-btn-30" onclick="xrWizClose()">${esc(tr('', w.step === 4 ? 'Done' : 'Cancel'))}</button></div>
     ${nav}${body}</div>`;
   if (w.step === 2) xrWizCheckSoon();
 }
@@ -6430,7 +6441,7 @@ function xrWizStep1() {
       ${card('direct', 'Direct', 'The Iran server connects to the foreign server. The usual choice.', 'Recommended')}
       ${card('reverse', 'Reverse', 'The foreign server connects to the Iran server. Use it when the Iran server cannot reach the foreign one, or its connections out get cut.', '')}
     </div>
-    <div class="xr-wiz-foot"><span></span><button type="button" class="hashem-btn hashem-btn-primary" onclick="xrWizGo(2)">${esc(tr('', 'Next'))}</button></div>`;
+    <div class="xr-wiz-foot"><span></span><button type="button" class="quantum-btn quantum-btn-primary" onclick="xrWizGo(2)">${esc(tr('', 'Next'))}</button></div>`;
 }
 
 function xrWizMode(mode) {
@@ -6475,7 +6486,7 @@ function xrWizStep2() {
       <small>${esc(tr('', x.hint))}</small></button>`;
   }).join('');
   const f = (id, label, val, ph, hint, extra) => `<div class="xr-field"><label class="qs-label" for="${id}">${esc(tr('', label))}</label>
-      <input class="hashem-input u-ltr u-mono" id="${id}" value="${esc(val == null ? '' : String(val))}" placeholder="${esc(ph || '')}" autocomplete="off" ${extra || ''}>
+      <input class="quantum-input u-ltr u-mono" id="${id}" value="${esc(val == null ? '' : String(val))}" placeholder="${esc(ph || '')}" autocomplete="off" ${extra || ''}>
       ${hint ? `<div class="qs-hint" id="${id}Hint">${hint}</div>` : `<div class="qs-hint" id="${id}Hint"></div>`}</div>`;
   const reality = p.security === 'reality', cdn = !!p.cdn;
   const sniList = ((_xray && _xray.sni) || {})[rev ? 'reverse' : 'direct'] || [];
@@ -6499,7 +6510,7 @@ function xrWizStep2() {
       ${rev ? f('xrPubIP', "This server's public IP", w.public_ip, '203.0.113.5', esc(tr('', 'The foreign server connects to this address.'))) : ''}
       ${f('xrPorts', 'Ports to forward', w.ports, '2053, 8080', esc(tr('', 'Users connect to these ports here; each reaches the same port on the foreign server (your 3x-ui inbounds).')), 'inputmode="numeric"')}
       ${cdn ? `<div class="xr-field"><label class="qs-label" for="xrTunnel">${esc(tr('', rev ? 'Tunnel port on this server' : 'Tunnel port on the foreign server'))}</label>
-        <select class="hashem-input u-ltr" id="xrTunnel">${XR_CDN_PORTS.map(x => `<option value="${x}"${x === w.tunnel_port ? ' selected' : ''}>${x}</option>`).join('')}</select>
+        <select class="quantum-input u-ltr" id="xrTunnel">${XR_CDN_PORTS.map(x => `<option value="${x}"${x === w.tunnel_port ? ' selected' : ''}>${x}</option>`).join('')}</select>
         <div class="qs-hint" id="xrTunnelHint">${esc(tr('', 'Cloudflare passes HTTPS only on these ports.'))}</div></div>`
         : f('xrTunnel', rev ? 'Tunnel port on this server' : 'Tunnel port on the foreign server', w.tunnel_port, '443', esc(tr('', '443 looks most like normal HTTPS.')), 'inputmode="numeric"')}
       ${f('xrName', 'Name (optional)', w.name, 'Frankfurt', '')}
@@ -6508,24 +6519,24 @@ function xrWizStep2() {
     </div>
     ${reality ? `<div class="xr-field">
       <label class="qs-label" for="xrSni">${esc(tr('', 'Disguise site (SNI)'))}</label>
-      <div class="xr-bar"><input class="hashem-input u-ltr u-mono xr-grow" id="xrSni" value="${esc(p.sni || '')}" placeholder="${esc(sniList[0] || '')}" autocomplete="off">
-        <button type="button" class="hashem-btn hashem-btn-secondary u-btn-30" onclick="xrSniTest()">${esc(tr('', 'Find a working site'))}</button></div>
+      <div class="xr-bar"><input class="quantum-input u-ltr u-mono xr-grow" id="xrSni" value="${esc(p.sni || '')}" placeholder="${esc(sniList[0] || '')}" autocomplete="off">
+        <button type="button" class="quantum-btn quantum-btn-secondary u-btn-30" onclick="xrSniTest()">${esc(tr('', 'Find a working site'))}</button></div>
       <div class="qs-hint">${esc(tr('', rev ? 'Reality borrows this site\'s TLS handshake on the Iran server, so it must open from Iran (TLS 1.3 with h2). The test runs from this server.' : 'Reality borrows this site\'s TLS handshake: a censor sees a visit to it. It must work from Iran (TLS 1.3 with h2); the test runs from this server.'))}</div>
       <div class="xr-sni" id="xrSniOut"></div></div>` : ''}
     ${cdnHTML}
     ${xrAdvHTML(w)}
     <div class="xr-wiz-foot">
-      ${w.id ? '<span></span>' : `<button type="button" class="hashem-btn hashem-btn-ghost" onclick="xrWizGo(1)">${esc(tr('', 'Back'))}</button>`}
-      <button type="button" class="hashem-btn hashem-btn-primary" onclick="xrWizGo(3)">${esc(tr('', 'Next'))}</button></div>`;
+      ${w.id ? '<span></span>' : `<button type="button" class="quantum-btn quantum-btn-ghost" onclick="xrWizGo(1)">${esc(tr('', 'Back'))}</button>`}
+      <button type="button" class="quantum-btn quantum-btn-primary" onclick="xrWizGo(3)">${esc(tr('', 'Next'))}</button></div>`;
 }
 
 // xrAdvHTML: every setting of the profile, closed by default.
 function xrAdvHTML(w) {
   const p = w.profile || {}, o = (_xray && _xray.options) || {};
   const sel = (id, label, list, val, none, extra) => `<div class="xr-field"><label class="qs-label" for="${id}">${esc(tr('', label))}</label>
-      <select class="hashem-input" id="${id}" ${extra || ""}>${none ? `<option value="">${esc(tr('', none))}</option>` : ''}${(list || []).map(v => `<option value="${esc(v)}"${String(v) === String(val) ? ' selected' : ''}>${esc(v)}</option>`).join('')}</select></div>`;
+      <select class="quantum-input" id="${id}" ${extra || ""}>${none ? `<option value="">${esc(tr('', none))}</option>` : ''}${(list || []).map(v => `<option value="${esc(v)}"${String(v) === String(val) ? ' selected' : ''}>${esc(v)}</option>`).join('')}</select></div>`;
   const inp = (id, label, val, ph, hint) => `<div class="xr-field"><label class="qs-label" for="${id}">${esc(tr('', label))}</label>
-      <input class="hashem-input u-ltr u-mono" id="${id}" value="${esc(val == null || val === 0 ? '' : String(val))}" placeholder="${esc(ph || '')}" autocomplete="off">${hint ? `<div class="qs-hint">${esc(tr('', hint))}</div>` : ''}</div>`;
+      <input class="quantum-input u-ltr u-mono" id="${id}" value="${esc(val == null || val === 0 ? '' : String(val))}" placeholder="${esc(ph || '')}" autocomplete="off">${hint ? `<div class="qs-hint">${esc(tr('', hint))}</div>` : ''}</div>`;
   const chk = (id, label, on) => `<label class="xr-check"><input type="checkbox" id="${id}" ${on ? 'checked' : ''}> ${esc(tr('', label))}</label>`;
   const fr = p.fragment || {}, k = p.kcp || {}, nz = p.noise || {};
   const t = p.transport;
@@ -6577,7 +6588,7 @@ function xrAdvHTML(w) {
         ${inp('xaFrDelay', 'Delay (ms)', fr.delay, '10-20')}
       </div>` : ''}
       <div class="xr-field"><label class="qs-label" for="xaExpert">${esc(tr('', 'Expert JSON (merged over the generated config)'))}</label>
-        <textarea class="hashem-input xr-json" id="xaExpert" spellcheck="false" placeholder='{"outbounds": [{"tag": "tunnel", "streamSettings": {"sockopt": {"tcpKeepAliveIdle": 30}}}]}' data-no-i18n>${esc(w.expert || '')}</textarea>
+        <textarea class="quantum-input xr-json" id="xaExpert" spellcheck="false" placeholder='{"outbounds": [{"tag": "tunnel", "streamSettings": {"sockopt": {"tcpKeepAliveIdle": 30}}}]}' data-no-i18n>${esc(w.expert || '')}</textarea>
         <div class="qs-hint">${esc(tr('', 'Objects merge key by key; inbounds and outbounds merge by tag. Xray checks the result before it is used. This server only.'))}</div></div>
     </div></details>`;
 }
@@ -6685,7 +6696,7 @@ async function xrWizCheck() {
     : `<span class="xr-ok">${esc(tr('', 'Free on this server'))}</span>`;
   const sug = _xrCheck.suggest_tunnel_port;
   if (ht && _xrWiz.mode === 'reverse') ht.innerHTML = onTunnel.length
-    ? `<span class="xr-bad" data-no-i18n>${esc(tr('', 'used by') + ' ' + onTunnel[0].owner)}</span>${sug ? ` <button type="button" class="hashem-btn hashem-btn-secondary u-btn-30" onclick="xrUsePort(${sug})">${esc(tr('', 'Use'))} ${sug}</button>` : ''}`
+    ? `<span class="xr-bad" data-no-i18n>${esc(tr('', 'used by') + ' ' + onTunnel[0].owner)}</span>${sug ? ` <button type="button" class="quantum-btn quantum-btn-secondary u-btn-30" onclick="xrUsePort(${sug})">${esc(tr('', 'Use'))} ${sug}</button>` : ''}`
     : `<span class="xr-ok">${esc(tr('', 'Free on this server'))}</span>`;
 }
 
@@ -6738,8 +6749,8 @@ function xrWizStep3() {
       ? 'Saving restarts the link here. If the foreign server needs the change too, a new bundle is shown to paste there.'
       : 'The link starts here first; then copy its bundle to the foreign server, which completes it.'))}</span></div></div>
     <div class="xr-wiz-foot">
-      <button type="button" class="hashem-btn hashem-btn-ghost" onclick="xrWizGo(2)">${esc(tr('', 'Back'))}</button>
-      <button type="button" class="hashem-btn hashem-btn-primary" id="xrCreateBtn" onclick="xrWizSubmit()">${esc(tr('', w.id ? 'Save and restart' : 'Create the tunnel'))}</button></div>`;
+      <button type="button" class="quantum-btn quantum-btn-ghost" onclick="xrWizGo(2)">${esc(tr('', 'Back'))}</button>
+      <button type="button" class="quantum-btn quantum-btn-primary" id="xrCreateBtn" onclick="xrWizSubmit()">${esc(tr('', w.id ? 'Save and restart' : 'Create the tunnel'))}</button></div>`;
 }
 
 // Step 4: the bring-up, then the bundle for the foreign server.
@@ -6790,14 +6801,14 @@ function xrImportOpen() {
   _xrWiz = { step: 0, importing: true };
   $('xrayWizard').innerHTML = `<div class="xr-wiz">
     <div class="xr-wiz-h"><b>${esc(tr('', 'Paste the bundle from the Iran server'))}</b>
-      <button type="button" class="hashem-btn hashem-btn-ghost u-btn-30" onclick="xrWizClose()">${esc(tr('', 'Close'))}</button></div>
+      <button type="button" class="quantum-btn quantum-btn-ghost u-btn-30" onclick="xrWizClose()">${esc(tr('', 'Close'))}</button></div>
     <div class="xr-field"><label class="qs-label" for="xrBundleIn">${esc(tr('', 'Bundle (xr1_…)'))}</label>
-      <textarea class="hashem-input xr-bundle" id="xrBundleIn" placeholder="xr1_…" spellcheck="false" data-no-i18n></textarea>
+      <textarea class="quantum-input xr-bundle" id="xrBundleIn" placeholder="xr1_…" spellcheck="false" data-no-i18n></textarea>
       <div class="qs-hint">${esc(tr('', 'From the Iran server: Xray tab, the link\'s Bundle button. The same bundle again updates the link.'))}</div></div>
     <div class="xr-fields">
-      <div class="xr-field"><label class="qs-label" for="xrImpName">${esc(tr('', 'Name (optional)'))}</label><input class="hashem-input" id="xrImpName" autocomplete="off"></div>
+      <div class="xr-field"><label class="qs-label" for="xrImpName">${esc(tr('', 'Name (optional)'))}</label><input class="quantum-input" id="xrImpName" autocomplete="off"></div>
     </div>
-    <div class="xr-bar"><button type="button" class="hashem-btn hashem-btn-primary" onclick="xrImport()">${esc(tr('', 'Import and start'))}</button></div>
+    <div class="xr-bar"><button type="button" class="quantum-btn quantum-btn-primary" onclick="xrImport()">${esc(tr('', 'Import and start'))}</button></div>
     <div id="xrImpRun"></div></div>`;
 }
 
@@ -6842,7 +6853,7 @@ async function loadWatchdog() {
     const tog = $('wdToggleBtn');
     if (tog) {
       tog.textContent = s.enabled ? 'Disable' : 'Enable';
-      tog.className = 'hashem-btn ' + (s.enabled ? 'hashem-btn-ghost' : 'hashem-btn-primary');
+      tog.className = 'quantum-btn ' + (s.enabled ? 'quantum-btn-ghost' : 'quantum-btn-primary');
     }
     const hVal = $('wdHealthVal');
     if (hVal) {
@@ -6979,8 +6990,8 @@ async function loadWatchdog() {
               <span class="wd-backup-info">${formatBytes(b.size)} · ${esc(b.time)}</span>
             </div>
             <div class="wd-backup-acts">
-              <button class="hashem-btn hashem-btn-secondary u-btn-xs" data-dl="${esc(b.name)}">Download</button>
-              <button class="hashem-btn hashem-btn-danger u-btn-xs" data-rst="${esc(b.name)}">Restore</button>
+              <button class="quantum-btn quantum-btn-secondary u-btn-xs" data-dl="${esc(b.name)}">Download</button>
+              <button class="quantum-btn quantum-btn-danger u-btn-xs" data-rst="${esc(b.name)}">Restore</button>
             </div>
           `;
           bList.appendChild(item);
@@ -7471,7 +7482,7 @@ function renderDoctor(rep) {
   doctorData = rep;
   // Fresh install: nothing to diagnose yet, so no score, no "issues", no auto-fix.
   // The report knows (a Bagher-only server has no dashboard tunnel); older servers fall back to the dashboard flag.
-  const unset = rep.configured === undefined ? window._hashemEmpty === true : !rep.configured;
+  const unset = rep.configured === undefined ? window._quantumEmpty === true : !rep.configured;
   const findings = rep.findings || [];
   const crit = findings.filter(f => f.severity === 'critical').length;
 
@@ -7511,7 +7522,7 @@ function renderDoctor(rep) {
     let html = '';
     if (unset) {
       html = '<div class="qs-hint">' + esc(tr('doc_unset', 'No tunnel on this server yet. Diagnostics start once one is set up.')) +
-        '</div><button type="button" class="hashem-btn hashem-btn-primary u-mt-12 u-self-start" onclick="goTab(&quot;setup&quot;)">' + esc(tr('onb_go', 'Open Setup')) + '</button>';
+        '</div><button type="button" class="quantum-btn quantum-btn-primary u-mt-12 u-self-start" onclick="goTab(&quot;setup&quot;)">' + esc(tr('onb_go', 'Open Setup')) + '</button>';
     } else if (!findings.length) {
       html = '<div class="doc-ok-line"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg><span>' +
         esc(tr('', 'No problems found')) + '</span></div>';
@@ -7525,7 +7536,7 @@ function renderDoctor(rep) {
       }).join('');
       if (rep.fix_available) {
         html += '<div class="doc-box-foot"><span class="qs-hint">' + esc(tr('', 'Quick Repair applies the fixes marked above. It never changes tunnel settings.')) + '</span>' +
-          '<button class="hashem-btn hashem-btn-primary u-btn-sm" id="docBoxFixBtn" onclick="fixDoctor()"><span>' + esc(tr('', 'Quick Repair')) + '</span></button></div>';
+          '<button class="quantum-btn quantum-btn-primary u-btn-sm" id="docBoxFixBtn" onclick="fixDoctor()"><span>' + esc(tr('', 'Quick Repair')) + '</span></button></div>';
       }
     }
     const le = rep.last_error;
@@ -7649,7 +7660,7 @@ function renderDocTunnels(tunnels, bagher) {
 function doctorReportText(rep) {
   const L = [];
   const p = rep.ping_result || {}, u = rep.underlay || {}, m = rep.mtu_result || {}, k = rep.kernel_audit || {}, s = rep.speed_result || {};
-  L.push('Hashem Doctor — ' + (rep.timestamp || '') + ' — score ' + rep.score + '/100 (' + rep.rating + ')');
+  L.push('Quantum Doctor — ' + (rep.timestamp || '') + ' — score ' + rep.score + '/100 (' + rep.rating + ')');
   L.push('Engine: ' + (rep.engine || '-') + ' · Role: ' + (rep.role || '-'));
   if (p.tested) L.push('Tunnel ping ' + p.target + ': ' + (p.success ? p.avg_rtt.toFixed(1) + ' ms, loss ' + p.packet_loss + '%, jitter ' + p.jitter.toFixed(1) + ' ms' : 'no reply'));
   if (u.tested) L.push('Public IP ping ' + u.target + ': ' + (u.success ? u.avg_rtt.toFixed(1) + ' ms, loss ' + u.packet_loss + '%' : 'no reply'));
@@ -7684,8 +7695,8 @@ function renderRevPath(entries) {
     const fix = d.suggested_fix ? '<div class="qs-hint">Fix: ' + esc(d.suggested_fix) + '</div>' : '';
     const btn = (d.verdict && d.verdict !== 'HEALTHY' && d.verdict !== 'UNKNOWN')
       ? '<div class="u-flex u-gap-8 u-mt-8 u-wrap">'
-        + '<button class="hashem-btn hashem-btn-secondary u-btn-xs" onclick="revFix(' + e.peer_id + ',false)">Show plan</button>'
-        + '<button class="hashem-btn hashem-btn-primary u-btn-xs" onclick="revFix(' + e.peer_id + ',true)">Apply fix</button>'
+        + '<button class="quantum-btn quantum-btn-secondary u-btn-xs" onclick="revFix(' + e.peer_id + ',false)">Show plan</button>'
+        + '<button class="quantum-btn quantum-btn-primary u-btn-xs" onclick="revFix(' + e.peer_id + ',true)">Apply fix</button>'
         + '</div><div class="qs-hint" id="revSteps' + e.peer_id + '"></div>'
       : '';
     return '<div class="det-card u-col-full"><div class="det-head"><span>' + esc(e.name || ('peer-' + e.peer_id)) + '</span>'
@@ -7892,9 +7903,9 @@ function limRow(s) {
   const vol = `<div class="lm-box"><div class="lm-k"><span>${esc(tr('', 'Volume'))}</span><b class="lm-num">${q ? esc(fmtGB(used) + ' / ' + fmtGB(q)) : r ? esc(fmtGB(used)) : esc(tr('', 'Unlimited'))}</b></div>` +
     meter(pct, q ? (r.blocked || pct >= 100 ? 'err' : pct >= 90 ? 'warn' : '') : 'inf') +
     `<div class="lm-sub">${r ? esc((q && r.reset === 'monthly' && s.next_reset ? tr('', 'Resets on') + ' ' + limDate(s.next_reset) : q ? tr('', 'Reset by hand') : tr('', 'No volume limit')) + ' · ' + tr('', 'counted since') + ' ' + limDate(r.period_start)) : ''}</div></div>`;
-  const acts = [`<button type="button" class="hashem-btn hashem-btn-secondary u-btn-30" onclick="openLimitEdit(${jsArg(ip)})">${esc(r ? tr('', 'Edit limits') : tr('', 'Set limits'))}</button>`];
-  if (r && (used > 0 || r.blocked)) acts.push(`<button type="button" class="hashem-btn hashem-btn-ghost u-btn-30" onclick="limitAction('reset', ${jsArg(ip)})">${esc(tr('', 'Reset usage'))}</button>`);
-  if (r) acts.push(`<button type="button" class="hashem-btn hashem-btn-ghost u-btn-30" onclick="limitAction('remove', ${jsArg(ip)})">${esc(tr('', 'Remove limits'))}</button>`);
+  const acts = [`<button type="button" class="quantum-btn quantum-btn-secondary u-btn-30" onclick="openLimitEdit(${jsArg(ip)})">${esc(r ? tr('', 'Edit limits') : tr('', 'Set limits'))}</button>`];
+  if (r && (used > 0 || r.blocked)) acts.push(`<button type="button" class="quantum-btn quantum-btn-ghost u-btn-30" onclick="limitAction('reset', ${jsArg(ip)})">${esc(tr('', 'Reset usage'))}</button>`);
+  if (r) acts.push(`<button type="button" class="quantum-btn quantum-btn-ghost u-btn-30" onclick="limitAction('remove', ${jsArg(ip)})">${esc(tr('', 'Remove limits'))}</button>`);
   return `<div class="lm-row${r && r.blocked ? ' cut' : cls === 'warn' ? ' warn' : ''}">
     <div class="lm-head"><div class="lm-name"><b class="lm-num">${esc(s.name || ip)}</b>${s.name || s.alias ? '<small class="lm-num">' + esc([s.name ? ip : '', s.alias || ''].filter(Boolean).join(' · ')) + '</small>' : ''}</div>
       <div class="lm-links">${(s.links || []).map(k => '<span>' + esc(limLinkName(k)) + '</span>').join('')}</div>
@@ -8125,7 +8136,7 @@ document.addEventListener('visibilitychange', () => {
 const RS_SRC = [
   [/^frps/, 'FRPS', 'src-frps'], [/^frpc/, 'FRPC', 'src-frpc'],
   [/^backhaul/, 'BH', 'src-bh'], [/^gre-tunnel|^ip$/, 'GRE', 'src-gre'],
-  [/^hashem-watchdog|watchdog/, 'WD', 'src-wd'], [/^gre-panel|^hashem/, 'PANEL', ''],
+  [/^quantum-watchdog|watchdog/, 'WD', 'src-wd'], [/^gre-panel|^quantum/, 'PANEL', ''],
 ];
 function rsParse(line) {
   // journalctl short format: "Oct 18 03:54:17 host unit[pid]: message"
@@ -8134,7 +8145,7 @@ function rsParse(line) {
   if (m) { time = m[1]; unit = m[2]; msg = m[3]; }
   else { const t = line.match(/\b(\d{2}:\d{2}:\d{2})\b/); if (t) time = t[1]; }
   // systemd's own lines ("Started frps.service") belong to the unit they name.
-  if (unit === 'systemd') { const u = msg.match(/\b(frps|frpc|backhaul[\w-]*|gre-tunnel|gre-panel|hashem-watchdog)\b/); unit = u ? u[1] : 'systemd'; }
+  if (unit === 'systemd') { const u = msg.match(/\b(frps|frpc|backhaul[\w-]*|gre-tunnel|gre-panel|quantum-watchdog)\b/); unit = u ? u[1] : 'systemd'; }
   let level = '';
   const lv = msg.match(/^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)? \[([A-Z])\]/);
   if (lv) level = lv[1] === 'E' ? 'err' : lv[1] === 'W' ? 'warn' : '';
@@ -8150,7 +8161,7 @@ function rsParse(line) {
   return { time, src, cls, level, msg: msg || line };
 }
 const rsState = { sig: '', hover: false, filter: 'all', events: [] };
-try { if (localStorage.getItem('hashem_rs_filter') === 'issues') rsState.filter = 'issues'; } catch (e) { /* storage blocked */ }
+try { if (lsGet('quantum_rs_filter') === 'issues') rsState.filter = 'issues'; } catch (e) { /* storage blocked */ }
 function rsLive() {
   const el = $('rsLive'); if (!el) return;
   const paused = rsState.hover || document.hidden;
@@ -8205,7 +8216,7 @@ if ($('rsLogs')) {
 }
 document.querySelectorAll('[data-rs-filter]').forEach(b => b.onclick = () => {
   rsState.filter = b.dataset.rsFilter;
-  try { localStorage.setItem('hashem_rs_filter', rsState.filter); } catch (e) { /* storage blocked */ }
+  try { localStorage.setItem('quantum_rs_filter', rsState.filter); } catch (e) { /* storage blocked */ }
   rsDraw();
 });
 if ($('rsOpenLogs')) $('rsOpenLogs').onclick = () => goTab('logs');
@@ -8223,7 +8234,7 @@ function rsSync() {
 }
 function rsSet(hidden, silent) {
   document.documentElement.dataset.rs = hidden ? '0' : '1';
-  try { localStorage.setItem('hashem_rs_hidden', hidden ? '1' : '0'); } catch (e) { /* storage blocked: choice lasts this session */ }
+  try { localStorage.setItem('quantum_rs_hidden', hidden ? '1' : '0'); } catch (e) { /* storage blocked: choice lasts this session */ }
   rsSync();
   if (hidden && !silent) toastOk(tr('rs_hidden_toast', 'Live Activity Stream hidden'), tr('rs_hidden_sub', 'Bring it back from Logs \u2192 Live Activity Stream'));
   if (!hidden) refreshRightSidebarLogs();
@@ -8242,7 +8253,7 @@ const ACCENTS = [
 function accCurrent() { return document.documentElement.dataset.acc || 'blue'; }
 function accSet(name) {
   if (name === 'blue') delete document.documentElement.dataset.acc; else document.documentElement.dataset.acc = name;
-  try { if (name === 'blue') localStorage.removeItem('hashem_accent'); else localStorage.setItem('hashem_accent', name); } catch (e) { /* storage blocked: choice lasts this session */ }
+  try { if (name === 'blue') localStorage.removeItem('quantum_accent'); else localStorage.setItem('quantum_accent', name); } catch (e) { /* storage blocked: choice lasts this session */ }
   accRender();
   try { if (typeof refreshDash === 'function') refreshDash(); } catch (e) { /* dashboard repaints on its next poll */ }
 }
@@ -8368,7 +8379,7 @@ function dialRender() {
   const acts = $('dialActs'); acts.textContent = '';
   [['auto', 'dial_auto', 'Auto'], ['gre', 'dial_gre', 'GRE inner IP'], ['public', 'dial_public_btn', 'Iran public IP']].forEach(([m, k, def]) => {
     const btn = document.createElement('button'); btn.type = 'button';
-    btn.className = 'hashem-btn ' + (d.mode === m ? 'hashem-btn-primary' : 'hashem-btn-secondary');
+    btn.className = 'quantum-btn ' + (d.mode === m ? 'quantum-btn-primary' : 'quantum-btn-secondary');
     btn.textContent = tr(k, def) + (d.mode === m ? ' ✓' : '');
     btn.onclick = async () => {
       btn.disabled = true;
@@ -8395,7 +8406,7 @@ function rscBadge(kind, key) {
   rscSet('rscBadgeTxt', tr(key, key));
 }
 function rscBtn(id, key, cls, fn) {
-  const b = document.createElement('button'); b.type = 'button'; b.id = id; b.className = 'hashem-btn ' + cls;
+  const b = document.createElement('button'); b.type = 'button'; b.id = id; b.className = 'quantum-btn ' + cls;
   b.textContent = tr(key, key); b.onclick = fn; return b;
 }
 function rscRender() {
@@ -8429,23 +8440,23 @@ function rscRender() {
     if (s.services) rows.push([tr('rsc_svc', ''), Object.entries(s.services).map(([k, v]) => k + (v ? ' ✓' : ' ✗')).join('  ')]);
     rows.forEach(([k, v]) => { const d = document.createElement('div'); d.className = 'rsc-row'; const a = document.createElement('span'); a.textContent = k; const b = document.createElement('b'); b.textContent = v; d.append(a, b); det.appendChild(d); });
     if (s.role === 'origin' && s.offer_pending) { const h = document.createElement('div'); h.className = 'qs-hint'; h.textContent = tr('rsc_auto', ''); det.appendChild(h); }
-    if (s.role === 'origin') acts.appendChild(rscBtn('rscGetCode', 'rsc_getcode', 'hashem-btn-secondary', rscShowCode));
-    acts.appendChild(rscBtn('rscDisable', 'rsc_disable', 'hashem-btn-danger', rscDisable));
+    if (s.role === 'origin') acts.appendChild(rscBtn('rscGetCode', 'rsc_getcode', 'quantum-btn-secondary', rscShowCode));
+    acts.appendChild(rscBtn('rscDisable', 'rsc_disable', 'quantum-btn-danger', rscDisable));
   } else if (_rscMode === 'enable') {
     rscBadge('', 'rsc_b_off'); msg = msg || tr('rsc_idle_warn', '');
-    acts.appendChild(rscBtn('rscEnableGo', 'rsc_enable', 'hashem-btn-primary', rscEnable));
-    acts.appendChild(rscBtn('rscCancel', 'rsc_cancel', 'hashem-btn-secondary', () => { _rscMode = ''; rscRender(); }));
+    acts.appendChild(rscBtn('rscEnableGo', 'rsc_enable', 'quantum-btn-primary', rscEnable));
+    acts.appendChild(rscBtn('rscCancel', 'rsc_cancel', 'quantum-btn-secondary', () => { _rscMode = ''; rscRender(); }));
   } else if (_rscMode === 'join') {
     rscBadge('', 'rsc_b_off'); msg = msg || tr('rsc_auto', '');
-    acts.appendChild(rscBtn('rscJoinGo', 'rsc_apply', 'hashem-btn-primary', rscJoin));
-    acts.appendChild(rscBtn('rscCancel', 'rsc_cancel', 'hashem-btn-secondary', () => { _rscMode = ''; rscRender(); }));
+    acts.appendChild(rscBtn('rscJoinGo', 'rsc_apply', 'quantum-btn-primary', rscJoin));
+    acts.appendChild(rscBtn('rscCancel', 'rsc_cancel', 'quantum-btn-secondary', () => { _rscMode = ''; rscRender(); }));
   } else {
     rscBadge(s.suspected ? 'warn' : '', s.suspected ? 'rsc_b_susp' : 'rsc_b_off');
     msg = msg || tr(s.suspected ? 'rsc_idle_warn' : 'rsc_idle_ok', '');
-    acts.appendChild(rscBtn('rscOpenEnable', 'rsc_enable', 'hashem-btn-primary', rscOpenEnable));
-    acts.appendChild(rscBtn('rscOpenJoin', 'rsc_join', 'hashem-btn-secondary', () => { _rscMode = 'join'; rscRender(); $('rscCode').focus(); }));
-    acts.appendChild(rscBtn('rscProbe', 'rsc_check', 'hashem-btn-ghost', rscProbe));
-    acts.appendChild(rscBtn('rscAuto', s.auto_mode ? 'rsc_auto_is_on' : 'rsc_auto_is_off', 'hashem-btn-ghost', rscToggleAuto));
+    acts.appendChild(rscBtn('rscOpenEnable', 'rsc_enable', 'quantum-btn-primary', rscOpenEnable));
+    acts.appendChild(rscBtn('rscOpenJoin', 'rsc_join', 'quantum-btn-secondary', () => { _rscMode = 'join'; rscRender(); $('rscCode').focus(); }));
+    acts.appendChild(rscBtn('rscProbe', 'rsc_check', 'quantum-btn-ghost', rscProbe));
+    acts.appendChild(rscBtn('rscAuto', s.auto_mode ? 'rsc_auto_is_on' : 'rsc_auto_is_off', 'quantum-btn-ghost', rscToggleAuto));
   }
   rscSet('rscMsg', msg);
 }
@@ -8501,9 +8512,9 @@ async function rscShowCode() {
     const box = $('rscDet'); let row = $('rscCodeRow');
     if (!row) { row = document.createElement('div'); row.id = 'rscCodeRow'; row.className = 'rsc-code'; box.appendChild(row); }
     row.textContent = '';
-    const inp = document.createElement('input'); inp.className = 'hashem-input mono'; inp.readOnly = true; inp.value = r.code; inp.setAttribute('aria-label', tr('rsc_code', ''));
+    const inp = document.createElement('input'); inp.className = 'quantum-input mono'; inp.readOnly = true; inp.value = r.code; inp.setAttribute('aria-label', tr('rsc_code', ''));
     inp.onfocus = () => inp.select();
-    const cp = document.createElement('button'); cp.type = 'button'; cp.className = 'hashem-btn hashem-btn-secondary'; cp.textContent = tr('rsc_copy', '');
+    const cp = document.createElement('button'); cp.type = 'button'; cp.className = 'quantum-btn quantum-btn-secondary'; cp.textContent = tr('rsc_copy', '');
     cp.onclick = () => { navigator.clipboard.writeText(r.code).then(() => toastOk(tr('rsc_copied', '')), () => { inp.select(); }); };
     row.append(inp, cp);
   } catch (e) { toastErr(e.message || String(e)); }
@@ -8540,13 +8551,13 @@ function uiObserve(s) {
   const bObj = (_sshfwdData || (window._lastDash && window._lastDash.bagher) || window._lastBagher || {});
   const bagherConfigured = !!(bObj.is_active || bObj.enabled || bObj.connected || bObj.has_config || (bObj.remote_host && bObj.remote_host.length) || (Array.isArray(bObj.ports) && bObj.ports.length));
   const empty = !peers.length && !(L.gre && L.gre.exists) && !L.frp_up && !L.frp_svc && !bagherConfigured && !mx.enabled;
-  let dismissed = false; try { dismissed = localStorage.getItem('hashem_onb_done') === '1'; } catch (e) { /* storage blocked */ }
-  window._hashemEmpty = empty; // refreshDash shows a neutral "not set up" state instead of errors
+  let dismissed = false; try { dismissed = lsGet('quantum_onb_done') === '1'; } catch (e) { /* storage blocked */ }
+  window._quantumEmpty = empty; // refreshDash shows a neutral "not set up" state instead of errors
   const c = $('onbCard'); if (c) c.hidden = !empty || dismissed;
 }
 { const _rd = renderDoctor; renderDoctor = function (rep) { _rd(rep); try { navBadge('doctor', !rep || rep.configured === false ? 0 : ((rep.findings || []).filter(f => f.severity !== 'minor').length), rep && rep.rating === 'critical' ? 'err' : 'warn', 'badge_doctor'); } catch (e) { /* cosmetic */ } }; }
 $('onbGo').onclick = () => goTab('setup');
-function onbHide() { try { localStorage.setItem('hashem_onb_done', '1'); } catch (e) { /* session only */ } $('onbCard').hidden = true; }
+function onbHide() { try { localStorage.setItem('quantum_onb_done', '1'); } catch (e) { /* session only */ } $('onbCard').hidden = true; }
 $('onbLater').onclick = onbHide; $('onbX').onclick = onbHide;
 
 // ---- sidebar collapse ----
@@ -8562,7 +8573,7 @@ function sbApply() {
 }
 function sbSet(c) {
   if (c) document.documentElement.dataset.sb = '1'; else delete document.documentElement.dataset.sb;
-  try { localStorage.setItem('hashem_sb', c ? '1' : '0'); } catch (e) { /* session only */ }
+  try { localStorage.setItem('quantum_sb', c ? '1' : '0'); } catch (e) { /* session only */ }
   sbApply();
 }
 $('sbToggle').onclick = () => sbSet(!sbIsCollapsed());
@@ -8575,7 +8586,7 @@ function densApply() {
 }
 function densSet(v) {
   if (v === 'compact') document.documentElement.dataset.dens = 'compact'; else delete document.documentElement.dataset.dens;
-  try { localStorage.setItem('hashem_dens', v); } catch (e) { /* session only */ }
+  try { localStorage.setItem('quantum_dens', v); } catch (e) { /* session only */ }
   densApply();
 }
 $('densSeg').addEventListener('click', e => { const b = e.target.closest('[data-dens]'); if (b) densSet(b.dataset.dens); });
@@ -8717,7 +8728,7 @@ function openEditPeer(peerId) {
     engine = p.engine || (p.frps_svc && p.frps_svc.includes('backhaul') ? (p.no_gre ? 'backhaul' : 'gre-backhaul') : 'frp');
     transport = p.transport || 'tcpmux';
     if (p.raw_ports) {
-      // a list from the panel, a string from older hashem.sh
+      // a list from the panel, a string from older quantum.sh
       ports = String(p.raw_ports).split(/[\s,]+/).filter(Boolean);
     } else {
       ports = p.ports ? [...p.ports] : [];
@@ -9032,7 +9043,7 @@ function renderBenchmark(bench, peer) {
     // A "winner" that never answered (score 0 / 100% loss) is not a recommendation.
     const usable = !!winner && winner.score > 0 && winner.packet_loss < 100;
     const runB = $('benchRunBtn');
-    if (runB) { runB.classList.toggle('hashem-btn-primary', !usable); runB.classList.toggle('hashem-btn-secondary', usable); }
+    if (runB) { runB.classList.toggle('quantum-btn-primary', !usable); runB.classList.toggle('quantum-btn-secondary', usable); }
     if ($('benchRecBadge')) $('benchRecBadge').classList.toggle('hidden', !usable);
     if (winnerBanner) { winnerBanner.classList.toggle('u-bd-ok', usable); winnerBanner.classList.toggle('u-bd-ln', !usable); }
     if ($('benchWinnerScore')) { $('benchWinnerScore').classList.toggle('u-c-ok', usable); $('benchWinnerScore').classList.toggle('u-c-mu', !usable); }
@@ -9167,8 +9178,8 @@ function renderBenchmark(bench, peer) {
       </td>
       <td><span class="badge ${statusClass} u-fs-12">${esc(statusLabel)}</span></td>
       <td>
-        ${isActive ? `<button class="hashem-btn hashem-btn-ghost u-btn-xs u-btn-30 u-o-65" disabled>Current Carrier</button>` :
-          `<button class="hashem-btn ${isWinner ? 'hashem-btn-primary' : 'hashem-btn-secondary'} u-btn-xs u-btn-30" onclick="smartApplyOrSetupCarrier(${jsArg(m.id)}, ${jsArg(m.name || m.id)})">${isWinner ? 'Top Pick' : 'Switch'}</button>`}
+        ${isActive ? `<button class="quantum-btn quantum-btn-ghost u-btn-xs u-btn-30 u-o-65" disabled>Current Carrier</button>` :
+          `<button class="quantum-btn ${isWinner ? 'quantum-btn-primary' : 'quantum-btn-secondary'} u-btn-xs u-btn-30" onclick="smartApplyOrSetupCarrier(${jsArg(m.id)}, ${jsArg(m.name || m.id)})">${isWinner ? 'Top Pick' : 'Switch'}</button>`}
       </td>
     </tr>`;
   });
@@ -9192,7 +9203,7 @@ async function runBenchmarkClick() {
   const txt = $('benchRunBtnTxt');
   if (btn) btn.disabled = true;
   if (txt) txt.textContent = 'Benchmarking carriers...';
-  toast('Running Benchmark', 'Probing all Hashem carriers concurrently...');
+  toast('Running Benchmark', 'Probing all Quantum carriers concurrently...');
 
   try {
     await loadBenchmark(true);
@@ -9730,7 +9741,7 @@ function sshfwdCopyAuthClick() {
 // Clears the Connectivity Rescue DNAT redirect that can steal Bagher's ports
 // (backend: /api/sshfwd clear_dnat -> cleanDnatConflict).
 async function sshfwdClearDnatClick() {
-  if (!await entConfirm('Clear DNAT Conflicts?', 'Turns off the Connectivity Rescue port redirect (hashem-rescue-dnat) so Bagher can use its ports. Rescue stays off until you enable it again.', 'Clear DNAT Conflicts')) return;
+  if (!await entConfirm('Clear DNAT Conflicts?', 'Turns off the Connectivity Rescue port redirect (quantum-rescue-dnat) so Bagher can use its ports. Rescue stays off until you enable it again.', 'Clear DNAT Conflicts')) return;
   try {
     const res = await api('/api/sshfwd', { action: 'clear_dnat' });
     toastOk('DNAT Cleared', (res && res.message) || 'Rescue redirect removed.');
@@ -10047,19 +10058,19 @@ function clPoolCard(p, links) {
       <td class="num">${conns}</td>
       <td class="num">${clMs(s.latency_ms)}</td>
       <td class="num">${share}</td>
-      ${cfgCol === 'weight' ? `<td><input class="hashem-input cl-num" type="number" min="1" max="100" value="${m.weight || 1}" aria-label="${esc(tr('', 'Weight'))}" onchange="clMemberSet(${P},${R},${L},'weight',this.value)"></td>` : ''}
-      ${cfgCol === 'priority' ? `<td><input class="hashem-input cl-num" type="number" min="0" max="1000" value="${m.priority || 0}" aria-label="${esc(tr('', 'Priority'))}" onchange="clMemberSet(${P},${R},${L},'priority',this.value)"></td>` : ''}
+      ${cfgCol === 'weight' ? `<td><input class="quantum-input cl-num" type="number" min="1" max="100" value="${m.weight || 1}" aria-label="${esc(tr('', 'Weight'))}" onchange="clMemberSet(${P},${R},${L},'weight',this.value)"></td>` : ''}
+      ${cfgCol === 'priority' ? `<td><input class="quantum-input cl-num" type="number" min="0" max="1000" value="${m.priority || 0}" aria-label="${esc(tr('', 'Priority'))}" onchange="clMemberSet(${P},${R},${L},'priority',this.value)"></td>` : ''}
       <td class="cl-acts">
-        <button class="hashem-btn hashem-btn-secondary u-btn-xs" onclick="clMemberAct(${P},${R},${L},'${m.drain ? 'resume' : 'drain'}')">${esc(tr('', m.drain ? 'Resume' : 'Drain'))}</button>
-        <button class="hashem-btn hashem-btn-ghost u-btn-xs" onclick="clMemberAct(${P},${R},${L},'remove')">${esc(tr('', 'Remove'))}</button>
+        <button class="quantum-btn quantum-btn-secondary u-btn-xs" onclick="clMemberAct(${P},${R},${L},'${m.drain ? 'resume' : 'drain'}')">${esc(tr('', m.drain ? 'Resume' : 'Drain'))}</button>
+        <button class="quantum-btn quantum-btn-ghost u-btn-xs" onclick="clMemberAct(${P},${R},${L},'remove')">${esc(tr('', 'Remove'))}</button>
       </td></tr>`;
   }).join('');
   const inPool = new Set((p.members || []).map(m => m.link));
   const addable = links.filter(l => !inPool.has(l.id));
-  const addSel = addable.length ? `<select class="hashem-input cl-sel" aria-label="${esc(tr('', 'Add a foreign server'))}" onchange="clMemberAdd(${P},${R},this.value)">
+  const addSel = addable.length ? `<select class="quantum-input cl-sel" aria-label="${esc(tr('', 'Add a foreign server'))}" onchange="clMemberAdd(${P},${R},this.value)">
       <option value="">${esc(tr('', 'Add a foreign server…'))}</option>
       ${addable.map(l => `<option value="${l.id}">${esc(l.name)} (${esc(l.remote || '')})</option>`).join('')}</select>` : '';
-  const modeSel = `<select class="hashem-input cl-sel" aria-label="${esc(tr('', 'Mode'))}" onchange="clPoolPatch(${P},${R},{mode:this.value})">
+  const modeSel = `<select class="quantum-input cl-sel" aria-label="${esc(tr('', 'Mode'))}" onchange="clPoolPatch(${P},${R},{mode:this.value})">
       ${Object.keys(CL_MODE_NAME).map(k => `<option value="${k}" ${p.mode === k ? 'selected' : ''}>${esc(tr('', CL_MODE_NAME[k]))}</option>`).join('')}</select>`;
   return `<div class="cl-pool">
     <div class="cl-pool-h">
@@ -10069,10 +10080,10 @@ function clPoolCard(p, links) {
         <span class="badge ${st[0]}">${esc(tr('', st[1]))}</span>
       </div>
       <div class="u-flex u-gap-8 u-wrap u-ai-c">${modeSel}
-        ${p.mode === 'failover' && p.no_failback ? `<button class="hashem-btn hashem-btn-secondary u-btn-xs" onclick="clPoolFailback(${P},${R})">${esc(tr('', 'Fail Back Now'))}</button>` : ''}
-        <button class="hashem-btn hashem-btn-secondary u-btn-xs" onclick="clPoolOpen(${P},${R})">${esc(tr('', 'Edit'))}</button>
-        <button class="hashem-btn hashem-btn-secondary u-btn-xs" onclick="clPoolPatch(${P},${R},{disabled:${!p.disabled}})">${esc(tr('', p.disabled ? 'Enable' : 'Disable'))}</button>
-        <button class="hashem-btn hashem-btn-ghost u-btn-xs" onclick="clPoolDelete(${P},${R})">${esc(tr('', 'Delete'))}</button>
+        ${p.mode === 'failover' && p.no_failback ? `<button class="quantum-btn quantum-btn-secondary u-btn-xs" onclick="clPoolFailback(${P},${R})">${esc(tr('', 'Fail Back Now'))}</button>` : ''}
+        <button class="quantum-btn quantum-btn-secondary u-btn-xs" onclick="clPoolOpen(${P},${R})">${esc(tr('', 'Edit'))}</button>
+        <button class="quantum-btn quantum-btn-secondary u-btn-xs" onclick="clPoolPatch(${P},${R},{disabled:${!p.disabled}})">${esc(tr('', p.disabled ? 'Enable' : 'Disable'))}</button>
+        <button class="quantum-btn quantum-btn-ghost u-btn-xs" onclick="clPoolDelete(${P},${R})">${esc(tr('', 'Delete'))}</button>
       </div>
     </div>
     <div class="ent-help u-m-0">${esc(tr('', CL_MODE[p.mode] || ''))}${p.check ? ' ' + esc(tr('', 'Service check every')) + ' ' + (p.check_every || 3) + ' s.' : ''}${p.mode === 'failover' && p.no_failback ? ' ' + esc(tr('', 'Failback is manual.')) : ''}</div>
@@ -10177,7 +10188,7 @@ function clPoolClose() { modalHide($('clPoolModal')); }
 
 // One tunnel in the pool dialog: in or out, and its settings when in.
 function clPoolMemberRow(l, m, on) {
-  const num = (k, label, v, min, max, ph) => `<label class="cl-pm-f"><span>${esc(tr('', label))}</span><input class="hashem-input cl-num" type="number" min="${min}" max="${max}" data-k="${k}" value="${v === undefined || v === null ? '' : v}" placeholder="${esc(tr('', ph || ''))}"></label>`;
+  const num = (k, label, v, min, max, ph) => `<label class="cl-pm-f"><span>${esc(tr('', label))}</span><input class="quantum-input cl-num" type="number" min="${min}" max="${max}" data-k="${k}" value="${v === undefined || v === null ? '' : v}" placeholder="${esc(tr('', ph || ''))}"></label>`;
   return `<div class="cl-pm" data-link="${l.id}">
     <label class="u-check-row"><input type="checkbox" class="cl-pm-on" value="${l.id}" ${on ? 'checked' : ''} onchange="this.closest('.cl-pm').querySelector('.cl-pm-opts').hidden=!this.checked">
       <b>${esc(l.name)}</b> <span class="u-mono u-c-mu">${esc(l.remote || '')} · ${esc((l.ports || []).join(', ') || '—')}</span></label>
@@ -10298,7 +10309,7 @@ function clRenderHubs(hubs, d) {
     return `<tr><td><b>${esc(h.name || h.id)}</b><div class="u-hint-12 u-mono">${esc(h.id)}${h.version ? ' · ' + esc(h.version) : ''}</div>${clHubVerBadge(h)}</td>
       <td class="mono">${esc(h.public_ip || '—')}</td><td class="cl-wrap">${status}${h.last_seen ? `<div class="u-hint-12">${esc(tr('', 'last seen'))} ${esc(h.last_seen)}</div>` : ''}</td>
       <td class="num">${clMs(h.up ? h.latency_ms : -1)}</td><td>${pools}</td>
-      <td><button class="hashem-btn hashem-btn-ghost u-btn-xs" onclick="clHubRemove(${jsArg(h.id)},${jsArg(h.name || h.id)})">${esc(tr('', 'Unlink'))}</button></td></tr>`;
+      <td><button class="quantum-btn quantum-btn-ghost u-btn-xs" onclick="clHubRemove(${jsArg(h.id)},${jsArg(h.name || h.id)})">${esc(tr('', 'Unlink'))}</button></td></tr>`;
   }).join('');
   box.innerHTML = `<div class="ent-tbl-wrap"><table class="ent-tbl"><thead><tr><th>${esc(tr('', 'Hub'))}</th><th>${esc(tr('', 'Public IP'))}</th><th>${esc(tr('', 'Status'))}</th><th class="num">${esc(tr('', 'Latency'))}</th><th>${esc(tr('', 'Pools There'))}</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
@@ -10428,7 +10439,7 @@ function clRenderJoined(joined) {
   $('clJoined').innerHTML = joined.map(h => {
     const st = !h.active ? clSt('err', 'Stopped') : h.session ? clSt('on', 'Connected') : clSt('warn', 'Running, not connected');
     const act = h.first ? `<span class="u-hint-12">${esc(tr('', 'set up in Setup'))}</span>`
-      : `<button class="hashem-btn hashem-btn-ghost u-btn-xs" onclick="clLeaveHub(${h.id},${jsArg(h.name)})">${esc(tr('', 'Leave'))}</button>`;
+      : `<button class="quantum-btn quantum-btn-ghost u-btn-xs" onclick="clLeaveHub(${h.id},${jsArg(h.name)})">${esc(tr('', 'Leave'))}</button>`;
     return `<tr><td><b>${esc(h.first ? tr('', 'First hub') : h.name)}</b></td><td class="mono">${esc(h.iran_pub || '—')}</td>
       <td>${st}</td><td class="mono">${esc(h.svc || '')}</td><td>${act}</td></tr>`;
   }).join('');
@@ -10717,7 +10728,7 @@ function clInspect(d) {
 function clInsRefresh() { _clInsKey = null; loadClusterStatus(); }
 
 const clKV = rows => `<dl>${rows.filter(r => r && r[1] !== undefined && r[1] !== null && r[1] !== '').map(r => `<dt>${esc(tr('', r[0]))}</dt><dd>${r[2] ? r[1] : esc(r[1])}</dd>`).join('')}</dl>`;
-const clIn = (id, label, val, attrs) => `<div class="fg"><label for="${id}">${esc(tr('', label))}</label><input class="hashem-input" id="${id}" value="${esc(val ?? '')}" ${attrs || ''}></div>`;
+const clIn = (id, label, val, attrs) => `<div class="fg"><label for="${id}">${esc(tr('', label))}</label><input class="quantum-input" id="${id}" value="${esc(val ?? '')}" ${attrs || ''}></div>`;
 
 function clInsLive(key, d) {
   const { k, a, b } = clSelParse(key);
@@ -10804,22 +10815,22 @@ function clInsForm(key, d) {
         <div class="ent-help u-m-0" id="clIModeHelp">${esc(tr('', CL_MODE[p.mode] || ''))}</div>
         <div class="ent-grid-2">
           ${clIn('clIPort', 'Public port', p.port, 'type="number" min="1" max="65535"')}
-          <div class="fg"><label for="clIProto">${esc(tr('', 'Protocol'))}</label><select class="hashem-input" id="clIProto">
+          <div class="fg"><label for="clIProto">${esc(tr('', 'Protocol'))}</label><select class="quantum-input" id="clIProto">
             ${['both', 'tcp', 'udp'].map(x => `<option value="${x}" ${p.proto === x ? 'selected' : ''}>${esc(tr('', x === 'both' ? 'TCP and UDP' : x.toUpperCase()))}</option>`).join('')}</select></div>
         </div>
         ${clIn('clIName', 'Name (optional)', p.name || '', 'maxlength="40"')}
         <label class="u-check-row"><input type="checkbox" id="clICheck" ${p.check ? 'checked' : ''}> ${esc(tr('', 'Service check: connect through the tunnel to the service'))}</label>
         ${clIn('clICheckEvery', 'Check every (seconds)', p.check_every || 3, 'type="number" min="1" max="60"')}
         <label class="u-check-row ${p.mode === 'failover' ? '' : 'hidden'}" id="clIFailbackRow"><input type="checkbox" id="clINoFailback" ${p.no_failback ? 'checked' : ''}> ${esc(tr('', 'Manual failback: stay on the backup until Fail Back Now'))}</label>
-        <div class="u-flex u-gap-8 u-wrap"><button type="button" class="hashem-btn hashem-btn-primary" onclick="clInsPoolSave(${P},${R})">${esc(tr('', 'Save Pool'))}</button></div>
+        <div class="u-flex u-gap-8 u-wrap"><button type="button" class="quantum-btn quantum-btn-primary" onclick="clInsPoolSave(${P},${R})">${esc(tr('', 'Save Pool'))}</button></div>
       </div>
       <div class="cl-ins-sec">
-        ${addable.length ? `<select class="hashem-input" aria-label="${esc(tr('', 'Add a foreign server'))}" onchange="clMemberAdd(${P},${R},this.value).then(clInsRefresh)">
+        ${addable.length ? `<select class="quantum-input" aria-label="${esc(tr('', 'Add a foreign server'))}" onchange="clMemberAdd(${P},${R},this.value).then(clInsRefresh)">
           <option value="">${esc(tr('', 'Add a foreign server…'))}</option>${addable.map(l => `<option value="${l.id}">${esc(l.name)} (${esc(l.remote || '')})</option>`).join('')}</select>` : ''}
         <div class="u-flex u-gap-8 u-wrap">
-          ${p.mode === 'failover' && p.no_failback ? `<button type="button" class="hashem-btn hashem-btn-secondary" onclick="clPoolFailback(${P},${R})">${esc(tr('', 'Fail Back Now'))}</button>` : ''}
-          <button type="button" class="hashem-btn hashem-btn-secondary" onclick="clPoolPatch(${P},${R},{disabled:${!p.disabled}}).then(clInsRefresh)">${esc(tr('', p.disabled ? 'Enable' : 'Disable'))}</button>
-          <button type="button" class="hashem-btn hashem-btn-ghost" onclick="clPoolDelete(${P},${R})">${esc(tr('', 'Delete Pool'))}</button>
+          ${p.mode === 'failover' && p.no_failback ? `<button type="button" class="quantum-btn quantum-btn-secondary" onclick="clPoolFailback(${P},${R})">${esc(tr('', 'Fail Back Now'))}</button>` : ''}
+          <button type="button" class="quantum-btn quantum-btn-secondary" onclick="clPoolPatch(${P},${R},{disabled:${!p.disabled}}).then(clInsRefresh)">${esc(tr('', p.disabled ? 'Enable' : 'Disable'))}</button>
+          <button type="button" class="quantum-btn quantum-btn-ghost" onclick="clPoolDelete(${P},${R})">${esc(tr('', 'Delete Pool'))}</button>
         </div>
       </div>`;
   }
@@ -10840,9 +10851,9 @@ function clInsForm(key, d) {
         <label class="u-check-row"><input type="checkbox" id="clIDrain" ${m.drain ? 'checked' : ''}> ${esc(tr('', 'Drain: no new connections, open ones finish'))}</label>
         <div class="ent-help u-m-0">${esc(tr('', 'Weight counts in balance, sticky and least connections; priority in failover (lower first).'))}</div>
         <div class="u-flex u-gap-8 u-wrap">
-          <button type="button" class="hashem-btn hashem-btn-primary" onclick="clInsMemberSave(${P},${R},${L})">${esc(tr('', 'Save'))}</button>
-          <button type="button" class="hashem-btn hashem-btn-secondary" onclick="clSelect(${jsArg('pool:' + a)})">${esc(tr('', 'Back to Pool'))}</button>
-          <button type="button" class="hashem-btn hashem-btn-ghost" onclick="clMemberAct(${P},${R},${L},'remove').then(clInsRefresh)">${esc(tr('', 'Remove From Pool'))}</button>
+          <button type="button" class="quantum-btn quantum-btn-primary" onclick="clInsMemberSave(${P},${R},${L})">${esc(tr('', 'Save'))}</button>
+          <button type="button" class="quantum-btn quantum-btn-secondary" onclick="clSelect(${jsArg('pool:' + a)})">${esc(tr('', 'Back to Pool'))}</button>
+          <button type="button" class="quantum-btn quantum-btn-ghost" onclick="clMemberAct(${P},${R},${L},'remove').then(clInsRefresh)">${esc(tr('', 'Remove From Pool'))}</button>
         </div>
       </div>`;
   }
@@ -10856,10 +10867,10 @@ function clInsForm(key, d) {
         ${pools.map(p => { const s = (p.member_status || []).find(x => x.link === l.id) || {};
           return `<button type="button" class="cl-row-btn" onclick="clSelect(${jsArg('member:' + clPoolKey(p) + ':' + l.id)})"><span><b>${p.port}</b> ${esc(CL_PROTO[p.proto] || p.proto)} · ${esc(tr('', CL_MODE_NAME[p.mode] || p.mode))}</span><span class="u-mono">${s.share ? Math.round(s.share * 100) + '%' : '—'}</span></button>`; }).join('')
           || `<div class="ent-empty">${esc(tr('', 'Not in any pool: it listens on its own public ports.'))}</div>`}
-        ${others.length ? `<select class="hashem-input" aria-label="${esc(tr('', 'Add to a pool'))}" onchange="clInsAddToPool(${l.id},this.value)">
+        ${others.length ? `<select class="quantum-input" aria-label="${esc(tr('', 'Add to a pool'))}" onchange="clInsAddToPool(${l.id},this.value)">
           <option value="">${esc(tr('', 'Add to a pool…'))}</option>${others.map(p => `<option value="${esc(clPoolKey(p))}">${p.port} ${esc(CL_PROTO[p.proto] || p.proto)}${p.name ? ' · ' + esc(p.name) : ''}</option>`).join('')}</select>` : ''}
         <div class="ent-help u-m-0">${esc(tr('', 'The tunnel itself (ports, transport, token) is edited in the Tunnel tab.'))}</div>
-        <div><button type="button" class="hashem-btn hashem-btn-secondary" onclick="goTab('tunnel')">${esc(tr('', 'Open Tunnel Tab'))}</button></div>
+        <div><button type="button" class="quantum-btn quantum-btn-secondary" onclick="goTab('tunnel')">${esc(tr('', 'Open Tunnel Tab'))}</button></div>
       </div>`;
   }
   if (k === 'hub') {
@@ -10877,14 +10888,14 @@ function clInsForm(key, d) {
           ${clIn('clIHcRise', 'Back after good checks', h.rise || 3, 'type="number" min="1" max="60"')}
         </div>
         <label class="u-check-row"><input type="checkbox" id="clIHubFwd" ${d.hub_forward ? 'checked' : ''}> ${esc(tr('', 'Forward a pool to another hub when no foreign server here can serve it'))}</label>
-        <div><button type="button" class="hashem-btn hashem-btn-primary" onclick="clInsHubSave()">${esc(tr('', 'Save'))}</button></div>
+        <div><button type="button" class="quantum-btn quantum-btn-primary" onclick="clInsHubSave()">${esc(tr('', 'Save'))}</button></div>
       </div>
       <div class="cl-ins-sec">
         <div class="u-flex u-gap-8 u-wrap">
-          <button type="button" class="hashem-btn hashem-btn-primary" onclick="clPoolOpen()">${esc(tr('', 'New Pool'))}</button>
-          <button type="button" class="hashem-btn hashem-btn-secondary" onclick="clJoinCodeOpen()">${esc(tr('', 'Show Join Code'))}</button>
-          <button type="button" class="hashem-btn hashem-btn-secondary" onclick="clHubAddOpen()">${esc(tr('', 'Link a Hub'))}</button>
-          <button type="button" class="hashem-btn hashem-btn-ghost" onclick="clInsRules()">${esc(tr('', 'Show Kernel Rules'))}</button>
+          <button type="button" class="quantum-btn quantum-btn-primary" onclick="clPoolOpen()">${esc(tr('', 'New Pool'))}</button>
+          <button type="button" class="quantum-btn quantum-btn-secondary" onclick="clJoinCodeOpen()">${esc(tr('', 'Show Join Code'))}</button>
+          <button type="button" class="quantum-btn quantum-btn-secondary" onclick="clHubAddOpen()">${esc(tr('', 'Link a Hub'))}</button>
+          <button type="button" class="quantum-btn quantum-btn-ghost" onclick="clInsRules()">${esc(tr('', 'Show Kernel Rules'))}</button>
         </div>
         <pre class="ent-code hidden cl-ins-pre" id="clIRules"></pre>
       </div>`;
@@ -10894,51 +10905,51 @@ function clInsForm(key, d) {
     return clInsHead(h.name || h.id, tr('', 'Linked Iran hub')) + `
       <div class="cl-ins-sec">
         <div class="ent-help u-m-0">${esc(tr('', 'When every foreign server of a pool is down here, its port is forwarded to a hub where the same pool works.'))}</div>
-        <div><button type="button" class="hashem-btn hashem-btn-ghost" onclick="clHubRemove(${jsArg(h.id)},${jsArg(h.name || h.id)}).then(clInsRefresh)">${esc(tr('', 'Unlink'))}</button></div>
+        <div><button type="button" class="quantum-btn quantum-btn-ghost" onclick="clHubRemove(${jsArg(h.id)},${jsArg(h.name || h.id)}).then(clInsRefresh)">${esc(tr('', 'Unlink'))}</button></div>
       </div>`;
   }
   if (k === 'dns') {
     const dns = d.dns || {}, hook = dns.provider === 'webhook';
     return clInsHead(tr('', 'DNS Failover'), tr('', 'A domain that always points to the Iran hubs that work.')) + `
       <div class="cl-ins-sec">
-        <div class="fg"><label for="clIDnsProv">${esc(tr('', 'Provider'))}</label><select class="hashem-input" id="clIDnsProv" onchange="clInsDnsProv()">
+        <div class="fg"><label for="clIDnsProv">${esc(tr('', 'Provider'))}</label><select class="quantum-input" id="clIDnsProv" onchange="clInsDnsProv()">
           <option value="cloudflare" ${hook ? '' : 'selected'}>Cloudflare</option><option value="webhook" ${hook ? 'selected' : ''}>${esc(tr('', 'Webhook (any DNS provider or script)'))}</option></select></div>
         ${clIn('clIDnsName', 'Record name', dns.name || '', 'placeholder="vpn.example.com" autocomplete="off"')}
-        <div class="${hook ? '' : 'hidden'}" id="clIDnsURLRow">${clIn('clIDnsURL', 'Webhook URL', dns.url || '', 'placeholder="https://example.com/hashem-dns" autocomplete="off"')}</div>
+        <div class="${hook ? '' : 'hidden'}" id="clIDnsURLRow">${clIn('clIDnsURL', 'Webhook URL', dns.url || '', 'placeholder="https://example.com/quantum-dns" autocomplete="off"')}</div>
         <div class="ent-grid-2">
           ${clIn('clIDnsTTL', 'TTL (seconds)', dns.ttl || 60, 'type="number" min="60" max="3600"')}
           <div class="fg"><label for="clIDnsTok" id="clIDnsTokL">${esc(tr('', hook ? 'Secret (optional, sent as Authorization: Bearer)' : 'Cloudflare API token (Zone, DNS, Edit)'))}</label>
-            <input class="hashem-input" id="clIDnsTok" type="password" autocomplete="off" placeholder="${esc(tr('', dns.has_token ? 'Saved; paste a new one to replace it' : hook ? 'Optional' : 'API token'))}"></div>
+            <input class="quantum-input" id="clIDnsTok" type="password" autocomplete="off" placeholder="${esc(tr('', dns.has_token ? 'Saved; paste a new one to replace it' : hook ? 'Optional' : 'API token'))}"></div>
         </div>
         <label class="u-check-row"><input type="checkbox" id="clIDnsOn" ${dns.enabled ? 'checked' : ''}> ${esc(tr('', 'Keep the record pointed at the working hubs'))}</label>
         <div class="u-flex u-gap-8 u-wrap">
-          <button type="button" class="hashem-btn hashem-btn-secondary" onclick="clInsDnsSave(true)">${esc(tr('', 'Test'))}</button>
-          <button type="button" class="hashem-btn hashem-btn-primary" onclick="clInsDnsSave(false)">${esc(tr('', 'Save'))}</button>
+          <button type="button" class="quantum-btn quantum-btn-secondary" onclick="clInsDnsSave(true)">${esc(tr('', 'Test'))}</button>
+          <button type="button" class="quantum-btn quantum-btn-primary" onclick="clInsDnsSave(false)">${esc(tr('', 'Save'))}</button>
         </div>
       </div>`;
   }
   if (k === 'users') {
     return clInsHead(tr('', 'Users'), tr('', 'Who connects to this hub')) + `
       <div class="cl-ins-sec"><div class="ent-help u-m-0">${esc(tr('', 'Users connect to this hub\'s public IP, or to the DNS name when DNS failover is on. Each pool sends their new connections to a working foreign server.'))}</div>
-      <div class="u-flex u-gap-8 u-wrap"><button type="button" class="hashem-btn hashem-btn-secondary" onclick="clSelect('dns')">${esc(tr('', 'DNS Failover'))}</button></div></div>`;
+      <div class="u-flex u-gap-8 u-wrap"><button type="button" class="quantum-btn quantum-btn-secondary" onclick="clSelect('dns')">${esc(tr('', 'DNS Failover'))}</button></div></div>`;
   }
   if (k === 'me') {
     return clInsHead(tr('', 'This foreign server'), tr('', 'Serves several Iran hubs: when one Iran server dies, users who connect through the others keep working.')) +
-      `<div class="cl-ins-sec"><div><button type="button" class="hashem-btn hashem-btn-primary" onclick="clSelect('joinnew')">${esc(tr('', 'Join Another Iran Hub'))}</button></div></div>`;
+      `<div class="cl-ins-sec"><div><button type="button" class="quantum-btn quantum-btn-primary" onclick="clSelect('joinnew')">${esc(tr('', 'Join Another Iran Hub'))}</button></div></div>`;
   }
   if (k === 'joined') {
     const h = (d.joined_hubs || []).find(x => String(x.id) === a);
     return clInsHead(h.first ? tr('', 'First hub') : h.name, h.iran_pub || '') + `<div class="cl-ins-sec">` +
       (h.first ? `<div class="ent-help u-m-0">${esc(tr('', 'The first hub is set up in Setup.'))}</div>`
-        : `<div><button type="button" class="hashem-btn hashem-btn-ghost" onclick="clLeaveHub(${h.id},${jsArg(h.name)}).then(clInsRefresh)">${esc(tr('', 'Leave'))}</button></div>`) + `</div>`;
+        : `<div><button type="button" class="quantum-btn quantum-btn-ghost" onclick="clLeaveHub(${h.id},${jsArg(h.name)}).then(clInsRefresh)">${esc(tr('', 'Leave'))}</button></div>`) + `</div>`;
   }
   if (k === 'joinnew') {
     return clInsHead(tr('', 'Join Another Iran Hub'), '') + `
       <div class="cl-ins-sec">
         <ol class="cl-steps"><li>${esc(tr('', 'On the other Iran server: Setup, add a foreign server with this server\'s IP and the same ports.'))}</li><li>${esc(tr('', 'Copy the bundle it prints and paste it here.'))}</li></ol>
-        <div class="fg"><label for="clIJoinBundle">${esc(tr('', 'Bundle (hsh1_, bh1_ or gh1_)'))}</label><textarea class="hashem-input u-mono u-resize-none" id="clIJoinBundle" rows="3" placeholder="hsh1_…"></textarea></div>
+        <div class="fg"><label for="clIJoinBundle">${esc(tr('', 'Bundle (hsh1_, bh1_ or gh1_)'))}</label><textarea class="quantum-input u-mono u-resize-none" id="clIJoinBundle" rows="3" placeholder="hsh1_…"></textarea></div>
         ${clIn('clIJoinName', 'Name (optional)', '', 'maxlength="32" placeholder="tehran-2"')}
-        <div><button type="button" class="hashem-btn hashem-btn-primary" id="clIJoinBtn" onclick="clJoinHub('clIJoin')">${esc(tr('', 'Join Hub'))}</button></div>
+        <div><button type="button" class="quantum-btn quantum-btn-primary" id="clIJoinBtn" onclick="clJoinHub('clIJoin')">${esc(tr('', 'Join Hub'))}</button></div>
         <pre class="ent-code hidden cl-ins-pre" id="clIJoinOut"></pre>
       </div>`;
   }

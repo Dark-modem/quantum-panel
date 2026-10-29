@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-// 6to4 and 4in6: the GRE tunnel rides on IPv6 (hashem.sh gre6_rebuild).
+// 6to4 and 4in6: the GRE tunnel rides on IPv6 (quantum.sh gre6_rebuild).
 //
 //	6to4  a sit tunnel (IP protocol 41) between the two IPv4 addresses carries
 //	      a private IPv6 /64; the GRE device runs on it as ip6gre.
@@ -31,7 +31,7 @@ const (
 
 func isCarrier6(t string) bool { return t == carrier6to4 || t == carrier4in6 }
 
-// gre6Env reads the ends hashem.sh keeps for GRE interface ifname
+// gre6Env reads the ends quantum.sh keeps for GRE interface ifname
 // (gre6/IF.env: REMOTE4, LOCAL4, REMOTE6, LOCAL6). An ip6gre device no longer
 // shows its IPv4 ends, so this is where they are read from.
 func gre6Env(ifname string) map[string]string {

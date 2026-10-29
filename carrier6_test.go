@@ -124,7 +124,7 @@ func TestPeerApplyCarrier4in6(t *testing.T) {
 	}
 	rr = httptest.NewRecorder()
 	handlePeerApplyCarrier(rr, httptest.NewRequest("POST", "/api/peer/apply-carrier", strings.NewReader(`{"carrier":"4in6","local6":"2001:db8::2","remote6":"2001:db8::1"}`)))
-	// valid addresses get through to hashem.sh (not installed here)
+	// valid addresses get through to quantum.sh (not installed here)
 	if rr.Code == 400 || loadCarrierConfig().ActiveCarrier != "4in6" {
 		t.Errorf("4in6 from the master: %d %s", rr.Code, rr.Body.String())
 	}

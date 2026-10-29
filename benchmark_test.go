@@ -49,7 +49,7 @@ func TestBenchmarkScoring(t *testing.T) {
 
 func TestBenchmarkExecutionAndEndpoints(t *testing.T) {
 	withTempConfig(t)
-	tmpDir, err := os.MkdirTemp("", "hashem_bench_test_*")
+	tmpDir, err := os.MkdirTemp("", "quantum_bench_test_*")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
@@ -145,7 +145,7 @@ func TestBenchmarkExecutionAndEndpoints(t *testing.T) {
 
 func TestBenchmarkAllSevenProtocolsAndCustomTarget(t *testing.T) {
 	withTempConfig(t)
-	tmpDir, err := os.MkdirTemp("", "hashem_bench_protos_*")
+	tmpDir, err := os.MkdirTemp("", "quantum_bench_protos_*")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}

@@ -203,13 +203,13 @@ func TestEnableOriginThenDisableLeavesNothing(t *testing.T) {
 			t.Fatalf("%s has mode %v, want 0600 (contains secrets)", f, fi.Mode().Perm())
 		}
 	}
-	for _, u := range []string{"hashem-rescue-fw", "hashem-rescue-frps", "hashem-rescue-frpc"} {
+	for _, u := range []string{"quantum-rescue-fw", "quantum-rescue-frps", "quantum-rescue-frpc"} {
 		if _, err := os.Stat(filepath.Join(rescueUnitDir, u+".service")); err != nil {
 			t.Fatalf("unit %s missing", u)
 		}
 	}
 	joined := strings.Join(*calls, "\n")
-	for _, w := range []string{"daemon-reload", "enable --now hashem-rescue-fw.service", "enable --now hashem-rescue-frps.service", "enable --now hashem-rescue-frpc.service"} {
+	for _, w := range []string{"daemon-reload", "enable --now quantum-rescue-fw.service", "enable --now quantum-rescue-frps.service", "enable --now quantum-rescue-frpc.service"} {
 		if !strings.Contains(joined, w) {
 			t.Fatalf("expected systemctl call %q in:\n%s", w, joined)
 		}
@@ -224,11 +224,11 @@ func TestEnableOriginThenDisableLeavesNothing(t *testing.T) {
 	if _, err := os.Stat(rescueStatePath()); !os.IsNotExist(err) {
 		t.Fatal("rescue.json must be removed")
 	}
-	left, _ := filepath.Glob(filepath.Join(rescueUnitDir, "hashem-rescue-*"))
+	left, _ := filepath.Glob(filepath.Join(rescueUnitDir, "quantum-rescue-*"))
 	if len(left) != 0 {
 		t.Fatalf("units left behind: %v", left)
 	}
-	if !strings.Contains(strings.Join(*calls, "\n"), "nft delete table inet hashem_rescue") {
+	if !strings.Contains(strings.Join(*calls, "\n"), "nft delete table inet quantum_rescue") {
 		t.Fatal("firewall table must be deleted on disable")
 	}
 	_ = dir
@@ -267,7 +267,7 @@ func TestEnableRollsBackOnSystemctlFailure(t *testing.T) {
 	if _, err := os.Stat(rescueStatePath()); !os.IsNotExist(err) {
 		t.Fatal("failed enable must roll back state")
 	}
-	left, _ := filepath.Glob(filepath.Join(rescueUnitDir, "hashem-rescue-*"))
+	left, _ := filepath.Glob(filepath.Join(rescueUnitDir, "quantum-rescue-*"))
 	if len(left) != 0 {
 		t.Fatalf("failed enable must remove units, left: %v", left)
 	}
@@ -294,7 +294,7 @@ func TestApplyCodeSkipsBusyPortsAndWritesEntry(t *testing.T) {
 	if !strings.Contains(string(b), `serverAddr = "198.51.100.22"`) || strings.Contains(string(b), "bindPort = 22\n") {
 		t.Fatalf("entry config wrong:\n%s", b)
 	}
-	if !strings.Contains(strings.Join(*calls, "\n"), "enable --now hashem-rescue-frpc.service") {
+	if !strings.Contains(strings.Join(*calls, "\n"), "enable --now quantum-rescue-frpc.service") {
 		t.Fatal("frpc must be started")
 	}
 	if _, err := rescueApplyCode(rescueEncode(st, "198.51.100.22")); err == nil {
@@ -433,14 +433,14 @@ func TestApplyCodeUsesKernelDNATForDirectlyReachablePorts(t *testing.T) {
 		t.Fatalf("frpc must only carry the filtered port:\n%s", fc)
 	}
 	j := strings.Join(*calls, "\n")
-	if !strings.Contains(j, "enable --now hashem-rescue-dnat.service") || !strings.Contains(j, "enable --now hashem-rescue-frpc.service") {
+	if !strings.Contains(j, "enable --now quantum-rescue-dnat.service") || !strings.Contains(j, "enable --now quantum-rescue-frpc.service") {
 		t.Fatalf("services not started:\n%s", j)
 	}
 	rescueDisable()
-	if left, _ := filepath.Glob(filepath.Join(rescueUnitDir, "hashem-rescue-*")); len(left) != 0 {
+	if left, _ := filepath.Glob(filepath.Join(rescueUnitDir, "quantum-rescue-*")); len(left) != 0 {
 		t.Fatalf("disable left units: %v", left)
 	}
-	if !strings.Contains(strings.Join(*calls, "\n"), "nft delete table inet hashem_dnat") {
+	if !strings.Contains(strings.Join(*calls, "\n"), "nft delete table inet quantum_dnat") {
 		t.Fatal("disable must drop the dnat table")
 	}
 }

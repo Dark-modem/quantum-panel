@@ -387,7 +387,7 @@ func (s *ptSession) tokenOK(t string) bool {
 // ---------- cores and processes ----------
 
 func ptCore(name string) string {
-	for _, d := range []string{os.Getenv("HASHEM_CORE_DIR"), "/usr/local/bin"} {
+	for _, d := range []string{envQuantum("QUANTUM_CORE_DIR", "HASHEM_CORE_DIR"), "/usr/local/bin"} {
 		if d == "" {
 			continue
 		}
@@ -403,7 +403,7 @@ func ptCore(name string) string {
 }
 
 // ptEnsureCores returns the paths of the cores this side needs, downloading
-// them once with `hashem download-cores` when one is missing.
+// them once with `quantum download-cores` when one is missing.
 func (s *ptSession) ptEnsureCores(names ...string) map[string]string {
 	find := func() (map[string]string, bool) {
 		m, all := map[string]string{}, true
@@ -436,7 +436,7 @@ func (s *ptSession) ptEnsureCores(names ...string) map[string]string {
 	}
 	for _, n := range names {
 		if m[n] == "" {
-			s.note("%s is not installed and could not be downloaded; its checks are skipped (run: hashem download-cores)", n)
+			s.note("%s is not installed and could not be downloaded; its checks are skipped (run: quantum download-cores)", n)
 		}
 	}
 	return m
@@ -506,7 +506,7 @@ remotePort = %d
 `, host, port, token, t, t, base+ptOffEcho, fwd)
 }
 
-// Backhaul v0.7 flat schema, the same keys hashem.sh writes.
+// Backhaul v0.7 flat schema, the same keys quantum.sh writes.
 func ptBHServerConf(base, i int, token, dir string) string {
 	t := ptBHTransports[i]
 	var b strings.Builder
@@ -897,7 +897,7 @@ func ptStartHub(req ptHubRequest) (*ptSession, error) {
 	if b != ptDefBase && req.BasePort == 0 {
 		s.notes = append(s.notes, fmt.Sprintf("ports from %d are in use on this server, so the test uses %d-%d", ptDefBase, b, b+ptOffBH+len(ptBHTransports)-1))
 	}
-	dir, err := os.MkdirTemp("", "hashem-pathtest-")
+	dir, err := os.MkdirTemp("", "quantum-pathtest-")
 	if err != nil {
 		s.cancel()
 		return nil, err
@@ -1243,7 +1243,7 @@ func ptStartSpoke(code string) (*ptSession, error) {
 	s := ptNewSession("foreign", c.Base, c.Minutes)
 	s.iranIP, s.iranIP6, s.token = c.Host, c.Host6, c.Token
 	s.checks = ptNetChecks(c.Base, c.Host6)
-	dir, err := os.MkdirTemp("", "hashem-pathtest-")
+	dir, err := os.MkdirTemp("", "quantum-pathtest-")
 	if err != nil {
 		s.cancel()
 		return nil, err
@@ -1584,7 +1584,7 @@ func cliPathTest(args []string) int {
 		configDir = v
 	}
 	loadOrInit()
-	if d, err := time.ParseDuration(os.Getenv("HASHEM_PT_GRACE")); err == nil && d > 0 {
+	if d, err := time.ParseDuration(envQuantum("QUANTUM_PT_GRACE", "HASHEM_PT_GRACE")); err == nil && d > 0 {
 		ptGrace = d // labs: settle sooner on blocked transports
 	}
 	var s *ptSession

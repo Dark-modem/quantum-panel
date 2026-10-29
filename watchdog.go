@@ -184,7 +184,7 @@ func listBackups() []backupItem {
 			continue
 		}
 		name := e.Name()
-		if strings.HasPrefix(name, "hashem-backup-") && strings.HasSuffix(name, ".enc") {
+		if strings.HasPrefix(name, "quantum-backup-") && strings.HasSuffix(name, ".enc") {
 			info, err := e.Info()
 			if err != nil {
 				continue
@@ -248,10 +248,12 @@ func collectWatchdogEvents() []errEvent {
 	return events
 }
 
-// ensureWatchdogTimer starts the 1-minute hashem-watchdog timer, which runs
+// ensureWatchdogTimer starts the 1-minute quantum-watchdog timer, which runs
 // scheduled backups/restarts and Auto-Pool even when alerts are off (M6).
-// Best effort: a schedule is still saved when hashem.sh is unavailable.
+// Best effort: a schedule is still saved when quantum.sh is unavailable.
 func ensureWatchdogTimer() {
+	// Adopt a legacy hashem-watchdog timer from a pre-rebrand install.
+	legacyUnitMigration("quantum-watchdog.timer")
 	if out, err := runWatchdogCmd("watchdog", "timer"); err != nil {
 		log.Printf("[watchdog] could not start the timer: %v %s", err, out)
 	}
@@ -543,7 +545,7 @@ func getBackupDir() string {
 	if v := os.Getenv("GRE_BACKUP_DIR"); v != "" {
 		return v
 	}
-	return "/var/backups/hashem"
+	return "/var/backups/quantum"
 }
 
 func handleBackupDownload(w http.ResponseWriter, r *http.Request) {

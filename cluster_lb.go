@@ -2,7 +2,7 @@ package main
 
 // Cluster pools: one public port on this Iran hub served by several foreign
 // servers. Each member link's relay (frps / backhaul-server) binds its public
-// ports to a private address on the hashem-lb dummy interface instead of
+// ports to a private address on the quantum-lb dummy interface instead of
 // 0.0.0.0, and kernel DNAT sends each new connection to a healthy member. The
 // client's real address reaches the relay (PROXY protocol keeps working), and
 // nothing is copied in user space, so a panel restart never drops traffic.
@@ -26,12 +26,12 @@ import (
 
 const (
 	lbNet    = "169.254.77.0/24"
-	lbIface  = "hashem-lb"
-	lbChain  = "HASHEM-LB"
-	lbEntry  = "HASHEM-LB-ENTRY"
-	lbFilter = "HASHEM-LB-FILTER"
-	lbPost   = "HASHEM-LB-POST"
-	lbFwd    = "HASHEM-LB-FWD"
+	lbIface  = "quantum-lb"
+	lbChain  = "QUANTUM-LB"
+	lbEntry  = "QUANTUM-LB-ENTRY"
+	lbFilter = "QUANTUM-LB-FILTER"
+	lbPost   = "QUANTUM-LB-POST"
+	lbFwd    = "QUANTUM-LB-FWD"
 	// sticky mode spreads users by the low 6 bits of their IPv4 address
 	lbBuckets = 64
 )
@@ -63,7 +63,7 @@ func lbProtos(p string) []string {
 
 // lbAddrFor is the private address the relay unit svc binds its public ports
 // to: the main tunnel's relay (frps / backhaul-server) gets .1, peer N's
-// (frps-N / backhaul-server-N) gets .N+1. hashem.sh derives the same address.
+// (frps-N / backhaul-server-N) gets .N+1. quantum.sh derives the same address.
 func lbAddrFor(svc string) string {
 	switch svc {
 	case "frps", "backhaul-server":
@@ -745,6 +745,9 @@ func lbRulesFile() string { return filepath.Join(configDir, "cluster-rules.v4") 
 // lbApplyRules replaces our chains atomically and makes sure the built-in
 // chains jump to them. Chains of pools that are gone are removed.
 func lbApplyRules(text string, oldChains []string) error {
+	// Adopt a legacy hashem-lb-net unit from a pre-rebrand install; the new
+	// unit is (re)written below.
+	legacyUnitMigration(lbUnit)
 	_ = os.MkdirAll(configDir, 0o700)
 	f := lbRulesFile()
 	if err := os.WriteFile(f, []byte(text), 0o600); err != nil {
@@ -811,8 +814,8 @@ func lbClearRules(oldChains []string) {
 
 // lbClearLegacyV1 removes the chains of the first cluster design.
 func lbClearLegacyV1() {
-	for _, c := range []string{"HASHEM-CLUSTER-PREROUTING", "HASHEM-CLUSTER-POSTROUTING"} {
-		base := strings.TrimPrefix(c, "HASHEM-CLUSTER-")
+	for _, c := range []string{"QUANTUM-CLUSTER-PREROUTING", "QUANTUM-CLUSTER-POSTROUTING"} {
+		base := strings.TrimPrefix(c, "QUANTUM-CLUSTER-")
 		_, _ = runCmdTimeout(5*time.Second, "iptables", "-w", "5", "-t", "nat", "-D", base, "-j", c)
 		_, _ = runCmdTimeout(5*time.Second, "iptables", "-w", "5", "-t", "nat", "-F", c)
 		_, _ = runCmdTimeout(5*time.Second, "iptables", "-w", "5", "-t", "nat", "-X", c)
@@ -827,18 +830,18 @@ func lbConntrackForget(addr string) {
 
 // ---- private addresses ----
 
-const lbUnit = "hashem-lb-net.service"
+const lbUnit = "quantum-lb-net.service"
 
 // lbUnitDir is where the unit goes; lab tests point it elsewhere.
 var lbUnitDir = "/etc/systemd/system"
 
 func lbUnitPath() string { return filepath.Join(lbUnitDir, lbUnit) }
 
-// lbBindsFile tells hashem.sh which relays are bound (one "svc addr" per
+// lbBindsFile tells quantum.sh which relays are bound (one "svc addr" per
 // line), so a peer it rewrites keeps listening on its private address.
 func lbBindsFile() string { return filepath.Join(configDir, "lb-binds") }
 
-// lbPooledPortsFile lists the pool ports ("443/tcp" per line): hashem.sh lets a
+// lbPooledPortsFile lists the pool ports ("443/tcp" per line): quantum.sh lets a
 // new peer claim one of them and binds that peer privately.
 func lbPooledPortsFile() string { return filepath.Join(configDir, "lb-ports") }
 
@@ -850,13 +853,13 @@ func lbUnitText(addrs []string) string {
 	for _, a := range addrs {
 		cmd.WriteString("; ip addr replace " + a + "/32 dev " + lbIface)
 	}
-	return "[Unit]\nDescription=Hashem cluster: private relay addresses\nDefaultDependencies=no\nAfter=local-fs.target\n" +
+	return "[Unit]\nDescription=Quantum cluster: private relay addresses\nDefaultDependencies=no\nAfter=local-fs.target\n" +
 		"Before=network-online.target frps.service backhaul-server.service\n\n" +
 		"[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=/bin/sh -c '" + cmd.String() + "'\n\n" +
 		"[Install]\nWantedBy=multi-user.target\n"
 }
 
-// lbEnsureAddrs makes hashem-lb carry exactly addrs and keeps the boot unit in
+// lbEnsureAddrs makes quantum-lb carry exactly addrs and keeps the boot unit in
 // step. With no addresses the interface and unit go away.
 func lbEnsureAddrs(addrs []string) error {
 	sort.Strings(addrs)
@@ -926,7 +929,7 @@ func lbSetRelayBind(svc, addr string) (changed bool, err error) {
 	if next == string(data) {
 		return false, nil
 	}
-	tmp := path + ".hashem-lb"
+	tmp := path + ".quantum-lb"
 	if err := os.WriteFile(tmp, []byte(next), 0o600); err != nil {
 		return false, err
 	}

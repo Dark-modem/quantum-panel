@@ -48,9 +48,9 @@ var (
 
 func defaultSSHFwdKeyPath() string {
 	if os.Geteuid() != 0 || strings.Contains(configDir, "gre-panel-test-") {
-		return filepath.Join(configDir, "hashem-fwd")
+		return filepath.Join(configDir, "quantum-fwd")
 	}
-	return "/root/.ssh/hashem-fwd"
+	return "/root/.ssh/quantum-fwd"
 }
 
 func defaultSSHFwdConfig() SSHFwdConfig {
@@ -130,14 +130,16 @@ func ensureSSHFwdKey(keyPath string) (pubKey string, err error) {
 		keyPath = defaultSSHFwdKeyPath()
 	}
 	pubPath := keyPath + ".pub"
+	// Adopt a legacy hashem-fwd key pair from a pre-rebrand install.
+	legacyMigrateSSHKey(keyPath)
 	if _, statErr := os.Stat(keyPath); os.IsNotExist(statErr) {
 		if err := os.MkdirAll(filepath.Dir(keyPath), 0700); err != nil {
-			keyPath = filepath.Join(configDir, "hashem-fwd")
+			keyPath = filepath.Join(configDir, "quantum-fwd")
 			pubPath = keyPath + ".pub"
 			_ = os.MkdirAll(filepath.Dir(keyPath), 0700)
 		}
 		if _, statErr2 := os.Stat(keyPath); os.IsNotExist(statErr2) {
-			out, err := runCmd("ssh-keygen", "-t", "ed25519", "-N", "", "-f", keyPath, "-C", "hashem-bagher-carrier")
+			out, err := runCmd("ssh-keygen", "-t", "ed25519", "-N", "", "-f", keyPath, "-C", "quantum-bagher-carrier")
 			if err != nil {
 				return "", fmt.Errorf("ssh-keygen failed: %v (%s)", err, strings.TrimSpace(out))
 			}
@@ -286,7 +288,7 @@ func buildBagherCarrierUnit(cfg SSHFwdConfig, id int) string {
 	var execCmd, desc string
 	if cfg.Mode == "bagher" || cfg.Mode == "frp_ssh" {
 		execCmd = fmt.Sprintf("%s bagher-carrier -link %d", bagherCarrierBin(), id)
-		desc = "Hashem Bagher Engine (Stealth Hybrid Tunnel)"
+		desc = "Quantum Bagher Engine (Stealth Hybrid Tunnel)"
 		if id > 1 {
 			if l, ok := findBagherLink(cfg, id); ok {
 				desc += " to " + l.RemoteHost
@@ -309,12 +311,12 @@ func buildBagherCarrierUnit(cfg SSHFwdConfig, id int) string {
 		}
 		execCmd = fmt.Sprintf("/usr/bin/ssh -N -i %s -o BatchMode=yes -o IdentitiesOnly=yes -o ExitOnForwardFailure=yes -o ConnectTimeout=8 -o ServerAliveInterval=%d -o ServerAliveCountMax=%d -o StrictHostKeyChecking=accept-new %s%s %s@%s",
 			cfg.KeyPath, cfg.ServerAliveInterval, cfg.ServerAliveCountMax, portArg, strings.Join(forwards, " "), cfg.RemoteUser, cfg.RemoteHost)
-		desc = "Hashem Direct SSH Forward Carrier"
+		desc = "Quantum Direct SSH Forward Carrier"
 	}
 
 	return fmt.Sprintf(`[Unit]
 Description=%s
-After=network-online.target hashem-bagher-frps.service
+After=network-online.target quantum-bagher-frps.service
 Wants=network-online.target
 
 [Service]
@@ -336,7 +338,7 @@ func buildFRPSConfig(cfg SSHFwdConfig) string {
 	return fmt.Sprintf(`bindAddr = "127.0.0.1"
 bindPort = %d
 proxyBindAddr = "0.0.0.0"
-auth.token = "hashem-bagher-sec"
+auth.token = "quantum-bagher-sec"
 transport.tcpMux = false
 
 webServer.addr = "127.0.0.1"
@@ -349,7 +351,7 @@ webServer.password = "bagher-dash-local"
 // buildFRPSService generates the systemd unit for frps on Iran host.
 func buildFRPSService() string {
 	return `[Unit]
-Description=Hashem Bagher Engine server (Iran)
+Description=Quantum Bagher Engine server (Iran)
 After=network-online.target
 Wants=network-online.target
 
@@ -400,7 +402,7 @@ remotePort = %d
 	dashPort := frpBindPort + 2
 	return fmt.Sprintf(`serverAddr = "127.0.0.1"
 serverPort = %d
-auth.token = "hashem-bagher-sec"
+auth.token = "quantum-bagher-sec"
 transport.tcpMux = false
 %s
 transport.poolCount = %d
@@ -425,9 +427,9 @@ func buildForeignSetupCommand(cfg SSHFwdConfig) string {
 	return fmt.Sprintf(`mkdir -p /etc/gre-panel/bagher
 cat > /etc/gre-panel/bagher/frpc.toml <<'EOF'
 %sEOF
-cat > /etc/systemd/system/hashem-bagher-frpc.service <<'EOF'
+cat > /etc/systemd/system/quantum-bagher-frpc.service <<'EOF'
 [Unit]
-Description=Hashem Bagher Engine client (Foreign)
+Description=Quantum Bagher Engine client (Foreign)
 After=network-online.target
 Wants=network-online.target
 
@@ -443,7 +445,7 @@ LimitNOFILE=1048576
 [Install]
 WantedBy=multi-user.target
 EOF
-systemctl daemon-reload && systemctl enable --now hashem-bagher-frpc.service`, strings.TrimSpace(frpcToml))
+systemctl daemon-reload && systemctl enable --now quantum-bagher-frpc.service`, strings.TrimSpace(frpcToml))
 }
 
 // BagherBundle encapsulates all connection, authentication, and port parameters
@@ -521,7 +523,7 @@ func MakeBagherBundle(cfg SSHFwdConfig, pubKey string) (string, error) {
 		RemoteHost:   strings.TrimSpace(cfg.RemoteHost),
 		FRPPort:      cfg.FRPBindPort,
 		Ports:        cfg.Ports,
-		Token:        "hashem-bagher-sec",
+		Token:        "quantum-bagher-sec",
 		PoolCount:    cfg.PoolCount,
 		UDP:          cfg.UDP,
 		SSHPublicKey: strings.TrimSpace(pubKey),
@@ -566,7 +568,7 @@ func ParseBagherBundle(bundleStr string) (*BagherBundle, error) {
 		b.PoolCount = 25
 	}
 	if b.Token == "" {
-		b.Token = "hashem-bagher-sec"
+		b.Token = "quantum-bagher-sec"
 	}
 	return &b, nil
 }
@@ -584,7 +586,7 @@ func applyBagherBundle(b *BagherBundle) error {
 	}
 
 	frpcUnit := `[Unit]
-Description=Hashem Bagher Engine client (Foreign)
+Description=Quantum Bagher Engine client (Foreign)
 After=network-online.target
 Wants=network-online.target
 
@@ -600,15 +602,15 @@ LimitNOFILE=1048576
 [Install]
 WantedBy=multi-user.target
 `
-	if err := os.WriteFile("/etc/systemd/system/hashem-bagher-frpc.service", []byte(frpcUnit), 0644); err != nil {
+	if err := os.WriteFile("/etc/systemd/system/quantum-bagher-frpc.service", []byte(frpcUnit), 0644); err != nil {
 		return fmt.Errorf("failed writing frpc service: %w", err)
 	}
 
 	if _, err := runCmd("systemctl", "daemon-reload"); err != nil {
 		return fmt.Errorf("daemon-reload failed: %w", err)
 	}
-	if _, err := runCmd("systemctl", "enable", "--now", "hashem-bagher-frpc.service"); err != nil {
-		return fmt.Errorf("failed starting hashem-bagher-frpc: %w", err)
+	if _, err := runCmd("systemctl", "enable", "--now", "quantum-bagher-frpc.service"); err != nil {
+		return fmt.Errorf("failed starting quantum-bagher-frpc: %w", err)
 	}
 
 	cfg := loadSSHFwdConfigLocked()
@@ -665,14 +667,14 @@ type BagherLiveMetrics struct {
 func getBagherLiveMetrics(cfg SSHFwdConfig) BagherLiveMetrics {
 	isForeign := cfg.Role == "foreign" || cfg.Role == "server"
 	if !isForeign {
-		outFrpc, _ := runCmd("systemctl", "is-active", "hashem-bagher-frpc.service")
+		outFrpc, _ := runCmd("systemctl", "is-active", "quantum-bagher-frpc.service")
 		if strings.TrimSpace(outFrpc) == "active" {
 			isForeign = true
 		}
 	}
 
 	if isForeign {
-		outFrpc, _ := runCmd("systemctl", "is-active", "hashem-bagher-frpc.service")
+		outFrpc, _ := runCmd("systemctl", "is-active", "quantum-bagher-frpc.service")
 		if strings.TrimSpace(outFrpc) != "active" {
 			return BagherLiveMetrics{Connected: false, StatusText: "inactive", RxFormatted: "0 B", TxFormatted: "0 B", TotalFormatted: "0 B"}
 		}
@@ -702,8 +704,8 @@ func getBagherLiveMetrics(cfg SSHFwdConfig) BagherLiveMetrics {
 	}
 
 	// Iran side
-	outBagher, _ := runCmd("systemctl", "is-active", "hashem-bagher.service")
-	outFrps, _ := runCmd("systemctl", "is-active", "hashem-bagher-frps.service")
+	outBagher, _ := runCmd("systemctl", "is-active", "quantum-bagher.service")
+	outFrps, _ := runCmd("systemctl", "is-active", "quantum-bagher-frps.service")
 	bagherActive := strings.TrimSpace(outBagher) == "active"
 	frpsActive := strings.TrimSpace(outFrps) == "active"
 
@@ -805,8 +807,8 @@ func getBagherLiveMetrics(cfg SSHFwdConfig) BagherLiveMetrics {
 
 // cleanDnatConflict removes conflicting nftables table or rescues that capture these ports.
 func cleanDnatConflict(ports []int) error {
-	_, _ = runCmd("systemctl", "disable", "--now", "hashem-rescue-dnat.service")
-	_, _ = runCmd("nft", "delete", "table", "inet", "hashem_dnat")
+	_, _ = runCmd("systemctl", "disable", "--now", "quantum-rescue-dnat.service")
+	_, _ = runCmd("nft", "delete", "table", "inet", "quantum_dnat")
 	return nil
 }
 
@@ -824,27 +826,34 @@ func enableSSHFwd(cfg SSHFwdConfig) error {
 
 	_ = cleanDnatConflict(cfg.Ports)
 
-	_, _ = runCmd("systemctl", "disable", "--now", "hashem-ssh-fwd.service")
-	_, _ = runCmd("systemctl", "disable", "--now", "hashem-ssh-frps.service")
-	_ = os.Remove("/etc/systemd/system/hashem-ssh-fwd.service")
-	_ = os.Remove("/etc/systemd/system/hashem-ssh-frps.service")
+	_, _ = runCmd("systemctl", "disable", "--now", "quantum-ssh-fwd.service")
+	_, _ = runCmd("systemctl", "disable", "--now", "quantum-ssh-frps.service")
+	_ = os.Remove("/etc/systemd/system/quantum-ssh-fwd.service")
+	_ = os.Remove("/etc/systemd/system/quantum-ssh-frps.service")
 
 	isBagher := cfg.Mode == "bagher" || cfg.Mode == "frp_ssh"
+	// The whole unit set is rewritten below; retire the legacy hashem-* twins
+	// from a pre-rebrand install so they are not left running.
+	legacyUnitRetire("quantum-ssh-fwd.service")
+	legacyUnitRetire("quantum-ssh-frps.service")
+	legacyUnitRetire("quantum-bagher.service")
+	legacyUnitRetire("quantum-bagher-frps.service")
+	legacyUnitRetire("quantum-bagher-frpc.service")
 	if isBagher {
 		_ = os.MkdirAll("/etc/gre-panel/bagher", 0755)
 		frpsToml := buildFRPSConfig(cfg)
 		if err := writeTokenFile("/etc/gre-panel/bagher/frps.toml", []byte(frpsToml)); err != nil {
 			return fmt.Errorf("failed writing frps.toml: %w", err)
 		}
-		if err := os.WriteFile("/etc/systemd/system/hashem-bagher-frps.service", []byte(buildFRPSService()), 0644); err != nil {
+		if err := os.WriteFile("/etc/systemd/system/quantum-bagher-frps.service", []byte(buildFRPSService()), 0644); err != nil {
 			return fmt.Errorf("failed writing frps service: %w", err)
 		}
 	} else {
-		_, _ = runCmd("systemctl", "disable", "--now", "hashem-bagher-frps.service")
+		_, _ = runCmd("systemctl", "disable", "--now", "quantum-bagher-frps.service")
 	}
 
 	svcContent := buildSSHFwdService(cfg)
-	unitPath := "/etc/systemd/system/hashem-bagher.service"
+	unitPath := "/etc/systemd/system/quantum-bagher.service"
 	if err := os.WriteFile(unitPath, []byte(svcContent), 0644); err != nil {
 		return fmt.Errorf("failed writing unit: %w", err)
 	}
@@ -853,14 +862,14 @@ func enableSSHFwd(cfg SSHFwdConfig) error {
 		return fmt.Errorf("daemon-reload failed: %w", err)
 	}
 	if isBagher {
-		if _, err := runCmd("systemctl", "enable", "--now", "hashem-bagher-frps.service"); err != nil {
-			return fmt.Errorf("failed starting hashem-bagher-frps: %w", err)
+		if _, err := runCmd("systemctl", "enable", "--now", "quantum-bagher-frps.service"); err != nil {
+			return fmt.Errorf("failed starting quantum-bagher-frps: %w", err)
 		}
 	}
 	// restart, not enable --now: a running carrier read the old settings
 	go func() {
-		_, _ = runCmd("systemctl", "enable", "hashem-bagher.service")
-		_, _ = runCmd("systemctl", "restart", "hashem-bagher.service")
+		_, _ = runCmd("systemctl", "enable", "quantum-bagher.service")
+		_, _ = runCmd("systemctl", "restart", "quantum-bagher.service")
 	}()
 	if isBagher && len(cfg.Links) > 0 {
 		if err := installBagherLinkUnits(cfg, true); err != nil {
@@ -878,11 +887,15 @@ func enableSSHFwd(cfg SSHFwdConfig) error {
 func disableSSHFwd() error {
 	cfg := loadSSHFwdConfigLocked()
 	stopBagherLinkUnits(cfg, false)
-	_, _ = runCmd("systemctl", "disable", "--now", "hashem-bagher.service")
-	_, _ = runCmd("systemctl", "disable", "--now", "hashem-bagher-frps.service")
-	_, _ = runCmd("systemctl", "disable", "--now", "hashem-bagher-frpc.service")
-	_, _ = runCmd("systemctl", "disable", "--now", "hashem-ssh-fwd.service")
-	_, _ = runCmd("systemctl", "disable", "--now", "hashem-ssh-frps.service")
+	_, _ = runCmd("systemctl", "disable", "--now", "quantum-bagher.service")
+	_, _ = runCmd("systemctl", "disable", "--now", "quantum-bagher-frps.service")
+	_, _ = runCmd("systemctl", "disable", "--now", "quantum-bagher-frpc.service")
+	_, _ = runCmd("systemctl", "disable", "--now", "quantum-ssh-fwd.service")
+	_, _ = runCmd("systemctl", "disable", "--now", "quantum-ssh-frps.service")
+	// Also stop the legacy hashem-* units from a pre-rebrand install.
+	for _, n := range bagherUnitNames {
+		legacyUnitRetire(n + ".service")
+	}
 	cfg.Enabled = false
 	cfg.LastStatus = "inactive"
 	return saveSSHFwdConfigLocked(cfg)
@@ -894,11 +907,11 @@ func cleanSSHFwd() error {
 	stopBagherLinkUnits(loadSSHFwdConfigLocked(), true)
 	_ = os.Remove(bagherCarrierStatusPath(1))
 	units := []string{
-		"/etc/systemd/system/hashem-bagher.service",
-		"/etc/systemd/system/hashem-bagher-frps.service",
-		"/etc/systemd/system/hashem-bagher-frpc.service",
-		"/etc/systemd/system/hashem-ssh-fwd.service",
-		"/etc/systemd/system/hashem-ssh-frps.service",
+		"/etc/systemd/system/quantum-bagher.service",
+		"/etc/systemd/system/quantum-bagher-frps.service",
+		"/etc/systemd/system/quantum-bagher-frpc.service",
+		"/etc/systemd/system/quantum-ssh-fwd.service",
+		"/etc/systemd/system/quantum-ssh-frps.service",
 	}
 	for _, u := range units {
 		_ = os.Remove(u)
@@ -908,7 +921,7 @@ func cleanSSHFwd() error {
 
 	_ = os.Remove("/etc/gre-panel/bagher/frps.toml")
 	_ = os.Remove("/etc/gre-panel/bagher/frpc.toml")
-	_, _ = runCmd("nft", "delete", "table", "inet", "hashem_dnat")
+	_, _ = runCmd("nft", "delete", "table", "inet", "quantum_dnat")
 
 	cfg := loadSSHFwdConfigLocked()
 	cfg.Enabled = false
@@ -935,10 +948,15 @@ func checkPortListening(bind string, port int) bool {
 }
 
 // bagherUnitNames are every unit name Bagher (or its predecessors) used.
-var bagherUnitNames = []string{"hashem-bagher", "hashem-bagher-frpc", "hashem-bagher-frps", "hashem-ssh-fwd", "hashem-frp-ssh-tunnel"}
+var bagherUnitNames = []string{"quantum-bagher", "quantum-bagher-frpc", "quantum-bagher-frps", "quantum-ssh-fwd", "quantum-frp-ssh-tunnel"}
 
 // bagherUnitInstalled reports whether any Bagher unit file exists (no fork).
 func bagherUnitInstalled() bool {
+	// Adopt legacy hashem-bagher* units from a pre-rebrand install so status
+	// and control keep working after an in-place update. Once per unit.
+	for _, n := range bagherUnitNames {
+		legacyUnitMigration(n + ".service")
+	}
 	for _, n := range bagherUnitNames {
 		if _, err := os.Stat(filepath.Join("/etc/systemd/system", n+".service")); err == nil {
 			return true
@@ -1007,27 +1025,27 @@ func getSSHFwdStatusLocked() map[string]any {
 	cfg := loadSSHFwdConfigLocked()
 	pubKey, _ := ensureSSHFwdKey(cfg.KeyPath)
 
-	out, _ := runCmd("systemctl", "is-active", "hashem-bagher.service")
+	out, _ := runCmd("systemctl", "is-active", "quantum-bagher.service")
 	isActive := strings.TrimSpace(out) == "active"
 	if !isActive {
-		outFrpc, _ := runCmd("systemctl", "is-active", "hashem-bagher-frpc.service")
+		outFrpc, _ := runCmd("systemctl", "is-active", "quantum-bagher-frpc.service")
 		if strings.TrimSpace(outFrpc) == "active" {
 			isActive = true
 		}
 	}
 	if !isActive {
-		outFrps, _ := runCmd("systemctl", "is-active", "hashem-bagher-frps.service")
+		outFrps, _ := runCmd("systemctl", "is-active", "quantum-bagher-frps.service")
 		if strings.TrimSpace(outFrps) == "active" {
 			isActive = true
 		}
 	}
 	// Fallback check for legacy services
 	if !isActive {
-		outLegacy, _ := runCmd("systemctl", "is-active", "hashem-ssh-fwd.service")
+		outLegacy, _ := runCmd("systemctl", "is-active", "quantum-ssh-fwd.service")
 		if strings.TrimSpace(outLegacy) == "active" {
 			isActive = true
 		} else {
-			outTun, _ := runCmd("systemctl", "is-active", "hashem-frp-ssh-tunnel.service")
+			outTun, _ := runCmd("systemctl", "is-active", "quantum-frp-ssh-tunnel.service")
 			if strings.TrimSpace(outTun) == "active" {
 				isActive = true
 			}
@@ -1039,8 +1057,8 @@ func getSSHFwdStatusLocked() map[string]any {
 		portStatus[strconv.Itoa(p)] = checkPortListening("127.0.0.1", p)
 	}
 
-	dnatOut, _ := runCmd("nft", "list", "table", "inet", "hashem_dnat")
-	dnatActive := strings.Contains(dnatOut, "table inet hashem_dnat")
+	dnatOut, _ := runCmd("nft", "list", "table", "inet", "quantum_dnat")
+	dnatActive := strings.Contains(dnatOut, "table inet quantum_dnat")
 
 	authLine := ""
 	if pubKey != "" {

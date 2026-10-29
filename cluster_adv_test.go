@@ -257,8 +257,8 @@ func TestClusterServiceCheck(t *testing.T) {
 	}
 	// metrics carry the same
 	prom := clusterPrometheus()
-	for _, want := range []string{`hashem_cluster_pool_state{pool="tcp/443"} 1`, `hashem_cluster_member_up{pool="tcp/443",link="1"} 0`,
-		`hashem_cluster_member_connections{pool="tcp/443",link="1"} 3`, `hashem_cluster_member_share{pool="tcp/443",link="2"} 1`} {
+	for _, want := range []string{`quantum_cluster_pool_state{pool="tcp/443"} 1`, `quantum_cluster_member_up{pool="tcp/443",link="1"} 0`,
+		`quantum_cluster_member_connections{pool="tcp/443",link="1"} 3`, `quantum_cluster_member_share{pool="tcp/443",link="2"} 1`} {
 		if !strings.Contains(prom, want) {
 			t.Fatalf("metrics miss %s:\n%s", want, prom)
 		}

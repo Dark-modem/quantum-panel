@@ -2,7 +2,7 @@ package main
 
 // Self-signed TLS for IP access: a persistent local CA plus a server cert
 // carrying the IP as SAN. The CA lives for 10 years (browsers trust it once
-// after the admin installs hashem-ca.crt); server certs live 825 days (the
+// after the admin installs quantum-ca.crt); server certs live 825 days (the
 // browser maximum) and rotate with Regenerate while the CA stays the same.
 // In-process HTTPS reload; tunnels never touched.
 
@@ -28,8 +28,8 @@ const (
 	caValidityDays     = 3650 // 10 years: install once, trust for a decade
 )
 
-func tlsCAFile() string    { return filepath.Join(tlsDir(), "hashem-ca.crt") }
-func tlsCAKeyFile() string { return filepath.Join(tlsDir(), "hashem-ca.key") }
+func tlsCAFile() string    { return filepath.Join(tlsDir(), "quantum-ca.crt") }
+func tlsCAKeyFile() string { return filepath.Join(tlsDir(), "quantum-ca.key") }
 
 func pemEncode(blockType string, der []byte) []byte {
 	return pem.EncodeToMemory(&pem.Block{Type: blockType, Bytes: der})
@@ -62,7 +62,7 @@ func tlsEnsureCA() (ca *x509.Certificate, caKey *ecdsa.PrivateKey, errMsg string
 	}
 	tmpl := &x509.Certificate{
 		SerialNumber:          serial,
-		Subject:               pkix.Name{Organization: []string{"Hashem Panel Local CA"}, CommonName: "Hashem Panel Local CA"},
+		Subject:               pkix.Name{Organization: []string{"Quantum Panel Local CA"}, CommonName: "Quantum Panel Local CA"},
 		NotBefore:             time.Now().Add(-time.Hour),
 		NotAfter:              time.Now().Add(caValidityDays * 24 * time.Hour),
 		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageDigitalSignature,
@@ -109,7 +109,7 @@ func tlsIssueIPCert(ip net.IP) (map[string]any, string) {
 	now := time.Now()
 	tmpl := &x509.Certificate{
 		SerialNumber: serial,
-		Subject:      pkix.Name{Organization: []string{"Hashem Panel"}, CommonName: ip.String()},
+		Subject:      pkix.Name{Organization: []string{"Quantum Panel"}, CommonName: ip.String()},
 		NotBefore:    now.Add(-time.Minute),
 		NotAfter:     now.Add(ipCertValidityDays * 24 * time.Hour),
 		KeyUsage:     x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
@@ -140,7 +140,7 @@ func tlsIssueIPCert(ip net.IP) (map[string]any, string) {
 		Domain:   ip.String(),
 		IssuedAt: now.Format("2006-01-02 15:04:05"),
 		Expiry:   expiry,
-		Issuer:   "Hashem Panel Local CA (self-signed)",
+		Issuer:   "Quantum Panel Local CA (self-signed)",
 		Source:   tlsSourceIP,
 	}
 	_ = os.WriteFile(tlsMetaFile(), mustJSON(meta), 0600)
@@ -204,6 +204,6 @@ func handleTLSIPCAGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/x-pem-file")
-	w.Header().Set("Content-Disposition", `attachment; filename="hashem-ca.crt"`)
+	w.Header().Set("Content-Disposition", `attachment; filename="quantum-ca.crt"`)
 	_, _ = w.Write(data)
 }

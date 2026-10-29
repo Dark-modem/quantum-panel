@@ -294,7 +294,7 @@ func isGreBackhaulBundle(s string) bool {
 // Explicit body.Ports (from the user's Reverse Ports field) are preserved
 // if the bundle itself has no ports segment (e.g. hsh1_...token__fou...).
 // body.OrigBundle must be set BEFORE calling applyBundle so runInstaller
-// can still pass --bundle to hashem.sh for carrier/FOU configuration.
+// can still pass --bundle to quantum.sh for carrier/FOU configuration.
 func applyBundle(body *setupRequest, b setupBundle) {
 	if b.Engine != "" {
 		body.Engine = b.Engine
@@ -337,7 +337,7 @@ func applyBundle(body *setupRequest, b setupBundle) {
 		cfg.FOUPort2 = b.FouPorts[1]
 		cfg.Candidates = []string{"direct", fmt.Sprintf("wss:%d", cfg.WSSPort)}
 		_ = saveCarrierConfig(cfg)
-		_, _ = runHashemCarrierCmd("set-ports", strconv.Itoa(cfg.FOUPort1), strconv.Itoa(cfg.FOUPort2))
+		_, _ = runQuantumCarrierCmd("set-ports", strconv.Itoa(cfg.FOUPort1), strconv.Itoa(cfg.FOUPort2))
 	}
 	// Replace body.Token with the inner token (not the full bundle string).
 	// The caller must have already saved OrigBundle = body.Token before calling.

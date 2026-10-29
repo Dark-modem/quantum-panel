@@ -8,11 +8,11 @@ window.matrixEditPanelOpen = async function() {
   const help = text => esc(tr('', text));
   $('matrixEditTitle').textContent = tr('', 'Edit Matrix tunnel');
   if (st.role === 'hub') {
-    body.innerHTML = `<div class="fg"><label for="mxEditPorts">${help('Forwarded ports (comma list)')}</label><input id="mxEditPorts" class="hashem-input u-mono" dir="ltr" value="${esc((st.ports || []).join(', '))}"></div>
+    body.innerHTML = `<div class="fg"><label for="mxEditPorts">${help('Forwarded ports (comma list)')}</label><input id="mxEditPorts" class="quantum-input u-mono" dir="ltr" value="${esc((st.ports || []).join(', '))}"></div>
       <div class="fg"><label id="mxEditFamilyLabel">${help('Family')}</label><div id="mxEditFamily" class="qs-seg mx-family-seg" role="radiogroup" aria-labelledby="mxEditFamilyLabel" dir="ltr">
         <button type="button" role="radio" data-mx-edit-family="ipv4" aria-checked="${st.family === 'ipv4'}" tabindex="${st.family === 'ipv4' ? 0 : -1}">IPv4</button>
         <button type="button" role="radio" data-mx-edit-family="ipv6" aria-checked="${st.family === 'ipv6'}" tabindex="${st.family === 'ipv6' ? 0 : -1}">IPv6</button></div></div>
-      <div class="fg"><label for="mxEditAddr">${help('Hub transport address')}</label><input id="mxEditAddr" class="hashem-input u-mono" dir="ltr" value="${esc(st.addr || '')}" placeholder="auto"></div>
+      <div class="fg"><label for="mxEditAddr">${help('Hub transport address')}</label><input id="mxEditAddr" class="quantum-input u-mono" dir="ltr" value="${esc(st.addr || '')}" placeholder="auto"></div>
       <p class="qs-hint">${help('Port edits preserve tunnel keys. Changing IPv4/IPv6 interrupts the transport until the updated bundle is applied on the other server.')}</p>`;
     matrixEditState.family = st.family;
     body.querySelectorAll('[data-mx-edit-family]').forEach(b => {
@@ -27,14 +27,14 @@ window.matrixEditPanelOpen = async function() {
     });
   } else {
     body.innerHTML = `<p class="qs-hint">${help('Edit settings on the Iran hub first. Paste its updated Matrix bundle here; existing keys and node identity are kept.')}</p>
-      <div class="fg"><label for="mxEditBundle">${help('Updated Matrix bundle')}</label><textarea id="mxEditBundle" rows="4" class="hashem-input u-mono" dir="ltr" placeholder="hmx1_…" spellcheck="false" autocomplete="off"></textarea></div>
+      <div class="fg"><label for="mxEditBundle">${help('Updated Matrix bundle')}</label><textarea id="mxEditBundle" rows="4" class="quantum-input u-mono" dir="ltr" placeholder="hmx1_…" spellcheck="false" autocomplete="off"></textarea></div>
       <hr>
       <b>${help('Connect a local service to Matrix')}</b>
       <p class="qs-hint">${help('For Xray listening only on 127.0.0.1:443, connect Matrix port 443 to local port 443. TLS/Reality keys and Xray configuration stay unchanged. This bridge supports TCP only.')}</p>
-      <div class="fg"><label for="mxLocalPort">${help('Matrix user port')}</label><input class="hashem-input u-mono" id="mxLocalPort" inputmode="numeric" value="${esc(String((st.ports || [443])[0] || 443))}" dir="ltr"></div>
-      <div class="fg"><label for="mxLocalTarget">${help('Local service port')}</label><input class="hashem-input u-mono" id="mxLocalTarget" inputmode="numeric" value="443" dir="ltr"></div>
-      <button type="button" class="hashem-btn hashem-btn-primary" id="mxConnectLocal">${help('Connect local service')}</button>
-      <button type="button" class="hashem-btn hashem-btn-ghost" id="mxDisconnectLocal">${help('Remove local bridge')}</button>
+      <div class="fg"><label for="mxLocalPort">${help('Matrix user port')}</label><input class="quantum-input u-mono" id="mxLocalPort" inputmode="numeric" value="${esc(String((st.ports || [443])[0] || 443))}" dir="ltr"></div>
+      <div class="fg"><label for="mxLocalTarget">${help('Local service port')}</label><input class="quantum-input u-mono" id="mxLocalTarget" inputmode="numeric" value="443" dir="ltr"></div>
+      <button type="button" class="quantum-btn quantum-btn-primary" id="mxConnectLocal">${help('Connect local service')}</button>
+      <button type="button" class="quantum-btn quantum-btn-ghost" id="mxDisconnectLocal">${help('Remove local bridge')}</button>
       <div class="qs-hint u-mt-8" id="mxLocalStatus" role="status" aria-live="polite"></div>`;
     $('mxConnectLocal').onclick = () => matrixLocalServiceSave(false);
     $('mxDisconnectLocal').onclick = () => matrixLocalServiceSave(true);
@@ -88,7 +88,7 @@ async function matrixEditSave() {
       $('matrixEditBody').innerHTML = `<p class="qs-hint">${esc(tr('', r.peer_sync_required
         ? 'Hub settings saved. Apply this updated bundle in Edit on the foreign server to finish the transport switch.'
         : 'Settings saved. This bundle updates the displayed settings on the foreign server too.'))}</p>
-        <div class="fg"><label for="mxEditedBundle">${esc(tr('', 'Updated Matrix bundle'))}</label><textarea id="mxEditedBundle" rows="5" readonly class="hashem-input u-mono" dir="ltr">${esc(r.bundle)}</textarea></div>`;
+        <div class="fg"><label for="mxEditedBundle">${esc(tr('', 'Updated Matrix bundle'))}</label><textarea id="mxEditedBundle" rows="5" readonly class="quantum-input u-mono" dir="ltr">${esc(r.bundle)}</textarea></div>`;
       msg.textContent = tr('', 'Keys and node identity preserved.');
     } else {
       matrixEditClose(); toastOk(tr('', 'Matrix settings updated'));

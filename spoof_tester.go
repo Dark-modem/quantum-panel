@@ -147,7 +147,7 @@ func startSpoofTester(req spoofTesterRequest) error {
 		return fmt.Errorf("add at least one source IP, range or CIDR")
 	}
 	if !engineBinaryPresent(spoofBinName) {
-		return fmt.Errorf("the spoof binary is not installed (install it with `hashem spoof` first)")
+		return fmt.Errorf("the spoof binary is not installed (install it with `quantum spoof` first)")
 	}
 
 	spoofTesterMu.Lock()

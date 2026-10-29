@@ -4,7 +4,7 @@ package main
 //
 //	argon2id$v=19$m=19456,t=2,p=1$<salt b64>$<hash b64>
 //
-// Legacy panel.json files (and hashem.sh, which still writes them) hold an
+// Legacy panel.json files (and quantum.sh, which still writes them) hold an
 // unsalted 64-char hex SHA-256. Those keep working and are transparently
 // upgraded to argon2id on the next successful login or password change.
 

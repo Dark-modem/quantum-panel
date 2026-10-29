@@ -34,14 +34,14 @@ var backhaulCoreVersion = func() string {
 	return ""
 }
 
-// backhaulTransports mirrors BACKHAUL_TRANSPORTS in hashem.sh: what the
+// backhaulTransports mirrors BACKHAUL_TRANSPORTS in quantum.sh: what the
 // installed core accepts. All carry TCP except udp, which carries UDP only.
 var backhaulTransports = []string{"tcp", "tcpmux", "ws", "wss", "wsmux", "wssmux", "udp"}
 
-// backhaulUnitDir is where hashem.sh writes the Backhaul units; tests point it elsewhere.
+// backhaulUnitDir is where quantum.sh writes the Backhaul units; tests point it elsewhere.
 var backhaulUnitDir = "/etc/systemd/system"
 
-// backhaulUDPUnit names the UDP companion of a Backhaul unit (hashem.sh
+// backhaulUDPUnit names the UDP companion of a Backhaul unit (quantum.sh
 // backhaul_udp_unit): a udp-transport Backhaul on the same port number that
 // carries the UDP of a TCP-only transport (tcpmux, ws, wss and the mux kinds).
 func backhaulUDPUnit(unit string) string {
@@ -49,7 +49,7 @@ func backhaulUDPUnit(unit string) string {
 }
 
 // backhaulUDPPort is the control port of a Backhaul unit's UDP companion: the
-// last field of its ExecCondition line (hashem backhaul-udp-conf MAIN OUT
+// last field of its ExecCondition line (quantum backhaul-udp-conf MAIN OUT
 // PORT). 0 when the unit has no companion.
 func backhaulUDPPort(unit string) int {
 	if unit == "" {
@@ -69,7 +69,7 @@ func backhaulUDPPort(unit string) int {
 	return 0
 }
 
-// udpPortRe finds the companion's port in hashem.sh's setup output.
+// udpPortRe finds the companion's port in quantum.sh's setup output.
 var udpPortRe = regexp.MustCompile(`UDP: backhaul-udp-\S+ .*control port (\d+)`)
 
 // udpPortFromSteps is the UDP companion port a setup just made (0: none).
@@ -92,7 +92,7 @@ func backhaulTransportOK(t string) bool {
 	return false
 }
 
-// backhaulIsV2 mirrors backhaul_is_v2 in hashem.sh. hashem installs upstream
+// backhaulIsV2 mirrors backhaul_is_v2 in quantum.sh. quantum installs upstream
 // v0.7.2 (flat [server]/[client]); a v2.x core an operator put in its place
 // uses a sectioned TOML schema ([listener]/[dialer]/...) and rejects the flat one.
 func backhaulIsV2() bool {
@@ -101,7 +101,7 @@ func backhaulIsV2() bool {
 }
 
 // ensureBackhaulTLS creates the self-signed cert the wss transports need,
-// like backhaul_ensure_tls in hashem.sh.
+// like backhaul_ensure_tls in quantum.sh.
 func ensureBackhaulTLS() {
 	crt, key := filepath.Join(backhaulDir, "server.crt"), filepath.Join(backhaulDir, "server.key")
 	if _, err := os.Stat(crt); err == nil {
@@ -156,7 +156,7 @@ func writeBackhaulServerConfig(path string, bindAddr string, transport string, t
 	return writeBackhaulFile(path, sb.String())
 }
 
-// backhaulServerConfigV2 is backhaul_write_server_conf_v2 from hashem.sh.
+// backhaulServerConfigV2 is backhaul_write_server_conf_v2 from quantum.sh.
 func backhaulServerConfigV2(bindAddr, transport, token string, ports []string) string {
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "[listener]\nbind_addr = %q\n\n", bindAddr)
@@ -178,7 +178,7 @@ func backhaulServerConfigV2(bindAddr, transport, token string, ports []string) s
 	return sb.String()
 }
 
-// backhaulClientConfigV2 is backhaul_write_client_conf_v2 from hashem.sh.
+// backhaulClientConfigV2 is backhaul_write_client_conf_v2 from quantum.sh.
 func backhaulClientConfigV2(remoteAddr, transport, token string) string {
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "[dialer]\nremote_addr = %q\ndial_timeout = 10\nretry_interval = 3\n\n", remoteAddr)

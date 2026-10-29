@@ -10,12 +10,12 @@ import (
 	"time"
 )
 
-// Path MTU. hashem.sh gives GRE interfaces MTU 1380 and clamps TCP MSS to
+// Path MTU. quantum.sh gives GRE interfaces MTU 1380 and clamps TCP MSS to
 // 1340. When Diagnostics measures that 1380-byte packets do not cross the
 // path, Quick Repair saves the largest size that does in <configDir>/gre_mtu.
-// hashem.sh reads that file wherever it sets the MTU or the clamp (start,
+// quantum.sh reads that file wherever it sets the MTU or the clamp (start,
 // carrier switch, Optimize, Restore), and the panel re-checks it every minute
-// so an older hashem.sh cannot put 1380 back.
+// so an older quantum.sh cannot put 1380 back.
 
 const (
 	pathMTUMin    = 1200 // the MTU probe's floor
@@ -112,7 +112,7 @@ func mssRewrite(rules string, mss int) (del, add [][]string) {
 
 // enforcePathMTU puts the GRE interfaces at the saved path MTU and the MSS
 // clamp at the matching size. Without a saved MTU it only makes sure a clamp
-// exists (1340, what hashem.sh adds). It returns what it changed.
+// exists (1340, what quantum.sh adds). It returns what it changed.
 func enforcePathMTU() []string {
 	if runtime.GOOS == "windows" {
 		return nil
@@ -169,7 +169,7 @@ func pathMTUFixes() []string {
 }
 
 // pathMTUKeeper re-applies the saved path MTU after anything resets it:
-// a reboot or carrier switch run by an hashem.sh that predates gre_mtu.
+// a reboot or carrier switch run by an quantum.sh that predates gre_mtu.
 func pathMTUKeeper() {
 	if runtime.GOOS == "windows" {
 		return

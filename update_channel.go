@@ -3,7 +3,7 @@ package main
 // Update channels: "stable" (semver vX.Y.Z releases, default) and "dev"
 // (dev-rN prereleases built from the dev branch). The channel decides which
 // release the version check, the updater and the script sync follow.
-// hashem.sh (update_pick_tag) reads the same <configDir>/update.json.
+// quantum.sh (update_pick_tag) reads the same <configDir>/update.json.
 
 import (
 	"encoding/json"
@@ -162,7 +162,7 @@ func getJSON(path string, out any) error {
 		if err != nil {
 			continue
 		}
-		req.Header.Set("User-Agent", "hashem-panel-updater/"+panelVersion)
+		req.Header.Set("User-Agent", "quantum-panel-updater/"+panelVersion)
 		if token != "" {
 			req.Header.Set("Authorization", "Bearer "+token)
 		}

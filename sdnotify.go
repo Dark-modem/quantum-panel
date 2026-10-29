@@ -5,7 +5,7 @@ package main
 // so a hung (not crashed) panel is restarted automatically, and READY=1 once
 // at start. No new dependencies: the datagram goes straight to $NOTIFY_SOCKET.
 // Silent no-op when NOTIFY_SOCKET is unset (dev, tests, non-systemd) or when
-// HASHEM_NO_SDNOTIFY=1 (tests, load lab).
+// QUANTUM_NO_SDNOTIFY=1 (tests, load lab).
 
 import (
 	"context"
@@ -32,7 +32,7 @@ var sdNotifySocket = func() string { return notifySockAtStart }
 // sdNotify sends one datagram to the systemd notify socket.
 func sdNotify(state string) error {
 	addr := sdNotifySocket()
-	if addr == "" || os.Getenv("HASHEM_NO_SDNOTIFY") == "1" {
+	if addr == "" || envQuantum("QUANTUM_NO_SDNOTIFY", "HASHEM_NO_SDNOTIFY") == "1" {
 		return nil
 	}
 	c, err := net.Dial("unixgram", addr)
@@ -47,7 +47,7 @@ func sdNotify(state string) error {
 // startSdWatchdog sends READY=1 once, then WATCHDOG=1 every interval until
 // ctx ends. Errors are swallowed: notification must never break the panel.
 func startSdWatchdog(ctx context.Context) {
-	if sdNotifySocket() == "" || os.Getenv("HASHEM_NO_SDNOTIFY") == "1" {
+	if sdNotifySocket() == "" || envQuantum("QUANTUM_NO_SDNOTIFY", "HASHEM_NO_SDNOTIFY") == "1" {
 		return
 	}
 	_ = sdNotify(fmt.Sprintf("MAINPID=%d\nREADY=1", os.Getpid()))

@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// A Backhaul peer written by an older hashem.sh has raw_ports as one string.
+// A Backhaul peer written by an older quantum.sh has raw_ports as one string.
 // It used to fail the whole decode, so every peer tunnel vanished from the panel.
 func TestLoadPeersReadsStringRawPorts(t *testing.T) {
 	old := configDir

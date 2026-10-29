@@ -1,7 +1,7 @@
 package main
 
 // Let's Encrypt for the panel, shared by the Settings tab (/api/tls) and the
-// terminal (gre-panel tls ..., which hashem.sh calls). What used to go wrong:
+// terminal (gre-panel tls ..., which quantum.sh calls). What used to go wrong:
 // certbot missing (the panel only said "install it"), a firewall dropping port
 // 80 or the HTTPS port, the certbot error buried in its full log, and "Renew"
 // or the hourly auto-renew calling certbot for an IP or custom certificate.
@@ -34,7 +34,7 @@ func tlsSource(m *tlsMeta) string {
 	if m.Source != "" {
 		return m.Source
 	}
-	if strings.Contains(m.Issuer, "Hashem Panel Local CA") || net.ParseIP(m.Domain) != nil {
+	if strings.Contains(m.Issuer, "Quantum Panel Local CA") || net.ParseIP(m.Domain) != nil {
 		return tlsSourceIP
 	}
 	if m.Domain != "" {

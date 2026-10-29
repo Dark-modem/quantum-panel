@@ -1,7 +1,7 @@
 package main
 
 // Tunnel inspection + actions: read GRE/FRP state via ip/systemd (never
-// writes), restart/ping/remove via systemctl/ping or the shared hashem.sh
+// writes), restart/ping/remove via systemctl/ping or the shared quantum.sh
 // installer (single source of truth, same as the CLI/menu path).
 
 import (
@@ -92,7 +92,7 @@ func handleLogs(w http.ResponseWriter, r *http.Request) {
 	// Stream / All activity mode for right sidebar
 	if svc == "" || svc == "stream" || svc == "all" {
 		// Every engine the panel runs; journalctl skips units that do not exist.
-		units := []string{"frps", "frpc", "gre-panel", "hashem-watchdog", "gre-tunnel",
+		units := []string{"frps", "frpc", "gre-panel", "quantum-watchdog", "gre-tunnel",
 			"backhaul", "backhaul-server", "backhaul-client"}
 		var args []string
 		for _, u := range units {
@@ -116,7 +116,7 @@ func handleLogs(w http.ResponseWriter, r *http.Request) {
 
 	// allowed units: legacy frps/frpc, per-peer frps-N, GRE units, panel itself
 	allowed := map[string]bool{"frps": true, "frpc": true, "gre-panel": true,
-		"gre-tunnel": true, "gre-tunnel.service": true, "hashem-watchdog": true,
+		"gre-tunnel": true, "gre-tunnel.service": true, "quantum-watchdog": true,
 		"backhaul": true, "backhaul-server": true, "backhaul-client": true}
 	if !allowed[svc] {
 		if strings.HasPrefix(svc, "frps-") || strings.HasPrefix(svc, "gre-t") || strings.HasPrefix(svc, "backhaul-") {
@@ -182,7 +182,7 @@ func handleAction(w http.ResponseWriter, r *http.Request) {
 			writeAPIError(w, r, "E-ACTION-03", out+": "+err.Error())
 			return
 		}
-		if body.Action != "tune-status" { // an older hashem.sh puts MTU 1380 back
+		if body.Action != "tune-status" { // an older quantum.sh puts MTU 1380 back
 			if fixed := enforcePathMTU(); len(fixed) > 0 {
 				out += "\n" + strings.Join(fixed, "\n")
 			}
@@ -250,7 +250,7 @@ func runAction(action string, peerID int) (string, error) {
 		if peerID > 0 {
 			return removePeerViaInstaller(peerID)
 		}
-		// mirror of hashem.sh remove_tunnel_force(): GRE + FRP gone, panel untouched.
+		// mirror of quantum.sh remove_tunnel_force(): GRE + FRP gone, panel untouched.
 		// Implemented via the installer itself (single source of truth) so the
 		// shell-out path and the menu path can never drift apart.
 		out, err := removeViaInstaller()
@@ -262,7 +262,7 @@ func runAction(action string, peerID int) (string, error) {
 	return "", fmt.Errorf("unknown action")
 }
 
-// tuneViaInstaller runs `hashem.sh optimize|restore|tune-status` and returns its
+// tuneViaInstaller runs `quantum.sh optimize|restore|tune-status` and returns its
 // output as the action result (single source of truth, same as menu/CLI).
 func tuneViaInstaller(action string) (string, error) {
 	script, err := greScriptPath()
@@ -287,7 +287,7 @@ func tuneViaInstaller(action string) (string, error) {
 	return o, nil
 }
 
-// removeViaInstaller runs `hashem.sh remove-tunnel --force` and returns its
+// removeViaInstaller runs `quantum.sh remove-tunnel --force` and returns its
 // output as the action result. GRE_SKIP_PANEL is irrelevant here (removal
 // never touches the panel), but kept for symmetry with runInstaller.
 func removeViaInstaller() (string, error) {
@@ -311,7 +311,7 @@ func removeViaInstaller() (string, error) {
 }
 
 // ---- multi-peer: registry + per-tunnel inspection ----
-// peers.json (written by hashem.sh add-peer) is the source of truth for how
+// peers.json (written by quantum.sh add-peer) is the source of truth for how
 // many foreign servers hang off this Iran. Legacy single installs without
 // a registry fall back to the old single-tunnel view.
 
@@ -339,7 +339,7 @@ type peerRecord struct {
 	UseCompression bool     `json:"use_compression,omitempty"` // transport.useCompression
 }
 
-// portList is raw_ports. Older hashem.sh wrote it for Backhaul peers as one
+// portList is raw_ports. Older quantum.sh wrote it for Backhaul peers as one
 // string ("443, 2083"); that failed the whole peers.json decode and hid every
 // peer tunnel from the panel. Both forms are read; it is written as a list.
 type portList []string
@@ -636,7 +636,7 @@ type tunnelStatus struct {
 	ProxyPorts   []int    `json:"proxy_ports"`
 	Ports        []int    `json:"ports,omitempty"`
 	BindPort     int      `json:"bind_port"`
-	// TuneBackup: hashem.sh optimize saved the previous settings, so Restore works.
+	// TuneBackup: quantum.sh optimize saved the previous settings, so Restore works.
 	TuneBackup bool `json:"tune_backup"`
 	// Matrix is additive: its service/mesh must never masquerade as GRE or FRP.
 	Matrix *matrixStatus `json:"matrix,omitempty"`
@@ -740,7 +740,7 @@ func matrixStatusFrom(st matrixState, v *hostView) *matrixStatus {
 	return mx
 }
 
-// engineBinDirs / backhaulExtraBins are where hashem.sh installs engine
+// engineBinDirs / backhaulExtraBins are where quantum.sh installs engine
 // binaries (INSTALL_DIR, plus the backhaul-core copy); vars so tests can
 // point them at temp dirs.
 var (
@@ -1064,7 +1064,7 @@ var engineUnitDir = "/etc/systemd/system"
 
 // preflightEngineSwitch verifies the target engine can actually run on this
 // host BEFORE any running service is stopped: binary installed and, for
-// Backhaul, the systemd unit written by hashem.sh present. A failed switch
+// Backhaul, the systemd unit written by quantum.sh present. A failed switch
 // must never take down the working tunnel.
 func preflightEngineSwitch(engine string, isIran bool) error {
 	switch engine {
@@ -1074,18 +1074,18 @@ func preflightEngineSwitch(engine string, isIran bool) error {
 			bin = "frps"
 		}
 		if !engineBinaryPresent(bin) {
-			return fmt.Errorf("%s binary not found (install it with `hashem` first); nothing was changed", bin)
+			return fmt.Errorf("%s binary not found (install it with `quantum` first); nothing was changed", bin)
 		}
 	case "backhaul", "gre-backhaul":
 		if !engineBinaryPresent("backhaul") {
-			return fmt.Errorf("backhaul binary not found (install it with `hashem` first); nothing was changed")
+			return fmt.Errorf("backhaul binary not found (install it with `quantum` first); nothing was changed")
 		}
 		unit := "backhaul-client"
 		if isIran {
 			unit = "backhaul-server"
 		}
 		if _, err := os.Stat(filepath.Join(engineUnitDir, unit+".service")); err != nil {
-			return fmt.Errorf("systemd unit %s.service is missing (run the Backhaul setup in `hashem` first); nothing was changed", unit)
+			return fmt.Errorf("systemd unit %s.service is missing (run the Backhaul setup in `quantum` first); nothing was changed", unit)
 		}
 	}
 	return nil
@@ -1295,7 +1295,7 @@ func switchTunnelEngineWith(targetEngine, targetTransport string, o engineOpts) 
 			return outMsg.String(), tx.rollback(fmt.Errorf("systemctl restart %s failed: %w", "gre-tunnel", err))
 		}
 		if isIran {
-			// Write frps.toml. kcp/quic bind ports match hashem.sh so peers
+			// Write frps.toml. kcp/quic bind ports match quantum.sh so peers
 			// using those FRP transports can still connect.
 			_, maxPool := effectivePoolValues()
 			quicPort := port + 1

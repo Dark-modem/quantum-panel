@@ -101,7 +101,7 @@ func meshVerify(secret string, h http.Header, body []byte, now time.Time) error 
 	if secret == "" {
 		return fmt.Errorf("no cluster secret")
 	}
-	ts, nonce, sig := h.Get("X-Hashem-Ts"), h.Get("X-Hashem-Nonce"), h.Get("X-Hashem-Sig")
+	ts, nonce, sig := h.Get("X-Quantum-Ts"), h.Get("X-Quantum-Nonce"), h.Get("X-Quantum-Sig")
 	sec, err := strconv.ParseInt(ts, 10, 64)
 	if err != nil || len(nonce) < 16 || sig == "" {
 		return fmt.Errorf("unsigned")
@@ -130,9 +130,9 @@ func meshVerify(secret string, h http.Header, body []byte, now time.Time) error 
 func meshSetSig(h http.Header, secret string, body []byte) {
 	ts := strconv.FormatInt(time.Now().Unix(), 10)
 	nonce := randHex(12)
-	h.Set("X-Hashem-Ts", ts)
-	h.Set("X-Hashem-Nonce", nonce)
-	h.Set("X-Hashem-Sig", meshSign(secret, ts, nonce, body))
+	h.Set("X-Quantum-Ts", ts)
+	h.Set("X-Quantum-Nonce", nonce)
+	h.Set("X-Quantum-Sig", meshSign(secret, ts, nonce, body))
 }
 
 // meshPost sends a signed beat to another hub and returns its signed answer.

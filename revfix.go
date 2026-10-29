@@ -9,8 +9,8 @@ package main
 //  2. Auto-fix: for AutoFixable verdicts with confidence != low, a fix plan
 //     (dry-run -> snapshot -> apply -> re-probe -> rollback if worse) using
 //     only sysctl writes, `ip route` changes and our own iptables chain
-//     HASHEM-REVPATH. Never restarts services. Report-only by default;
-//     `revpath_auto` in the panel config (or HASHEM_REVPATH_AUTO=1) enables
+//     QUANTUM-REVPATH. Never restarts services. Report-only by default;
+//     `revpath_auto` in the panel config (or QUANTUM_REVPATH_AUTO=1) enables
 //     automatic application, rate-limited to 1 fix / peer / 10 min and 3 /
 //     hour globally.
 
@@ -34,7 +34,7 @@ import (
 // ---------- config ----------
 
 func revPathAutoEnabled() bool {
-	if os.Getenv("HASHEM_REVPATH_AUTO") == "1" {
+	if envQuantum("QUANTUM_REVPATH_AUTO", "HASHEM_REVPATH_AUTO") == "1" {
 		return true
 	}
 	return cfg.RevPathAuto
@@ -302,7 +302,7 @@ var (
 const (
 	fixPeerCooldown = 10 * time.Minute
 	fixHourMax      = 3
-	revChain        = "HASHEM-REVPATH"
+	revChain        = "QUANTUM-REVPATH"
 )
 
 // fixAllowed reports whether a fix may run now (rate limits).
@@ -349,7 +349,7 @@ func fixRecord(peerID int, s FixStep, auto bool, v Verdict) {
 // revpathSysctlConf is the persist file for reverse-path sysctl fixes.
 // Tests point it at a throwaway dir (same pattern as frpDir/backhaulDir);
 // production keeps /etc/sysctl.d. Overridable with GRE_SYSCTL_CONF.
-var revpathSysctlConf = "/etc/sysctl.d/99-hashem-revpath.conf"
+var revpathSysctlConf = "/etc/sysctl.d/99-quantum-revpath.conf"
 
 // sysctlPersist writes key=value via sysctl -w and persists it to
 // revpathSysctlConf. Returns a rollback closure.

@@ -10,7 +10,7 @@ import (
 )
 
 func TestPeerConfigDefaultsAndLoadSave(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "hashem_peer_test_*")
+	tmpDir, err := os.MkdirTemp("", "quantum_peer_test_*")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
@@ -46,7 +46,7 @@ func TestPeerConfigDefaultsAndLoadSave(t *testing.T) {
 }
 
 func TestPeerAuthMiddleware(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "hashem_peer_auth_test_*")
+	tmpDir, err := os.MkdirTemp("", "quantum_peer_auth_test_*")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
@@ -102,7 +102,7 @@ func TestPeerAuthMiddleware(t *testing.T) {
 }
 
 func TestPeerEndpoints(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "hashem_peer_endpoints_test_*")
+	tmpDir, err := os.MkdirTemp("", "quantum_peer_endpoints_test_*")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
@@ -180,7 +180,7 @@ func TestSendToPeerDualPath(t *testing.T) {
 	}))
 	defer mockServer.Close()
 
-	tmpDir, err := os.MkdirTemp("", "hashem_peer_send_test_*")
+	tmpDir, err := os.MkdirTemp("", "quantum_peer_send_test_*")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}

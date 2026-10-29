@@ -42,9 +42,9 @@ func findBagherLink(cfg SSHFwdConfig, id int) (BagherLink, bool) {
 // bagherLinkUnit is the carrier unit name of link id.
 func bagherLinkUnit(id int) string {
 	if id <= 1 {
-		return "hashem-bagher"
+		return "quantum-bagher"
 	}
-	return fmt.Sprintf("hashem-bagher-%d", id)
+	return fmt.Sprintf("quantum-bagher-%d", id)
 }
 
 func bagherLinkUnitPath(id int) string {
@@ -201,14 +201,14 @@ func installBagherLinkUnits(cfg SSHFwdConfig, restart bool) error {
 	return nil
 }
 
-// staleBagherLinkUnits lists hashem-bagher-<n>.service files not in keep.
+// staleBagherLinkUnits lists quantum-bagher-<n>.service files not in keep.
 func staleBagherLinkUnits(keep map[string]bool) []string {
-	matches, _ := filepath.Glob("/etc/systemd/system/hashem-bagher-*.service")
+	matches, _ := filepath.Glob("/etc/systemd/system/quantum-bagher-*.service")
 	var out []string
 	for _, m := range matches {
 		b := filepath.Base(m)
 		var n int
-		if _, err := fmt.Sscanf(b, "hashem-bagher-%d.service", &n); err == nil && n > 1 && !keep[b] {
+		if _, err := fmt.Sscanf(b, "quantum-bagher-%d.service", &n); err == nil && n > 1 && !keep[b] {
 			out = append(out, b)
 		}
 	}
@@ -351,7 +351,7 @@ func migrateBagherCarrierUnit(unitPath string) (bool, error) {
 }
 
 // migrateBagherFRPCTLS adds bagherFRPCNoTLS to a Bagher frpc.toml written by
-// an older panel or hashem.sh and restarts a running frpc, so an update alone
+// an older panel or quantum.sh and restarts a running frpc, so an update alone
 // drops the second encryption layer. A file that sets TLS itself is left alone.
 func migrateBagherFRPCTLS(path string) (bool, error) {
 	data, err := os.ReadFile(path)
@@ -363,7 +363,7 @@ func migrateBagherFRPCTLS(path string) (bool, error) {
 	if err := writeTokenFile(path, append([]byte(bagherFRPCNoTLS+"\n"), data...)); err != nil {
 		return false, err
 	}
-	_, _ = runCmd("systemctl", "try-restart", "hashem-bagher-frpc.service")
+	_, _ = runCmd("systemctl", "try-restart", "quantum-bagher-frpc.service")
 	return true, nil
 }
 

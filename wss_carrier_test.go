@@ -12,7 +12,7 @@ import (
 )
 
 func TestWSSConfigDefaultsAndLoadSave(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "hashem_wss_test_*")
+	tmpDir, err := os.MkdirTemp("", "quantum_wss_test_*")
 	if err != nil {
 		t.Fatalf("MkdirTemp failed: %v", err)
 	}
@@ -82,7 +82,7 @@ func TestWSSCarrierStartStop(t *testing.T) {
 }
 
 func TestCarrierWSSIntegration(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "hashem_carrier_wss_test_*")
+	tmpDir, err := os.MkdirTemp("", "quantum_carrier_wss_test_*")
 	if err != nil {
 		t.Fatalf("MkdirTemp failed: %v", err)
 	}

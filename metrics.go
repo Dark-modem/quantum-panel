@@ -266,7 +266,7 @@ func handleSelfStats(w http.ResponseWriter, r *http.Request) {
 // ---- optional pprof ----
 
 func debugEnabled() bool {
-	return os.Getenv("HASHEM_PPROF") == "1" || cfg.DebugEnabled
+	return envQuantum("QUANTUM_PPROF", "HASHEM_PPROF") == "1" || cfg.DebugEnabled
 }
 
 // pprofHandler serves /debug/pprof/* (path already stripped of the base).
@@ -286,7 +286,7 @@ func pprofHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // mountDebug registers pprof behind the normal session auth; no-op unless
-// HASHEM_PPROF=1 or debug_enabled is set.
+// QUANTUM_PPROF=1 or debug_enabled is set.
 func mountDebug(mux *http.ServeMux, base string) {
 	if !debugEnabled() {
 		return

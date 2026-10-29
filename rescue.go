@@ -14,7 +14,7 @@ package main
 //
 // Detection is passive-cheap (a few TCP dials + one ping per minute) and only
 // ever raises a banner; nothing is changed until the user clicks. Everything
-// created is namespaced hashem-rescue-* so Disable removes it completely.
+// created is namespaced quantum-rescue-* so Disable removes it completely.
 
 import (
 	"context"
@@ -258,7 +258,7 @@ func rescueEntryFrpcTomlMux(originIP string, cport int, token, secret string, po
 }
 
 func rescueFwNft(cport int, entryIP string) string {
-	return fmt.Sprintf("table inet hashem_rescue {\n  chain input {\n    type filter hook input priority -5; policy accept;\n    iifname \"lo\" accept\n    tcp dport %d %s saddr != %s counter drop\n  }\n}\n", cport, nftFam(entryIP), entryIP)
+	return fmt.Sprintf("table inet quantum_rescue {\n  chain input {\n    type filter hook input priority -5; policy accept;\n    iifname \"lo\" accept\n    tcp dport %d %s saddr != %s counter drop\n  }\n}\n", cport, nftFam(entryIP), entryIP)
 }
 
 func rescueUnit(desc, exec, after, before string) string {
@@ -280,7 +280,7 @@ func rescueDnatNft(originIP string, ports []int) string {
 	}
 	pl := strings.Join(ps, ", ")
 	fam := nftFam(originIP)
-	return fmt.Sprintf("table inet hashem_dnat {\n  chain prerouting {\n    type nat hook prerouting priority dstnat - 5; policy accept;\n    fib daddr type local meta l4proto { tcp, udp } th dport { %s } dnat %s to %s\n  }\n  chain postrouting {\n    type nat hook postrouting priority srcnat + 5; policy accept;\n    %s daddr %s meta l4proto { tcp, udp } th dport { %s } masquerade\n  }\n}\n", pl, fam, originIP, fam, originIP, pl)
+	return fmt.Sprintf("table inet quantum_dnat {\n  chain prerouting {\n    type nat hook prerouting priority dstnat - 5; policy accept;\n    fib daddr type local meta l4proto { tcp, udp } th dport { %s } dnat %s to %s\n  }\n  chain postrouting {\n    type nat hook postrouting priority srcnat + 5; policy accept;\n    %s daddr %s meta l4proto { tcp, udp } th dport { %s } masquerade\n  }\n}\n", pl, fam, originIP, fam, originIP, pl)
 }
 
 // rescueSplitDirect dials every port on the origin from here. A port that
@@ -312,11 +312,11 @@ func rescueSplitDirect(ip string, ports []int) (direct, relay []int) {
 }
 
 func rescueDnatUnit(nftFile string) string {
-	return "[Unit]\nDescription=Hashem rescue: high-speed kernel DNAT\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=/bin/sh -c \"sysctl -w net.ipv4.ip_forward=1 && nft delete table inet hashem_dnat 2>/dev/null; nft -f " + nftFile + "\"\nExecStop=/bin/sh -c \"nft delete table inet hashem_dnat 2>/dev/null; true\"\n\n[Install]\nWantedBy=multi-user.target\n"
+	return "[Unit]\nDescription=Quantum rescue: high-speed kernel DNAT\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=/bin/sh -c \"sysctl -w net.ipv4.ip_forward=1 && nft delete table inet quantum_dnat 2>/dev/null; nft -f " + nftFile + "\"\nExecStop=/bin/sh -c \"nft delete table inet quantum_dnat 2>/dev/null; true\"\n\n[Install]\nWantedBy=multi-user.target\n"
 }
 
 func rescueFwUnit(nftFile string) string {
-	return "[Unit]\nDescription=Hashem rescue: restrict control port to the peer\nAfter=network-pre.target\nBefore=hashem-rescue-frps.service\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=/bin/sh -c \"nft delete table inet hashem_rescue 2>/dev/null; nft -f " + nftFile + "\"\nExecStop=/bin/sh -c \"nft delete table inet hashem_rescue 2>/dev/null; true\"\n\n[Install]\nWantedBy=multi-user.target\n"
+	return "[Unit]\nDescription=Quantum rescue: restrict control port to the peer\nAfter=network-pre.target\nBefore=quantum-rescue-frps.service\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=/bin/sh -c \"nft delete table inet quantum_rescue 2>/dev/null; nft -f " + nftFile + "\"\nExecStop=/bin/sh -c \"nft delete table inet quantum_rescue 2>/dev/null; true\"\n\n[Install]\nWantedBy=multi-user.target\n"
 }
 
 func writeSecretFile(path, content string, mode os.FileMode) error {
@@ -430,6 +430,12 @@ func rescueEnableOrigin(entryIP string, ports []int) (rescueState, error) {
 	if cur.Role != "" {
 		return st, errors.New("rescue is already active — disable it first")
 	}
+	// Rescue units are fully regenerated below; stop any legacy
+	// hashem-rescue-* units from a pre-rebrand install so they are not left
+	// running.
+	for _, s := range []string{"quantum-rescue-fw", "quantum-rescue-frps", "quantum-rescue-frpc", "quantum-rescue-dnat"} {
+		legacyUnitRetire(s + ".service")
+	}
 	reserved := rescueReserved()
 	var use []int
 	for _, p := range ports {
@@ -467,9 +473,9 @@ func rescueEnableOrigin(entryIP string, ports []int) (rescueState, error) {
 			{filepath.Join(d, "frps.toml"), rescueFrpsToml(cp, st.Token), 0600},
 			{filepath.Join(d, "frpc.toml"), rescueOriginFrpcToml(cp, st.Token, st.Secret, use), 0600},
 			{filepath.Join(d, "fw.nft"), rescueFwNft(cp, ip), 0600},
-			{rescueUnitPath("hashem-rescue-fw"), rescueFwUnit(filepath.Join(d, "fw.nft")), 0644},
-			{rescueUnitPath("hashem-rescue-frps"), rescueUnit("Hashem rescue control (frps)", frps+" -c "+filepath.Join(d, "frps.toml"), " hashem-rescue-fw.service", ""), 0644},
-			{rescueUnitPath("hashem-rescue-frpc"), rescueUnit("Hashem rescue origin (frpc)", frpc+" -c "+filepath.Join(d, "frpc.toml"), " hashem-rescue-frps.service", ""), 0644},
+			{rescueUnitPath("quantum-rescue-fw"), rescueFwUnit(filepath.Join(d, "fw.nft")), 0644},
+			{rescueUnitPath("quantum-rescue-frps"), rescueUnit("Quantum rescue control (frps)", frps+" -c "+filepath.Join(d, "frps.toml"), " quantum-rescue-fw.service", ""), 0644},
+			{rescueUnitPath("quantum-rescue-frpc"), rescueUnit("Quantum rescue origin (frpc)", frpc+" -c "+filepath.Join(d, "frpc.toml"), " quantum-rescue-frps.service", ""), 0644},
 		}
 		for _, f := range files {
 			if err := writeSecretFile(f.p, f.c, f.m); err != nil {
@@ -482,7 +488,7 @@ func rescueEnableOrigin(entryIP string, ports []int) (rescueState, error) {
 		if err := sysctl("daemon-reload"); err != nil {
 			return err
 		}
-		for _, s := range []string{"hashem-rescue-fw", "hashem-rescue-frps", "hashem-rescue-frpc"} {
+		for _, s := range []string{"quantum-rescue-fw", "quantum-rescue-frps", "quantum-rescue-frpc"} {
 			if err := sysctl("enable", "--now", s+".service"); err != nil {
 				return err
 			}
@@ -543,7 +549,7 @@ func rescueApplyCode(code string) (rescueState, error) {
 			m    os.FileMode
 		}{
 			{filepath.Join(d, "frpc.toml"), rescueEntryFrpcTomlMux(c.IP, c.CPort, c.Token, c.Secret, relay, mux), 0600},
-			{rescueUnitPath("hashem-rescue-frpc"), rescueUnit("Hashem rescue entry (frpc visitors)", frpc+" -c "+filepath.Join(d, "frpc.toml"), "", ""), 0644},
+			{rescueUnitPath("quantum-rescue-frpc"), rescueUnit("Quantum rescue entry (frpc visitors)", frpc+" -c "+filepath.Join(d, "frpc.toml"), "", ""), 0644},
 		}
 		if len(direct) > 0 {
 			files = append(files,
@@ -554,7 +560,7 @@ func rescueApplyCode(code string) (rescueState, error) {
 				struct {
 					p, c string
 					m    os.FileMode
-				}{rescueUnitPath("hashem-rescue-dnat"), rescueDnatUnit(filepath.Join(d, "dnat.nft")), 0644})
+				}{rescueUnitPath("quantum-rescue-dnat"), rescueDnatUnit(filepath.Join(d, "dnat.nft")), 0644})
 		}
 		for _, f := range files {
 			if err := writeSecretFile(f.p, f.c, f.m); err != nil {
@@ -571,11 +577,11 @@ func rescueApplyCode(code string) (rescueState, error) {
 			return err
 		}
 		if len(direct) > 0 {
-			if err := sysctl("enable", "--now", "hashem-rescue-dnat.service"); err != nil {
+			if err := sysctl("enable", "--now", "quantum-rescue-dnat.service"); err != nil {
 				return err
 			}
 		}
-		return sysctl("enable", "--now", "hashem-rescue-frpc.service")
+		return sysctl("enable", "--now", "quantum-rescue-frpc.service")
 	}
 	if err := write(); err != nil {
 		rescueTeardownLocked()
@@ -587,13 +593,14 @@ func rescueApplyCode(code string) (rescueState, error) {
 
 // rescueTeardownLocked removes everything this feature ever created.
 func rescueTeardownLocked() {
-	for _, s := range []string{"hashem-rescue-frpc", "hashem-rescue-frps", "hashem-rescue-fw", "hashem-rescue-dnat"} {
+	for _, s := range []string{"quantum-rescue-frpc", "quantum-rescue-frps", "quantum-rescue-fw", "quantum-rescue-dnat"} {
 		_, _ = runCmd("systemctl", "disable", "--now", s+".service")
 		_ = os.Remove(rescueUnitPath(s))
+		legacyUnitRetire(s + ".service")
 	}
 	_, _ = runCmd("systemctl", "daemon-reload")
-	_, _ = runCmd("nft", "delete", "table", "inet", "hashem_rescue")
-	_, _ = runCmd("nft", "delete", "table", "inet", "hashem_dnat")
+	_, _ = runCmd("nft", "delete", "table", "inet", "quantum_rescue")
+	_, _ = runCmd("nft", "delete", "table", "inet", "quantum_dnat")
 	_ = os.RemoveAll(rescueDir())
 	cur := loadRescueLocked()
 	_ = os.Remove(rescueStatePath())
@@ -1072,12 +1079,12 @@ func rescueStatusMap(full bool) map[string]any {
 		m["ctrl_port"] = st.CtrlPort
 	}
 	if st.Role != "" {
-		svc := map[string]bool{"frpc": rescueUnitActive("hashem-rescue-frpc")}
+		svc := map[string]bool{"frpc": rescueUnitActive("quantum-rescue-frpc")}
 		if st.Role == "origin" {
-			svc["frps"] = rescueUnitActive("hashem-rescue-frps")
-			svc["firewall"] = rescueUnitActive("hashem-rescue-fw")
+			svc["frps"] = rescueUnitActive("quantum-rescue-frps")
+			svc["firewall"] = rescueUnitActive("quantum-rescue-fw")
 		} else if len(st.Direct) > 0 {
-			svc["dnat"] = rescueUnitActive("hashem-rescue-dnat")
+			svc["dnat"] = rescueUnitActive("quantum-rescue-dnat")
 		}
 		m["services"] = svc
 		m["connected"] = rescueConnected(st)

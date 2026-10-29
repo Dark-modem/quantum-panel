@@ -103,7 +103,7 @@ var commonWeakPasswords = map[string]struct{}{
 	"admin12345678":  {},
 	"administrator":  {},
 	"qwerty123456":   {},
-	"hashempanel123": {},
+	"quantumpanel123": {},
 	"grepanel123456": {},
 	"rootroot1234":   {},
 	"welcome123456":  {},

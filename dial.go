@@ -13,19 +13,19 @@ import (
 
 // Dial route (foreign side): the client may reach the Iran hub over the GRE
 // inner address or straight to the hub's public IP. When GRE is blocked on one
-// path, "public" keeps FRP alive without GRE ping. Logic lives in hashem.sh
-// (`hashem dial`); this is a thin, validated wrapper.
+// path, "public" keeps FRP alive without GRE ping. Logic lives in quantum.sh
+// (`quantum dial`); this is a thin, validated wrapper.
 
-func runHashemDial(args ...string) (string, error) {
+func runQuantumDial(args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
 	defer cancel()
 	var cmd *exec.Cmd
 	if script, err := greScriptPath(); err == nil {
 		cmd = exec.CommandContext(ctx, "bash", append([]string{script, "dial"}, args...)...)
-	} else if fileExists("/usr/local/bin/hashem") {
-		cmd = exec.CommandContext(ctx, "/usr/local/bin/hashem", append([]string{"dial"}, args...)...)
+	} else if fileExists("/usr/local/bin/quantum") {
+		cmd = exec.CommandContext(ctx, "/usr/local/bin/quantum", append([]string{"dial"}, args...)...)
 	} else {
-		return "", fmt.Errorf("hashem script not found")
+		return "", fmt.Errorf("quantum script not found")
 	}
 	cmd.Env = append(os.Environ(), "GRE_SKIP_PANEL=1", "TERM=dumb", "GRE_PANEL_DIR="+configDir)
 	out, err := cmd.CombinedOutput()
@@ -52,7 +52,7 @@ func parseDialStatus(out string) map[string]any {
 }
 
 func handleDialGet(w http.ResponseWriter, r *http.Request) {
-	out, _ := runHashemDial("status")
+	out, _ := runQuantumDial("status")
 	writeJSON(w, parseDialStatus(out))
 }
 
@@ -71,12 +71,12 @@ func handleDialPost(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, r, "E-ACTION-01", "mode must be auto, gre or public")
 		return
 	}
-	out, err := runHashemDial(b.Mode)
+	out, err := runQuantumDial(b.Mode)
 	if err != nil {
 		writeAPIError(w, r, "E-ACTION-01", "dial change failed: "+out)
 		return
 	}
-	st, _ := runHashemDial("status")
+	st, _ := runQuantumDial("status")
 	res := parseDialStatus(st)
 	res["ok"] = true
 	writeJSON(w, res)

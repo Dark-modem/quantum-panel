@@ -1,6 +1,6 @@
-# Hashem Panel
+# Quantum Panel
 
-Web control panel for the GRE+FRP tunnel stack (login inspired by Hashem panel).
+Web control panel for the GRE+FRP tunnel stack (login inspired by Quantum panel).
 Single Go binary, no dependencies. Install on **both** servers — each panel
 configures only its own side, and shows the other side via Peer link.
 
@@ -19,7 +19,7 @@ configures only its own side, and shows the other side via Peer link.
 ## One-line install (recommended)
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/pdnczone/hashem-panel/main/install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/pdnczone/quantum-panel/main/install.sh)
 ```
 
 Then pick **7) Install Web Panel** — it builds the Go binary, installs the

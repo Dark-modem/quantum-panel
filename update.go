@@ -1,7 +1,7 @@
 package main
 
 // Update API: check for a newer prebuilt panel release and install it.
-// Same safety rules as hashem.sh update_all(): verify download, keep local
+// Same safety rules as quantum.sh update_all(): verify download, keep local
 // config (panel.json) untouched, restart the service, and
 // never leave the system in a broken state on failure.
 
@@ -24,9 +24,9 @@ var updateClient = &http.Client{Timeout: 25 * time.Second}
 // handleVersion / latestReleaseTag (channel aware) live in update_channel.go.
 
 // handleUpdate downloads the latest prebuilt binary for this arch,
-// verifies it (non-empty ELF), swaps it in, syncs the latest hashem.sh
+// verifies it (non-empty ELF), swaps it in, syncs the latest quantum.sh
 // next to the panel binary, and restarts the service.
-const panelScriptName = "hashem.sh"
+const panelScriptName = "quantum.sh"
 
 // quantumRepo is the private repository the updater pulls releases from.
 const quantumRepo = "Dark-modem/quantum"
@@ -65,7 +65,7 @@ func ghFetchAsset(tag, name string, tmp *os.File) error {
 	if err != nil {
 		return err
 	}
-	req.Header.Set("User-Agent", "hashem-panel-updater/"+panelVersion)
+	req.Header.Set("User-Agent", "quantum-panel-updater/"+panelVersion)
 	req.Header.Set("Authorization", "Bearer "+githubToken())
 	req.Header.Set("Accept", "application/octet-stream")
 	resp, err := client.Do(req)
@@ -187,7 +187,7 @@ func handleUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = os.Chmod(exe, 0755)
-	// Keep hashem.sh in sync with the binary
+	// Keep quantum.sh in sync with the binary
 	syncPanelScriptFrom(latest)
 
 	LogSecurityAudit("update_success", cfg.Username, ClientIP(r), "installed version "+latest)
@@ -299,7 +299,7 @@ func downloadFile(rawURL string, tmp *os.File) error {
 			if err != nil {
 				return err
 			}
-			req.Header.Set("User-Agent", "hashem-panel-updater/"+panelVersion)
+			req.Header.Set("User-Agent", "quantum-panel-updater/"+panelVersion)
 			req.Header.Set("Authorization", "Bearer "+token)
 			resp, err := client.Do(req)
 			if err != nil {
@@ -338,7 +338,7 @@ func downloadFile(rawURL string, tmp *os.File) error {
 
 	// Mirrors only for release assets, which are then checked against the
 	// checksum manifest fetched from GitHub directly. raw.githubusercontent.com
-	// files (hashem.sh from main) have no checksum, so for them GitHub's own
+	// files (quantum.sh from main) have no checksum, so for them GitHub's own
 	// TLS is the only integrity check and a mirror could serve anything.
 	urlsToTry := []string{rawURL}
 	if strings.HasPrefix(rawURL, "https://github.com/") {
@@ -359,7 +359,7 @@ func downloadFile(rawURL string, tmp *os.File) error {
 				lastErr = err
 				continue
 			}
-			req.Header.Set("User-Agent", "hashem-panel-updater/"+panelVersion)
+			req.Header.Set("User-Agent", "quantum-panel-updater/"+panelVersion)
 
 			resp, err := client.Do(req)
 			if err != nil {
@@ -445,12 +445,12 @@ func restartSelf() {
 // sessionFile returns the path of the server-side session store.
 func sessionFile() string { return filepath.Join(configDir, "sessions.json") }
 
-// ---- hashem.sh sync (keeps server script in step with the binary) ----
+// ---- quantum.sh sync (keeps server script in step with the binary) ----
 
-// syncPanelScript refreshes hashem.sh from the running binary's own release.
+// syncPanelScript refreshes quantum.sh from the running binary's own release.
 func syncPanelScript() { syncPanelScriptFrom(runningReleaseTag()) }
 
-// syncPanelScriptFrom downloads hashem.sh from release `tag` (checksum
+// syncPanelScriptFrom downloads quantum.sh from release `tag` (checksum
 // verified; main only if the tag has no such asset), syntax-checks
 // it with `bash -n`, and installs it where greScriptPath() reads from
 // (next to the running binary on servers).
@@ -467,7 +467,7 @@ func syncPanelScriptFrom(tag string) {
 			return
 		}
 	}
-	tmp, err := os.CreateTemp("", "hashem-*.sh")
+	tmp, err := os.CreateTemp("", "quantum-*.sh")
 	if err != nil {
 		recordError("E-UPDATE-06", "script-sync", "tmpfile: "+err.Error())
 		return
@@ -475,7 +475,7 @@ func syncPanelScriptFrom(tag string) {
 	tmpPath := tmp.Name()
 	_ = tmp.Close()
 	defer func() { _ = os.Remove(tmpPath) }()
-	if err := fetchScript(tag, "hashem.sh", scriptURL, tmpPath); err != nil {
+	if err := fetchScript(tag, "quantum.sh", scriptURL, tmpPath); err != nil {
 		recordError("E-UPDATE-06", "script-sync", "download: "+err.Error())
 		return
 	}
@@ -496,10 +496,10 @@ func syncPanelScriptFrom(tag string) {
 	}
 	_ = os.Chmod(target, 0755)
 	LogSecurityAudit("script_synced", "system", "local", "target="+target)
-	// Migrate servers to the new name: refresh the hashem copies + legacy
+	// Migrate servers to the new name: refresh the quantum copies + legacy
 	// gre.sh symlink, and drop a stale standalone gre.sh file (symlink wins
 	// so old lookup paths keep working).
-	for _, p := range []string{"/usr/local/bin/hashem.sh", "/usr/local/bin/hashem"} {
+	for _, p := range []string{"/usr/local/bin/quantum.sh", "/usr/local/bin/quantum"} {
 		if p == target {
 			continue
 		}
@@ -508,10 +508,10 @@ func syncPanelScriptFrom(tag string) {
 		}
 	}
 	_ = os.Remove("/usr/local/bin/gre.sh")
-	_ = os.Symlink("/usr/local/bin/hashem.sh", "/usr/local/bin/gre.sh")
+	_ = os.Symlink("/usr/local/bin/quantum.sh", "/usr/local/bin/gre.sh")
 }
 
-const scriptURL = "https://raw.githubusercontent.com/Dark-modem/quantum/main/hashem.sh"
+const scriptURL = "https://raw.githubusercontent.com/Dark-modem/quantum/main/quantum.sh"
 
 // greScriptURL stays as an alias: releases before the rename shipped gre.sh,
 // and external tools may import the name.

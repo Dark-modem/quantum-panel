@@ -2,7 +2,7 @@ package main
 
 // gre-panel settings ...: the Settings tab items that live in panel.json, for
 // the terminal. The running panel reads most of them only at start, so the
-// caller (hashem.sh) restarts gre-panel after a change; tunnels keep running.
+// caller (quantum.sh) restarts gre-panel after a change; tunnels keep running.
 
 import (
 	"fmt"

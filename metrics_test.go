@@ -138,7 +138,7 @@ func TestMetricsSelfStatsRequiresAuth(t *testing.T) {
 }
 
 func TestMetricsPprofOffByDefault(t *testing.T) {
-	t.Setenv("HASHEM_PPROF", "")
+	t.Setenv("QUANTUM_PPROF", "")
 	old := cfg
 	cfg.DebugEnabled = false
 	defer func() { cfg = old }()
@@ -149,7 +149,7 @@ func TestMetricsPprofOffByDefault(t *testing.T) {
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("pprof must be unmounted by default, got %d", rec.Code)
 	}
-	t.Setenv("HASHEM_PPROF", "1")
+	t.Setenv("QUANTUM_PPROF", "1")
 	mux = http.NewServeMux()
 	mountDebug(mux, "/bp")
 	rec = httptest.NewRecorder()

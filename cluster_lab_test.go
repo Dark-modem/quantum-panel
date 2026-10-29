@@ -4,11 +4,11 @@ package main
 // network namespace of their own; tests/test_cluster_lab.sh runs them (CI's
 // lab job does, with the pinned FRP and Backhaul releases):
 //   - TestLBLab: the kernel rules alone. Backends listen on private addresses
-//     of the hashem-lb dummy interface; connections to this host's own
+//     of the quantum-lb dummy interface; connections to this host's own
 //     address must reach them the way the pools, the stickiness and the
-//     pass-through ports say (HASHEM_LB_LAB=1).
-//   - TestLBLabForward: a pool forwarded to another Iran hub (HASHEM_LB_LAB=1).
-//   - TestLBLabE2E: everything at once on real relays (HASHEM_LB_E2E=1).
+//     pass-through ports say (QUANTUM_LB_LAB=1).
+//   - TestLBLabForward: a pool forwarded to another Iran hub (QUANTUM_LB_LAB=1).
+//   - TestLBLabE2E: everything at once on real relays (QUANTUM_LB_E2E=1).
 
 import (
 	"bufio"
@@ -65,8 +65,8 @@ func labHostIP(t *testing.T) string {
 }
 
 func TestLBLab(t *testing.T) {
-	if os.Getenv("HASHEM_LB_LAB") != "1" {
-		t.Skip("lab test: set HASHEM_LB_LAB=1 (root, iptables, own network namespace)")
+	if os.Getenv("QUANTUM_LB_LAB") != "1" {
+		t.Skip("lab test: set QUANTUM_LB_LAB=1 (root, iptables, own network namespace)")
 	}
 	configDir, lbUnitDir = t.TempDir(), t.TempDir()
 	old := runner
@@ -146,20 +146,20 @@ func TestLBLab(t *testing.T) {
 	if got := labAsk(t, host+":18080"); got != "refused" {
 		t.Fatalf("after clear: %s", got)
 	}
-	if out, _ := runCmdTimeout(5*time.Second, "iptables", "-t", "nat", "-S"); strings.Contains(string(out), "HASHEM-LB") {
+	if out, _ := runCmdTimeout(5*time.Second, "iptables", "-t", "nat", "-S"); strings.Contains(string(out), "QUANTUM-LB") {
 		t.Fatalf("leftovers:\n%s", out)
 	}
 }
 
 // TestLBLabServe is not a test: TestLBLabForward runs the test binary inside
-// a network namespace with HASHEM_LB_LAB_SERVE=addr to stand in for the
+// a network namespace with QUANTUM_LB_LAB_SERVE=addr to stand in for the
 // other Iran hub.
 func TestLBLabServe(t *testing.T) {
-	addr := os.Getenv("HASHEM_LB_LAB_SERVE")
+	addr := os.Getenv("QUANTUM_LB_LAB_SERVE")
 	if addr == "" {
 		t.Skip("helper")
 	}
-	label := os.Getenv("HASHEM_LB_LAB_NAME")
+	label := os.Getenv("QUANTUM_LB_LAB_NAME")
 	if label == "" {
 		label = "far"
 	}
@@ -181,8 +181,8 @@ func TestLBLabServe(t *testing.T) {
 // own namespace connects to this host, the hub "far" (another namespace)
 // answers, with FORWARD dropped by default as ufw sets it.
 func TestLBLabForward(t *testing.T) {
-	if os.Getenv("HASHEM_LB_LAB") != "1" {
-		t.Skip("lab test: set HASHEM_LB_LAB=1")
+	if os.Getenv("QUANTUM_LB_LAB") != "1" {
+		t.Skip("lab test: set QUANTUM_LB_LAB=1")
 	}
 	configDir, lbUnitDir = t.TempDir(), t.TempDir()
 	old := runner
@@ -214,7 +214,7 @@ func TestLBLabForward(t *testing.T) {
 
 	exe, _ := os.Executable()
 	srv := exec.Command("ip", "netns", "exec", "far", exe, "-test.run", "^TestLBLabServe$")
-	srv.Env = append(os.Environ(), "HASHEM_LB_LAB_SERVE=10.99.0.2:18090")
+	srv.Env = append(os.Environ(), "QUANTUM_LB_LAB_SERVE=10.99.0.2:18090")
 	if err := srv.Start(); err != nil {
 		t.Fatal(err)
 	}
@@ -263,7 +263,7 @@ type labForeign struct {
 // service check, private addresses, iptables) except the link list and the
 // relay binding: the relays here start already bound to their addresses.
 func TestLBLabE2E(t *testing.T) {
-	if os.Getenv("HASHEM_LB_E2E") != "1" {
+	if os.Getenv("QUANTUM_LB_E2E") != "1" {
 		t.Skip("lab test: run tests/test_cluster_lab.sh")
 	}
 	frpDir, bhBin := os.Getenv("FRP_DIR"), os.Getenv("BACKHAUL_BIN")
@@ -345,7 +345,7 @@ func TestLBLabE2E(t *testing.T) {
 	defer lbEnsureAddrs(nil)
 
 	startService := func(f *labForeign) {
-		f.service = start(f.name+"-svc", []string{"HASHEM_LB_LAB_SERVE=127.0.0.1:8080", "HASHEM_LB_LAB_NAME=" + f.name},
+		f.service = start(f.name+"-svc", []string{"QUANTUM_LB_LAB_SERVE=127.0.0.1:8080", "QUANTUM_LB_LAB_NAME=" + f.name},
 			"ip", "netns", "exec", f.ns, exe, "-test.run", "^TestLBLabServe$")
 	}
 	startClient := func(f *labForeign) {

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Hashem Panel — Enterprise Design System (Phase 1 Preview)</title>
+<title>Quantum Panel — Enterprise Design System (Phase 1 Preview)</title>
 <link rel="stylesheet" href="tokens.css">
 <link rel="stylesheet" href="base.css">
 <link rel="stylesheet" href="enterprise.css">
@@ -91,14 +91,14 @@
     <h2>4 · Sidebar / header / buttons</h2>
     <p>Sidebar 232px, sections Overview → Tunnel → System, active rail = 3px accent bar. Header: title + role line + Refresh.</p>
     <div class="ds-row">
-      <button class="hashem-btn hashem-btn-primary">Primary — Apply setup</button>
-      <button class="hashem-btn hashem-btn-secondary">Secondary — Restart GRE</button>
-      <button class="hashem-btn hashem-btn-danger">Danger — Remove tunnel</button>
-      <button class="hashem-btn hashem-btn-ghost">Ghost — Logout</button>
+      <button class="quantum-btn quantum-btn-primary">Primary — Apply setup</button>
+      <button class="quantum-btn quantum-btn-secondary">Secondary — Restart GRE</button>
+      <button class="quantum-btn quantum-btn-danger">Danger — Remove tunnel</button>
+      <button class="quantum-btn quantum-btn-ghost">Ghost — Logout</button>
     </div>
     <div class="ds-row">
-      <input class="hashem-input" placeholder="Search peers…" style="max-width:260px">
-      <select class="hashem-select" style="max-width:200px"><option>All levels</option><option>Errors</option></select>
+      <input class="quantum-input" placeholder="Search peers…" style="max-width:260px">
+      <select class="quantum-select" style="max-width:200px"><option>All levels</option><option>Errors</option></select>
     </div>
   </div>
 
@@ -142,9 +142,9 @@
     <h2>8 · Modal / notification / terminal (placeholder)</h2>
     <p>Modal + typed toasts ship now; terminal gets the <span class="ent-code">.ent-code</span> surface + status row in Phase 3.</p>
     <div class="ds-row">
-      <button class="hashem-btn hashem-btn-secondary" onclick="document.getElementById('demoModal').hidden=false">Open modal</button>
-      <button class="hashem-btn hashem-btn-secondary" onclick="demoToast('ok','Tunnel added','germany-1 · token shown in logs')">Toast: ok</button>
-      <button class="hashem-btn hashem-btn-secondary" onclick="demoToast('err','E-FRP-02 · auth failed','Re-copy the token from the Iran peer card')">Toast: error</button>
+      <button class="quantum-btn quantum-btn-secondary" onclick="document.getElementById('demoModal').hidden=false">Open modal</button>
+      <button class="quantum-btn quantum-btn-secondary" onclick="demoToast('ok','Tunnel added','germany-1 · token shown in logs')">Toast: ok</button>
+      <button class="quantum-btn quantum-btn-secondary" onclick="demoToast('err','E-FRP-02 · auth failed','Re-copy the token from the Iran peer card')">Toast: error</button>
     </div>
     <div class="ent-tbl-wrap"><table class="ent-tbl"><tbody>
       <tr><td class="mono">root@iran:~# grepanel status</td><td><span class="ent-st on"><i></i>connected</span></td></tr>
@@ -170,7 +170,7 @@
   <div class="ent-modal" role="dialog" aria-modal="true" aria-label="Demo modal">
     <div class="ent-modal-h"><b>Remove tunnel?</b><button class="ent-x" onclick="document.getElementById('demoModal').hidden=true" aria-label="Close">×</button></div>
     <div class="ent-modal-b"><p style="color:var(--tx2);margin:0">GRE + FRP for <span class="ent-code">germany-1</span> will be deleted; the panel stays. This is the future confirm pattern for destructive actions.</p></div>
-    <div class="ent-modal-f"><button class="hashem-btn hashem-btn-ghost" onclick="document.getElementById('demoModal').hidden=true">Cancel</button><button class="hashem-btn hashem-btn-danger" onclick="document.getElementById('demoModal').hidden=true">Remove</button></div>
+    <div class="ent-modal-f"><button class="quantum-btn quantum-btn-ghost" onclick="document.getElementById('demoModal').hidden=true">Cancel</button><button class="quantum-btn quantum-btn-danger" onclick="document.getElementById('demoModal').hidden=true">Remove</button></div>
   </div>
 </div>
 <div id="entToasts"></div>
@@ -207,7 +207,14 @@ function demoToast(kind, title, sub) {
   line(dl, '#f4f4f5', true);
 })();
 try {
-  var t = localStorage.getItem('gre_theme') || 'dark';
+  var _LEGACY_PREF = 'has' + 'hem_';
+  function lsGet(k) {
+    try { var v = localStorage.getItem(k); if (v !== null && v !== undefined) return v; } catch (e) { return null; }
+    var legacy = (k === 'gre_theme') ? _LEGACY_PREF + 'theme' : k.replace(/^quantum_/, _LEGACY_PREF);
+    if (legacy === k) return null;
+    try { return localStorage.getItem(legacy); } catch (e) { return null; }
+  }
+  var t = lsGet('gre_theme') || 'dark';
   document.body.dataset.t = t;
 } catch (e) {}
 </script>

@@ -18,7 +18,7 @@ import (
 type perfConfig struct {
 	ProxyEncryption  bool `json:"proxy_encryption"`
 	ProxyCompression bool `json:"proxy_compression"`
-	// AutoPool: true (default, also when the key is missing) lets hashem.sh size the pool;
+	// AutoPool: true (default, also when the key is missing) lets quantum.sh size the pool;
 	// false applies FRPPoolCount / FRPMaxPool as typed.
 	AutoPool     bool `json:"auto_pool"`
 	FRPPoolCount int  `json:"frp_pool_count"`
@@ -34,7 +34,7 @@ type perfConfig struct {
 	HealthCheck   bool   `json:"health_check,omitempty"`
 }
 
-// autoPoolState mirrors the auto_pool.json that hashem.sh autopool_tick maintains.
+// autoPoolState mirrors the auto_pool.json that quantum.sh autopool_tick maintains.
 type autoPoolState struct {
 	Pool              int    `json:"pool"`
 	MaxPool           int    `json:"max_pool"`
@@ -583,7 +583,7 @@ func handlePerfPost(w http.ResponseWriter, r *http.Request) {
 		if body.AutoPool != nil {
 			c.AutoPool = *body.AutoPool
 			if c.AutoPool {
-				// Auto-Pool runs from the hashem-watchdog timer (autopool_tick).
+				// Auto-Pool runs from the quantum-watchdog timer (autopool_tick).
 				defer ensureWatchdogTimer()
 			}
 		}
@@ -604,7 +604,7 @@ func handlePerfPost(w http.ResponseWriter, r *http.Request) {
 		if body.AutoPool != nil {
 			c.AutoPool = *body.AutoPool
 			if c.AutoPool {
-				// Auto-Pool runs from the hashem-watchdog timer (autopool_tick).
+				// Auto-Pool runs from the quantum-watchdog timer (autopool_tick).
 				defer ensureWatchdogTimer()
 			}
 		}
@@ -625,7 +625,7 @@ func handlePerfPost(w http.ResponseWriter, r *http.Request) {
 		if body.AutoPool != nil {
 			c.AutoPool = *body.AutoPool
 			if c.AutoPool {
-				// Auto-Pool runs from the hashem-watchdog timer (autopool_tick).
+				// Auto-Pool runs from the quantum-watchdog timer (autopool_tick).
 				defer ensureWatchdogTimer()
 			}
 		}

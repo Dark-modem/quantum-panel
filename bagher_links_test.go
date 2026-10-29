@@ -125,7 +125,7 @@ func TestBagherLinkAPI(t *testing.T) {
 	// a key on disk, so no ssh-keygen runs
 	pub, _, _ := ed25519.GenerateKey(rand.Reader)
 	sp, _ := ssh.NewPublicKey(pub)
-	keyPath := filepath.Join(dir, "hashem-fwd")
+	keyPath := filepath.Join(dir, "quantum-fwd")
 	_ = os.WriteFile(keyPath, []byte("unused"), 0600)
 	_ = os.WriteFile(keyPath+".pub", ssh.MarshalAuthorizedKey(sp), 0600)
 	cfg := bagherTestCfg()
@@ -182,17 +182,17 @@ func TestMigrateBagherCarrierUnit(t *testing.T) {
 	t.Cleanup(func() { runCmd = oldRun })
 
 	cfg := bagherTestCfg()
-	cfg.KeyPath = filepath.Join(dir, "hashem-fwd")
+	cfg.KeyPath = filepath.Join(dir, "quantum-fwd")
 	_ = os.WriteFile(cfg.KeyPath, []byte("k"), 0600)
 	if err := saveSSHFwdConfigLocked(cfg); err != nil {
 		t.Fatal(err)
 	}
 	// the unit v2.6.0 wrote
-	legacy := "[Unit]\nDescription=Hashem Bagher Engine (Stealth Hybrid Tunnel)\n\n[Service]\n" +
+	legacy := "[Unit]\nDescription=Quantum Bagher Engine (Stealth Hybrid Tunnel)\n\n[Service]\n" +
 		"ExecStart=/usr/bin/ssh -N -i " + cfg.KeyPath + " -o BatchMode=yes -o IdentitiesOnly=yes -o ExitOnForwardFailure=yes -o ConnectTimeout=8 " +
 		"-o ServerAliveInterval=15 -o ServerAliveCountMax=3 -o StrictHostKeyChecking=accept-new -R 127.0.0.1:55400:127.0.0.1:55400 " +
 		"-o Ciphers=aes128-gcm@openssh.com,chacha20-poly1305@openssh.com -o TCPKeepAlive=yes root@198.51.100.1\nRestart=always\n"
-	unit := filepath.Join(dir, "hashem-bagher.service")
+	unit := filepath.Join(dir, "quantum-bagher.service")
 	_ = os.WriteFile(unit, []byte(legacy), 0644)
 	if ok, err := migrateBagherCarrierUnit(unit); !ok || err != nil {
 		t.Fatalf("legacy unit not migrated: %v %v", ok, err)
@@ -201,7 +201,7 @@ func TestMigrateBagherCarrierUnit(t *testing.T) {
 	if !strings.Contains(string(got), "bagher-carrier -link 1") || strings.Contains(string(got), "/usr/bin/ssh") {
 		t.Fatalf("migrated unit: %s", got)
 	}
-	if strings.Join(calls, "; ") != "systemctl daemon-reload; systemctl try-restart hashem-bagher.service" {
+	if strings.Join(calls, "; ") != "systemctl daemon-reload; systemctl try-restart quantum-bagher.service" {
 		t.Fatalf("systemctl calls: %v", calls)
 	}
 	// already the carrier: nothing to do
