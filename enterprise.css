@@ -1334,3 +1334,23 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
   .topo-wiz-types { grid-template-columns: 1fr; }
   .topo-wiz-head { align-items: flex-start; flex-direction: column; }
 }
+
+/* ---------- Add-topology wizard modal ---------- */
+.topo-create-ring svg { display: block; }
+.topo-create-ring-track { fill: none; stroke: var(--ln2); stroke-width: 3; }
+.topo-create-ring-arc {
+  fill: none; stroke: var(--ac); stroke-width: 3; stroke-linecap: round;
+  transform: rotate(-90deg); transform-origin: 50% 50%;
+  transition: stroke-dasharray var(--dur) var(--spring);
+}
+.topo-create-ring-txt { fill: var(--tx); font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.topo-create-dots { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.topo-create-dot { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--ln2); background: transparent; }
+.topo-create-dot.on { border-color: var(--ac); background: var(--ac); }
+.topo-create-dot.done { border-color: var(--ok); background: var(--ok); }
+.topo-create-role { grid-template-columns: auto 1fr; column-gap: 12px; align-items: center; }
+.topo-create-role svg { grid-row: 1 / span 2; width: 34px; height: 24px; }
+.topo-create-role b { align-self: end; }
+.topo-create-role span { align-self: start; }
+.topo-create-flag { display: flex; justify-content: center; padding: 4px 0 2px; }
+.topo-create-flag svg { width: 46px; height: 32px; }

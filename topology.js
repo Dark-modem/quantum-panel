@@ -341,22 +341,10 @@ function topologyBack() {
   renderTunnelsList();
   if (typeof tabHashWrite === 'function') tabHashWrite('tunnel');
 }
-async function topologyCreate() {
-  if (topologyBusy) return;
-  topologyBusy = true;
-  try {
-    const local = window._lastLocal || {};
-    const nameBase = tr('', 'New topology');
-    let number = 1;
-    while (topologyData.topologies.some(t => t.name === nameBase + ' ' + number)) number++;
-    const r = await api('/api/topologies', {name: nameBase + ' ' + number, role: /foreign/.test(local.role || '') ? 'foreign' : 'iran', local_ip: local.local_pub || '', remote_ip: '', tunnel_ids: []});
-    topologySelected = r.topology.id;
-    await topologyReload();
-    toastOk(tr('', 'Topology created'), r.topology.name || '');
-    $('topologyName').focus();
-  } catch(e) { toastErr(tr('', 'Topology create failed'), e.message); }
-  finally { topologyBusy = false; }
-}
+// The wizard is the only path that creates a topology: entering the flow or
+// closing it mid-way must not leave an empty topology behind (the old code
+// POSTed one immediately with blank IPs).
+function topologyCreate() { topoCreateOpen(); }
 async function topologySave() {
   const topo = topologyCurrent(); if (!topo || topologyBusy) return;
   topologyBusy = true; $('topologySaveBtn').disabled = true;
@@ -721,6 +709,212 @@ function topologySelectForTunnel(kind) {
 }
 function topologyDisplayMode() { topologyRender(); }
 
+// ---- Add-topology wizard: a 6-step modal (Role -> This server's IP ->
+// Other server's IP -> Country -> Name -> Review) that replaces the old
+// "instantly POST an empty topology" behaviour. The draft lives in
+// localStorage under topoCreateDraft so closing the modal keeps everything
+// typed; only a successful create clears it.
+const TOPO_CREATE_STEPS = ['Role', 'This server', 'Other server', 'Country', 'Name', 'Review'];
+const TOPO_CREATE_DRAFT_KEY = 'topoCreateDraft';
+const TOPO_CREATE_FIELDS = { 2: ['topoCreateLocal', 'local'], 3: ['topoCreateRemote', 'remote'], 4: ['topoCreateCountry', 'country'], 5: ['topoCreateName', 'name'] };
+let topoCreate = null;
+let topoCreateBusy = false;
+function topoCreateDraftStore() {
+  return (typeof localStorage !== 'undefined') ? localStorage : null;
+}
+function topoCreateDraftSave() {
+  const store = topoCreateDraftStore();
+  if (!store || !topoCreate) return;
+  try { store.setItem(TOPO_CREATE_DRAFT_KEY, JSON.stringify({ step: topoCreate.step, values: topoCreate.values })); } catch (_) { /* storage unavailable: the wizard still works, just without a draft */ }
+}
+function topoCreateDraftClear() {
+  const store = topoCreateDraftStore();
+  if (!store) return;
+  try { store.removeItem(TOPO_CREATE_DRAFT_KEY); } catch (_) {}
+}
+function topoCreateDraftLoad() {
+  const store = topoCreateDraftStore();
+  if (!store) return null;
+  try {
+    const d = JSON.parse(store.getItem(TOPO_CREATE_DRAFT_KEY) || 'null');
+    if (!d || !/^[1-6]$/.test(String(d.step)) || !d.values || typeof d.values !== 'object') return null;
+    const v = d.values;
+    return { step: Number(d.step), values: {
+      role: v.role === 'foreign' ? 'foreign' : 'iran',
+      local: String(v.local || ''), remote: String(v.remote || ''),
+      country: String(v.country || ''), name: String(v.name || '')
+    } };
+  } catch (_) { return null; }
+}
+function topoCreateShow() {
+  const ov = $('topoCreateModal');
+  if (typeof modalShow === 'function') modalShow(ov, topoCreateCancel);
+  else ov.hidden = false;
+}
+function topoCreateHide() {
+  const ov = $('topoCreateModal');
+  if (typeof modalHide === 'function') modalHide(ov);
+  else ov.hidden = true;
+}
+function topoCreateCancel() {
+  if (!topoCreate || topoCreateBusy) return;
+  topoCreateDraftSave(); // closing keeps the draft for the next visit
+  topoCreate = null;
+  topoCreateHide();
+}
+function topoCreateDefaultName() {
+  const nameBase = tr('', 'New topology');
+  let number = 1;
+  while (topologyData.topologies.some(t => t.name === nameBase + ' ' + number)) number++;
+  return nameBase + ' ' + number;
+}
+function topoCreateOpen() {
+  if (topoCreate) { topoCreateShow(); topoCreateRender(); return; }
+  const draft = topoCreateDraftLoad();
+  if (draft) topoCreate = draft;
+  else {
+    const local = (typeof window !== 'undefined' && window._lastLocal) || {};
+    topoCreate = { step: 1, values: {
+      role: /foreign/.test(local.role || '') ? 'foreign' : 'iran',
+      local: local.local_pub || '', remote: '', country: '', name: topoCreateDefaultName()
+    } };
+  }
+  topoCreateShow();
+  topoCreateRender();
+}
+function topoCreateError(msg) {
+  const el = $('topoCreateErr');
+  el.textContent = msg || '';
+  el.classList.toggle('hidden', !msg);
+}
+// Circular step counter: a ring whose arc fills with progress, "1/6" inside.
+function topoCreateRing(step, n) {
+  const r = 15, c = 2 * Math.PI * r;
+  const label = tr('', 'Step {x} of {n}').replace('{x}', String(step)).replace('{n}', String(n));
+  return `<svg viewBox="0 0 40 40" width="40" height="40" role="img" aria-label="${esc(label)}">` +
+    `<circle class="topo-create-ring-track" cx="20" cy="20" r="${r}"/>` +
+    `<circle class="topo-create-ring-arc" cx="20" cy="20" r="${r}" stroke-dasharray="${(c * step / n).toFixed(2)} ${c.toFixed(2)}"/>` +
+    `<text class="topo-create-ring-txt" x="20" y="20" text-anchor="middle" dominant-baseline="central">${step}/${n}</text></svg>`;
+}
+function topoCreateRender() {
+  if (!topoCreate) return;
+  const step = topoCreate.step, n = TOPO_CREATE_STEPS.length, v = topoCreate.values;
+  $('topoCreateProgress').textContent = tr('', 'Step {x} of {n}').replace('{x}', String(step)).replace('{n}', String(n));
+  $('topoCreateRing').innerHTML = topoCreateRing(step, n);
+  $('topoCreateDots').innerHTML = TOPO_CREATE_STEPS.map((lb, i) =>
+    `<i class="topo-create-dot${i + 1 < step ? ' done' : ''}${i + 1 === step ? ' on' : ''}" title="${esc(tr('', lb))}"></i>`).join('');
+  $('topoCreateBack').hidden = step === 1;
+  const next = $('topoCreateNext');
+  next.textContent = step === n ? tr('', 'Create topology') : tr('', 'Next');
+  next.disabled = topoCreateBusy;
+  topoCreateError('');
+  if (step === 1) {
+    $('topoCreateBody').innerHTML = `<p class="qs-hint u-m-0">${esc(tr('', 'Choose this server\'s role'))}</p>` +
+      `<div class="topo-wiz-types" role="group" aria-label="${esc(tr('', 'Choose this server\'s role'))}">` +
+      `<button type="button" class="topo-wiz-type topo-create-role${v.role === 'iran' ? ' on' : ''}" data-create-role="iran" aria-pressed="${v.role === 'iran'}">${topologyFlagSvg('ir')}<b>${esc(tr('', 'Iran'))}</b><span>${esc(tr('', 'This server is inside Iran; the other server is abroad.'))}</span></button>` +
+      `<button type="button" class="topo-wiz-type topo-create-role${v.role === 'foreign' ? ' on' : ''}" data-create-role="foreign" aria-pressed="${v.role === 'foreign'}">${topologyFlagSvg('')}<b>${esc(tr('', 'Foreign'))}</b><span>${esc(tr('', 'This server is abroad; the other server is inside Iran.'))}</span></button>` +
+      `</div>`;
+    document.querySelectorAll('#topoCreateBody [data-create-role]').forEach(b => { b.onclick = () => { topoCreate.values.role = b.dataset.createRole; topoCreateDraftSave(); topoCreateRender(); }; });
+  } else if (step === 4) {
+    $('topoCreateBody').innerHTML = `<p class="qs-hint u-m-0">${esc(tr('', 'Used for the flag next to the foreign server.'))}</p>` +
+      `<div class="topo-create-flag">${topologyFlagSvg(v.country)}</div>` +
+      `<div class="fg"><label class="qs-label" for="topoCreateCountry">${esc(tr('', 'Foreign server country'))}</label><select class="quantum-input" id="topoCreateCountry">` +
+      TOPO_COUNTRIES.map(c => `<option value="${esc(c[0])}"${c[0] === v.country ? ' selected' : ''}>${esc(tr('', c[1]))}</option>`).join('') +
+      `</select></div>`;
+    $('topoCreateCountry').onchange = () => { topoCreateRead(); topoCreateRender(); };
+  } else if (step === 6) {
+    topoCreateRenderReview();
+  } else {
+    const [id, key] = TOPO_CREATE_FIELDS[step];
+    const label = { local: tr('', "This server's IP"), remote: tr('', "Other server's IP"), name: tr('', 'Topology name') }[key];
+    const hint = {
+      local: tr('', 'The address this server is reached at, IPv4 or IPv6.'),
+      remote: tr('', 'The public address of the other server.'),
+      name: tr('', 'Shown in the topology list and on the dashboard.')
+    }[key];
+    $('topoCreateBody').innerHTML = `<p class="qs-hint u-m-0">${esc(hint)}</p>` +
+      `<div class="fg"><label class="qs-label" for="${id}">${esc(label)}</label><input class="quantum-input u-mono" id="${id}" dir="ltr" value="${esc(v[key])}"${key === 'name' ? ' maxlength="120"' : ''}></div>`;
+    $(id).oninput = topoCreateRead; // every keystroke lands in the draft
+  }
+}
+function topoCreateRead() {
+  if (!topoCreate) return;
+  const f = TOPO_CREATE_FIELDS[topoCreate.step];
+  if (f) { const el = $(f[0]); if (el) topoCreate.values[f[1]] = String(el.value || '').trim(); }
+  topoCreateDraftSave();
+}
+function topoCreateRow(k, val) {
+  return `<div class="topo-wiz-row"><span>${esc(k)}</span><bdi>${esc(val || '—')}</bdi></div>`;
+}
+function topoCreateRenderReview() {
+  const v = topoCreate.values;
+  const rows = [
+    [tr('', 'Role'), tr('', v.role === 'foreign' ? 'Foreign' : 'Iran')],
+    [tr('', "This server's IP"), v.local],
+    [tr('', "Other server's IP"), v.remote],
+    [tr('', 'Foreign server country'), tr('', (TOPO_COUNTRIES.find(c => c[0] === v.country) || ['', 'Other'])[1])],
+    [tr('', 'Topology name'), v.name]
+  ];
+  $('topoCreateBody').innerHTML = `<div class="topo-wiz-review">${rows.map(r => topoCreateRow(r[0], r[1])).join('')}</div>` +
+    `<p class="qs-hint u-m-0">${esc(tr('', 'A topology becomes active once at least one tunnel is added to it.'))}</p>`;
+}
+function topoCreateNext() {
+  if (!topoCreate || topoCreateBusy) return;
+  topoCreateRead();
+  const v = topoCreate.values, n = TOPO_CREATE_STEPS.length;
+  const validIp = s => /^[0-9A-Fa-f.:]{3,45}$/.test(s) && /[.:]/.test(s);
+  if (topoCreate.step === 1) {
+    if (!v.role) { topoCreateError(tr('', 'Choose this server\'s role')); return; }
+  } else if (topoCreate.step === 2) {
+    if (!v.local) { topoCreateError(tr('', "Enter this server's IP address.")); return; }
+    if (!validIp(v.local)) { topoCreateError(tr('', 'Enter a valid IPv4 or IPv6 address.')); return; }
+  } else if (topoCreate.step === 3) {
+    if (!v.remote) { topoCreateError(tr('', "Enter the other server's IP address.")); return; }
+    if (!validIp(v.remote)) { topoCreateError(tr('', 'Enter a valid IPv4 or IPv6 address.')); return; }
+    if (v.remote === v.local) { topoCreateError(tr('', 'The two IP addresses must be different.')); return; }
+  } else if (topoCreate.step === 5) {
+    if (!v.name) { topoCreateError(tr('', 'Enter a name for the topology.')); return; }
+  } else if (topoCreate.step === n) { return topoCreateFinish(); }
+  topoCreate.step = Math.min(n, topoCreate.step + 1);
+  topoCreateDraftSave();
+  topoCreateRender();
+}
+function topoCreateBack() {
+  if (!topoCreate || topoCreateBusy || topoCreate.step === 1) return;
+  topoCreateRead(); // Back keeps everything typed so far
+  topoCreate.step--;
+  topoCreateDraftSave();
+  topoCreateRender();
+}
+async function topoCreateFinish() {
+  if (!topoCreate || topoCreateBusy) return;
+  topoCreateBusy = true;
+  topoCreateError('');
+  const btn = $('topoCreateNext');
+  btn.disabled = true;
+  const oldTxt = btn.textContent;
+  btn.innerHTML = '<span class="ent-spinner"></span> ' + esc(tr('', 'Creating…'));
+  const v = topoCreate.values;
+  try {
+    const r = await api('/api/topologies', { name: v.name, role: v.role, local_ip: v.local, remote_ip: v.remote, country: (v.country || '').toLowerCase(), tunnel_ids: [] });
+    topoCreateDraftClear();
+    topoCreate = null;
+    topologySelected = r.topology.id;
+    await topologyReload();
+    topoCreateHide();
+    toastOk(tr('', 'Topology created'), r.topology.name || '');
+    const add = $('topologyAddTunnelBtn');
+    if (add && add.focus) add.focus();
+  } catch (e) {
+    topoCreateError(e.message);
+    toastErr(tr('', 'Topology create failed'), e.message);
+  } finally {
+    topoCreateBusy = false;
+    btn.disabled = false;
+    btn.textContent = oldTxt;
+  }
+}
+
 function topologySetView(mode) {
   topologyViewMode = mode === 'grid' ? 'grid' : 'list';
   const listBtn = $('topologyViewListBtn'), gridBtn = $('topologyViewGridBtn');
@@ -739,6 +933,10 @@ $('topoWizCancelBtn').onclick = topoWizCancel;
 $('topoWizX').onclick = topoWizCancel;
 $('topoWizBack').onclick = topoWizBack;
 $('topoWizNext').onclick = topoWizNext;
+$('topoCreateCancelBtn').onclick = topoCreateCancel;
+$('topoCreateX').onclick = topoCreateCancel;
+$('topoCreateBack').onclick = topoCreateBack;
+$('topoCreateNext').onclick = topoCreateNext;
 $('topologySearch').addEventListener('input', e => { topologySearchQuery = (e && e.target ? e.target.value : '') || ''; topologyRender(); });
 $('topologyViewListBtn').onclick = () => topologySetView('list');
 $('topologyViewGridBtn').onclick = () => topologySetView('grid');

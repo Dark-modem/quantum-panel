@@ -3557,6 +3557,21 @@
   </div>
 </div>
 
+<!-- Add-topology wizard: role -> IPs -> country -> name -> review, with a circular step counter -->
+<div class="ent-modal-ov" id="topoCreateModal" hidden>
+  <div class="ent-modal topo-wiz-modal" role="dialog" aria-modal="true" aria-labelledby="topoCreateTitle">
+    <div class="ent-modal-h"><b id="topoCreateTitle" data-i18n="topology_create">Add topology</b><button type="button" class="ent-x" id="topoCreateX" aria-label="Close" data-i18n-aria="aria_close">×</button></div>
+    <div class="topo-wiz-head"><span class="topo-create-ring" id="topoCreateRing"></span><span class="topo-wiz-progress" id="topoCreateProgress"></span><span class="topo-create-dots" id="topoCreateDots" role="group" aria-label="Steps"></span></div>
+    <div class="ent-modal-b" id="topoCreateBody"></div>
+    <div class="xr-err hidden" id="topoCreateErr" role="alert"></div>
+    <div class="ent-modal-f">
+      <button type="button" class="quantum-btn quantum-btn-ghost" id="topoCreateCancelBtn">Cancel</button>
+      <button type="button" class="quantum-btn quantum-btn-secondary" id="topoCreateBack">Back</button>
+      <button type="button" class="quantum-btn quantum-btn-primary" id="topoCreateNext">Next</button>
+    </div>
+  </div>
+</div>
+
 <div class="ent-modal-ov" id="termAuthModal" hidden>
   <div class="ent-modal" role="dialog" aria-modal="true" aria-labelledby="termAuthTitle">
     <div class="ent-modal-h"><b id="termAuthTitle">Confirm it's you</b><button class="ent-x" id="termAuthX" aria-label="Close">×</button></div>
