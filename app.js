@@ -7788,7 +7788,12 @@ function renderUsage(d) {
   const bytes = v => v == null ? tr('dash_unknown', 'Unknown') : fmtBytes(v);
   const sum = sumOf(tot), windowSum = sumOf(win);
   const rows = Array.isArray(d.topologies) ? d.topologies.slice() : [];
-  if (d.unassigned) rows.push({ ...d.unassigned, name: tr('', 'Unassigned tunnels') });
+  // The unassigned bucket is only a fallback for tunnels (or detached history)
+  // outside every named topology; never render it as an empty placeholder row.
+  const un = d.unassigned;
+  if (un && (un.tunnel_count > 0 || (valid(un.rx) && un.rx > 0) || (valid(un.tx) && un.tx > 0))) {
+    rows.push({ ...un, name: tr('', 'Unassigned tunnels') });
+  }
   const top = Math.max(1, ...rows.map(l => sumOf(l) || 0));
   const list = rows.map(l => {
     const s = sumOf(l), rx = value(l, 'rx'), tx = value(l, 'tx');

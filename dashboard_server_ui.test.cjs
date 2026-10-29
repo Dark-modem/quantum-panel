@@ -94,6 +94,13 @@ const legacy = { online: false, health: 'DOWN', local_pub: '203.0.113.7', role: 
   assert.match(h.elements.usageBody.innerHTML,/Renamed grouping/); assert.doesNotMatch(h.elements.usageBody.innerHTML,/Named topology/);
   h.context.renderUsage({links:usage.links,topologies:[{name:'Unmeasured',rx:0,tx:0,known:false}]});
   assert.match(h.elements.usageBody.innerHTML,/Unknown/); assert.doesNotMatch(h.elements.usageBody.innerHTML,/0 B|888888/);
+  // The unassigned bucket is a fallback only: hidden when empty, shown with real content.
+  h.context.renderUsage({...usage,unassigned:{rx:0,tx:0,total:0,known:true,tunnel_count:0}});
+  assert.doesNotMatch(h.elements.usageBody.innerHTML,/Unassigned tunnels/);
+  h.context.renderUsage({...usage,unassigned:{rx:5,tx:6,total:11,known:true,tunnel_count:0}});
+  assert.match(h.elements.usageBody.innerHTML,/Unassigned tunnels/);
+  h.context.renderUsage({...usage,unassigned:{rx:null,tx:null,total:null,known:false,tunnel_count:0}});
+  assert.doesNotMatch(h.elements.usageBody.innerHTML,/Unassigned tunnels/);
   const seven = h.context.usageCols({range:'7d'},usage.server_window);
   assert.equal(seven.length,1); assert.equal(seven[0].rx,30); assert.equal(seven[0].tx,20);
 

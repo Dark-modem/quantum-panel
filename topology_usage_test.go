@@ -67,6 +67,22 @@ func TestTopologyUsageMissingIdleUnknownAndUnassigned(t *testing.T) {
 	}
 }
 
+func TestUnassignedUsageRowVisibility(t *testing.T) {
+	if unassignedUsageVisible(topologyUsageRow{usageAmount: usageAmount{Known: true}}) {
+		t.Fatal("empty unassigned bucket must not be emitted as a placeholder row")
+	}
+	for name, row := range map[string]topologyUsageRow{
+		"count":   {usageAmount: usageAmount{Known: true}, TunnelCount: 1},
+		"rx":      {usageAmount: usageAmount{Rx: 1, Known: true}},
+		"tx":      {usageAmount: usageAmount{Tx: 1, Known: true}},
+		"unknown": {usageAmount: usageAmount{Rx: 30, Tx: 5}},
+	} {
+		if !unassignedUsageVisible(row) {
+			t.Fatalf("unassigned with real content (%s) must stay visible: %+v", name, row)
+		}
+	}
+}
+
 func TestTopologyUsageLegacyMainAliasNotDoubleCounted(t *testing.T) {
 	s := newUsage()
 	for _, key := range []string{"main", "p1"} {
@@ -177,6 +193,9 @@ func TestTopologyUsageAPITruthfulContractNoProbes(t *testing.T) {
 	trafficUsage.observe("main", "main", now, up64(30), up64(40))
 	observeServerInterfaceUsage(now.Add(-time.Minute), map[string][2]uint64{"eth0": {1000, 2000}}, true)
 	observeServerInterfaceUsage(now, map[string][2]uint64{"eth0": {1100, 2200}}, true)
+	// Detached tunnel history with real traffic keeps the fallback bucket alive.
+	trafficUsage.observe("p9", "removed", now.Add(-time.Minute), up64(0), up64(0))
+	trafficUsage.observe("p9", "removed", now, up64(3), up64(4))
 	rec := httptest.NewRecorder()
 	handleUsageGet(rec, httptest.NewRequest(http.MethodGet, "/api/traffic/usage?range=1h", nil))
 	var response struct {
@@ -191,6 +210,15 @@ func TestTopologyUsageAPITruthfulContractNoProbes(t *testing.T) {
 	if response.Server.Total != 300 || response.Window.Total != 300 || response.Rows[0].Total != 70 || response.Rows[0].Known || response.Basis != "current_assignments" {
 		t.Fatalf("additive contract: %s", rec.Body.String())
 	}
+	var withUnassigned struct {
+		Unassigned topologyUsageRow `json:"unassigned"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &withUnassigned); err != nil {
+		t.Fatal(err)
+	}
+	if withUnassigned.Unassigned.Total != 7 || withUnassigned.Unassigned.TunnelCount != 1 {
+		t.Fatalf("unassigned fallback with traffic must stay visible: %s", rec.Body.String())
+	}
 	if err := os.WriteFile(topologyPath(), []byte("bad json"), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -198,5 +226,12 @@ func TestTopologyUsageAPITruthfulContractNoProbes(t *testing.T) {
 	handleUsageGet(rec, httptest.NewRequest(http.MethodGet, "/api/traffic/usage", nil))
 	if !strings.Contains(rec.Body.String(), `"topology_known":false`) || !strings.Contains(rec.Body.String(), `"topology_error"`) {
 		t.Fatalf("corrupt grouping cannot silently appear empty: %s", rec.Body.String())
+	}
+	var withoutUnassigned map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &withoutUnassigned); err != nil {
+		t.Fatal(err)
+	}
+	if _, exists := withoutUnassigned["unassigned"]; exists {
+		t.Fatalf("no unassigned row without topologies: %s", rec.Body.String())
 	}
 }

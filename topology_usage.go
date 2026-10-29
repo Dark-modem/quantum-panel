@@ -148,6 +148,13 @@ func usageIDFromKey(key string) string {
 	return ""
 }
 
+// The unassigned bucket is a fallback for tunnels (or their retained history)
+// that no current grouping owns. With every tunnel assigned and no detached
+// history it is empty, and must not be emitted as a placeholder row.
+func unassignedUsageVisible(row topologyUsageRow) bool {
+	return row.TunnelCount > 0 || row.Rx > 0 || row.Tx > 0
+}
+
 // topologyTotals does not take topology/engine locks. Callers read grouping
 // metadata and inventory first, release their locks, then query the usage mutex.
 func (s *usageStore) topologyTotals(now time.Time, window time.Duration, step int64, groups []Topology, inventory []topologyTunnel, snapshot *HubSnapshot) ([]topologyUsageRow, topologyUsageRow) {
@@ -309,15 +316,17 @@ func usageResponse(now time.Time, window time.Duration, step int64, rangeName st
 	out := map[string]any{
 		"range": rangeName, "keep_days": int(usageKeep / (24 * time.Hour)), "step_sec": step, "now": now.Unix(),
 		"links":        trafficUsage.all(now, window, step),
-		"server_total": server, "server_window": serverWindow, "topologies": rows, "unassigned": unassigned,
+		"server_total": server, "server_window": serverWindow, "topologies": rows,
 		"grouping_basis": "current_assignments", "server_basis": "physical_interfaces", "topology_basis": "recorded_tunnel_counters",
 		"topology_known": err == nil,
+	}
+	// Grouping metadata is unavailable: no unassigned fallback row either.
+	if err == nil && unassignedUsageVisible(unassigned) {
+		out["unassigned"] = unassigned
 	}
 	if err != nil {
 		out["topology_error"] = "cannot read topology collection"
 		out["topologies"] = []topologyUsageRow{}
-		unassigned.Known = false
-		out["unassigned"] = unassigned
 	}
 	return out
 }
