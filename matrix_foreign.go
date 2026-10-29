@@ -143,7 +143,7 @@ func handleMatrixForeignRemove(w http.ResponseWriter, r *http.Request) {
 // host files are filled around key generation (own key locally, the hub's
 // host file arrives with the registration answer).
 func matrixWriteNode(family string, port int) (string, error) {
-	name := "matrix-f" + randHex(4)
+	name := "matrixf" + randHex(4)
 	if err := os.MkdirAll(filepath.Join(matrixConfDir, "hosts"), 0755); err != nil {
 		return "", err
 	}
