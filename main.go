@@ -90,8 +90,8 @@ func effectiveTLSPort() int {
 var (
 	cfg panelConfig
 	// panelVersion is set at release build time:
-	// go build -ldflags "-X main.panelVersion=v1.22.10"
-	panelVersion = "v1.22.10"
+	// go build -ldflags "-X main.panelVersion=v1.23.0"
+	panelVersion = "v1.23.0"
 	// panelMux is shared between the HTTP listener and the HTTPS listener.
 	panelMux *http.ServeMux
 )
@@ -663,6 +663,7 @@ func main() {
 	mux.HandleFunc("POST "+base+"/api/topologies", requireAuth(requireCSRF(handleTopologiesPost)))
 	mux.HandleFunc("PATCH "+base+"/api/topologies/{id}", requireAuth(requireCSRF(handleTopologyPatch)))
 	mux.HandleFunc("DELETE "+base+"/api/topologies/{id}", requireAuth(requireCSRF(handleTopologyDelete)))
+	mux.HandleFunc("POST "+base+"/api/topologies/{id}/active", requireAuth(requireCSRF(handleTopologyPowerPost)))
 	mux.HandleFunc("POST "+base+"/api/matrix/edit", requireAuth(requireCSRF(handleMatrixEdit)))
 	mux.HandleFunc("POST "+base+"/api/matrix/register", handleMatrixRegister)
 	mux.HandleFunc("GET "+base+"/api/update/peer", requireAuth(handleUpdatePeer))
