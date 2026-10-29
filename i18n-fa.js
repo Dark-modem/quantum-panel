@@ -3010,7 +3010,7 @@ window.FA_TEXT = {
 "A topology groups tunnels between two servers. Create the topology first, then add or attach tunnels.": "توپولوژی گروهی از تونل‌های بین دو سرور است. ابتدا توپولوژی را بسازید و سپس تونل‌ها را اضافه یا به آن متصل کنید.",
 "Unassigned tunnels": "تونل‌های بدون توپولوژی",
 "Existing tunnels keep running. Open a topology to attach them without recreating them.": "تونل‌های موجود فعال می‌مانند. یک توپولوژی را باز کنید تا بدون ساخت مجدد، به آن متصل شوند.",
-"Back to topologies": "بازگشت به توپولوژی‌ها",
+"Back to the list": "بازگشت به لیست",
 "Topology name": "نام توپولوژی",
 "This server's role": "نقش سرور فعلی",
 "Other server's IP": "آی‌پی سرور مقابل",
