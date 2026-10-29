@@ -36,12 +36,12 @@ func TestParseSSListeners(t *testing.T) {
 
 func TestXrayOwnerLabel(t *testing.T) {
 	cases := map[string]xrayListener{
-		"3x-ui (x-ui)":           {Proc: "xray-linux-amd6", Exe: "/usr/local/x-ui/bin/xray-linux-amd64"},
-		"Marzban":                {Proc: "xray", Exe: "/var/lib/marzban/xray-core/xray"},
-		"a Docker container":     {Proc: "docker-proxy"},
+		"3x-ui (x-ui)":            {Proc: "xray-linux-amd6", Exe: "/usr/local/x-ui/bin/xray-linux-amd64"},
+		"Marzban":                 {Proc: "xray", Exe: "/var/lib/marzban/xray-core/xray"},
+		"a Docker container":      {Proc: "docker-proxy"},
 		"the Quantum Xray tunnel": {Proc: "xray", Exe: xrayBinPath},
-		"xray":                   {Proc: "xray", Exe: "/usr/local/bin/xray"},
-		"another program":        {},
+		"xray":                    {Proc: "xray", Exe: "/usr/local/bin/xray"},
+		"another program":         {},
 	}
 	for want, l := range cases {
 		if got := xrayOwnerLabel(l); got != want {
