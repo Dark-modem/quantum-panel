@@ -1248,7 +1248,7 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 .topo-menu { position:relative; }
 .topo-kebab { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px;
   border-radius:999px; border:0; background:transparent; color:var(--mu); cursor:pointer; }
-.topo-kebab svg { width:18px; height:18px; fill:currentColor; stroke:none; }
+.topo-kebab svg { width:18px; height:18px; fill:currentColor; stroke:none; flex:none; }
 .topo-kebab:hover, .topo-kebab[aria-expanded="true"] { color:var(--tx); background:var(--s3); }
 /* fixed + JS-positioned: the list wrap clips overflow, so an anchored pop
    would be cut off before it can be seen */
