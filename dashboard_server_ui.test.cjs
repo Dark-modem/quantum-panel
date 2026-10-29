@@ -88,18 +88,27 @@ const legacy = { online: false, health: 'DOWN', local_pub: '203.0.113.7', role: 
     unassigned:{rx:null,tx:null,total:null,known:false,tunnel_count:1},links:[{name:'Wrong tunnel total',rx:888888,tx:999999}]};
   h.context.renderUsage(usage); const html = h.elements.usageBody.innerHTML;
   assert.match(html,/Server total.*1500 B/); assert.match(html,/Selected range.*50 B/); assert.match(html,/Named topology/);
-  assert.match(html,/Unassigned tunnels/); assert.match(html,/Unknown/); assert.match(html,/ug-chart/); assert.doesNotMatch(html,/Wrong tunnel total|888888|999999/);
+  // Stale deleted-entity data (unknown traffic, history-only tunnel count)
+  // must never resurrect the unassigned row.
+  assert.doesNotMatch(html,/Unassigned tunnels/);
+  assert.match(html,/ug-chart/); assert.doesNotMatch(html,/Wrong tunnel total|888888|999999/);
   assert.equal((html.match(/class="ug-col"/g)||[]).length,2);
   usage.topologies[0].name = 'Renamed grouping'; h.context.renderUsage(usage);
   assert.match(h.elements.usageBody.innerHTML,/Renamed grouping/); assert.doesNotMatch(h.elements.usageBody.innerHTML,/Named topology/);
   h.context.renderUsage({links:usage.links,topologies:[{name:'Unmeasured',rx:0,tx:0,known:false}]});
   assert.match(h.elements.usageBody.innerHTML,/Unknown/); assert.doesNotMatch(h.elements.usageBody.innerHTML,/0 B|888888/);
-  // The unassigned bucket is a fallback only: hidden when empty, shown with real content.
+  // The unassigned bucket is a fallback only: hidden when empty, stale-only or
+  // unknown, shown only for a live unassigned tunnel with measured nonzero traffic.
   h.context.renderUsage({...usage,unassigned:{rx:0,tx:0,total:0,known:true,tunnel_count:0}});
   assert.doesNotMatch(h.elements.usageBody.innerHTML,/Unassigned tunnels/);
+  h.context.renderUsage({...usage,unassigned:{rx:null,tx:null,total:null,known:false,tunnel_count:1}});
+  assert.doesNotMatch(h.elements.usageBody.innerHTML,/Unassigned tunnels/);
   h.context.renderUsage({...usage,unassigned:{rx:5,tx:6,total:11,known:true,tunnel_count:0}});
+  assert.doesNotMatch(h.elements.usageBody.innerHTML,/Unassigned tunnels/);
+  h.context.renderUsage({...usage,unassigned:{rx:5,tx:6,total:11,known:true,tunnel_count:1}});
   assert.match(h.elements.usageBody.innerHTML,/Unassigned tunnels/);
-  h.context.renderUsage({...usage,unassigned:{rx:null,tx:null,total:null,known:false,tunnel_count:0}});
+  // Zero topologies plus stale deleted-tunnel data: no row at all.
+  h.context.renderUsage({...usage,topologies:[],unassigned:{rx:null,tx:null,total:null,known:false,tunnel_count:1}});
   assert.doesNotMatch(h.elements.usageBody.innerHTML,/Unassigned tunnels/);
   const seven = h.context.usageCols({range:'7d'},usage.server_window);
   assert.equal(seven.length,1); assert.equal(seven[0].rx,30); assert.equal(seven[0].tx,20);

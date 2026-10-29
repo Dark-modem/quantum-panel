@@ -272,18 +272,77 @@ func (s *usageStore) prune(now time.Time) {
 	}
 }
 
+// ---- deletion purge --------------------------------------------------------
+
+// purge deletes whole ledger links right now: minute points, day totals,
+// baselines and lifetime counters. Deleting a tunnel or a topology must leave
+// nothing of it behind, so this bypasses the 7-day retention that live links
+// keep for rename identity and history. A link whose counter was only an alias
+// of a purged one (a legacy peer recorded under "main") is purged with it.
+// When the ledger file exists it is rewritten in the same call, so a restart
+// cannot resurrect the deleted records; without a file there is nothing on
+// disk to resurrect and the periodic saver persists the emptied state.
+func (s *usageStore) purge(keys ...string) {
+	target := make(map[string]bool, len(keys))
+	for _, k := range keys {
+		if k != "" {
+			target[k] = true
+		}
+	}
+	if len(target) == 0 {
+		return
+	}
+	s.mu.Lock()
+	for key, l := range s.links {
+		if target[key] || l != nil && target[l.AliasOf] {
+			delete(s.links, key)
+			s.dirty = true
+		}
+	}
+	s.mu.Unlock()
+	// Persist the purged state when a ledger file exists, so a restart cannot
+	// resurrect the deleted records; without a file there is nothing on disk
+	// to purge and the periodic saver persists the emptied state. The retention
+	// sweep is deliberately not run here: the purge only removes the deleted
+	// entity's records, pruning stays the periodic saver's job.
+	if _, err := os.Stat(usageFile()); err != nil {
+		return
+	}
+	s.mu.Lock()
+	b, err := s.encodeLocked(time.Now().Unix())
+	s.mu.Unlock()
+	if err == nil {
+		_ = writeUsageAtomic(usageFile(), b)
+	}
+}
+
+// purgeTunnelUsage drops every usage record of deleted tunnels inside the
+// delete request itself. ids are topology tunnel IDs ("main", "peer:3",
+// "matrix", "matrix2", "bagher:2", "xray:4") — exactly the keys under which the
+// ledger recorded their history, so a deleted tunnel can never surface again,
+// neither in a topology row nor in the unassigned bucket.
+func purgeTunnelUsage(ids ...string) {
+	keys := make([]string, 0, len(ids))
+	for _, id := range ids {
+		if id != "" {
+			keys = append(keys, topologyUsageKey(id))
+		}
+	}
+	trafficUsage.purge(keys...)
+}
+
 // ---- persistence -----------------------------------------------------------
 
-func (s *usageStore) save(path string, now time.Time) error {
-	s.prune(now)
-	s.mu.Lock()
-	d := usageDisk{Version: usageFileVer, SavedAt: now.Unix(), Links: s.links}
-	b, err := json.Marshal(d)
+// encodeLocked serializes the current in-memory state and clears the dirty
+// flag. Caller holds s.mu.
+func (s *usageStore) encodeLocked(savedAt int64) ([]byte, error) {
 	s.dirty = false
-	s.mu.Unlock()
-	if err != nil {
-		return err
-	}
+	return json.Marshal(usageDisk{Version: usageFileVer, SavedAt: savedAt, Links: s.links})
+}
+
+// writeUsageAtomic publishes b through a private temp file and a rename, so a
+// crash never leaves a half-written ledger behind.
+func writeUsageAtomic(path string, b []byte) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		return err
 	}
@@ -304,6 +363,17 @@ func (s *usageStore) save(path string, now time.Time) error {
 		return err
 	}
 	return os.Rename(tmp, path)
+}
+
+func (s *usageStore) save(path string, now time.Time) error {
+	s.prune(now)
+	s.mu.Lock()
+	b, err := s.encodeLocked(now.Unix())
+	s.mu.Unlock()
+	if err != nil {
+		return err
+	}
+	return writeUsageAtomic(path, b)
 }
 
 // load restores the ledger. A missing, corrupt or unknown-version file is

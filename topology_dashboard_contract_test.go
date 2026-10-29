@@ -175,7 +175,29 @@ func TestTopologyDashboardNameContract(t *testing.T) {
 		t.Fatalf("group DELETE after engine removal failed: %d %s", w.Code, w.Body.String())
 	}
 	topologyInventory = originalInventory
-	assertPhysicalUnchanged()
+	// Deleting the topology purges the usage records still keyed by its listed
+	// tunnels; the physical snapshot and unrelated live series stay untouched.
+	if snapPtr.Load() != snap || topologyContractJSON(t, snap) != beforeSnapshot {
+		t.Fatal("group delete changed physical snapshot, engine identity, or counters")
+	}
+	if trafficUsage.links["main"] != nil {
+		t.Fatal("group delete must purge the usage records of its listed tunnels")
+	}
+	if l := trafficUsage.links[usageHostKey]; l == nil || len(l.Points) != 1 || l.CumulativeRx != 40 {
+		t.Fatalf("group delete must not purge unrelated live series: %+v", l)
+	}
+	for name, want := range files {
+		if name == "traffic_peers.json" {
+			continue // the deletion purge rewrites the ledger file
+		}
+		got, err := os.ReadFile(filepath.Join(configDir, name))
+		if err != nil || string(got) != want {
+			t.Fatalf("grouping delete changed %s: %q (%v)", name, got, err)
+		}
+	}
+	if data, err := os.ReadFile(filepath.Join(configDir, "traffic_peers.json")); err != nil || !json.Valid(data) {
+		t.Fatalf("purge must leave a valid persisted ledger: %q (%v)", data, err)
+	}
 }
 
 // Current-assignment usage is keyed by stable topology identity, never its

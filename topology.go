@@ -479,6 +479,11 @@ func handleTopologyDelete(w http.ResponseWriter, r *http.Request) {
 			topologyError(w, http.StatusInternalServerError, "cannot save topology collection")
 			return
 		}
+		// Deleting the grouping purges the usage records still keyed by its
+		// listed tunnels (all of them are absent from the inventory here, so no
+		// live tunnel's history is touched): nothing of a deleted topology may
+		// keep rendering anywhere.
+		purgeTunnelUsage(t.TunnelIDs...)
 		writeJSON(w, map[string]any{"status": "ok", "id": id})
 		return
 	}

@@ -1135,9 +1135,13 @@ func handleXrayPost(w http.ResponseWriter, r *http.Request) {
 		if !ok {
 			return
 		}
-		stopXrayLink(st.Links[i].ID, true)
+		id := st.Links[i].ID
+		stopXrayLink(id, true)
 		st.Links = append(st.Links[:i], st.Links[i+1:]...)
 		_ = saveXrayState(st)
+		// The link is deleted: its recorded traffic must not survive as an
+		// unassigned or stale row anywhere.
+		purgeTunnelUsage("xray:" + strconv.Itoa(id))
 		writeJSON(w, map[string]any{"status": "ok"})
 
 	default:

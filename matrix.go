@@ -1050,6 +1050,9 @@ func handleMatrixRemovePost(w http.ResponseWriter, r *http.Request) {
 			writeAPIError(w, r, "E-MATRIX-07", e.Error())
 			return
 		}
+		// The instance is gone: its recorded traffic must not survive as an
+		// unassigned or stale row anywhere.
+		purgeTunnelUsage(in.ID)
 	}
 	LogSecurityAudit("matrix_remove", cfg.Username, ClientIP(r), "instance="+in.ID+" removed owned network")
 	writeJSON(w, map[string]string{"status": "ok", "detail": "Matrix removed; unrelated tinc networks and firewall rules preserved"})

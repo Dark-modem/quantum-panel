@@ -34,17 +34,24 @@ function toastMsg(kind, title, sub) {
     sub = title.slice(i + 1).replace(/^↪\s*/, '');
     title = title.slice(0, i);
   }
+  const life = kind === 'err' ? 5000 : 2800;
   const el = document.createElement('div');
   el.className = 'ent-toast ' + kind;
   el.setAttribute('role', kind === 'err' ? 'alert' : 'status');
   const b = document.createElement('b'); b.textContent = title;
-  const wrap = document.createElement('div'); wrap.appendChild(b);
+  const wrap = document.createElement('div'); wrap.className = 'ent-toast-body'; wrap.appendChild(b);
   if (sub) { const s = document.createElement('small'); s.textContent = sub; wrap.appendChild(s); }
   const dot = document.createElement('i');
-  el.appendChild(dot); el.appendChild(wrap);
+  // the green life line drains as the toast ages; × dismisses it at once
+  let gone = false;
+  const dismiss = () => { if (gone) return; gone = true; el.style.opacity = '0'; el.style.transition = 'opacity .3s'; setTimeout(() => el.remove(), 320); };
+  const bar = document.createElement('span'); bar.className = 'ent-toast-life'; bar.style.animationDuration = life + 'ms';
+  const x = document.createElement('button'); x.type = 'button'; x.className = 'ent-toast-x'; x.setAttribute('aria-label', tr('', 'Dismiss')); x.textContent = '×';
+  x.onclick = dismiss;
+  el.appendChild(dot); el.appendChild(wrap); el.appendChild(x); el.appendChild(bar);
   box.appendChild(el);
   while (box.children.length > 4) box.firstChild.remove();
-  setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .3s'; setTimeout(() => el.remove(), 320); }, kind === 'err' ? 5000 : 2800);
+  setTimeout(dismiss, life);
 }
 // ---- Error surfacing: console.warn + deduplicated, rate-limited toast (language-aware) ----
 const _errSeen = new Map();
@@ -7814,10 +7821,14 @@ function renderUsage(d) {
   const bytes = v => v == null ? tr('dash_unknown', 'Unknown') : fmtBytes(v);
   const sum = sumOf(tot), windowSum = sumOf(win);
   const rows = Array.isArray(d.topologies) ? d.topologies.slice() : [];
-  // The unassigned bucket is only a fallback for tunnels (or detached history)
-  // outside every named topology; never render it as an empty placeholder row.
+  // The unassigned bucket is only a fallback for a live tunnel outside every
+  // named topology; never render it as an empty placeholder row. Unknown
+  // traffic stays unknown: unreadable or stale-only records (a deleted tunnel
+  // or topology is purged server-side) must never resurrect the row, so it
+  // needs a live tunnel AND measured nonzero traffic.
   const un = d.unassigned;
-  if (un && (un.tunnel_count > 0 || (valid(un.rx) && un.rx > 0) || (valid(un.tx) && un.tx > 0))) {
+  if (un && un.tunnel_count > 0 && un.known === true &&
+      ((valid(un.rx) && un.rx > 0) || (valid(un.tx) && un.tx > 0))) {
     rows.push({ ...un, name: tr('', 'Unassigned tunnels') });
   }
   const top = Math.max(1, ...rows.map(l => sumOf(l) || 0));

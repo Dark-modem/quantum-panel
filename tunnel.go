@@ -307,6 +307,9 @@ func removeViaInstaller() (string, error) {
 	if runErr != nil {
 		return o, fmt.Errorf("remove-tunnel failed: %w", runErr)
 	}
+	// The main tunnel is gone: its usage records (and the alias history of
+	// legacy peers recorded under "main") must not survive it anywhere.
+	purgeTunnelUsage(usageMainKey)
 	return o, nil
 }
 
@@ -518,6 +521,9 @@ func (l *peerLive) applyHealth(sig LinkSignals, ic icmpResult) {
 }
 
 func removePeerViaInstaller(id int) (string, error) {
+	// The record must be read before removal: the installer drops it from the
+	// registry, and the alias decision below needs it.
+	p := findPeer(id)
 	script, err := greScriptPath()
 	if err != nil {
 		return "", err
@@ -534,8 +540,9 @@ func removePeerViaInstaller(id int) (string, error) {
 	if runErr != nil {
 		// Stale installer without remove-peer: fall back to direct removal
 		// from the registry record (same units the installer would stop).
-		if p := findPeer(id); p != nil && isMissingRemovePeer(o) {
+		if p != nil && isMissingRemovePeer(o) {
 			if fo, ferr := removePeerDirect(p); ferr == nil {
+				purgeRemovedPeerUsage(p, id)
 				return fo, nil
 			} else {
 				return o, fmt.Errorf("remove-peer failed (%v) and fallback failed: %v", runErr, ferr)
@@ -544,7 +551,19 @@ func removePeerViaInstaller(id int) (string, error) {
 		return o, fmt.Errorf("remove-peer failed: %w", runErr)
 	}
 	invalidatePeerIfsCache()
+	purgeRemovedPeerUsage(p, id)
 	return o, nil
+}
+
+// purgeRemovedPeerUsage drops a deleted peer's usage records in the same
+// request. A legacy peer 1 shares the main tunnel's counter, so its history is
+// recorded under "main" and must go with it; a standalone peer is keyed "pN".
+func purgeRemovedPeerUsage(p *peerRecord, id int) {
+	ids := []string{"peer:" + strconv.Itoa(id)}
+	if p != nil && (p.Legacy || p.GreIf == "gre-tunnel") {
+		ids = append(ids, usageMainKey)
+	}
+	purgeTunnelUsage(ids...)
 }
 
 // isMissingRemovePeer reports whether installer output means the script has

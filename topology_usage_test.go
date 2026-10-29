@@ -72,13 +72,22 @@ func TestUnassignedUsageRowVisibility(t *testing.T) {
 		t.Fatal("empty unassigned bucket must not be emitted as a placeholder row")
 	}
 	for name, row := range map[string]topologyUsageRow{
-		"count":   {usageAmount: usageAmount{Known: true}, TunnelCount: 1},
-		"rx":      {usageAmount: usageAmount{Rx: 1, Known: true}},
-		"tx":      {usageAmount: usageAmount{Tx: 1, Known: true}},
-		"unknown": {usageAmount: usageAmount{Rx: 30, Tx: 5}},
+		"rx": {usageAmount: usageAmount{Rx: 1, Known: true}, TunnelCount: 1},
+		"tx": {usageAmount: usageAmount{Tx: 1, Known: true}, TunnelCount: 1},
 	} {
 		if !unassignedUsageVisible(row) {
-			t.Fatalf("unassigned with real content (%s) must stay visible: %+v", name, row)
+			t.Fatalf("unassigned with a live tunnel and measured traffic (%s) must stay visible: %+v", name, row)
+		}
+	}
+	for name, row := range map[string]topologyUsageRow{
+		// Unknown traffic must never satisfy visibility, even with a count.
+		"unknown":    {usageAmount: usageAmount{Rx: 30, Tx: 5}, TunnelCount: 1},
+		"stale-only": {usageAmount: usageAmount{Rx: 5, Known: true}},          // no live unassigned tunnel
+		"zero":       {usageAmount: usageAmount{Known: true}, TunnelCount: 1}, // measured idle
+		"count-only": {usageAmount: usageAmount{Known: true, Rx: 0, Tx: 0}, TunnelCount: 1},
+	} {
+		if unassignedUsageVisible(row) {
+			t.Fatalf("unassigned without a live tunnel and measured traffic (%s) must not render: %+v", name, row)
 		}
 	}
 }
@@ -193,7 +202,8 @@ func TestTopologyUsageAPITruthfulContractNoProbes(t *testing.T) {
 	trafficUsage.observe("main", "main", now, up64(30), up64(40))
 	observeServerInterfaceUsage(now.Add(-time.Minute), map[string][2]uint64{"eth0": {1000, 2000}}, true)
 	observeServerInterfaceUsage(now, map[string][2]uint64{"eth0": {1100, 2200}}, true)
-	// Detached tunnel history with real traffic keeps the fallback bucket alive.
+	// Detached tunnel history (a removed tunnel's stale records) must never
+	// resurrect the fallback row, even with recorded traffic.
 	trafficUsage.observe("p9", "removed", now.Add(-time.Minute), up64(0), up64(0))
 	trafficUsage.observe("p9", "removed", now, up64(3), up64(4))
 	rec := httptest.NewRecorder()
@@ -210,14 +220,25 @@ func TestTopologyUsageAPITruthfulContractNoProbes(t *testing.T) {
 	if response.Server.Total != 300 || response.Window.Total != 300 || response.Rows[0].Total != 70 || response.Rows[0].Known || response.Basis != "current_assignments" {
 		t.Fatalf("additive contract: %s", rec.Body.String())
 	}
+	var withoutStale map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &withoutStale); err != nil {
+		t.Fatal(err)
+	}
+	if _, exists := withoutStale["unassigned"]; exists {
+		t.Fatalf("detached history must not render the unassigned row: %s", rec.Body.String())
+	}
+	// A live unassigned tunnel with measured traffic keeps the fallback row.
+	topologyInventory = func() []topologyTunnel { return []topologyTunnel{{ID: "main"}, {ID: "peer:2"}, {ID: "peer:9"}} }
+	rec = httptest.NewRecorder()
+	handleUsageGet(rec, httptest.NewRequest(http.MethodGet, "/api/traffic/usage?range=1h", nil))
 	var withUnassigned struct {
 		Unassigned topologyUsageRow `json:"unassigned"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &withUnassigned); err != nil {
 		t.Fatal(err)
 	}
-	if withUnassigned.Unassigned.Total != 7 || withUnassigned.Unassigned.TunnelCount != 1 {
-		t.Fatalf("unassigned fallback with traffic must stay visible: %s", rec.Body.String())
+	if withUnassigned.Unassigned.Total != 7 || withUnassigned.Unassigned.TunnelCount != 1 || !withUnassigned.Unassigned.Known {
+		t.Fatalf("live unassigned tunnel with measured traffic must stay visible: %s", rec.Body.String())
 	}
 	if err := os.WriteFile(topologyPath(), []byte("bad json"), 0600); err != nil {
 		t.Fatal(err)
@@ -233,5 +254,132 @@ func TestTopologyUsageAPITruthfulContractNoProbes(t *testing.T) {
 	}
 	if _, exists := withoutUnassigned["unassigned"]; exists {
 		t.Fatalf("no unassigned row without topologies: %s", rec.Body.String())
+	}
+}
+
+// Deleting a tunnel must remove its usage records in the same request: not
+// left as an unassigned row, not resurrected from the ledger file on restart.
+func TestPurgeTunnelUsageOnDelete(t *testing.T) {
+	old, oldDir := trafficUsage, configDir
+	trafficUsage, configDir = newUsage(), t.TempDir()
+	t.Cleanup(func() { trafficUsage, configDir = old, oldDir })
+	trafficUsage.observe("main", "Main", t0, up64(0), up64(0))
+	trafficUsage.observe("main", "Main", t0.Add(time.Minute), up64(30), up64(4))
+	trafficUsage.observe("p2", "Peer two", t0, up64(0), up64(0))
+	trafficUsage.observe("p2", "Peer two", t0.Add(time.Minute), up64(7), up64(2))
+	trafficUsage.observe("xray:4", "Xray", t0, up64(0), up64(0))
+	trafficUsage.observe("xray:4", "Xray", t0.Add(time.Minute), up64(9), up64(1))
+	trafficUsage.mu.Lock()
+	trafficUsage.links["p1"] = &usageLink{Name: "legacy", AliasOf: usageMainKey, Days: map[string]usageDay{}}
+	trafficUsage.mu.Unlock()
+	if err := trafficUsage.save(usageFile(), t0.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	// Deleting one tunnel purges exactly its records; live tunnels keep their
+	// 7-day history.
+	purgeTunnelUsage("peer:2")
+	if trafficUsage.links["p2"] != nil {
+		t.Fatal("deleting a tunnel must purge its usage records immediately")
+	}
+	if trafficUsage.links[usageMainKey] == nil || trafficUsage.links["xray:4"] == nil {
+		t.Fatal("unrelated live links must survive the purge")
+	}
+	// Deleting the main tunnel takes its alias history (legacy peer 1) with it.
+	purgeTunnelUsage(usageMainKey)
+	if trafficUsage.links[usageMainKey] != nil || trafficUsage.links["p1"] != nil {
+		t.Fatal("main tunnel deletion must purge its records and alias history")
+	}
+	if trafficUsage.links["xray:4"] == nil {
+		t.Fatal("unrelated live links must survive the purge")
+	}
+	// The purged state is on disk: a restart must not resurrect the records.
+	fresh := newUsage()
+	if n := fresh.load(usageFile(), t0.Add(2*time.Minute)); n != 1 {
+		t.Fatalf("restart must load only the surviving link, got %d", n)
+	}
+	if fresh.links["p2"] != nil || fresh.links[usageMainKey] != nil || fresh.links["p1"] != nil {
+		t.Fatal("deleted tunnels must never be resurrected from the ledger file")
+	}
+}
+
+// A legacy peer 1 shares the main tunnel's counter, so its purge must cover
+// "main" too; a standalone peer purges only its own key.
+func TestPurgeRemovedPeerUsageKeys(t *testing.T) {
+	old, oldDir := trafficUsage, configDir
+	trafficUsage, configDir = newUsage(), t.TempDir()
+	t.Cleanup(func() { trafficUsage, configDir = old, oldDir })
+	for _, key := range []string{"main", "p1", "p3"} {
+		trafficUsage.observe(key, key, t0, up64(0), up64(0))
+		trafficUsage.observe(key, key, t0.Add(time.Minute), up64(4), up64(4))
+	}
+	purgeRemovedPeerUsage(&peerRecord{ID: 1, Legacy: true}, 1)
+	if trafficUsage.links["p1"] != nil || trafficUsage.links[usageMainKey] != nil || trafficUsage.links["p3"] == nil {
+		t.Fatalf("legacy peer 1 removal must purge p1 and main only: %+v", trafficUsage.links)
+	}
+	purgeRemovedPeerUsage(&peerRecord{ID: 3, GreIf: "gre-t3"}, 3)
+	if trafficUsage.links["p3"] != nil || trafficUsage.links[usageMainKey] != nil {
+		t.Fatalf("standalone peer removal must purge p3 only: %+v", trafficUsage.links)
+	}
+}
+
+// Deleting a topology purges the usage records still keyed by its listed
+// tunnels in the same request.
+func TestTopologyDeletePurgesItsUsageRecords(t *testing.T) {
+	topologyFixture(t)
+	old := trafficUsage
+	trafficUsage = newUsage()
+	t.Cleanup(func() { trafficUsage = old })
+	// peer:5's tunnel is already gone; only its ledger history remains, still
+	// listed in the topology's stored bindings.
+	trafficUsage.observe("p5", "Removed tunnel", t0, up64(0), up64(0))
+	trafficUsage.observe("p5", "Removed tunnel", t0.Add(time.Minute), up64(11), up64(6))
+	group := topologyDeleteStored(t, []string{"peer:5"})
+	topologyInventory = func() []topologyTunnel { return []topologyTunnel{{ID: "peer:8", State: "healthy"}} }
+	w := topologyRequest(http.MethodDelete, group.ID, "")
+	if w.Code != http.StatusOK {
+		t.Fatalf("DELETE stale topology: %d %s", w.Code, w.Body.String())
+	}
+	trafficUsage.mu.Lock()
+	_, alive := trafficUsage.links["p5"]
+	trafficUsage.mu.Unlock()
+	if alive {
+		t.Fatal("deleting a topology must purge the usage records of its listed tunnels")
+	}
+}
+
+// Zero topologies plus stale ledger history: the API must not emit an
+// unassigned row at all (the reported «تونل‌های بدون توپولوژی» bug).
+func TestUsageAPIStaleHistoryAloneShowsNoUnassignedRow(t *testing.T) {
+	oldUsage, oldDir, oldInventory, oldSnap := trafficUsage, configDir, topologyInventory, snapPtr.Load()
+	trafficUsage, configDir = newUsage(), t.TempDir()
+	topologyInventory = func() []topologyTunnel { return []topologyTunnel{} }
+	snapPtr.Store(nil)
+	t.Cleanup(func() {
+		trafficUsage, configDir, topologyInventory = oldUsage, oldDir, oldInventory
+		snapPtr.Store(oldSnap)
+	})
+	// What the stale deleted tunnel left behind: recent records whose counters
+	// are no longer measured (unknown) and whose ID is no longer in the
+	// inventory — the exact shape of the reported bug.
+	now := time.Now()
+	trafficUsage.observe("p7", "deleted tunnel", now.Add(-time.Minute), up64(0), up64(0))
+	trafficUsage.observe("p7", "deleted tunnel", now, up64(30), up64(5))
+	rec := httptest.NewRecorder()
+	handleUsageGet(rec, httptest.NewRequest(http.MethodGet, "/api/traffic/usage?range=7d", nil))
+	var out struct {
+		Topologies []topologyUsageRow `json:"topologies"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		t.Fatal(err)
+	}
+	if len(out.Topologies) != 0 {
+		t.Fatalf("no topology rows without topologies: %s", rec.Body.String())
+	}
+	var m map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &m); err != nil {
+		t.Fatal(err)
+	}
+	if _, exists := m["unassigned"]; exists {
+		t.Fatalf("stale history alone must not emit an unassigned row: %s", rec.Body.String())
 	}
 }

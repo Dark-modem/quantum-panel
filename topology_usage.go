@@ -150,9 +150,13 @@ func usageIDFromKey(key string) string {
 
 // The unassigned bucket is a fallback for tunnels (or their retained history)
 // that no current grouping owns. With every tunnel assigned and no detached
-// history it is empty, and must not be emitted as a placeholder row.
+// history it is empty, and must not be emitted as a placeholder row. Unknown
+// traffic stays unknown: unreadable or stale-only records must never make the
+// row render, so it needs a live unassigned tunnel (TunnelCount counts those
+// only) AND measured nonzero traffic. Deleting the tunnel or its topology
+// purges the ledger instead of leaving a row behind.
 func unassignedUsageVisible(row topologyUsageRow) bool {
-	return row.TunnelCount > 0 || row.Rx > 0 || row.Tx > 0
+	return row.TunnelCount > 0 && row.Known && row.Rx+row.Tx > 0
 }
 
 // topologyTotals does not take topology/engine locks. Callers read grouping
@@ -189,6 +193,7 @@ func (s *usageStore) topologyTotalsLocked(now time.Time, window time.Duration, s
 	unassigned := topologyUsageRow{ID: "unassigned", Name: "Unassigned tunnels", usageAmount: usageAmount{Known: true}}
 	ids := map[string]bool{}
 	present := map[string]bool{}
+	liveUnassigned := 0
 	for _, tunnel := range inventory {
 		id := canonicalUsageID(tunnel.ID, aliases)
 		ids[id], present[id] = true, true
@@ -212,8 +217,10 @@ func (s *usageStore) topologyTotalsLocked(now time.Time, window time.Duration, s
 		row := &unassigned
 		if owner, ok := owners[id]; ok {
 			row = &rows[owner]
-		} else {
-			unassigned.TunnelCount++
+		} else if present[id] {
+			// Only live unowned tunnels count; the retained history of removed
+			// ones must never resurrect a "tunnels" count in the fallback row.
+			liveUnassigned++
 		}
 		key := topologyUsageKey(id)
 		sr, exists := s.seriesLocked(key, now, window, step)
@@ -224,6 +231,7 @@ func (s *usageStore) topologyTotalsLocked(now time.Time, window time.Duration, s
 		row.Tx += sr.Tx
 		row.Total = row.Rx + row.Tx
 	}
+	unassigned.TunnelCount = liveUnassigned
 	return rows, unassigned
 }
 

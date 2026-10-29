@@ -1304,11 +1304,22 @@ func handleSSHFwdPost(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]any{"status": "ok", "message": "Bagher Engine disabled", "status_data": getSSHFwdStatusLocked()})
 
 	case "clean", "purge", "reset":
+		oldLinks := append([]BagherLink(nil), cfg.Links...)
 		if err := cleanSSHFwd(); err != nil {
 			writeAPIError(w, r, "E-SSHFWD-07", err.Error())
 			return
 		}
 		dropLinkNames("bagher-")
+		// The whole Bagher tunnel (main + every extra link) is deleted: its
+		// recorded traffic must not survive as an unassigned or stale row.
+		ids := make([]string, 0, len(oldLinks)+1)
+		ids = append(ids, "bagher")
+		for _, l := range oldLinks {
+			if l.ID > 0 {
+				ids = append(ids, "bagher:"+strconv.Itoa(l.ID))
+			}
+		}
+		purgeTunnelUsage(ids...)
 		writeJSON(w, map[string]any{
 			"status":      "ok",
 			"message":     "Bagher tunnel cleaned and reset",
@@ -1395,6 +1406,9 @@ func handleSSHFwdPost(w http.ResponseWriter, r *http.Request) {
 			writeAPIError(w, r, "E-SSHFWD-04", err.Error())
 			return
 		}
+		// The link is deleted: its recorded traffic must not survive as an
+		// unassigned or stale row anywhere.
+		purgeTunnelUsage("bagher:" + strconv.Itoa(body.ID))
 		writeJSON(w, map[string]any{"status": "ok", "status_data": getSSHFwdStatusLocked()})
 
 	case "clear_dnat", "clear-dnat":
