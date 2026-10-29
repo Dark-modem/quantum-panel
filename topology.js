@@ -167,6 +167,7 @@ function topologyOpen(id) {
   applyTunnelDetail(false);
   topologyRender();
   renderTunnelsList();
+  if (typeof tabHashWrite === 'function') tabHashWrite('tunnel');
 }
 function topologyBack() {
   topologySelected = null;
@@ -174,6 +175,7 @@ function topologyBack() {
   applyTunnelDetail(false);
   topologyRender();
   renderTunnelsList();
+  if (typeof tabHashWrite === 'function') tabHashWrite('tunnel');
 }
 async function topologyCreate() {
   if (topologyBusy) return;

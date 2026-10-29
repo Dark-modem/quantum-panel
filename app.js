@@ -282,6 +282,7 @@ function goTab(name) {
   document.querySelectorAll('.sidebar-nav [data-tab]').forEach(markTab);
   const dr = $('drawerNav');
   if (dr) dr.querySelectorAll('[data-tab]').forEach(markTab);
+  tabHashWrite(name);
   if (name === 'setup' || name === 'tunnel') { loadSSHFwd(); loadMatrix(); }
   if (name === 'cluster') {
     loadClusterStatus();
@@ -306,6 +307,19 @@ function goTab(name) {
       drawChart(c._hist, c._isDown);
     }
   }
+}
+// tabHashWrite/restore: the current tab (and selected topology) survive a page
+// refresh via the URL hash. Best-effort only; the dashboard stays the fallback.
+function tabHashWrite(name) {
+  const topo = name === 'tunnel' && typeof topologySelected !== 'undefined' && topologySelected ? '&topo=' + encodeURIComponent(topologySelected) : '';
+  try { history.replaceState(null, '', '#t=' + name + topo); } catch (e) { /* hash persistence is best-effort */ }
+}
+function bootRestoreTab() {
+  const m = (location.hash || '').match(/^#t=([a-z-]+)(?:&topo=([^&]+))?/);
+  if (!m) return;
+  const name = m[1];
+  if (name === 'tunnel' && m[2] && typeof topologySelected !== 'undefined') topologySelected = decodeURIComponent(m[2]);
+  if (name !== 'dashboard' && $('tab-' + name)) goTab(name);
 }
 document.querySelectorAll('[data-tab]').forEach(b => { b.onclick = () => goTab(b.dataset.tab); });
 // mobile drawer: clones the sidebar nav so phone users get a hamburger
@@ -8076,7 +8090,7 @@ if ($('docCopyBtn')) $('docCopyBtn').onclick = () => { if (doctorData) copyTextS
 
 // boot: if already logged in, status works; else show login
 (async () => {
-  try { await api('/api/status'); showApp(); refresh(); loadSetupDefaults(); loadVersion(); termFlagRefresh(); tlsRefresh(); twofaRefresh(); idleRefresh(); termAllowRefresh(); alertsRefresh(); metricsRefresh(); histRefresh(); advisorRefresh(); }
+  try { await api('/api/status'); showApp(); bootRestoreTab(); refresh(); loadSetupDefaults(); loadVersion(); termFlagRefresh(); tlsRefresh(); twofaRefresh(); idleRefresh(); termAllowRefresh(); alertsRefresh(); metricsRefresh(); histRefresh(); advisorRefresh(); }
   catch(e) { showLogin(); }
 })();
 // light pollers: skip when the tab is in the background (background tabs
