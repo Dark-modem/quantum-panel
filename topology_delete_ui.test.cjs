@@ -12,7 +12,7 @@ const emptyBody = 'This empty topology will be removed.';
 
 function harness(topologies, tunnels, { fa = false, confirm = true, conflict = false } = {}) {
   const elements = new Map();
-  const calls = [], confirms = [], warnings = [], errors = [];
+  const calls = [], confirms = [], warnings = [], errors = [], oks = [];
   function el(id) {
     if (!elements.has(id)) elements.set(id, {
       hidden: false, disabled: false, value: '', textContent: '', innerHTML: '',
@@ -26,6 +26,7 @@ function harness(topologies, tunnels, { fa = false, confirm = true, conflict = f
     $: el, _tunnelDetail: null, setInterval() {}, renderTunnelsList() {},
     esc: value => String(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'),
     toastWarn: (message, sub) => warnings.push([message, sub]), toastErr: (...args) => errors.push(args),
+    toastOk: (title, sub) => oks.push([title, sub]),
     entConfirm: async (...args) => { confirms.push(args); return confirm; },
     api: async (url, body, method) => {
       calls.push({ url, body, method });
@@ -38,7 +39,7 @@ function harness(topologies, tunnels, { fa = false, confirm = true, conflict = f
   sandbox.tr = (_key, fallback) => fa ? sandbox.window.FA_TEXT[fallback] || fallback : fallback;
   vm.runInContext(source, sandbox, { filename: 'topology.js' });
   vm.runInContext(`topologyData = ${JSON.stringify({ topologies, tunnels })};`, sandbox);
-  return { sandbox, el, calls, confirms, warnings, errors };
+  return { sandbox, el, calls, confirms, warnings, errors, oks };
 }
 
 function topo(ids = [], id = 'pair') {
@@ -127,6 +128,8 @@ for (const ids of [[], ['deleted-matrix', 'peer:99']]) {
     await h.sandbox.topologyDelete('pair');
     assert.deepEqual(h.confirms, [['Delete topology?', emptyBody, 'Delete topology']]);
     assert.equal(h.warnings.length, 0, 'empty topologies delete without a warning toast');
+    assert.equal(h.oks.length, 1, 'successful deletion toasts');
+    assert.equal(h.oks[0][0], 'Topology deleted');
     assert.deepEqual(h.calls.map(c => [c.url, c.method]), [
       ['/api/topologies/pair', 'DELETE'], ['/api/topologies', undefined]
     ]);
@@ -165,7 +168,7 @@ test('backend conflict remains handled without retrying or removing engines', as
   const h = harness([topo()], [], { conflict: true });
   await h.sandbox.topologyDelete('pair');
   assert.deepEqual(h.calls.map(c => [c.url, c.method]), [['/api/topologies/pair', 'DELETE']]);
-  assert.deepEqual(h.errors, [['Topology save failed', '409: topology still contains tunnels']]);
+  assert.deepEqual(h.errors, [['Topology delete failed', '409: topology still contains tunnels']]);
 });
 
 test('Persian title, count notice and empty confirmation are translated with unique keys', async () => {
