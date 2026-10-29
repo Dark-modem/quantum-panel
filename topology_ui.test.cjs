@@ -107,7 +107,9 @@ assert.ok($('topologiesList').innerHTML.includes('colspan="5"'),'empty state spa
 assert.ok(!$('topologiesList').innerHTML.includes('topo-list-row'),'no phantom topology row when empty');
 assert.equal($('topologyCount').textContent,'0');
 topologyData={topologies:[topo],tunnels:one};topologySelected='t';
-assert.deepEqual(topologyFilterRows([{kind:'main'},{kind:'matrix'},{kind:2}]).map(x=>x.kind),['matrix',2]);
+assert.deepEqual(topologyFilterRows([{kind:'main'},{kind:'matrix'},{kind:2}]).map(x=>x.kind),['main','matrix',2],'unassigned tunnels stay visible inside the open topology');
+topologyData={topologies:[topo,{...topo,id:'t2',name:'Other pair',tunnel_ids:['main']}],tunnels:one};topologySelected='t';
+assert.deepEqual(topologyFilterRows([{kind:'main'},{kind:'matrix'},{kind:2}]).map(x=>x.kind),['matrix',2],'tunnels owned by another topology are not listed here');
 topologyOpen('t');assert.equal($('topologyListCard').hidden,true);assert.equal($('topologyDetailCard').hidden,false);
 topologyBack();assert.equal($('topologyListCard').hidden,false);assert.equal($('topologyDetailCard').hidden,true);
 topologySelected='t';_tunnelDetail='matrix';topologyRender();assert.equal($('topologyDetailCard').hidden,true);

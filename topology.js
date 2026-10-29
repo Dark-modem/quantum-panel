@@ -172,10 +172,13 @@ function topologyKind(id) {
 }
 function topologyFilterRows(rows) {
   const topo = topologyCurrent();
-  // No topology selected: the table lists every established tunnel. With one
-  // open, only the tunnels assigned to it belong to this server pair.
-  if (!topo) return rows;
-  return rows.filter(row => (topo.tunnel_ids || []).includes(topologyTunnelKey(row.kind)));
+  // The tunnels table lives inside the open topology's page: the tunnels
+  // assigned to this server pair, plus the unassigned ones still waiting for
+  // a topology to attach them. With no topology open the table stays hidden.
+  if (!topo) return [];
+  const owned = new Set(topologyData.topologies.flatMap(t => t.tunnel_ids || []));
+  return rows.filter(row => (topo.tunnel_ids || []).includes(topologyTunnelKey(row.kind)) ||
+    !owned.has(topologyTunnelKey(row.kind)));
 }
 function topologyGraph(topo, tunnels) {
   const text = value => esc(String(value || '—'));
@@ -285,6 +288,7 @@ function topologyRender() {
   $('tunnelsAddBtn').disabled = !topo || !topo.local_ip || !topo.remote_ip;
   $('topologyAddTunnelBtn').disabled = !topo || !topo.local_ip || !topo.remote_ip;
   $('tunnelsEmpty').hidden = !topo || inTunnel;
+  if (!topo) $('tunnelsListCard').hidden = true;
   $('topologyCount').textContent = String(topologyData.topologies.length);
   const listTable = $('topologyListTable');
   if (listTable && listTable.classList) listTable.classList.toggle('topo-grid', topologyViewMode === 'grid');
