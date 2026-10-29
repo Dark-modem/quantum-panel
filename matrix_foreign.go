@@ -70,13 +70,18 @@ func handleMatrixForeignSetup(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, r, "E-MATRIX-07", err.Error())
 		return
 	}
+	matrixFreshDir() // wipe any previous matrix install on this server
 	name, err := matrixWriteNode(b.Family, b.Port)
 	if err != nil {
 		writeAPIError(w, r, "E-MATRIX-07", err.Error())
 		return
 	}
-	if out, err := runMatrixCmd("tincd", "-n", matrixNetname, "-K4096"); err != nil {
-		writeAPIError(w, r, "E-MATRIX-07", "tincd keygen: "+err.Error()+": "+trimLen(out, 200))
+	if err := matrixKeygen(); err != nil {
+		writeAPIError(w, r, "E-MATRIX-07", err.Error())
+		return
+	}
+	if err := matrixEnsureHostKey(name); err != nil {
+		writeAPIError(w, r, "E-MATRIX-07", err.Error())
 		return
 	}
 	// the node's own host file now carries its public key

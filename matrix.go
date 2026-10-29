@@ -199,6 +199,39 @@ func matrixIface() string {
 	return ""
 }
 
+// matrixKeygen runs tincd -K (interactive in tinc 1.0: both key paths are
+// answered with their defaults via stdin) so the key files land in place.
+func matrixKeygen() error {
+	cmd := exec.Command("tincd", "-n", matrixNetname, "-K4096")
+	cmd.Stdin = strings.NewReader(strings.Repeat("\n", 10))
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("tincd keygen: %v: %s", err, trimLen(string(out), 200))
+	}
+	return nil
+}
+
+// matrixEnsureHostKey guarantees hosts/<name> carries a public key, appending
+// rsa_key.pub when tincd left it beside the private key instead.
+func matrixEnsureHostKey(name string) error {
+	hf := filepath.Join(matrixConfDir, "hosts", name)
+	data, err := os.ReadFile(hf)
+	if err != nil {
+		return err
+	}
+	if strings.Contains(string(data), "PUBLIC KEY") {
+		return nil
+	}
+	pub, err := os.ReadFile(filepath.Join(matrixConfDir, "rsa_key.pub"))
+	if err != nil {
+		return fmt.Errorf("no public key was generated for %s", name)
+	}
+	return os.WriteFile(hf, append(bytes.TrimRight(data, "\n"), []byte("\n"+string(pub)+"\n")...), 0644)
+}
+
+// matrixFreshDir wipes our netname directory for a clean (re)setup — a
+// previous manual matrix-network install must not leak into ours.
+func matrixFreshDir() { _ = os.RemoveAll(matrixConfDir) }
+
 func matrixDNATClear() {
 	for _, c := range []string{"PREROUTING", "POSTROUTING"} {
 		out, _ := exec.Command("iptables", "-t", "nat", "-S", c).CombinedOutput()
@@ -315,12 +348,17 @@ func handleMatrixSetupPost(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, r, "E-MATRIX-07", err.Error())
 		return
 	}
+	matrixFreshDir() // a clean (re)setup: stale matrix configs from manual installs go away
 	if err := matrixWriteHub(family, addr, req.Port); err != nil {
 		writeAPIError(w, r, "E-MATRIX-07", err.Error())
 		return
 	}
-	if out, err := runMatrixCmd("tincd", "-n", matrixNetname, "-K4096"); err != nil {
-		writeAPIError(w, r, "E-MATRIX-07", "tincd keygen: "+err.Error()+": "+trimLen(out, 200))
+	if err := matrixKeygen(); err != nil {
+		writeAPIError(w, r, "E-MATRIX-07", err.Error())
+		return
+	}
+	if err := matrixEnsureHostKey("main"); err != nil {
+		writeAPIError(w, r, "E-MATRIX-07", err.Error())
 		return
 	}
 	if err := matrixServiceStart(); err != nil {
