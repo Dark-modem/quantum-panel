@@ -1282,8 +1282,10 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 .topo-n-bg { fill:var(--s1); stroke:var(--ln2); stroke-width:1.5; transition:stroke var(--dur-fast) ease; }
 .topo-node:hover > .topo-n-bg, .topo-node:focus-visible > .topo-n-bg { stroke:var(--ac); }
 .topo-cap { fill:var(--mu); font-size:12px; }
-.topo-t1 { fill:var(--tx); font-size:16px; font-weight:600; }
-.topo-ip { fill:var(--mu); font-size:13px; font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+/* The card stays quiet: a soft title below pure white and a dimmed IP —
+   the card frame and the cables carry the attention, not the text. */
+.topo-t1 { fill:var(--tx2); font-size:14px; font-weight:600; }
+.topo-ip { fill:var(--dim); font-size:12.5px; font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
 .topo-dot.ok { fill:var(--ok); } .topo-dot.warn { fill:var(--wr); }
 .topo-dot.err { fill:var(--er); }
 .topo-e-hit { fill:none; stroke:transparent; stroke-width:16; }
