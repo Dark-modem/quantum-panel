@@ -72,8 +72,8 @@ for(const action of ['data-topo-open','data-topo-delete']) {
 }
 assert.ok(listHTML.includes('data-topo-id="'+esc(unsafePair.id)+'"'),'row ID is escaped');
 assert.equal((listHTML.match(/<tr\\b/g)||[]).length,1,'one semantic row per topology');
-assert.equal((listHTML.match(/<td\\b/g)||[]).length,5,'name, iran, foreign, count and actions cells');
-for(const cell of ['name','iran','foreign','tunnels','actions']) assert.ok(listHTML.includes('class="topo-cell-'+cell+'" data-label='),cell+' supports narrow-screen labels');
+assert.equal((listHTML.match(/<td\\b/g)||[]).length,6,'name, iran, foreign, count, status and actions cells');
+for(const cell of ['name','iran','foreign','tunnels','state','actions']) assert.ok(listHTML.includes('class="topo-cell-'+cell+'" data-label='),cell+' supports narrow-screen labels');
 assert.ok(!listHTML.includes('topo-dot'),'no status dot next to the topology name');
 assert.ok(!listHTML.includes('topo-cell-status'),'status column is gone');
 assert.ok(listHTML.includes('tabindex="0"'),'rows are keyboard reachable');
@@ -103,7 +103,7 @@ topologyData={topologies:[topo],tunnels:[...one,{...one[0]}, {id:'unrelated',sta
 const populated=$('topologiesList').innerHTML;
 assert.ok(populated.includes('aria-label="1 existing tunnel(s)">1</span>'),'duplicate inventory and deleted IDs do not inflate count');
 topologyData={topologies:[],tunnels:one};topologyRender();
-assert.ok($('topologiesList').innerHTML.includes('colspan="5"'),'empty state spans the table');
+assert.ok($('topologiesList').innerHTML.includes('colspan="6"'),'empty state spans the table');
 assert.ok(!$('topologiesList').innerHTML.includes('topo-list-row'),'no phantom topology row when empty');
 assert.equal($('topologyCount').textContent,'0');
 topologyData={topologies:[topo],tunnels:one};topologySelected='t';
@@ -167,9 +167,10 @@ topologyData={topologies:[topo],tunnels:one};
 // Tunnels and Actions on fixed tracks, and the embedded flags get a fixed
 // footprint so they line up with the mono IP in both directions.
 const entCss=fs.readFileSync(path.join(__dirname,'enterprise.css'),'utf8');
-assert.ok(/\.topo-list-head\s*,\s*\.topo-list-row\s*\{[^}]*grid-template-columns\s*:[^;}]*minmax\(0,[^;}]*72px\s+152px/.test(entCss),'shared grid strips content minimums and fixes the Tunnels/Actions tracks');
+assert.ok(/\.topo-list-head\s*,\s*\.topo-list-row\s*\{[^}]*grid-template-columns\s*:[^;}]*minmax\(0,[^;}]*64px\s+96px\s+56px/.test(entCss),'shared grid strips content minimums and fixes the Tunnels/Actions tracks');
 assert.ok(/\.topo-list-head\s+th:nth-child\(4\)\s*\{[^}]*text-align\s*:\s*center/.test(entCss),'Tunnels header is centred over its column');
-assert.ok(/\.topo-list-head\s+th:nth-child\(5\)\s*\{[^}]*text-align\s*:\s*end/.test(entCss),'Actions header is end-aligned like its buttons');
+assert.ok(/\.topo-list-head\s+th:nth-child\(5\)\s*\{[^}]*text-align\s*:\s*center/.test(entCss),'Status header is centred over its column');
+assert.ok(/\.topo-list-head\s+th:nth-child\(6\)\s*\{[^}]*text-align\s*:\s*end/.test(entCss),'Actions header is end-aligned like its buttons');
 assert.ok(/\.topo-flag-svg\s*\{[^}]*width\s*:\s*20px[^}]*height\s*:\s*14px/.test(entCss),'embedded flags keep a fixed 20x14 footprint');
 (async()=>{
  // loadedOnce gate: topologyReload paints the skeleton before the first

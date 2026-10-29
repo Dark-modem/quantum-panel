@@ -24,6 +24,30 @@ function topologyExistingTunnels(topo) {
 function topologyExistingTunnelCount(topo) {
   return topologyExistingTunnels(topo).length;
 }
+// Pair health for the list's status pill: active while at least one tunnel is
+// up, down only when every tunnel is cut, unknown otherwise (or when the pair
+// has no tunnels to speak of yet).
+function topologyHealthOf(topo, tunnels) {
+  if (!tunnels.length) return 'unknown';
+  const bucket = s => ['healthy', 'ok', 'up', 'connected'].includes(s) ? 'ok'
+    : ['down', 'err', 'stopped'].includes(s) ? 'err' : 'warn';
+  const states = (tunnels || []).map(t => bucket(t.state));
+  if (states.every(s => s === 'err')) return 'down';
+  return states.includes('ok') ? 'ok' : 'unknown';
+}
+function topoMenusClose() {
+  document.querySelectorAll('.topo-menu-pop').forEach(p => p.classList.add('hidden'));
+  document.querySelectorAll('.topo-kebab[aria-expanded="true"]').forEach(b => b.setAttribute('aria-expanded', 'false'));
+}
+async function topologyPower(id, active) {
+  try {
+    const r = await api('/api/topologies/' + encodeURIComponent(id) + '/active', { active: !!active }, 'POST');
+    const bad = (r.results || []).filter(x => !x.ok);
+    if (bad.length) toastErr(tr('', 'Some tunnels did not change state'), bad.map(x => (x.id || '') + (x.error ? ': ' + x.error : '')).join(' · '));
+    else toastOk(active ? tr('', 'Tunnels connected') : tr('', 'Tunnels disconnected'));
+    await topologyReload();
+  } catch(e) { toastErr(tr('', 'Topology action failed'), e.message); }
+}
 // Foreign endpoint country, chosen by the user (ISO 3166-1 alpha-2). The Iran
 // side is always the home server; an empty country falls back to a globe icon.
 const TOPO_COUNTRIES = [
@@ -315,19 +339,23 @@ function topologyRender() {
         const countLabel = tr('', '{n} existing tunnel(s)').replace('{n}', String(remaining));
         const deleteTitle = remaining ? topologyDeleteNotice(remaining) : tr('', 'Delete topology');
         const serverCell = (flag, ip) => `<span class="topo-server"><span class="topo-flag" aria-hidden="true">${topologyFlagSvg(flag)}</span><bdi class="u-mono" dir="ltr">${esc(ip || '—')}</bdi></span>`;
+        const health = topologyHealthOf(t, tunnels);
+        const healthLabel = tr('', health === 'ok' ? 'Active' : health === 'down' ? 'Down' : 'Unknown');
+        const powering = health === 'down' || !remaining;
         return `<tr class="topo-list-row" role="row" tabindex="0" data-topo-id="${esc(t.id)}" aria-label="${esc(t.name)}">
         <td role="cell" class="topo-cell-name" data-label="${esc(tr('', 'Name'))}"><button type="button" class="topo-name" data-topo-open="${esc(t.id)}"><bdi>${esc(t.name)}</bdi></button></td>
         <td role="cell" class="topo-cell-iran" data-label="${esc(tr('', 'Iran'))}">${serverCell('ir', endpoints.iran)}</td>
         <td role="cell" class="topo-cell-foreign" data-label="${esc(tr('', 'Foreign'))}">${serverCell(t.country, endpoints.foreign)}</td>
         <td role="cell" class="topo-cell-tunnels" data-label="${esc(tr('', 'Tunnels'))}"><span class="topo-count" aria-label="${esc(countLabel)}">${remaining}</span></td>
-        <td role="cell" class="topo-cell-actions" data-label="${esc(tr('', 'Actions'))}"><div class="topo-actions"><button type="button" class="quantum-btn quantum-btn-primary topo-view" data-topo-open="${esc(t.id)}">${esc(tr('', 'View'))}</button><span class="topo-delete-wrap" title="${esc(deleteTitle)}"><button type="button" class="quantum-btn quantum-btn-danger topo-delete" data-topo-delete="${esc(t.id)}" aria-label="${esc(tr('', 'Delete topology'))}"${remaining ? ` title="${esc(tr('', 'Delete all tunnels in this topology first'))}"` : ''}><svg class="topo-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg>${esc(tr('', 'Delete'))}</button></span></div></td>
+        <td role="cell" class="topo-cell-state" data-label="${esc(tr('', 'Status'))}"><span class="topo-state-pill st-${health}"><i aria-hidden="true"></i>${esc(healthLabel)}</span></td>
+        <td role="cell" class="topo-cell-actions" data-label="${esc(tr('', 'Actions'))}"><div class="topo-actions"><div class="topo-menu"><button type="button" class="topo-kebab" data-topo-menu="${esc(t.id)}" aria-haspopup="menu" aria-expanded="false" aria-label="${esc(tr('', 'Tunnel actions'))}"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="19" r="1.7"/></svg></button><div class="topo-menu-pop hidden" role="menu" aria-label="${esc(tr('', 'Tunnel actions'))}"><button type="button" class="topo-menu-item" role="menuitem" data-topo-open="${esc(t.id)}">${esc(tr('', 'View'))}</button><button type="button" class="topo-menu-item" role="menuitem" data-topo-power="${esc(t.id)}" data-active="${powering ? 'true' : 'false'}">${esc(powering ? tr('', 'Activate') : tr('', 'Deactivate'))}</button><span class="topo-delete-wrap" title="${esc(deleteTitle)}"><button type="button" class="quantum-btn quantum-btn-danger topo-delete topo-menu-item" role="menuitem" data-topo-delete="${esc(t.id)}" aria-label="${esc(tr('', 'Delete topology'))}"${remaining ? ` title="${esc(tr('', 'Delete all tunnels in this topology first'))}"` : ''}>${esc(tr('', 'Delete'))}</button></span></div></div></div></td>
       </tr>`;
       }).join('')
     : searching
-      ? `<tr class="topo-list-empty"><td colspan="5"><div class="ent-empty"><b>${esc(tr('', 'No topology matches your search.'))}</b><span>${esc(tr('', 'Clear the search to see all topologies.'))}</span></div></td></tr>`
+      ? `<tr class="topo-list-empty"><td colspan="6"><div class="ent-empty"><b>${esc(tr('', 'No topology matches your search.'))}</b><span>${esc(tr('', 'Clear the search to see all topologies.'))}</span></div></td></tr>`
       : topologyLoading && !topologyLoadedOnce
-        ? `<tr class="topo-list-empty topo-list-skel"><td colspan="5">${skel(2)}</td></tr>`
-        : `<tr class="topo-list-empty"><td colspan="5"><div class="ent-empty"><b>${esc(tr('', 'No topology yet'))}</b><span>${esc(tr('', 'Create a topology, set the server roles, then add tunnels between them.'))}</span></div></td></tr>`;
+        ? `<tr class="topo-list-empty topo-list-skel"><td colspan="6">${skel(2)}</td></tr>`
+        : `<tr class="topo-list-empty"><td colspan="6"><div class="ent-empty"><b>${esc(tr('', 'No topology yet'))}</b><span>${esc(tr('', 'Create a topology, set the server roles, then add tunnels between them.'))}</span></div></td></tr>`;
   const assigned = new Set(topologyData.topologies.flatMap(t => t.tunnel_ids || []));
   if (!topo) return;
   const cables = (topo.tunnel_ids || []).map(id => topologyData.tunnels.find(t => t.id === id) || {id, name: id, engine: '—', state: 'down'});
@@ -995,6 +1023,15 @@ $('topologyViewGridBtn').onclick = () => topologySetView('grid');
 document.querySelectorAll('[data-topo-role]').forEach(b => { b.onclick = () => topologyChooseRole(b.dataset.topoRole); });
 $('tab-tunnel').addEventListener('click', e => {
   const target = e.target.closest('button'); if (!target) return;
+  if (target.dataset.topoMenu !== undefined) { // kebab: toggle this menu, close the others
+    const pop = target.parentElement.querySelector('.topo-menu-pop');
+    const wasOpen = pop && !pop.classList.contains('hidden');
+    topoMenusClose();
+    if (pop && !wasOpen) { pop.classList.remove('hidden'); target.setAttribute('aria-expanded', 'true'); }
+    return;
+  }
+  if (target.dataset.topoPower !== undefined) { topoMenusClose(); topologyPower(target.dataset.topoPower, target.dataset.active === 'true'); return; }
+  if (target.dataset.topoOpen || target.dataset.topoDelete) topoMenusClose();
   if (target.dataset.topoOpen) topologyOpen(target.dataset.topoOpen);
   if (target.dataset.topoDelete) topologyDelete(target.dataset.topoDelete);
   if (target.dataset.topoDetach) topologyDetach(target.dataset.topoDetach);
@@ -1005,6 +1042,10 @@ $('tab-tunnel').addEventListener('click', e => {
     openTunnelDetail(kind);
   }
 });
+if (document.addEventListener) { // sandbox DOM stubs may not have it
+  document.addEventListener('click', e => { if (!e.target.closest('.topo-menu')) topoMenusClose(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') topoMenusClose(); });
+}
 // The whole row opens the topology: clicks anywhere except the action buttons.
 $('topologiesList').addEventListener('click', e => {
   if (e.target.closest('.topo-actions')) return; // View/Delete keep their own behaviour
@@ -1018,5 +1059,6 @@ $('topologiesList').addEventListener('keydown', e => {
 });
 setInterval(() => {
   const tab = $('tab-tunnel');
+  if (document.querySelector('.topo-menu-pop:not(.hidden)')) return; // an open menu would be wiped
   if (tab && !tab.hidden && !document.hidden && !topologyBusy && !_tunnelDetail) topologyReload();
 }, 15000);

@@ -32,6 +32,10 @@ type Topology struct {
 	Country   string   `json:"country"`
 	TunnelIDs []string `json:"tunnel_ids"`
 	CreatedAt int64    `json:"created_at"`
+	// Disabled: the user powered the pair's tunnels off from the panel. The
+	// watchdog reads the tunnels-disabled marker (syncTunnelsDisabledMarker)
+	// and leaves the units alone until the topology is powered back on.
+	Disabled bool `json:"disabled,omitempty"`
 }
 
 type topologyTunnel struct {
@@ -488,6 +492,250 @@ func handleTopologyDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	topologyError(w, http.StatusNotFound, "topology not found")
+}
+
+// ---- topology power: connect or disconnect every tunnel of a server pair ----
+
+// tunnelsDisabledMarker tells the watchdog's scheduled restart (quantum.sh
+// restart_all_lite) to leave the tunnel services alone while a topology is
+// powered off — otherwise the auto-restart would silently bring them back.
+func tunnelsDisabledMarker() string { return filepath.Join(configDir, "tunnels-disabled") }
+
+// syncTunnelsDisabledMarker recreates or removes the marker so it reflects
+// whether any topology is currently powered off.
+func syncTunnelsDisabledMarker() {
+	disabled := false
+	topologyMu.Lock()
+	topologies, err := loadTopologies()
+	topologyMu.Unlock()
+	if err == nil {
+		for _, t := range topologies {
+			if t.Disabled {
+				disabled = true
+				break
+			}
+		}
+	}
+	if disabled {
+		_ = os.WriteFile(tunnelsDisabledMarker(), []byte("a topology is powered off\n"), 0600)
+		return
+	}
+	_ = os.Remove(tunnelsDisabledMarker())
+}
+
+type topologyPowerResult struct {
+	ID    string `json:"id"`
+	OK    bool   `json:"ok"`
+	Error string `json:"error,omitempty"`
+}
+
+// handleTopologyPowerPost connects ({"active": true}) or disconnects
+// ({"active": false}) every tunnel assigned to the topology, best effort per
+// tunnel; the results say what each tunnel did. The disabled flag is
+// persisted so the state survives a panel restart.
+func handleTopologyPowerPost(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Active *bool `json:"active"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 4<<10)).Decode(&body); err != nil || body.Active == nil {
+		topologyError(w, http.StatusBadRequest, "body must be {\"active\": true|false}")
+		return
+	}
+	id := r.PathValue("id")
+	topologyMu.Lock()
+	topologies, err := loadTopologies()
+	topologyMu.Unlock()
+	if err != nil {
+		topologyError(w, http.StatusInternalServerError, "cannot read topology collection")
+		return
+	}
+	topo := (*Topology)(nil)
+	for i := range topologies {
+		if topologies[i].ID == id {
+			topo = &topologies[i]
+			break
+		}
+	}
+	if topo == nil {
+		topologyError(w, http.StatusNotFound, "topology not found")
+		return
+	}
+	results := make([]topologyPowerResult, 0, len(topo.TunnelIDs))
+	for _, tunnelID := range topo.TunnelIDs {
+		results = append(results, topologyPowerTunnel(tunnelID, *body.Active))
+	}
+	topo.Disabled = !*body.Active
+	topologyMu.Lock()
+	err = saveTopologies(topologies)
+	topologyMu.Unlock()
+	if err != nil {
+		topologyError(w, http.StatusInternalServerError, "cannot save topology collection")
+		return
+	}
+	syncTunnelsDisabledMarker()
+	writeJSON(w, map[string]any{"status": "ok", "active": *body.Active, "results": results})
+}
+
+// topologyPowerTunnel starts or stops one tunnel by its inventory id. Units
+// that do not exist on this host are skipped; a start that finds nothing to
+// start reports an error instead of pretending success.
+func topologyPowerTunnel(id string, active bool) topologyPowerResult {
+	res := topologyPowerResult{ID: id, OK: true}
+	fail := func(err error) { res.OK, res.Error = false, err.Error() }
+	unitExists := func(unit string) bool { return fileExists(filepath.Join("/etc/systemd/system", unit)) }
+	switch {
+	case id == "main":
+		st := localStatus()
+		if active {
+			started := false
+			if st.Gre.Exists {
+				if err := runSystemctl("start", "gre-tunnel"); err != nil {
+					fail(err)
+				} else {
+					started = true
+				}
+			}
+			if st.FrpSvc != "" {
+				if err := runSystemctl("start", st.FrpSvc); err != nil {
+					fail(err)
+				} else {
+					started = true
+				}
+			}
+			if !started && res.OK {
+				fail(fmt.Errorf("no tunnel service configured"))
+			}
+			return res
+		}
+		for _, u := range baseUnits {
+			if engineServiceActive(u) {
+				if err := runSystemctl("stop", u); err != nil {
+					fail(err)
+				}
+			}
+		}
+		if st.Gre.Exists && engineServiceActive("gre-tunnel") {
+			if err := runSystemctl("stop", "gre-tunnel"); err != nil {
+				fail(err)
+			}
+		}
+	case strings.HasPrefix(id, "peer:"):
+		n, err := strconv.Atoi(strings.TrimPrefix(id, "peer:"))
+		if err != nil || n <= 0 {
+			fail(fmt.Errorf("bad tunnel id %q", id))
+			return res
+		}
+		relay, gre := peerFrpsSvc(n), peerGreSvc(n)
+		if active {
+			started := false
+			if unitExists(gre) {
+				if err := runSystemctl("start", gre); err != nil {
+					fail(err)
+				} else {
+					started = true
+				}
+			}
+			if unitExists(relay+".service") {
+				if err := runSystemctl("start", relay); err != nil {
+					fail(err)
+				} else {
+					started = true
+				}
+			}
+			if !started && res.OK {
+				fail(fmt.Errorf("no units found for %s on this host", id))
+			}
+			return res
+		}
+		for _, u := range []string{relay, strings.TrimSuffix(gre, ".service")} {
+			if engineServiceActive(u) {
+				if err := runSystemctl("stop", u); err != nil {
+					fail(err)
+				}
+			}
+		}
+	case id == "matrix" || strings.HasPrefix(id, "matrix"):
+		unit := "quantum-matrix" + strings.TrimPrefix(id, "matrix") + ".service"
+		if !unitExists(unit) {
+			fail(fmt.Errorf("%s is not set up on this host", id))
+			return res
+		}
+		if active {
+			if err := runSystemctl("enable", unit); err != nil {
+				fail(err)
+				return res
+			}
+			if err := runSystemctl("restart", unit); err != nil {
+				fail(err)
+			}
+			return res
+		}
+		if err := runSystemctl("disable", "--now", unit); err != nil {
+			fail(err)
+		}
+	case id == "bagher":
+		if active {
+			if err := enableSSHFwd(loadSSHFwdConfigLocked()); err != nil {
+				fail(err)
+			}
+			return res
+		}
+		if err := disableSSHFwd(); err != nil {
+			fail(err)
+		}
+	case strings.HasPrefix(id, "bagher:"):
+		n, err := strconv.Atoi(strings.TrimPrefix(id, "bagher:"))
+		if err != nil || n <= 1 {
+			fail(fmt.Errorf("bad tunnel id %q", id))
+			return res
+		}
+		unit := bagherLinkUnit(n) + ".service"
+		if !unitExists(unit) {
+			fail(fmt.Errorf("%s is not set up on this host", id))
+			return res
+		}
+		action := "disable"
+		if active {
+			action = "enable"
+		}
+		if err := runSystemctl(action, "--now", unit); err != nil {
+			fail(err)
+		}
+	case strings.HasPrefix(id, "xray:"):
+		n, err := strconv.Atoi(strings.TrimPrefix(id, "xray:"))
+		if err != nil {
+			fail(fmt.Errorf("bad tunnel id %q", id))
+			return res
+		}
+		st := loadXrayState()
+		idx := -1
+		for i := range st.Links {
+			if st.Links[i].ID == n {
+				idx = i
+				break
+			}
+		}
+		if idx < 0 {
+			fail(fmt.Errorf("xray link %d not found", n))
+			return res
+		}
+		if active {
+			st.Links[idx].Disabled = false
+			if _, err := applyXrayLink(st.Links[idx], st.Links); err != nil {
+				fail(err)
+				return res
+			}
+		} else {
+			stopXrayLink(st.Links[idx].ID, false)
+			st.Links[idx].Disabled = true
+		}
+		if err := saveXrayState(st); err != nil {
+			fail(err)
+		}
+	default:
+		fail(fmt.Errorf("tunnel %q cannot be powered from this host", id))
+	}
+	return res
 }
 
 // topologyBoundTunnelPorts maps every port owned by a tunnel already bound to

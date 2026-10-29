@@ -434,6 +434,7 @@ const I18N = {
     topology_list_name: "Name",
     topology_list_iran: "Iran",
     topology_list_foreign: "Foreign",
+    topology_list_state: "Status",
     topology_list_actions: "Actions",
     topology_search_ph: "Search topologies…",
     topology_view_label: "View",

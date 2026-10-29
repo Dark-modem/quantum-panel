@@ -26,7 +26,7 @@ func TestTopologyListSemanticTable(t *testing.T) {
 		t.Error("generated topology rows must remain inside the table body")
 	}
 	headers := regexp.MustCompile(`(?s)<th\b([^>]*)>(.*?)</th>`).FindAllStringSubmatch(table[1], -1)
-	want := []string{"Name", "Iran", "Foreign", "Tunnels", "Actions"}
+	want := []string{"Name", "Iran", "Foreign", "Tunnels", "Status", "Actions"}
 	if len(headers) != len(want) {
 		t.Fatalf("got %d topology columns, want %d", len(headers), len(want))
 	}
@@ -133,8 +133,8 @@ func TestTopologyListSharedResponsiveColumns(t *testing.T) {
 	}
 	// Tunnels and Actions sit on fixed tracks so the headers stay over their
 	// cells no matter how the flexible name/endpoints columns squeeze.
-	if !regexp.MustCompile(`grid-template-columns\s*:[^}]*72px\s+152px`).MatchString(shared[1]) {
-		t.Error("shared grid must keep fixed 72px (Tunnels) and 152px (Actions) tracks")
+	if !regexp.MustCompile(`grid-template-columns\s*:[^}]*64px\s+96px\s+56px`).MatchString(shared[1]) {
+		t.Error("shared grid must keep fixed 64px (Tunnels), 96px (Status) and 56px (Actions) tracks")
 	}
 
 	media := regexp.MustCompile(`@media\s*\(\s*max-width\s*:\s*799px\s*\)`).FindStringIndex(css)
