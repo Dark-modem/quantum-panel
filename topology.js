@@ -359,7 +359,7 @@ function topologyRender() {
         <td role="cell" class="topo-cell-foreign" data-label="${esc(tr('', 'Foreign'))}">${serverCell(t.country, endpoints.foreign)}</td>
         <td role="cell" class="topo-cell-tunnels" data-label="${esc(tr('', 'Tunnels'))}"><span class="topo-count" aria-label="${esc(countLabel)}">${remaining}</span></td>
         <td role="cell" class="topo-cell-state" data-label="${esc(tr('', 'Status'))}"><span class="topo-state-pill st-${health}"><i aria-hidden="true"></i>${esc(healthLabel)}</span></td>
-        <td role="cell" class="topo-cell-actions" data-label="${esc(tr('', 'Actions'))}"><div class="topo-actions"><div class="topo-menu"><button type="button" class="topo-kebab" data-topo-menu="${esc(t.id)}" aria-haspopup="menu" aria-expanded="false" aria-label="${esc(tr('', 'Tunnel actions'))}"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="19" r="1.7"/></svg></button><div class="topo-menu-pop hidden" role="menu" aria-label="${esc(tr('', 'Tunnel actions'))}"><button type="button" class="topo-menu-item" role="menuitem" data-topo-open="${esc(t.id)}">${esc(tr('', 'View'))}</button><button type="button" class="topo-menu-item" role="menuitem" data-topo-power="${esc(t.id)}" data-active="${powering ? 'true' : 'false'}">${esc(powering ? tr('', 'Activate') : tr('', 'Deactivate'))}</button><span class="topo-delete-wrap" title="${esc(deleteTitle)}"><button type="button" class="quantum-btn quantum-btn-danger topo-delete topo-menu-item" role="menuitem" data-topo-delete="${esc(t.id)}" aria-label="${esc(tr('', 'Delete topology'))}"${remaining ? ` title="${esc(tr('', 'Delete all tunnels in this topology first'))}"` : ''}>${esc(tr('', 'Delete'))}</button></span></div></div></div></td>
+        <td role="cell" class="topo-cell-actions" data-label="${esc(tr('', 'Actions'))}"><div class="topo-actions"><div class="topo-menu"><button type="button" class="topo-kebab" data-topo-menu="${esc(t.id)}" aria-haspopup="menu" aria-expanded="false" aria-label="${esc(tr('', 'Tunnel actions'))}"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></button><div class="topo-menu-pop hidden" role="menu" aria-label="${esc(tr('', 'Tunnel actions'))}"><button type="button" class="topo-menu-item" role="menuitem" data-topo-open="${esc(t.id)}">${esc(tr('', 'View'))}</button><button type="button" class="topo-menu-item" role="menuitem" data-topo-power="${esc(t.id)}" data-active="${powering ? 'true' : 'false'}">${esc(powering ? tr('', 'Activate') : tr('', 'Deactivate'))}</button><span class="topo-delete-wrap" title="${esc(deleteTitle)}"><button type="button" class="quantum-btn quantum-btn-danger topo-delete topo-menu-item" role="menuitem" data-topo-delete="${esc(t.id)}" aria-label="${esc(tr('', 'Delete topology'))}"${remaining ? ` title="${esc(tr('', 'Delete all tunnels in this topology first'))}"` : ''}>${esc(tr('', 'Delete'))}</button></span></div></div></div></td>
       </tr>`;
       }).join('')
     : searching
@@ -1141,7 +1141,20 @@ $('tab-tunnel').addEventListener('click', e => {
     const pop = target.parentElement.querySelector('.topo-menu-pop');
     const wasOpen = pop && !pop.classList.contains('hidden');
     topoMenusClose();
-    if (pop && !wasOpen) { pop.classList.remove('hidden'); target.setAttribute('aria-expanded', 'true'); }
+    if (pop && !wasOpen) {
+      pop.classList.remove('hidden');
+      const r = target.getBoundingClientRect();
+      const ph = pop.offsetHeight || 130, pw = pop.offsetWidth || 172;
+      let top = r.bottom + 6;
+      if (top + ph > window.innerHeight - 8) top = Math.max(8, r.top - ph - 6);
+      pop.style.top = top + 'px';
+      pop.style.right = 'auto';
+      // end-align the pop with the kebab (kebab sits at the row's end edge),
+      // then clamp inside the viewport
+      let left = document.documentElement.dir === 'rtl' ? r.left : r.right - pw;
+      pop.style.left = Math.min(Math.max(8, left), window.innerWidth - pw - 8) + 'px';
+      target.setAttribute('aria-expanded', 'true');
+    }
     return;
   }
   if (target.dataset.topoPower !== undefined) { topoMenusClose(); topologyPower(target.dataset.topoPower, target.dataset.active === 'true'); return; }
@@ -1159,6 +1172,10 @@ $('tab-tunnel').addEventListener('click', e => {
 if (document.addEventListener) { // sandbox DOM stubs may not have it
   document.addEventListener('click', e => { if (!e.target.closest('.topo-menu')) topoMenusClose(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') topoMenusClose(); });
+  if (window.addEventListener) {
+    window.addEventListener('scroll', topoMenusClose, { passive: true });
+    window.addEventListener('resize', topoMenusClose);
+  }
 }
 // The whole row opens the topology: clicks anywhere except the action buttons.
 $('topologiesList').addEventListener('click', e => {
