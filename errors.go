@@ -182,6 +182,7 @@ var errCatalog = map[string]errInfo{
 	"E-MATRIX-05":  {400, "no global IPv6 address on this server", "The IPv6 family needs a public IPv6 address — add one to the server or pick the IPv4 family."},
 	"E-MATRIX-06":  {400, "invalid IPv6 address", "Enter the server's public IPv6 address, e.g. 2001:db8::1."},
 	"E-MATRIX-07":  {500, "matrix setup failed", "See the detail: the server log (journalctl -u gre-panel) carries the exact step that failed."},
+	"E-MATRIX-09":  {409, "another package installation is still running", "Matrix waited for apt/dpkg without deleting locks or stopping processes. Wait for the other installation to finish, then retry."},
 	"E-MATRIX-08":  {502, "hub registration failed", "The foreign panel could not register with the Iran panel — check that the Iran panel is reachable from this server, then try again."},
 	"E-CLUSTER-08": {502, "cannot link with the other Iran hub", "Both panels need the same version, the panel port open between the hubs, and correct clocks (NTP)."},
 	"E-CLUSTER-10": {502, "DNS provider refused the request", "Use a Cloudflare API token with Zone > DNS > Edit for the zone, and a DNS-only (grey cloud) record."},

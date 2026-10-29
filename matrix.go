@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -127,15 +128,56 @@ func runMatrixCmd(name string, args ...string) (string, error) {
 	}
 	return string(b), nil
 }
+
+var errMatrixPackageBusy = errors.New("package manager is busy")
+var matrixAptSleep = time.Sleep
+var matrixAptNow = time.Now
+
+func matrixPackageLockError(text string) bool {
+	text = strings.ToLower(text)
+	for _, marker := range []string{"could not get lock", "unable to acquire", "unable to lock", "is held by process", "waiting for cache lock"} {
+		if strings.Contains(text, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func matrixAptGet(args ...string) error {
+	// dpkg's native wait protects an installation already in progress. The
+	// apt lists lock does not honor this option, so retry that lock separately.
+	deadline := matrixAptNow().Add(90 * time.Second)
+	for {
+		out, err := matrixExec("apt-get", append([]string{"-o", "DPkg::Lock::Timeout=90"}, args...)...)
+		if err == nil {
+			return nil
+		}
+		if !matrixPackageLockError(out + " " + err.Error()) {
+			return err
+		}
+		if !matrixAptNow().Before(deadline) {
+			return fmt.Errorf("%w: another apt/dpkg process is still running after waiting; let it finish and retry Matrix setup", errMatrixPackageBusy)
+		}
+		matrixAptSleep(3 * time.Second)
+	}
+}
+
 func matrixInstallTinc() error {
-	if _, e := exec.LookPath("tincd"); e == nil {
+	if _, e := matrixTincPath(); e == nil {
 		return nil
 	}
-	if _, e := matrixExec("apt-get", "update"); e != nil {
-		return e
+	if err := matrixAptGet("update"); err != nil {
+		return err
 	}
-	_, e := matrixExec("apt-get", "install", "-y", "--no-install-recommends", "tinc")
-	return e
+	return matrixAptGet("install", "-y", "--no-install-recommends", "tinc")
+}
+
+func writeMatrixSetupError(w http.ResponseWriter, r *http.Request, err error) {
+	if errors.Is(err, errMatrixPackageBusy) {
+		writeAPIError(w, r, "E-MATRIX-09", "")
+		return
+	}
+	writeAPIError(w, r, "E-MATRIX-07", err.Error())
 }
 func validateMatrixSettings(family, addr string, port int, ports []int) error {
 	ip := net.ParseIP(addr)
@@ -539,7 +581,7 @@ func handleMatrixSetupPost(w http.ResponseWriter, r *http.Request) {
 	}
 	st := matrixState{Enabled: true, Network: matrixNetname, Role: "hub", Family: q.Family, Port: q.Port, Addr: q.Addr, Token: randHex(32), Ports: q.Ports, Name: "main", IP: matrixHubIP}
 	if e := matrixSetup(st, ""); e != nil {
-		writeAPIError(w, r, "E-MATRIX-07", e.Error())
+		writeMatrixSetupError(w, r, e)
 		return
 	}
 	LogSecurityAudit("matrix_setup", cfg.Username, ClientIP(r), "family="+st.Family)
@@ -619,7 +661,7 @@ func handleMatrixForeignSetup(w http.ResponseWriter, r *http.Request) {
 	}
 	st := matrixState{Enabled: true, Network: matrixNetname, Role: "node", Family: b.Family, Port: b.Port, Addr: b.Addr, Ports: b.Ports, Name: "node" + randHex(8), IP: matrixFirstPeer, Panel: b.Panel}
 	if e = matrixSetup(st, b.MainHost); e != nil {
-		writeAPIError(w, r, "E-MATRIX-07", e.Error())
+		writeMatrixSetupError(w, r, e)
 		return
 	}
 	self, _ := os.ReadFile(filepath.Join(matrixDir(), "hosts", st.Name))

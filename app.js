@@ -1466,7 +1466,73 @@ async function loadMatrix() {
   if (_tunnelDetail === 'matrix') renderMatrixDetail();
 }
 
+// Help uses its own enterprise modal; destructive confirmations stay independent.
+const MX_HELP = {
+  family: {
+    title: 'Matrix transport family',
+    paragraphs: [
+      'IPv4 / IPv6 chooses the outer tinc server-to-server transport, not the user service address family.',
+      'These are separate network families, but the current implementation supports only ONE Matrix pair per server. IPv4 and IPv6 Matrix pairs cannot run in parallel on the same server.',
+      'For either choice, the internal mesh is IPv4 10.254.231.0/30 and public forwarded user ports use IPv4.'
+    ]
+  },
+  port: {
+    title: 'Tinc listener port',
+    paragraphs: [
+      'The tinc port is the private control/data listener, using TCP + UDP on BOTH ends. The default is 2097.',
+      'Allow this port between the two servers on both ends. It is distinct from forwarded user ports, SSH port 22 and the panel port; do not reuse those listener ports.'
+    ]
+  },
+  ports: {
+    title: 'Forwarded user ports',
+    paragraphs: [
+      'Users connect to Iran IP:<port>. Matrix applies DNAT through qmx0 to the FOREIGN mesh address 10.254.231.2:<same port>, for TCP + UDP.',
+      'The foreign service must listen on 10.254.231.2 or 0.0.0.0, not only 127.0.0.1. This forwarding uses IPv4 even when the outer tinc transport is IPv6.',
+      'An existing Xray inbound on Iran :443 is NOT automatically routed through Matrix. Move or copy that inbound to the foreign server, preserving its UUID and Reality keys, and bind it to the mesh IP.',
+      'Validate the foreign inbound first. Free Iran :443 ONLY as part of an explicit administrator cutover before forwarding that port. This help does not change live configurations.'
+    ]
+  }
+};
+function mxHelpButton(topic, label) {
+  return `<button type="button" class="mx-help-btn" data-mx-help="${topic}" aria-label="${esc(tr('', label))}" aria-haspopup="dialog" aria-controls="mxHelpModal">?</button>`;
+}
+function mxHelpOpen(topic) {
+  const help = MX_HELP[topic], ov = $('mxHelpModal');
+  if (!help || !ov) return;
+  $('mxHelpTitle').textContent = tr('', help.title);
+  $('mxHelpBody').innerHTML = help.paragraphs.map(p => `<p>${esc(tr('', p))}</p>`).join('')
+    + (topic === 'ports' ? `<div class="mx-help-route" dir="ltr">${esc(tr('', 'Iran :443 → Matrix → foreign :443 → Internet'))}</div>` : '');
+  const close = () => modalHide(ov);
+  $('mxHelpX').setAttribute('aria-label', tr('', 'Close'));
+  $('mxHelpClose').textContent = tr('', 'Close');
+  $('mxHelpX').onclick = $('mxHelpClose').onclick = close;
+  ov.onclick = e => { if (e.target === ov) close(); };
+  modalShow(ov, close);
+  $('mxHelpClose').focus();
+}
+function mxSelectFamily(family, focus) {
+  const group = $('mxFamilySeg');
+  if (!group || !['ipv4', 'ipv6'].includes(family)) return;
+  $('mxFamily').value = family;
+  group.querySelectorAll('[data-mx-family]').forEach(b => {
+    const selected = b.dataset.mxFamily === family;
+    b.setAttribute('aria-checked', String(selected));
+    b.tabIndex = selected ? 0 : -1;
+    if (selected && focus) b.focus();
+  });
+}
+let _mxSetupBusy = false;
+function mxSetSetupBusy(busy) {
+  _mxSetupBusy = busy;
+  const box = $('mxState'), status = $('mxSetupStatus');
+  if (box) box.setAttribute('aria-busy', String(busy));
+  ['mxApplyBtn', 'mxRegisterBtn'].forEach(id => { const b = $(id); if (b) b.disabled = busy; });
+  if (status) status.hidden = !busy;
+}
+
 function renderMatrixSetup() {
+  // Keep in-flight setup feedback and the submitted fields intact during refresh.
+  if (_mxSetupBusy) return;
   const st = window._matrixState, box = $('mxState'), badge = $('mxRoleBadge');
   if (!box || !st) { if (badge) badge.textContent = '—'; return; }
   badge.textContent = st.enabled ? (st.role === 'hub' ? tr('', 'Hub') : tr('', 'Node')) : tr('', 'off');
@@ -1474,13 +1540,18 @@ function renderMatrixSetup() {
   if (!st.enabled) {
     box.innerHTML = `
       <div class="u-flex-center-wrap10">
-        <div class="fg"><label for="mxFamily">${esc(tr('', 'Family'))}</label>
-          <select class="hashem-input" id="mxFamily"><option value="ipv4">IPv4</option><option value="ipv6">IPv6</option></select></div>
-        <div class="fg"><label for="mxPort">${esc(tr('', 'Tinc port'))}</label><input class="hashem-input u-w-120" id="mxPort" value="2097" inputmode="numeric" dir="ltr"></div>
+        <div class="fg"><div class="mx-field-label"><span id="mxFamilyLabel">${esc(tr('', 'Family'))}</span>${mxHelpButton('family', 'Help with Matrix transport family')}</div>
+          <input type="hidden" id="mxFamily" value="ipv4">
+          <div class="qs-seg mx-family-seg" id="mxFamilySeg" role="radiogroup" aria-labelledby="mxFamilyLabel" dir="ltr">
+            <button type="button" role="radio" aria-checked="true" tabindex="0" data-mx-family="ipv4" data-no-i18n>IPv4</button>
+            <button type="button" role="radio" aria-checked="false" tabindex="-1" data-mx-family="ipv6" data-no-i18n>IPv6</button>
+          </div></div>
+        <div class="fg"><div class="mx-field-label"><label for="mxPort">${esc(tr('', 'Tinc port'))}</label>${mxHelpButton('port', 'Help with Tinc port')}</div><input class="hashem-input u-w-120" id="mxPort" value="2097" inputmode="numeric" dir="ltr"></div>
         <div class="fg"><label for="mxV6">${esc(tr('', "This server's IPv6 (IPv6 family)"))}</label><input class="hashem-input u-mono" id="mxV6" placeholder="auto" dir="ltr"></div>
-        <div class="fg u-flex-1"><label for="mxPorts">${esc(tr('', 'Forwarded ports (comma list)'))}</label><input class="hashem-input u-mono" id="mxPorts" placeholder="443, 8080" dir="ltr"></div>
+        <div class="fg u-flex-1"><div class="mx-field-label"><label for="mxPorts">${esc(tr('', 'Forwarded ports (comma list)'))}</label>${mxHelpButton('ports', 'Help with forwarded user ports')}</div><input class="hashem-input u-mono" id="mxPorts" placeholder="443, 8080" dir="ltr"></div>
       </div>
       <button type="button" class="hashem-btn hashem-btn-primary u-mt-8" id="mxApplyBtn">${esc(tr('', 'Apply Matrix Setup'))}</button>
+      <div class="mx-setup-status u-mt-8" id="mxSetupStatus" role="status" aria-live="polite" hidden><span class="ent-spinner" aria-hidden="true"></span><span>${esc(tr('', 'Installing tinc or waiting for another package installation…'))} ${esc(tr('', 'Please keep this page open.'))}</span></div>
       <div class="u-mt-12">
         <p class="qs-hint">${esc(tr('', 'Foreign server? Paste the Matrix bundle from the Iran panel here and register it.'))}</p>
         <div class="u-flex-center-wrap10 u-mt-4">
@@ -1488,6 +1559,16 @@ function renderMatrixSetup() {
           <button type="button" class="hashem-btn hashem-btn-secondary" id="mxRegisterBtn">${esc(tr('', 'Register'))}</button>
         </div>
       </div>`;
+    box.querySelectorAll('[data-mx-help]').forEach(b => { b.onclick = () => mxHelpOpen(b.dataset.mxHelp); });
+    box.querySelectorAll('[data-mx-family]').forEach(b => {
+      b.onclick = () => mxSelectFamily(b.dataset.mxFamily);
+      b.onkeydown = e => {
+        if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) return;
+        e.preventDefault();
+        const family = e.key === 'Home' ? 'ipv4' : e.key === 'End' ? 'ipv6' : b.dataset.mxFamily === 'ipv4' ? 'ipv6' : 'ipv4';
+        mxSelectFamily(family, true);
+      };
+    });
     $('mxApplyBtn').onclick = mxApplyClick;
     $('mxRegisterBtn').onclick = mxRegisterClick;
     return;
@@ -1535,23 +1616,32 @@ function renderMatrixBody(targetId) {
 }
 
 async function mxApplyClick() {
+  if (_mxSetupBusy) return;
   const ports = ($('mxPorts').value || '').split(/[ ,]+/).filter(Boolean).map(Number).filter(n => n > 0);
   const body = { family: $('mxFamily').value, port: Number($('mxPort').value) || 2097, ports, addr: ($('mxFamily').value === 'ipv6' && $('mxV6') ? $('mxV6').value.trim() : '') };
+  mxSetSetupBusy(true);
   try {
     const r = await api('/api/matrix/setup', body);
     toastOk(tr('', 'Matrix hub started — copy the bundle to the foreign panel'));
     window._matrixState = r.state;
     window._matrixState.bundle = r.bundle;
+    mxSetSetupBusy(false);
     renderMatrixSetup();
     renderTunnelsList();
   } catch (e) { toastErr('matrix setup failed', e.message); }
+  finally { mxSetSetupBusy(false); }
 }
 async function mxRegisterClick() {
+  if (_mxSetupBusy) return;
+  const body = { bundle: ($('mxBundle').value || '').trim() };
+  mxSetSetupBusy(true);
   try {
-    const r = await api('/api/matrix/foreign-setup', { bundle: ($('mxBundle').value || '').trim() });
+    const r = await api('/api/matrix/foreign-setup', body);
     toastOk(r.detail || tr('', 'Matrix node registered'));
-    loadMatrix();
+    mxSetSetupBusy(false);
+    await loadMatrix();
   } catch (e) { toastErr('matrix registration failed', e.message); }
+  finally { mxSetSetupBusy(false); }
 }
 function matrixRestartClick() {
   return api('/api/matrix/restart', {}).then(() => { toastOk(tr('', 'Matrix service restarted')); loadMatrix(); })

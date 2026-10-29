@@ -69,6 +69,32 @@ table.ent-tbl { width: 100%; border-collapse: collapse; font-size: var(--ent-tbl
 .ent-x { width: 32px; height: 32px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: var(--mu); cursor: pointer; font-size: 16px; line-height: 1; }
 .ent-x:hover { background: var(--sunk); color: var(--tx); }
 
+/* ---------- Matrix setup: transport selection and read-only help ---------- */
+.mx-field-label { display: flex; align-items: center; gap: 7px; min-height: 28px; }
+.mx-help-btn {
+  display: inline-grid; place-items: center; flex: none; width: 28px; height: 28px;
+  border: 1px solid var(--ln2); border-radius: 50%; background: var(--s2);
+  color: var(--mu); font: inherit; font-size: var(--fs-small); font-weight: 700; cursor: pointer;
+}
+.mx-help-btn:hover { color: var(--ac); border-color: var(--ac); background: var(--ac-soft); }
+.mx-family-seg { min-width: 190px; }
+.qs-seg.mx-family-seg button { min-height: 40px; padding-inline: 22px; }
+.qs-seg.mx-family-seg button[aria-checked="true"] {
+  background: var(--ac-fill); color: var(--ac-on);
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--ac) 30%, transparent);
+}
+.mx-help-btn:focus-visible, .mx-family-seg button:focus-visible,
+.mx-help-modal button:focus-visible { outline: 2px solid var(--ent-focus); outline-offset: 3px; }
+.mx-help-modal { width: min(94vw, 600px); }
+.mx-help-body { color: var(--tx2); font-size: var(--fs-body); line-height: 1.7; overflow-wrap: anywhere; }
+.mx-help-body p { margin: 0; }
+.mx-help-route {
+  padding: 12px 14px; border: 1px solid var(--ln2); border-radius: var(--r-md);
+  background: var(--s2); color: var(--tx); font-weight: 600; text-align: center;
+}
+.mx-setup-status { display: flex; align-items: center; gap: 8px; color: var(--mu); font-size: var(--fs-small); }
+.mx-setup-status[hidden] { display: none; }
+
 /* ---------- toasts (typed; existing #toast keeps working) ---------- */
 #entToasts { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 130; display: grid; gap: 8px; width: var(--ent-toast-w); }
 .ent-toast {
