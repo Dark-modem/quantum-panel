@@ -54,6 +54,10 @@ func TestTopologyListSemanticTable(t *testing.T) {
 		`$('topologiesList').addEventListener`,      // whole-row click opens the topology
 		`toastWarn(tr('', 'Delete topology'), topologyDeleteNotice(remaining))`, // delete explains blocked state
 		`hashem-btn-danger topo-delete`,             // delete is a danger button, never disabled
+		`let topologyLoadedOnce = false`,            // first-load gate: skeleton instead of empty-state flash
+		`if (!topologyLoadedOnce) topologyRender()`, // first load paints the skeleton immediately
+		`topologyLoading && !topologyLoadedOnce`,    // skeleton branch replaces the "No topology yet" row
+		`${skel(2)}`,                                // skeleton rows reuse the shared skel() helper
 	} {
 		if !strings.Contains(js, want) {
 			t.Errorf("topology.js lacks %q", want)
@@ -79,6 +83,7 @@ func TestTopologyListModernChrome(t *testing.T) {
 		{"view toggle active state", `\.topo-view-toggle\s+button\[aria-pressed="true"\]`},
 		{"grid card mode", `\.topo-list-table\.topo-grid\s+\.topo-list-row\s*\{[^}]*border-radius\s*:\s*var\(--r-md\)`},
 		{"subtle row hover", `\.topo-list-row:hover\s*\{[^}]*background\s*:\s*var\(--sunk\)\s*;?\s*\}`},
+		{"first-load skeleton bars", `\.topo-list-skel\s+\.ent-skel\s*\{[^}]*width\s*:\s*100%`},
 	} {
 		if rule.name == "no circular count badge" {
 			// The count is plain bold blue text: no border, circle or background.

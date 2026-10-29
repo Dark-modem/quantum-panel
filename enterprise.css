@@ -1213,6 +1213,10 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 .topo-list-empty { display:block; }
 .topo-list-empty td { display:block; padding:0; }
 .topo-list-empty .ent-empty { border:0; border-radius:0; }
+/* skeleton rows while the first /api/topologies load is in flight (skel()) */
+.topo-list-skel td { padding:6px 12px; }
+.topo-list-skel .u-grid { display:grid; gap:8px; width:100%; }
+.topo-list-skel .ent-skel { width:100%; height:14px; min-height:14px; }
 .topo-list-tools { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:14px; }
 .topo-search { flex:1 1 220px; max-width:380px; min-height:36px; }
 .topo-view-toggle { margin-inline-start:auto; flex:none; }

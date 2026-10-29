@@ -18,6 +18,7 @@ const sandbox={
  window:{_lastLocal:{role:'iran (matrix hub)',local_pub:'185.226.119.74'}},
  $:el, el, tr:(_k,fb)=>fb, esc:s=>String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'),
  _tunnelDetail:null, applyTunnelDetail(){},renderTunnelsList(){},toastErr(){},toastOk(){},toastWarn(){},goTab(){},setRole(){},openTunnelDetail(){},
+ skel:n=>{let s='';for(let i=0;i<(n||3);i++)s+='<div class="ent-skel u-h-14"></div>';return '<div class="u-grid u-gap-8">'+s+'</div>';},
  api:async(path,body,method)=>{calls.push({path,body,method});if(path==='/api/topologies'&&!body)return {topologies:[],tunnels:[]};return {topology:{id:'new'}};},
  entConfirm:async()=>true
 };
@@ -124,8 +125,41 @@ assert.ok(el('topologyListTable').classList._toggles.some(([c,v])=>c==='topo-gri
 topologySetView('list');
 assert.ok(el('topologyListTable').classList._toggles.some(([c,v])=>c==='topo-grid'&&v===false),'list view restores the row layout');
 topologyData={topologies:[topo],tunnels:one};
+// First-load skeleton: while the first fetch is in flight the list shows
+// skeleton rows and never the "No topology yet" empty state.
+assert.equal(topologyLoadedOnce,false,'no load has finished yet');
+topologyLoading=true;topologyData={topologies:[],tunnels:[]};topologyRender();
+let loadingHTML=$('topologiesList').innerHTML;
+assert.ok(loadingHTML.includes('ent-skel'),'first load renders skeleton bars');
+assert.ok(loadingHTML.includes('topo-list-skel'),'skeleton row keeps the empty-row slot');
+assert.ok(!loadingHTML.includes('No topology yet'),'empty state must not flash during the first load');
+topologyLoading=false;topologyLoadedOnce=true;topologyRender();
+assert.ok($('topologiesList').innerHTML.includes('No topology yet'),'finished first load with zero topologies shows the empty state');
+topologyLoading=false;topologyLoadedOnce=true;topologyData={topologies:[topo],tunnels:one};topologyRender();
+assert.ok($('topologiesList').innerHTML.includes('topo-list-row'),'finished first load with data renders rows');
+assert.ok(!$('topologiesList').innerHTML.includes('ent-skel'),'no skeleton once data is on screen');
+topologySearchQuery='zzz-nomatch';topologyRender();
+assert.ok($('topologiesList').innerHTML.includes('No topology matches your search.'),'search miss after load still explains itself');
+topologySearchQuery='';
+topologyData={topologies:[topo],tunnels:one};
 `,sandbox);
 (async()=>{
+ // loadedOnce gate: topologyReload paints the skeleton before the first
+ // response and flips the flag once the fetch settles (success or failure).
+ calls=[];vm.runInContext('topologyLoadedOnce=false;topologyLoading=false;topologySelected=null;topologySearchQuery="";_tunnelDetail=null;topologyData={topologies:[],tunnels:[]}',sandbox);
+ const pending=vm.runInContext('topologyReload()',sandbox);
+ let duringLoad=el("topologiesList").innerHTML;
+ assert.ok(duringLoad.includes('ent-skel'),'topologyReload paints the skeleton synchronously on the first load');
+ assert.ok(!duringLoad.includes('No topology yet'),'empty state never flashes while the first fetch is in flight');
+ await pending;
+ assert.equal(vm.runInContext('topologyLoadedOnce',sandbox),true,'first response marks the load complete');
+ assert.ok(el('topologiesList').innerHTML.includes('No topology yet'),'zero topologies after the first load shows the empty state');
+ sandbox.api=async(p,b,m)=>{calls.push({path:p,body:b,method:m});if(p==='/api/topologies'&&!b)throw new Error('boom');return {};};
+ calls=[];await vm.runInContext('topologyReload()',sandbox);
+ assert.equal(vm.runInContext('topologyLoadedOnce',sandbox),true,'a failed first load also completes the gate');
+ assert.equal(el('topologyError').hidden,false,'errors keep the topologyError banner');
+ sandbox.api=async(p,b,m)=>{calls.push({path:p,body:b,method:m});if(p==='/api/topologies'&&!b)return {topologies:[],tunnels:[]};return {topology:{id:'new'}};};
+ vm.runInContext("topologyData={topologies:[topo],tunnels:one};topologySelected='t'",sandbox);
  calls=[];el('topologyAttachSelect').value='candidate';await sandbox.topologyAttach();
  assert.equal(calls[0].path,'/api/topologies/t');assert.equal(calls[0].method,'PATCH');
  assert.deepEqual(Array.from(calls[0].body.tunnel_ids),['matrix','peer:2','candidate']);
@@ -143,5 +177,5 @@ topologyData={topologies:[topo],tunnels:one};
  assert.equal(calls[0].method,'PATCH');
  assert.equal(calls[0].body.country,'fi','save persists the chosen country');
  assert.ok(sandbox.topologyCountryOptions('fi').includes('<option value="fi" selected'),'saved country is preselected in the selector');
- console.log('Topology UI: semantic table/actions, escaping, flag columns, country selector, plain counts, keyboard rows, view/back, absent overview card, attachment and safe deletion PASS');
+ console.log('Topology UI: semantic table/actions, escaping, flag columns, country selector, plain counts, keyboard rows, view/back, first-load skeleton gate, absent overview card, attachment and safe deletion PASS');
 })().catch(e=>{console.error(e);process.exitCode=1;});

@@ -6,6 +6,9 @@ let topologySearchQuery = '';
 let topologyViewMode = 'list';
 let topologyBusy = false;
 let topologyLoading = false;
+// First /api/topologies round-trip: until it finishes the list shows skeleton
+// rows instead of the "No topology yet" empty state (which would flash).
+let topologyLoadedOnce = false;
 
 function topologyCurrent() {
   return topologyData.topologies.find(t => t.id === topologySelected) || null;
@@ -85,13 +88,18 @@ function topologyGraph(topo, tunnels) {
 async function topologyReload() {
   if (topologyLoading) return;
   topologyLoading = true;
+  // First load: paint skeleton rows now so the list never flashes the
+  // empty state while /api/topologies is in flight.
+  if (!topologyLoadedOnce) topologyRender();
   try {
     const r = await api('/api/topologies');
     topologyData = { topologies: r.topologies || [], tunnels: r.tunnels || [] };
     if (topologySelected && !topologyCurrent()) topologySelected = null;
+    topologyLoadedOnce = true;
     topologyRender();
     renderTunnelsList();
   } catch(e) {
+    topologyLoadedOnce = true;
     $('topologyError').textContent = e.message;
     $('topologyError').hidden = false;
   } finally { topologyLoading = false; }
@@ -145,7 +153,9 @@ function topologyRender() {
       }).join('')
     : searching
       ? `<tr class="topo-list-empty"><td colspan="5"><div class="ent-empty"><b>${esc(tr('', 'No topology matches your search.'))}</b><span>${esc(tr('', 'Clear the search to see all topologies.'))}</span></div></td></tr>`
-      : `<tr class="topo-list-empty"><td colspan="5"><div class="ent-empty"><b>${esc(tr('', 'No topology yet'))}</b><span>${esc(tr('', 'Create a topology, set the server roles, then add tunnels between them.'))}</span></div></td></tr>`;
+      : topologyLoading && !topologyLoadedOnce
+        ? `<tr class="topo-list-empty topo-list-skel"><td colspan="5">${skel(2)}</td></tr>`
+        : `<tr class="topo-list-empty"><td colspan="5"><div class="ent-empty"><b>${esc(tr('', 'No topology yet'))}</b><span>${esc(tr('', 'Create a topology, set the server roles, then add tunnels between them.'))}</span></div></td></tr>`;
   const assigned = new Set(topologyData.topologies.flatMap(t => t.tunnel_ids || []));
   if (!topo) return;
   const cables = (topo.tunnel_ids || []).map(id => topologyData.tunnels.find(t => t.id === id) || {id, name: id, engine: '—', state: 'down'});
