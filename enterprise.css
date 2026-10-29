@@ -1288,6 +1288,14 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 .topo-list-table.topo-grid .topo-cell-tunnels { text-align:start; }
 .topo-list-table.topo-grid .topo-actions { justify-content:flex-start; }
 .topo-settings { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin:16px 0; }
+/* Detail header actions: the same quiet pills as the back button — power
+   toggle, Edit, and an icon-only danger Delete. */
+.topo-detail-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.topo-act { display:inline-flex; align-items:center; gap:6px; min-height:34px; padding:0 14px; border:1px solid var(--ln2); border-radius:999px; background:transparent; color:var(--tx2); font-size:var(--fs-small); }
+.topo-act:hover, .topo-act:focus-visible { border-color:var(--ac); color:var(--tx); background:var(--ac-soft); }
+.topo-act .topo-act-ic { width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; flex:none; }
+.topo-act-danger { color:var(--er); }
+.topo-act-danger:hover, .topo-act-danger:focus-visible { border-color:var(--er); background:var(--er-fill); color:var(--tx); }
 /* Back pill in the topology header (Arvan-style): quiet ghost pill with a
    direction-aware arrow — points back toward the reading start. */
 .topo-back { display:inline-flex; align-items:center; gap:8px; min-height:34px; padding:0 16px; border:1px solid var(--ln2); border-radius:999px; background:transparent; color:var(--tx2); font-size:var(--fs-small); }
@@ -1436,3 +1444,46 @@ html[dir="rtl"] .topo-back .topo-back-ic { transform:scaleX(-1); }
 .topo-create-role span { align-self: start; }
 .topo-create-flag { display: flex; justify-content: center; padding: 4px 0 2px; }
 .topo-create-flag svg { width: 46px; height: 32px; }
+
+/* ---------- Wizard footer: two actions, opposite ends ---------- */
+/* Cancel lives only in the header ×. Back and Next are spread to opposite
+   sides of the bar with space-between; flex follows the panel's dir
+   attribute (html[dir="rtl"] in Persian), so «Back» hugs the inline start
+   (right in Persian, left in English) and the primary action the inline
+   end — the two never sit adjacent. When Back is hidden the render flips
+   the footer to next-only so the single Next keeps its reading-end spot.
+   Scoped to the two wizard modals: the edit dialog keeps its grouped
+   Cancel/Save footer. */
+#topoWizModal .ent-modal-f, #topoCreateModal .ent-modal-f { justify-content: space-between; }
+#topoWizModal .ent-modal-f.next-only, #topoCreateModal .ent-modal-f.next-only { justify-content: flex-end; }
+
+/* ---------- Custom country dropdown (topology forms + wizards) ---------- */
+/* The native <select> opened as a plain OS popup outside the dialog. This
+   listbox is absolutely positioned inside the modal (the host is the
+   positioning context), scrolls internally, and mirrors per direction:
+   flags, text and the checkmark follow the panel's dir like every other
+   flex row via logical properties (inset-inline / margin-inline-start). */
+.topo-dd { position: relative; }
+.topo-dd-btn {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  font: inherit; text-align: start; cursor: pointer;
+}
+.topo-dd-btn .topo-dd-txt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topo-dd-chev {
+  width: 16px; height: 16px; flex: none;
+  fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+}
+.topo-dd-flag { display: inline-flex; flex: none; }
+.topo-dd-flag .topo-flag-svg { display: block; }
+.topo-dd-list {
+  position: absolute; top: calc(100% + 4px); inset-inline: 0; z-index: 40;
+  max-height: 260px; overflow-y: auto; overscroll-behavior: contain;
+  display: grid; gap: 2px; padding: 6px;
+  background: var(--s1); border: 1px solid var(--ln2); border-radius: var(--r-lg);
+  box-shadow: var(--lift);
+}
+.topo-dd-opt { display: flex; align-items: center; gap: 8px; padding: 7px 9px; border-radius: var(--r-md); cursor: pointer; }
+.topo-dd-opt:hover, .topo-dd-opt.hot { background: var(--ac-soft); }
+.topo-dd-opt.on { color: var(--ac); font-weight: 600; }
+.topo-dd-opt.on::after { content: "\2713"; margin-inline-start: auto; font-weight: 800; }
+.topo-dd-txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

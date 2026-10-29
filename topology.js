@@ -179,10 +179,115 @@ function topologyFlagSvg(country, attrs) {
     '<rect x="0.5" y="0.5" width="19" height="13" rx="2.5" fill="none" stroke="currentColor" stroke-opacity=".3" stroke-width="1"/>' +
     '</svg>';
 }
-function topologyCountryOptions(current) {
-  return TOPO_COUNTRIES.map(([cc, label]) =>
-    `<option value="${esc(cc)}"${cc === (current || '') ? ' selected' : ''}>${esc(tr('', label))}</option>`
-  ).join('');
+// ---- Custom country dropdown ----
+// A native <select> opens as a plain OS popup outside the dialog: it
+// overflows the modal and shows no flags. This component replaces it with a
+// trigger button (flag + translated name) and an absolutely-positioned
+// listbox that stays inside the dialog, using the same embedded SVG flags
+// as the rest of the topology UI. The chosen ISO code is written to the
+// hidden input `valueId`, so existing readers (`$('topologyCountry').value`
+// in the settings PATCH, `$('topoCreateCountry').value` in the create
+// wizard, the localStorage draft) keep working unchanged.
+const topoDDState = {};
+function topoCountryIndex(cc) {
+  const i = TOPO_COUNTRIES.findIndex(c => c[0] === String(cc || '').toLowerCase());
+  return i < 0 ? TOPO_COUNTRIES.length - 1 : i; // «Other» also covers unknown codes
+}
+function topoCountryOptionsHtml(hostId, sel, hot) {
+  return TOPO_COUNTRIES.map((c, i) =>
+    `<div class="topo-dd-opt${i === sel ? ' on' : ''}${i === hot ? ' hot' : ''}" role="option" id="${hostId}Opt${i}" aria-selected="${i === sel}" data-dd-value="${esc(c[0])}">`
+    + `<span class="topo-dd-flag" aria-hidden="true">${topologyFlagSvg(c[0])}</span>`
+    + `<span class="topo-dd-txt">${esc(tr('', c[1]))}</span></div>`).join('');
+}
+function topoCountryTriggerHtml(hostId, cc) {
+  return `<span class="topo-dd-flag" aria-hidden="true">${topologyFlagSvg(cc)}</span>`
+    + `<span class="topo-dd-txt" id="${hostId}Txt">${esc(tr('', TOPO_COUNTRIES[topoCountryIndex(cc)][1]))}</span>`
+    + `<svg class="topo-dd-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>`;
+}
+// Render the dropdown into `hostId` (position:relative, so the listbox can
+// never leave the dialog) and wire it. `fieldLabel` names the listbox for
+// screen readers; `labelId` names the visible field label so the trigger
+// announces «label: value»; `onChange` runs after every pick.
+function topoCountryMount(hostId, valueId, fieldLabel, labelId, onChange) {
+  const host = $(hostId), val = $(valueId);
+  if (!host || !val) return;
+  const cc = String(val.value || '').toLowerCase();
+  topoDDState[hostId] = { open: false, active: topoCountryIndex(cc), valueId, onChange };
+  host.classList.add('topo-dd');
+  host.innerHTML =
+    `<button type="button" class="quantum-input topo-dd-btn" id="${hostId}Btn" aria-haspopup="listbox" aria-expanded="false" aria-controls="${hostId}List"${labelId ? ` aria-labelledby="${esc(labelId)} ${hostId}Txt"` : ''}>${topoCountryTriggerHtml(hostId, cc)}</button>`
+    + `<div class="topo-dd-list hidden" id="${hostId}List" role="listbox" aria-label="${esc(tr('', fieldLabel || ''))}" tabindex="-1">${topoCountryOptionsHtml(hostId, topoCountryIndex(cc), topoCountryIndex(cc))}</div>`;
+  const btn = $(hostId + 'Btn');
+  if (btn) {
+    btn.onclick = () => topoCountrySetOpen(hostId, !topoDDState[hostId].open);
+    btn.onkeydown = e => topoCountryKey(hostId, e);
+  }
+  host.onclick = e => { // one delegated handler covers every option row
+    const opt = e && e.target && e.target.closest ? e.target.closest('.topo-dd-opt') : null;
+    if (opt) topoCountryPick(hostId, opt.dataset.ddValue);
+  };
+}
+// Repaint the list rows and the trigger's aria-activedescendant: `sel` marks
+// the picked option (checkmark), `hot` the keyboard highlight.
+function topoCountryPaint(hostId) {
+  const st = topoDDState[hostId], list = $(hostId + 'List'), btn = $(hostId + 'Btn');
+  if (!st || !list || !btn) return;
+  const val = $(st.valueId);
+  list.innerHTML = topoCountryOptionsHtml(hostId, topoCountryIndex(val && val.value), st.active);
+  btn.setAttribute('aria-activedescendant', `${hostId}Opt${st.active}`);
+  if (list.querySelector) {
+    const hot = list.querySelector('.topo-dd-opt.hot');
+    if (hot && hot.scrollIntoView) hot.scrollIntoView({ block: 'nearest' });
+  }
+}
+function topoCountrySetOpen(hostId, open) {
+  const st = topoDDState[hostId], list = $(hostId + 'List'), btn = $(hostId + 'Btn');
+  if (!st || !list || !btn || st.open === open) return;
+  st.open = open;
+  list.classList.toggle('hidden', !open);
+  btn.setAttribute('aria-expanded', String(open));
+  if (open) topoCountryPaint(hostId);
+  else st.active = topoCountryIndex($(st.valueId) && $(st.valueId).value); // reopening highlights the real value again
+}
+function topoCountryPick(hostId, cc) {
+  const st = topoDDState[hostId];
+  if (!st) return;
+  st.active = topoCountryIndex(cc);
+  const val = $(st.valueId);
+  if (val) val.value = TOPO_COUNTRIES[st.active][0];
+  const btn = $(hostId + 'Btn');
+  if (btn) btn.innerHTML = topoCountryTriggerHtml(hostId, TOPO_COUNTRIES[st.active][0]);
+  topoCountrySetOpen(hostId, false);
+  if (typeof st.onChange === 'function') st.onChange(TOPO_COUNTRIES[st.active][0]);
+}
+// Keyboard: Enter/Space/Arrows open, arrows move the highlight, Enter/Space
+// select, Escape/Tab close. Focus stays on the trigger; the highlight moves
+// via aria-activedescendant.
+function topoCountryKey(hostId, e) {
+  const st = topoDDState[hostId];
+  if (!st || !e || !e.key) return;
+  const space = e.key === ' ' || e.key === 'Spacebar';
+  if (!st.open) {
+    if (e.key === 'Enter' || space || e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      topoCountrySetOpen(hostId, true);
+    }
+    return;
+  }
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    st.active = e.key === 'ArrowDown' ? Math.min(TOPO_COUNTRIES.length - 1, st.active + 1) : Math.max(0, st.active - 1);
+    topoCountryPaint(hostId);
+  } else if (e.key === 'Home' || e.key === 'End') {
+    e.preventDefault();
+    st.active = e.key === 'Home' ? 0 : TOPO_COUNTRIES.length - 1;
+    topoCountryPaint(hostId);
+  } else if (e.key === 'Enter' || space) {
+    e.preventDefault();
+    topoCountryPick(hostId, TOPO_COUNTRIES[st.active][0]);
+  } else if (e.key === 'Escape' || e.key === 'Tab') {
+    topoCountrySetOpen(hostId, false);
+  }
 }
 function topologyDeleteNotice(count) {
   return tr('', '{n} tunnel(s) still exist. Delete all tunnels in this topology first, including stopped tunnels.').replace('{n}', String(count));
@@ -371,13 +476,17 @@ function topologyRender() {
   if (!topo) return;
   const cables = (topo.tunnel_ids || []).map(id => topologyData.tunnels.find(t => t.id === id) || {id, name: id, engine: '—', state: 'down'});
   $('topologyGraph').innerHTML = topologyGraph(topo, cables);
-  $('topologyNameHeading').textContent = topo.name;
+  // The header's power toggle mirrors the row menu: a pair whose tunnels are
+  // not up offers Activate, a live pair offers Deactivate.
+  const act = $('topologyActivateBtn');
+  if (act) act.textContent = tr('', topologyHealthOf(topo, cables) !== 'ok' ? 'Activate' : 'Deactivate');
   // Do not overwrite a form the user is currently editing.
   if (!$('topologySettings').contains(document.activeElement)) {
     $('topologyName').value = topo.name;
     $('topologyLocalIP').value = topo.local_ip || '';
     $('topologyRemoteIP').value = topo.remote_ip || '';
-    $('topologyCountry').innerHTML = topologyCountryOptions(topo.country);
+    $('topologyCountry').value = topo.country || '';
+    topoCountryMount('topologyCountryDD', 'topologyCountry', tr('', 'Foreign server country'), 'topologyCountryLbl');
     topologyChooseRole(topo.role || 'iran');
   }
   const candidates = topologyData.tunnels.filter(t => !assigned.has(t.id) && (!t.remote_ip || t.remote_ip === topo.remote_ip || (t.remote_ips || []).includes(topo.remote_ip)));
@@ -401,6 +510,7 @@ function topologyOpen(id) {
 function topologyBack() {
   topologySelected = null;
   _tunnelDetail = null;
+  topoEditClose();
   applyTunnelDetail(false);
   topologyRender();
   renderTunnelsList();
@@ -415,9 +525,31 @@ async function topologySave() {
   topologyBusy = true; $('topologySaveBtn').disabled = true;
   try {
     await api('/api/topologies/' + encodeURIComponent(topo.id), {name: $('topologyName').value.trim(), role: $('topologyRole').value, local_ip: $('topologyLocalIP').value.trim(), remote_ip: $('topologyRemoteIP').value.trim(), country: $('topologyCountry').value.trim().toLowerCase()}, 'PATCH');
-    await topologyReload(); toastOk(tr('', 'Topology saved'));
+    await topologyReload(); toastOk(tr('', 'Topology saved')); topoEditClose();
   } catch(e) { toastErr(tr('', 'Topology save failed'), e.message); }
   finally { topologyBusy = false; $('topologySaveBtn').disabled = false; }
+}
+// Edit dialog: the old inline settings form, now opened from the header's
+// Edit action. It reuses the same field ids the save PATCH has always read.
+function topoEditShow() {
+  const ov = $('topoEditModal');
+  if (typeof modalShow === 'function') modalShow(ov, topoEditClose);
+  else ov.hidden = false;
+}
+function topoEditClose() {
+  const ov = $('topoEditModal');
+  if (typeof modalHide === 'function') modalHide(ov);
+  else ov.hidden = true;
+}
+function topoEditOpen() {
+  const topo = topologyCurrent(); if (!topo) return;
+  $('topologyName').value = topo.name || '';
+  $('topologyLocalIP').value = topo.local_ip || '';
+  $('topologyRemoteIP').value = topo.remote_ip || '';
+  $('topologyCountry').value = topo.country || '';
+  topoCountryMount('topologyCountryDD', 'topologyCountry', tr('', 'Foreign server country'), 'topologyCountryLbl');
+  topologyChooseRole(topo.role || 'iran');
+  topoEditShow();
 }
 async function topologyAttach() {
   const topo = topologyCurrent(), id = $('topologyAttachSelect').value;
@@ -536,10 +668,10 @@ function topoWizRender() {
   $('topoWizProgress').textContent = tr('', 'Step {x} of {n}').replace('{x}', String(step)).replace('{n}', String(steps.length));
   $('topoWizSteps').innerHTML = steps.map((lb, i) =>
     `<span class="topo-wiz-step${i + 1 < step ? ' done' : ''}${i + 1 === step ? ' on' : ''}" data-wiz-step="${i + 1}"${i + 1 === step ? ' aria-current="step"' : ''}>${esc(tr('', lb))}</span>`).join('');
-  // The bundle hand-off screen is terminal: Back and Cancel would only confuse
-  // after the tunnel already exists; the header × still closes it.
+  // The bundle hand-off screen is terminal: Back would only confuse after
+  // the tunnel already exists; the header × still closes it.
   $('topoWizBack').hidden = step === 1 || bundle;
-  $('topoWizCancelBtn').hidden = bundle;
+  $('topoWizFoot').classList.toggle('next-only', step === 1 || bundle);
   const next = $('topoWizNext');
   next.textContent = bundle ? tr('', 'Done') : (step === 3 ? tr('', 'Create the tunnel') : tr('', 'Next'));
   next.disabled = step === 1 && !topoWiz.type;
@@ -998,6 +1130,7 @@ function topoCreateRender() {
   $('topoCreateDots').innerHTML = TOPO_CREATE_STEPS.map((lb, i) =>
     `<i class="topo-create-dot${i + 1 < step ? ' done' : ''}${i + 1 === step ? ' on' : ''}" title="${esc(tr('', lb))}"></i>`).join('');
   $('topoCreateBack').hidden = step === 1;
+  $('topoCreateFoot').classList.toggle('next-only', step === 1);
   const next = $('topoCreateNext');
   next.textContent = step === n ? tr('', 'Create topology') : tr('', 'Next');
   next.disabled = topoCreateBusy;
@@ -1012,10 +1145,14 @@ function topoCreateRender() {
   } else if (step === 4) {
     $('topoCreateBody').innerHTML = `<p class="qs-hint u-m-0">${esc(tr('', 'Used for the flag next to the foreign server.'))}</p>` +
       `<div class="topo-create-flag">${topologyFlagSvg(v.country)}</div>` +
-      `<div class="fg"><label class="qs-label" for="topoCreateCountry">${esc(tr('', 'Foreign server country'))}</label><select class="quantum-input" id="topoCreateCountry">` +
-      TOPO_COUNTRIES.map(c => `<option value="${esc(c[0])}"${c[0] === v.country ? ' selected' : ''}>${esc(tr('', c[1]))}</option>`).join('') +
-      `</select></div>`;
-    $('topoCreateCountry').onchange = () => { topoCreateRead(); topoCreateRender(); };
+      `<div class="fg"><label class="qs-label" id="topoCreateCountryLbl">${esc(tr('', 'Foreign server country'))}</label>` +
+      `<input type="hidden" id="topoCreateCountry" value="${esc(v.country || '')}">` +
+      `<div id="topoCreateCountryDD"></div></div>`;
+    // Custom dropdown: the flag list stays inside the modal (a native
+    // <select> popup would overflow it). The hidden input above still
+    // carries the code for topoCreateRead() and the draft.
+    topoCountryMount('topoCreateCountryDD', 'topoCreateCountry', tr('', 'Foreign server country'), 'topoCreateCountryLbl',
+      () => { topoCreateRead(); topoCreateRender(); });
   } else if (step === 6) {
     topoCreateRenderReview();
   } else {
@@ -1120,14 +1257,20 @@ $('topologyCreateBtn').onclick = topologyCreate;
 $('topologyBackBtn').onclick = topologyBack;
 $('topologySaveBtn').onclick = topologySave;
 $('topologyAttachBtn').onclick = topologyAttach;
+$('topologyEditBtn').onclick = topoEditOpen;
+$('topoEditCancel').onclick = topoEditClose;
+$('topoEditX').onclick = topoEditClose;
+$('topologyActivateBtn').onclick = () => {
+  const t = topologyCurrent(); if (!t) return;
+  topologyPower(t.id, topologyHealthOf(t, topologyExistingTunnels(t)) !== 'ok');
+};
+$('topologyDeleteBtn').onclick = () => { const t = topologyCurrent(); if (t) topologyDelete(t.id); };
 $('topologySetupBack').onclick = topologyResume;
 $('tunnelsAddBtn').onclick = topologyNewTunnel;
 $('topologyAddTunnelBtn').onclick = topologyNewTunnel;
-$('topoWizCancelBtn').onclick = topoWizCancel;
 $('topoWizX').onclick = topoWizCancel;
 $('topoWizBack').onclick = topoWizBack;
 $('topoWizNext').onclick = topoWizNext;
-$('topoCreateCancelBtn').onclick = topoCreateCancel;
 $('topoCreateX').onclick = topoCreateCancel;
 $('topoCreateBack').onclick = topoCreateBack;
 $('topoCreateNext').onclick = topoCreateNext;
@@ -1172,6 +1315,26 @@ $('tab-tunnel').addEventListener('click', e => {
 if (document.addEventListener) { // sandbox DOM stubs may not have it
   document.addEventListener('click', e => { if (!e.target.closest('.topo-menu')) topoMenusClose(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') topoMenusClose(); });
+  // A click outside an open country dropdown closes it; clicks inside are
+  // handled by the trigger and the delegated option handler.
+  document.addEventListener('click', e => {
+    for (const id of Object.keys(topoDDState)) {
+      if (topoDDState[id].open && !(e.target.closest && e.target.closest('.topo-dd'))) topoCountrySetOpen(id, false);
+    }
+  });
+  // Escape closes an open country dropdown first: this capture listener was
+  // registered before the modal trap's, and stopImmediatePropagation keeps
+  // the same keystroke from closing the whole wizard.
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    for (const id of Object.keys(topoDDState)) {
+      if (topoDDState[id].open) {
+        topoCountrySetOpen(id, false);
+        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+        break;
+      }
+    }
+  }, true);
   if (window.addEventListener) {
     window.addEventListener('scroll', topoMenusClose, { passive: true });
     window.addEventListener('resize', topoMenusClose);

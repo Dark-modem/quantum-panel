@@ -446,6 +446,7 @@ const I18N = {
     topology_unassigned: "Unassigned tunnels",
     topology_preserve: "Existing tunnels keep running. Open a topology to attach them without recreating them.",
     topology_back: "Back to the list",
+    topology_edit: "Edit topology",
     topology_name: "Topology name",
     topology_role: "This server's role",
     topology_local: "This server's IP",

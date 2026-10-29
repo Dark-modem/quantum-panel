@@ -3017,6 +3017,7 @@ window.FA_TEXT = {
 "Unassigned tunnels": "تونل‌های بدون توپولوژی",
 "Existing tunnels keep running. Open a topology to attach them without recreating them.": "تونل‌های موجود فعال می‌مانند. یک توپولوژی را باز کنید تا بدون ساخت مجدد، به آن متصل شوند.",
 "Back to the list": "بازگشت به لیست",
+"Edit topology": "ویرایش توپولوژی",
 "Topology name": "نام توپولوژی",
 "This server's role": "نقش سرور فعلی",
 "Other server's IP": "آی‌پی سرور مقابل",

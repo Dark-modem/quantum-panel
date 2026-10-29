@@ -1506,18 +1506,17 @@
           </table></div>
         </div>
         <div class="tunnel-card" id="topologyDetailCard" hidden>
-          <div class="tc-header"><button type="button" id="topologyBackBtn" class="quantum-btn topo-back"><svg class="topo-back-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg><span data-i18n="topology_back">Back to the list</span></button><b id="topologyNameHeading"></b></div>
+          <div class="tc-header">
+            <button type="button" id="topologyBackBtn" class="quantum-btn topo-back"><svg class="topo-back-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg><span data-i18n="topology_back">Back to the list</span></button>
+            <div class="topo-detail-actions" role="group" aria-label="Topology actions">
+              <button type="button" id="topologyActivateBtn" class="quantum-btn topo-act">Activate</button>
+              <button type="button" id="topologyEditBtn" class="quantum-btn topo-act" data-i18n="topology_edit">Edit</button>
+              <button type="button" id="topologyDeleteBtn" class="quantum-btn topo-act topo-act-danger" aria-label="Delete topology"><svg class="topo-act-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg></button>
+            </div>
+          </div>
           <div id="topologyGraph"></div>
           <div class="qs-hint" data-i18n="topology_cables">Each cable represents one tunnel between the two servers.</div>
-          <div id="topologySettings" class="topo-settings">
-            <div class="fg"><label for="topologyName" data-i18n="topology_name">Topology name</label><input id="topologyName" class="quantum-input" maxlength="120"></div>
-            <div class="fg"><span id="topologyRoleLabel" class="qs-label" data-i18n="topology_role">This server's role</span><input type="hidden" id="topologyRole" value="iran"><div class="qs-seg" role="group" aria-labelledby="topologyRoleLabel"><button type="button" data-topo-role="iran" aria-pressed="true" data-i18n="x002">Iran</button><button type="button" data-topo-role="foreign" aria-pressed="false" data-i18n="x003">Foreign</button></div></div>
-            <div class="fg"><label for="topologyLocalIP" data-i18n="topology_local">This server's IP</label><input id="topologyLocalIP" class="quantum-input u-mono" dir="ltr"></div>
-            <div class="fg"><label for="topologyRemoteIP" data-i18n="topology_remote">Other server's IP</label><input id="topologyRemoteIP" class="quantum-input u-mono" dir="ltr" placeholder="IPv4 / IPv6"></div>
-            <div class="fg"><label for="topologyCountry" data-i18n="topology_country">Foreign server country</label><select id="topologyCountry" class="quantum-input"></select></div>
-          </div>
           <button type="button" id="topologyAddTunnelBtn" class="quantum-btn quantum-btn-primary" data-i18n="tunnels_new">New Tunnel</button>
-          <button type="button" id="topologySaveBtn" class="quantum-btn quantum-btn-primary" data-i18n="topology_save">Save topology</button>
           <div class="topo-attach u-mt-12"><label for="topologyAttachSelect" data-i18n="topology_attach">Attach an existing tunnel</label><select id="topologyAttachSelect" class="quantum-input"></select><button type="button" id="topologyAttachBtn" class="quantum-btn quantum-btn-secondary" data-i18n="topology_attach_btn">Attach tunnel</button></div>
           <div id="topologyBoundList" class="u-mt-8"></div>
         </div>
@@ -3548,8 +3547,9 @@
     <div class="topo-wiz-head"><span class="topo-wiz-progress" id="topoWizProgress"></span><span class="topo-wiz-steps" id="topoWizSteps" role="group" aria-label="Steps"></span></div>
     <div class="ent-modal-b" id="topoWizBody"></div>
     <div class="xr-err hidden" id="topoWizErr" role="alert"></div>
-    <div class="ent-modal-f">
-      <button type="button" class="quantum-btn quantum-btn-ghost" id="topoWizCancelBtn">Cancel</button>
+    <!-- Back and Next sit on opposite ends of the footer (flex space-between,
+         mirrored per language); the header × is the only cancel affordance -->
+    <div class="ent-modal-f" id="topoWizFoot">
       <button type="button" class="quantum-btn quantum-btn-secondary" id="topoWizBack">Back</button>
       <button type="button" class="quantum-btn quantum-btn-primary" id="topoWizNext">Next</button>
     </div>
@@ -3563,10 +3563,30 @@
     <div class="topo-wiz-head"><span class="topo-create-ring" id="topoCreateRing"></span><span class="topo-wiz-progress" id="topoCreateProgress"></span><span class="topo-create-dots" id="topoCreateDots" role="group" aria-label="Steps"></span></div>
     <div class="ent-modal-b" id="topoCreateBody"></div>
     <div class="xr-err hidden" id="topoCreateErr" role="alert"></div>
-    <div class="ent-modal-f">
-      <button type="button" class="quantum-btn quantum-btn-ghost" id="topoCreateCancelBtn">Cancel</button>
+    <!-- Back and Next on opposite ends (see the tunnel wizard footer note) -->
+    <div class="ent-modal-f" id="topoCreateFoot">
       <button type="button" class="quantum-btn quantum-btn-secondary" id="topoCreateBack">Back</button>
       <button type="button" class="quantum-btn quantum-btn-primary" id="topoCreateNext">Next</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit-topology modal: the old inline settings form, now a dialog -->
+<div class="ent-modal-ov" id="topoEditModal" hidden>
+  <div class="ent-modal topo-wiz-modal" role="dialog" aria-modal="true" aria-labelledby="topoEditTitle">
+    <div class="ent-modal-h"><b id="topoEditTitle" data-i18n="topology_edit">Edit topology</b><button type="button" class="ent-x" id="topoEditX" aria-label="Close" data-i18n-aria="aria_close">×</button></div>
+    <div class="ent-modal-b">
+      <div id="topologySettings" class="topo-settings" style="margin:0;">
+        <div class="fg"><label for="topologyName" data-i18n="topology_name">Topology name</label><input id="topologyName" class="quantum-input" maxlength="120"></div>
+        <div class="fg"><span id="topologyRoleLabel" class="qs-label" data-i18n="topology_role">This server's role</span><input type="hidden" id="topologyRole" value="iran"><div class="qs-seg" role="group" aria-labelledby="topologyRoleLabel"><button type="button" data-topo-role="iran" aria-pressed="true" data-i18n="x002">Iran</button><button type="button" data-topo-role="foreign" aria-pressed="false" data-i18n="x003">Foreign</button></div></div>
+        <div class="fg"><label for="topologyLocalIP" data-i18n="topology_local">This server's IP</label><input id="topologyLocalIP" class="quantum-input u-mono" dir="ltr"></div>
+        <div class="fg"><label for="topologyRemoteIP" data-i18n="topology_remote">Other server's IP</label><input id="topologyRemoteIP" class="quantum-input u-mono" dir="ltr" placeholder="IPv4 / IPv6"></div>
+        <div class="fg"><label id="topologyCountryLbl" data-i18n="topology_country">Foreign server country</label><input type="hidden" id="topologyCountry" value=""><div id="topologyCountryDD" class="topo-dd"></div></div>
+      </div>
+    </div>
+    <div class="ent-modal-f">
+      <button type="button" class="quantum-btn quantum-btn-ghost" id="topoEditCancel">Cancel</button>
+      <button type="button" id="topologySaveBtn" class="quantum-btn quantum-btn-primary" data-i18n="topology_save">Save topology</button>
     </div>
   </div>
 </div>
