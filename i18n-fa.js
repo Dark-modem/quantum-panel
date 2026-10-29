@@ -3148,5 +3148,6 @@ window.FA_TEXT = {
 "Paste the hub bundle from the Iran server.": "باندل هاب را از سرور ایران وارد کنید.",
 "The bundle must start with hmx1_.": "باندل باید با hmx1_ شروع شود.",
 "Matrix tunnel connected to the hub.": "تونل ماتریس به هاب متصل شد.",
+"Local mesh port: {port}": "پورت مش محلی: {port}",
 "Stealth tunnel over an SSH connection pool.": "تونل پنهان‌کار روی استخر اتصال SSH."
 };

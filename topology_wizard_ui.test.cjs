@@ -9,7 +9,7 @@ const faSource = fs.readFileSync(path.join(__dirname, 'i18n-fa.js'), 'utf8');
 const pageSource = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 const cssSource = fs.readFileSync(path.join(__dirname, 'enterprise.css'), 'utf8');
 
-function harness({ fa = false, topologies, tunnels, failOn, failCode, failMessage, instances = [], localRole = '' } = {}) {
+function harness({ fa = false, topologies, tunnels, failOn, failCode, failMessage, instances = [], localRole = '', foreignPort = 0 } = {}) {
   const elements = new Map();
   const calls = [], toasts = [], clipboard = [];
   let created = null;
@@ -26,7 +26,7 @@ function harness({ fa = false, topologies, tunnels, failOn, failCode, failMessag
     '/api/setup': body => ({ id: 'main', name: body.name || 'main', engine: body.engine || 'frp', state: 'healthy' }),
     '/api/sshfwd': body => ({ id: 'bagher-1', name: body.name || 'bagher-1', engine: 'bagher', state: 'healthy' }),
     '/api/matrix/setup': body => ({ id: 'matrix', name: 'Matrix', engine: 'matrix', state: 'healthy', port: body.port || 21007, bundle: 'hmx1_QnVuZGxl', instance: 'matrix' }),
-    '/api/matrix/foreign-setup': body => ({ id: 'matrix', name: 'Matrix', engine: 'matrix', state: 'healthy', status: 'ok', detail: 'matrix node registered with the hub and started' }),
+    '/api/matrix/foreign-setup': body => Object.assign({ id: 'matrix', name: 'Matrix', engine: 'matrix', state: 'healthy', status: 'ok', detail: 'matrix node registered with the hub and started' }, foreignPort ? { port: foreignPort } : {}),
     '/api/xray': () => ({ id: 'xray:1', name: 'xr', engine: 'xray', state: 'healthy' })
   };
   const sandbox = {
@@ -342,7 +342,7 @@ test('wizard strings carry unique Persian translations', () => {
     'Copy this bundle and paste it on the foreign server, in the new-tunnel wizard under Matrix.',
     'Enter the hub bundle here', 'On the Iran server, create the Matrix tunnel, copy the bundle it shows, and paste it here.',
     'Hub bundle', 'Paste the hub bundle from the Iran server.', 'The bundle must start with hmx1_.',
-    'Matrix tunnel connected to the hub.'];
+    'Matrix tunnel connected to the hub.', 'Local mesh port: {port}'];
   for (const key of keys) {
     assert.equal(faSource.split(JSON.stringify(key) + ':').length - 1, 1, `unique translation: ${key}`);
     assert.ok(map[key], `Persian entry exists: ${key}`);
@@ -471,6 +471,23 @@ test('foreign side: a valid bundle pairs via foreign-setup, attaches, and closes
   assert.ok(patch, 'the paired node tunnel is attached to the topology');
   assert.deepEqual(Array.from(patch.body.tunnel_ids), ['matrix'], 'the matrix inventory id attaches like on the hub');
   assert.ok(h.toasts.some(t => t[0] === 'ok' && String(t[1]).includes('Matrix tunnel connected to the hub')), 'the pairing success toast is shown');
+  assert.ok(!h.toasts.some(t => String(t[1]).includes('Local mesh port')), 'no local mesh port is reported when the response carries none');
   assert.equal(h.el('topoWizModal').hidden, true, 'the node side closes without a bundle screen');
   assert.equal(h.wiz('topoWiz'), null);
+});
+
+test('foreign side: a shifted local mesh port is appended to the pairing toast', async () => {
+  // The node may have had to pick its own local mesh port (the bundle's port
+  // is the hub's); the pairing toast must say so in the same message.
+  const h = harness({ topologies: [topo()], tunnels: [], localRole: 'foreign (matrix node)', foreignPort: 21001 });
+  h.sandbox.topologyNewTunnel();
+  h.sandbox.topoWizPick('matrix');
+  h.el('topoWizFBundle').value = 'hmx1_QnVuZGxl';
+  h.sandbox.topoWizRead();
+  h.sandbox.topoWizNext();
+  await h.sandbox.topoWizNext();
+  const toast = h.toasts.find(t => t[0] === 'ok' && String(t[1]).includes('Matrix tunnel connected to the hub.'));
+  assert.ok(toast, 'the pairing success toast is shown');
+  assert.ok(String(toast[1]).includes('Local mesh port: 21001'), 'the toast appends the node-local mesh port, got ' + JSON.stringify(h.toasts));
+  assert.ok(!h.toasts.some(t => String(t[1]).includes('Matrix mesh port:')), 'no separate hub-style mesh-port toast on the node side');
 });

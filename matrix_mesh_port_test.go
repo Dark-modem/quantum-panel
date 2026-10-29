@@ -1,7 +1,12 @@
 package main
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"net"
 	"net/http"
@@ -10,6 +15,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -248,3 +254,222 @@ func TestMatrixEditMeshPortParity(t *testing.T) {
 }
 
 func intPtr(v int) *int { return &v }
+
+// foreignTestBundle builds a valid pairing bundle targeting instance matrix2
+// whose hub lives at hubURL; MainHost carries a real 2048-bit key so
+// parseMatrixBundleFor accepts it.
+func foreignTestBundle(t *testing.T, hubURL string, port int, ports []int) matrixBundlePayload {
+	t.Helper()
+	key, e := rsa.GenerateKey(rand.Reader, 2048)
+	if e != nil {
+		t.Fatal(e)
+	}
+	pub := string(pem.EncodeToMemory(&pem.Block{Type: "RSA PUBLIC KEY", Bytes: x509.MarshalPKCS1PublicKey(&key.PublicKey)}))
+	in, _ := matrixInstanceOfNetwork("quantum_matrix2")
+	return matrixBundlePayload{
+		Panel: hubURL, Token: strings.Repeat("t", 64), Family: "ipv4", Addr: "185.226.119.74",
+		Port: port, FIP: in.firstPeer(), Ports: ports, MainHost: pub, Network: "quantum_matrix2",
+	}
+}
+
+// foreignSetupBody posts the bundle-encoded pairing request to
+// handleMatrixForeignSetup.
+func foreignSetupBody(t *testing.T, b matrixBundlePayload) *httptest.ResponseRecorder {
+	t.Helper()
+	raw, e := json.Marshal(b)
+	if e != nil {
+		t.Fatal(e)
+	}
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/matrix/foreign-setup",
+		strings.NewReader(fmt.Sprintf(`{"bundle":%q}`, matrixBundlePfx+base64.StdEncoding.EncodeToString(raw))))
+	handleMatrixForeignSetup(rr, req)
+	return rr
+}
+
+// fakeMatrixHub accepts the node's registration POST, records its payload and
+// answers like the real hub.
+func fakeMatrixHub(t *testing.T) (*httptest.Server, func() map[string]any) {
+	t.Helper()
+	var mu sync.Mutex
+	payload := map[string]any{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/matrix/register" {
+			http.NotFound(w, r)
+			return
+		}
+		var body map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		mu.Lock()
+		payload = body
+		mu.Unlock()
+		w.Write([]byte(`{"status":"ok","main_host":"hub host file"}`))
+	}))
+	t.Cleanup(srv.Close)
+	return srv, func() map[string]any {
+		mu.Lock()
+		defer mu.Unlock()
+		return payload
+	}
+}
+
+// The reported regression: the node server still runs an ENABLED legacy Matrix
+// instance (an old pairing) holding the bundle's mesh port. The node dials the
+// hub at the port embedded in the hub host file, not at its own local port, so
+// a taken local mesh port must be auto-shifted instead of failing E-MATRIX-02.
+func TestMatrixForeignSetupShiftsBusyLocalMeshPort(t *testing.T) {
+	matrixInstanceLab(t)
+	// The legacy instance owns mesh port 21097 and forwarded 18080.
+	if e := saveMatrix(matrixState{Enabled: true, Network: matrixNetname, Role: "hub", Port: 21097, Ports: []int{18080}}); e != nil {
+		t.Fatal(e)
+	}
+	// Shrink the auto-port scan and occupy its first candidate, so the picked
+	// local mesh port is deterministic.
+	oldCand := matrixMeshPortCandidates
+	matrixMeshPortCandidates = func() []int { return []int{21000, 21001} }
+	t.Cleanup(func() { matrixMeshPortCandidates = oldCand })
+	occupyTCP(t, 21000)
+
+	hub, reg := fakeMatrixHub(t)
+	b := foreignTestBundle(t, hub.URL, 21097, []int{18081})
+	rr := foreignSetupBody(t, b)
+	if rr.Code != 200 {
+		t.Fatalf("status %d body %s", rr.Code, rr.Body.String())
+	}
+	var out struct {
+		Status string `json:"status"`
+		Port   int    `json:"port"`
+	}
+	if e := json.Unmarshal(rr.Body.Bytes(), &out); e != nil {
+		t.Fatal(e)
+	}
+	if out.Status != "ok" || out.Port != 21001 {
+		t.Fatalf("response = %+v, want ok with the shifted local port 21001", out)
+	}
+	in2 := matrixInstance{ID: "matrix2"}
+	st := loadMatrixInstance(in2)
+	if !st.Enabled || st.Role != "node" || st.Port != 21001 || st.Network != "quantum_matrix2" {
+		t.Fatalf("node state = %+v, want an enabled matrix2 node on local mesh port 21001", st)
+	}
+	// The node listens on the shifted port but still dials the hub through the
+	// host file's hub port: tinc.conf vs hosts/main.
+	conf, e := os.ReadFile(filepath.Join(matrixDirOf(in2), "tinc.conf"))
+	if e != nil {
+		t.Fatal(e)
+	}
+	if !strings.Contains(string(conf), "Port = 21001") || !strings.Contains(string(conf), "ConnectTo = main") {
+		t.Fatalf("tinc.conf not on the shifted local port: %q", string(conf))
+	}
+	main, e := os.ReadFile(filepath.Join(matrixDirOf(in2), "hosts", "main"))
+	if e != nil {
+		t.Fatal(e)
+	}
+	if !strings.Contains(string(main), "Port = 21097") || !strings.Contains(string(main), "Address = 185.226.119.74") {
+		t.Fatalf("hosts/main must keep the hub dial port: %q", string(main))
+	}
+	// The registration payload still identifies the node, and the host file it
+	// uploads carries the node's own (shifted) port.
+	got := reg()
+	if got["token"] != b.Token || got["revision"] != "" || !strings.HasPrefix(fmt.Sprint(got["name"]), "node") {
+		t.Fatalf("register payload = %+v", got)
+	}
+	if hf := fmt.Sprint(got["host_file"]); !strings.Contains(hf, "Port = 21001") {
+		t.Fatalf("register host_file must carry the node's local port: %q", hf)
+	}
+}
+
+// When the bundle's mesh port is free locally nothing shifts and the response
+// carries no port override.
+func TestMatrixForeignSetupKeepsFreeBundlePort(t *testing.T) {
+	matrixInstanceLab(t)
+	hub, _ := fakeMatrixHub(t)
+	p := freeTCPPort(t)
+	b := foreignTestBundle(t, hub.URL, p, []int{18081})
+	rr := foreignSetupBody(t, b)
+	if rr.Code != 200 {
+		t.Fatalf("status %d body %s", rr.Code, rr.Body.String())
+	}
+	var out map[string]any
+	if e := json.Unmarshal(rr.Body.Bytes(), &out); e != nil {
+		t.Fatal(e)
+	}
+	if _, shifted := out["port"]; shifted {
+		t.Fatalf("free bundle port must not be reported as shifted: %v", out)
+	}
+	if st := loadMatrixInstance(matrixInstance{ID: "matrix2"}); !st.Enabled || st.Port != p {
+		t.Fatalf("node state = %+v, want the bundle port %d kept", st, p)
+	}
+}
+
+// Forwarded ports are a genuine conflict: the hub DNATs exactly those port
+// numbers into this node, where the real service listens. The refusal must
+// name the port, the owning instance and the fix, and must not touch state.
+func TestMatrixForeignSetupForwardedPortConflictFailsClearly(t *testing.T) {
+	matrixInstanceLab(t)
+	if e := saveMatrix(matrixState{Enabled: true, Network: matrixNetname, Role: "hub", Port: 21097, Ports: []int{18080}}); e != nil {
+		t.Fatal(e)
+	}
+	// The hub URL is never contacted: the conflict is refused in the preflight.
+	b := foreignTestBundle(t, "http://127.0.0.1:9", 22000, []int{18080})
+	rr := foreignSetupBody(t, b)
+	if rr.Code != 400 {
+		t.Fatalf("status %d body %s", rr.Code, rr.Body.String())
+	}
+	var out struct {
+		Code  string `json:"error_code"`
+		Error string `json:"error"`
+	}
+	if e := json.Unmarshal(rr.Body.Bytes(), &out); e != nil {
+		t.Fatal(e)
+	}
+	if out.Code != "E-MATRIX-02" {
+		t.Fatalf("error_code = %q (%s)", out.Code, out.Error)
+	}
+	want := "forwarded port 18080 is already used on this server by Matrix instance matrix — free that port or remove that tunnel first"
+	if !strings.Contains(out.Error, want) {
+		t.Fatalf("error %q does not name the port, owner and fix", out.Error)
+	}
+	in2, _ := matrixInstanceOfNetwork("quantum_matrix2")
+	if _, e := os.Stat(matrixStatePathOf(in2)); !os.IsNotExist(e) {
+		t.Fatalf("state persisted despite the conflict: %v", e)
+	}
+	if _, e := os.Stat(matrixDirOf(in2)); !os.IsNotExist(e) {
+		t.Fatalf("tinc dir created despite the conflict: %v", e)
+	}
+}
+
+// Hub-side setup busy messages name the port and the owning instance: a taken
+// mesh port points at the auto pick, a taken forwarded port names the fix.
+func TestMatrixSetupBusyMessageNamesPortAndInstance(t *testing.T) {
+	matrixInstanceLab(t)
+	if e := saveMatrixInstance(matrixInstance{ID: "matrix2"}, matrixState{Enabled: true, Network: "quantum_matrix2", Role: "hub", Port: 21000, Ports: []int{21001}}); e != nil {
+		t.Fatal(e)
+	}
+	rr := matrixSetupBody(21000, []int{18080})
+	if rr.Code != 400 {
+		t.Fatalf("status %d body %s", rr.Code, rr.Body.String())
+	}
+	var out struct {
+		Code  string `json:"error_code"`
+		Error string `json:"error"`
+	}
+	if e := json.Unmarshal(rr.Body.Bytes(), &out); e != nil {
+		t.Fatal(e)
+	}
+	if out.Code != "E-MATRIX-02" || !strings.Contains(out.Error, "mesh port 21000 is already used by Matrix instance matrix2 — pick another port or leave it blank for auto") {
+		t.Fatalf("mesh-port message = %q (%s)", out.Error, out.Code)
+	}
+	rr2 := matrixSetupBody(2097, []int{21001})
+	if rr2.Code != 400 {
+		t.Fatalf("status %d body %s", rr2.Code, rr2.Body.String())
+	}
+	var out2 struct {
+		Error string `json:"error"`
+	}
+	if e := json.Unmarshal(rr2.Body.Bytes(), &out2); e != nil {
+		t.Fatal(e)
+	}
+	if !strings.Contains(out2.Error, "forwarded port 21001 is already used by Matrix instance matrix2 — free that port or remove that tunnel first") {
+		t.Fatalf("forwarded message = %q", out2.Error)
+	}
+}

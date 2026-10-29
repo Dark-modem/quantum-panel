@@ -985,12 +985,18 @@ async function topoWizCreate() {
     await topologyReload();
     toastOk(tr('', 'Tunnel created'), tr('', 'The new tunnel is attached to this topology.'));
     // The server answers with the mesh port it picked (or accepted); showing
-    // it spares the user a round-trip to the Matrix card to look it up.
-    if (t.id === 'matrix' && mxResult && mxResult.port) {
+    // it spares the user a round-trip to the Matrix card to look it up. On the
+    // node side the port is appended to the pairing toast instead.
+    if (t.id === 'matrix' && !topoWizForeignSide() && mxResult && mxResult.port) {
       toastOk(tr('', 'Matrix mesh port: {port}').replace('{port}', String(mxResult.port)));
     }
     if (t.id === 'matrix' && topoWizForeignSide()) {
-      toastOk(tr('', 'Matrix tunnel connected to the hub.'));
+      // The node may have shifted its own local mesh port away from the
+      // bundle's (that port only binds the hub); say so in the same toast.
+      const localPort = mxResult && mxResult.port
+        ? ' ' + tr('', 'Local mesh port: {port}').replace('{port}', String(mxResult.port))
+        : '';
+      toastOk(tr('', 'Matrix tunnel connected to the hub.') + localPort);
       topoWiz = null;
       topoWizHide();
     } else if (t.id === 'matrix' && mxResult && mxResult.bundle) {

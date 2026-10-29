@@ -779,6 +779,13 @@ func matrixBundle(in matrixInstance, st matrixState, r *http.Request) string {
 // Matrix instance's state (mesh port or forwarded user ports), mapped to that
 // instance's ID. State-level ownership catches stopped instances too.
 func matrixInstancePortsBusy(in matrixInstance, ports []int) string {
+	owner, _ := matrixFirstInstancePortBusy(in, ports)
+	return owner
+}
+
+// matrixFirstInstancePortBusy is matrixInstancePortsBusy with the colliding
+// port itself, so error messages can name it.
+func matrixFirstInstancePortBusy(in matrixInstance, ports []int) (string, int) {
 	wanted := map[int]bool{}
 	for _, p := range ports {
 		wanted[p] = true
@@ -793,24 +800,31 @@ func matrixInstancePortsBusy(in matrixInstance, ports []int) string {
 		}
 		for _, p := range append([]int{st.Port}, st.Ports...) {
 			if p != 0 && wanted[p] {
-				return other.ID
+				return other.ID, p
 			}
 		}
 	}
-	return ""
+	return "", 0
 }
 
 // matrixTopologyPortOwner returns the topology name owning the first port that
 // belongs to a tunnel already bound to any topology. A new tunnel may never
 // reuse a port owned by another topology's tunnel.
 func matrixTopologyPortOwner(ports []int) string {
+	name, _ := matrixFirstTopologyPortOwner(ports)
+	return name
+}
+
+// matrixFirstTopologyPortOwner is matrixTopologyPortOwner with the colliding
+// port itself, so error messages can name it.
+func matrixFirstTopologyPortOwner(ports []int) (string, int) {
 	owned := topologyBoundTunnelPorts()
 	for _, p := range ports {
 		if name, ok := owned[p]; ok {
-			return name
+			return name, p
 		}
 	}
-	return ""
+	return "", 0
 }
 
 // matrixReservedPorts returns every port held by any Matrix instance state;
@@ -931,12 +945,16 @@ func handleMatrixSetupPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	allPorts := append([]int{q.Port}, q.Ports...)
-	if owner := matrixInstancePortsBusy(in, allPorts); owner != "" {
-		writeAPIError(w, r, "E-MATRIX-02", fmt.Sprintf("port is already used by Matrix instance %s", owner))
+	if owner, port := matrixFirstInstancePortBusy(in, allPorts); owner != "" {
+		if port == q.Port {
+			writeAPIError(w, r, "E-MATRIX-02", fmt.Sprintf("mesh port %d is already used by Matrix instance %s — pick another port or leave it blank for auto", port, owner))
+		} else {
+			writeAPIError(w, r, "E-MATRIX-02", fmt.Sprintf("forwarded port %d is already used by Matrix instance %s — free that port or remove that tunnel first", port, owner))
+		}
 		return
 	}
-	if owner := matrixTopologyPortOwner(allPorts); owner != "" {
-		writeAPIError(w, r, "E-MATRIX-02", fmt.Sprintf("port is already owned by another topology's tunnel (%s)", owner))
+	if owner, port := matrixFirstTopologyPortOwner(allPorts); owner != "" {
+		writeAPIError(w, r, "E-MATRIX-02", fmt.Sprintf("port %d is already owned by another topology's tunnel (%s)", port, owner))
 		return
 	}
 	st := matrixState{Enabled: true, Network: in.network(), Role: "hub", Family: q.Family, Port: q.Port, Addr: q.Addr, Token: randHex(32), Ports: q.Ports, Name: "main", IP: in.hubIP()}
@@ -1050,16 +1068,31 @@ func handleMatrixForeignSetup(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, r, "E-MATRIX-01", "")
 		return
 	}
-	allPorts := append([]int{b.Port}, b.Ports...)
-	if owner := matrixInstancePortsBusy(in, allPorts); owner != "" {
-		writeAPIError(w, r, "E-MATRIX-02", fmt.Sprintf("port is already used by Matrix instance %s", owner))
+	// Forwarded user ports genuinely must be free on the node: the hub DNATs
+	// exactly these port numbers into this server, where the real service
+	// listens. A collision there is a hard, user-fixable conflict.
+	if owner, port := matrixFirstInstancePortBusy(in, b.Ports); owner != "" {
+		writeAPIError(w, r, "E-MATRIX-02", fmt.Sprintf("forwarded port %d is already used on this server by Matrix instance %s — free that port or remove that tunnel first", port, owner))
 		return
 	}
-	if owner := matrixTopologyPortOwner(allPorts); owner != "" {
-		writeAPIError(w, r, "E-MATRIX-02", fmt.Sprintf("port is already owned by another topology's tunnel (%s)", owner))
+	if owner, port := matrixFirstTopologyPortOwner(b.Ports); owner != "" {
+		writeAPIError(w, r, "E-MATRIX-02", fmt.Sprintf("forwarded port %d is already owned by another topology's tunnel (%s)", port, owner))
 		return
 	}
 	st := matrixState{Enabled: true, Network: in.network(), Role: "node", Family: b.Family, Port: b.Port, Addr: b.Addr, Ports: b.Ports, Name: "node" + randHex(8), IP: in.firstPeer(), Panel: b.Panel}
+	// The node's local mesh port does not have to equal the hub's: the node
+	// dials the hub at the port embedded in the hub host file (b.MainHost),
+	// and the hub never dials the node by a stored port. So a b.Port taken
+	// locally (a previous pairing, a topology-bound tunnel, any other program)
+	// is not a blocker — the node just picks a free local mesh port instead.
+	if matrixInstancePortsBusy(in, []int{b.Port}) != "" || matrixTopologyPortOwner([]int{b.Port}) != "" || !matrixPortFree(b.Port) {
+		p, e := matrixAutoMeshPort(in, b.Ports)
+		if e != nil {
+			writeAPIError(w, r, "E-MATRIX-10", e.Error())
+			return
+		}
+		st.Port = p
+	}
 	if e = matrixSetup(in, st, b.MainHost); e != nil {
 		writeMatrixSetupError(w, r, e)
 		return
@@ -1080,7 +1113,13 @@ func handleMatrixForeignSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	LogSecurityAudit("matrix_node_setup", cfg.Username, ClientIP(r), "instance="+in.ID+" family="+st.Family)
-	writeJSON(w, map[string]string{"status": "ok", "detail": "matrix node registered with the hub and started"})
+	out := map[string]any{"status": "ok", "detail": "matrix node registered with the hub and started"}
+	// A shifted local mesh port is the one thing the node chose for itself;
+	// surfacing it spares the user a round-trip to the Matrix card.
+	if st.Port != b.Port {
+		out["port"] = st.Port
+	}
+	writeJSON(w, out)
 }
 func matrixPublicState(in matrixInstance, st matrixState) map[string]any {
 	peers := []map[string]any{}
