@@ -115,10 +115,13 @@ topologyOpen('t');assert.equal($('topologyListCard').hidden,true);assert.equal($
 topologyBack();assert.equal($('topologyListCard').hidden,false);assert.equal($('topologyDetailCard').hidden,true);
 topologySelected='t';_tunnelDetail='matrix';topologyRender();assert.equal($('topologyDetailCard').hidden,true);
 _tunnelDetail=null;topologyRender();assert.equal($('topologyDetailCard').hidden,false);
-assert.ok($('topologyCountry').innerHTML.includes('value="de"'),'country selector offers Germany');
-assert.ok($('topologyCountry').innerHTML.includes('value=""'),'country selector offers Other');
-assert.ok(!/[\\u{1F1E6}-\\u{1F1FF}]/u.test($('topologyCountry').innerHTML),'country selector uses plain country names, no emoji flags');
-assert.ok(topologyCountryOptions('de').includes('selected'),'current country is preselected');
+assert.ok($('topologyCountryDD').innerHTML.includes('role="listbox"'),'the form country field is the custom dropdown');
+assert.ok($('topologyCountryDD').innerHTML.includes('data-dd-value="de"'),'country dropdown offers Germany');
+assert.ok($('topologyCountryDD').innerHTML.includes('data-dd-value=""'),'country dropdown offers Other');
+assert.ok(!$('topologyCountryDD').innerHTML.includes('<select'),'no native select for the country field');
+assert.ok(!/[\\u{1F1E6}-\\u{1F1FF}]/u.test($('topologyCountryDD').innerHTML),'country dropdown uses embedded SVG flags, no emoji');
+assert.ok($('topologyCountryDD').innerHTML.includes('aria-haspopup="listbox"'),'the dropdown trigger announces the listbox');
+assert.ok(topoCountryOptionsHtml('topologyCountryDD', topoCountryIndex('de'), topoCountryIndex('de')).includes('aria-selected="true" data-dd-value="de"'),'current country is preselected');
 const candidates=[
  {id:'candidate',name:'Existing tunnel',engine:'frp',remote_ip:topo.remote_ip},
  {id:'unknown',name:'Unknown endpoint',engine:'frp'},
@@ -206,6 +209,6 @@ assert.ok(/\.topo-flag-svg\s*\{[^}]*width\s*:\s*20px[^}]*height\s*:\s*14px/.test
  calls=[];await sandbox.topologySave();
  assert.equal(calls[0].method,'PATCH');
  assert.equal(calls[0].body.country,'fi','save persists the chosen country');
- assert.ok(sandbox.topologyCountryOptions('fi').includes('<option value="fi" selected'),'saved country is preselected in the selector');
+ assert.ok(sandbox.topoCountryOptionsHtml('topologyCountryDD', sandbox.topoCountryIndex('fi'), sandbox.topoCountryIndex('fi')).includes('aria-selected="true" data-dd-value="fi"'),'saved country is preselected in the dropdown');
  console.log('Topology UI: semantic table/actions, escaping, embedded SVG flag columns, country selector, aligned columns, plain counts, keyboard rows, view/back, first-load skeleton gate, absent overview card, attachment and safe deletion PASS');
 })().catch(e=>{console.error(e);process.exitCode=1;});

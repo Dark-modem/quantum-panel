@@ -6,6 +6,8 @@ const test = require('node:test');
 
 const source = fs.readFileSync(path.join(__dirname, 'topology.js'), 'utf8');
 const faSource = fs.readFileSync(path.join(__dirname, 'i18n-fa.js'), 'utf8');
+const pageSource = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+const cssSource = fs.readFileSync(path.join(__dirname, 'enterprise.css'), 'utf8');
 
 function harness({ fa = false, topologies = [], tunnels = [], failOn } = {}) {
   const elements = new Map();
@@ -14,6 +16,7 @@ function harness({ fa = false, topologies = [], tunnels = [], failOn } = {}) {
   function el(id) {
     if (!elements.has(id)) elements.set(id, {
       hidden: false, disabled: false, value: '', textContent: '', innerHTML: '', dataset: {},
+      _attrs: {}, setAttribute(k, v) { this._attrs[k] = String(v); }, getAttribute(k) { return k in this._attrs ? this._attrs[k] : null; },
       classList: { _s: new Set(), toggle(c, v) { if (v === undefined) this._s.has(c) ? this._s.delete(c) : this._s.add(c); else v ? this._s.add(c) : this._s.delete(c); }, add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); }, contains(c) { return this._s.has(c); } },
       contains() { return false; },
       addEventListener(type, cb) { this[type] = cb; }
@@ -200,4 +203,88 @@ test('wizard strings carry unique Persian translations', () => {
   h.sandbox.topologyCreate();
   h.sandbox.topoCreateNext();
   assert.ok(h.el('topoCreateBody').innerHTML.includes(map["This server's IP"]), 'the IP step label is translated');
+});
+
+// Advance the wizard to the country step (4) with valid IPs.
+function openToCountryStep(h) {
+  h.sandbox.topologyCreate();
+  h.sandbox.topoCreateNext();
+  h.el('topoCreateLocal').value = '192.0.2.1';
+  h.sandbox.topoCreateNext();
+  h.el('topoCreateRemote').value = '192.0.2.2';
+  h.sandbox.topoCreateNext();
+  assert.equal(h.wiz('topoCreate.step'), 4);
+}
+const keyEv = key => ({ key, preventDefault() {}, stopPropagation() {}, stopImmediatePropagation() {} });
+
+test('the country step renders the custom dropdown inside the modal, not a native select', () => {
+  const h = harness();
+  openToCountryStep(h);
+  const body = h.el('topoCreateBody').innerHTML;
+  assert.ok(!body.includes('<select'), 'no native select renders on the country step');
+  assert.ok(body.includes('<input type="hidden" id="topoCreateCountry"'), 'the chosen code rides the same field the wizard reads');
+  assert.ok(body.includes('<div id="topoCreateCountryDD">'), 'the dropdown mounts next to the hidden field');
+  assert.ok(h.el('topoCreateCountryDD').classList._s.has('topo-dd'), 'the host is the positioning context that keeps the list inside the modal');
+  const dd = h.el('topoCreateCountryDD').innerHTML;
+  assert.ok(dd.includes('id="topoCreateCountryDDBtn"') && dd.includes('aria-haspopup="listbox"') && dd.includes('aria-expanded="false"'), 'the trigger announces the collapsed listbox');
+  assert.ok(dd.includes('id="topoCreateCountryDDList"') && dd.includes('role="listbox"'), 'the listbox renders with its container');
+  const opts = dd.match(/role="option"/g) || [];
+  assert.ok(opts.length >= 20, 'every country renders as an option, got ' + opts.length);
+  assert.ok(dd.includes('data-dd-value="de"') && dd.includes('data-dd-value=""'), 'Germany and the «Other» fallback are offered');
+  assert.ok(dd.split('topo-flag-svg').length > opts.length, 'options carry embedded SVG flags, not emoji');
+  assert.ok(dd.includes('aria-labelledby="topoCreateCountryLbl topoCreateCountryDDTxt"'), 'the trigger announces label plus value');
+});
+
+test('the dropdown is keyboard operable and keeps the value wiring', () => {
+  const h = harness();
+  openToCountryStep(h);
+  const btn = h.el('topoCreateCountryDDBtn');
+  btn.onkeydown(keyEv('Enter'));
+  assert.equal(btn.getAttribute('aria-expanded'), 'true', 'Enter opens the list');
+  const lastIdx = h.wiz('TOPO_COUNTRIES.length - 1');
+  assert.equal(btn.getAttribute('aria-activedescendant'), `topoCreateCountryDDOpt${lastIdx}`, 'the empty selection starts on «Other», the last row');
+  btn.onkeydown(keyEv('Home'));
+  btn.onkeydown(keyEv('ArrowDown'));
+  btn.onkeydown(keyEv('ArrowDown'));
+  assert.equal(btn.getAttribute('aria-activedescendant'), 'topoCreateCountryDDOpt2', 'arrows move the highlight');
+  btn.onkeydown(keyEv('Enter'));
+  assert.equal(h.el('topoCreateCountry').value, 'nl', 'Enter writes the highlighted ISO code to the form field');
+  assert.equal(btn.getAttribute('aria-expanded'), 'false', 'Enter closes the list');
+  assert.ok(btn.innerHTML.includes('Netherlands') && btn.innerHTML.includes('topo-flag-svg'), 'the trigger shows the picked name and flag');
+  assert.equal(JSON.parse(h.sandbox.localStorage.getItem('topoCreateDraft')).values.country, 'nl', 'the pick lands in the localStorage draft');
+  h.sandbox.topoCreateNext(); // -> name step
+  h.el('topoCreateName').value = 'Pair';
+  h.sandbox.topoCreateNext(); // -> review
+  assert.ok(h.el('topoCreateBody').innerHTML.includes('Netherlands'), 'the review keeps showing the country');
+  // Escape closes without changing the picked value.
+  btn.onkeydown(keyEv('Enter'));
+  btn.onkeydown(keyEv('ArrowDown'));
+  btn.onkeydown(keyEv('Escape'));
+  assert.equal(btn.getAttribute('aria-expanded'), 'false', 'Escape closes the list');
+  assert.equal(h.el('topoCreateCountry').value, 'nl', 'Escape does not change the picked value');
+  // Space also opens; clicking an option picks it through the delegated handler.
+  btn.onkeydown(keyEv(' '));
+  assert.equal(btn.getAttribute('aria-expanded'), 'true', 'Space reopens the list');
+  h.el('topoCreateCountryDD').onclick({ target: { closest: s => s === '.topo-dd-opt' ? { dataset: { ddValue: 'fr' } } : null } });
+  assert.equal(h.el('topoCreateCountry').value, 'fr', 'clicking an option picks it');
+  btn.onclick();
+  assert.equal(btn.getAttribute('aria-activedescendant'), 'topoCreateCountryDDOpt3', 'reopening highlights the picked country');
+});
+
+test('the wizard footer has no Cancel; Back and Next render on opposite ends', () => {
+  assert.ok(!source.includes('topoCreateCancelBtn'), 'topology.js no longer wires a footer Cancel button');
+  assert.ok(!pageSource.includes('id="topoCreateCancelBtn"'), 'index.html drops the create-wizard Cancel button');
+  const foot = pageSource.match(/<div class="ent-modal-f" id="topoCreateFoot">([\s\S]*?)<\/div>/);
+  assert.ok(foot, 'the create wizard footer keeps its own id');
+  assert.ok(foot[1].indexOf('id="topoCreateBack"') >= 0 && foot[1].indexOf('id="topoCreateBack"') < foot[1].indexOf('id="topoCreateNext"'),
+    'Back renders before Next so space-between pulls them to opposite ends');
+  assert.ok(!foot[1].includes('Cancel'), 'the footer holds only Back and Next');
+  assert.ok(/#topoCreateModal \.ent-modal-f[^}]*justify-content\s*:\s*space-between/.test(cssSource),
+    'footer CSS spreads Back and Next to opposite ends (flex mirrors with the dir attribute)');
+  const h = harness();
+  h.sandbox.topologyCreate();
+  h.sandbox.topoCreateRender();
+  assert.ok(h.el('topoCreateFoot').classList._s.has('next-only'), 'step 1 has no Back: the footer goes next-only');
+  h.sandbox.topoCreateNext();
+  assert.ok(!h.el('topoCreateFoot').classList._s.has('next-only'), 'from step 2 on the footer spreads Back and Next');
 });

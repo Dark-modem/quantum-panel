@@ -167,9 +167,39 @@ func TestTopologyListSharedResponsiveColumns(t *testing.T) {
 // step indicators and event wiring must stay in place.
 func TestTopologyWizardMarkup(t *testing.T) {
 	html := topologyListTestSource(t, "index.html")
-	for _, id := range []string{"topoWizModal", "topoWizProgress", "topoWizSteps", "topoWizBody", "topoWizErr", "topoWizCancelBtn", "topoWizBack", "topoWizNext", "topoWizX"} {
+	for _, id := range []string{"topoWizModal", "topoWizProgress", "topoWizSteps", "topoWizBody", "topoWizErr", "topoWizBack", "topoWizNext", "topoWizX", "topoWizFoot"} {
 		if !strings.Contains(html, `id="`+id+`"`) {
 			t.Errorf("index.html must keep the wizard element %s", id)
+		}
+	}
+	// The footer Cancel was redundant next to Back/Next: the header × is the
+	// only cancel affordance in both wizards.
+	for _, gone := range []string{"topoWizCancelBtn", "topoCreateCancelBtn"} {
+		if strings.Contains(html, `id="`+gone+`"`) {
+			t.Errorf("wizard footer must not keep the redundant %s button", gone)
+		}
+		if strings.Contains(topologyListTestSource(t, "topology.js"), gone) {
+			t.Errorf("topology.js must not reference the removed %s", gone)
+		}
+	}
+	// Back renders before Next in both footers, so the flex space-between rule
+	// pulls them to opposite, direction-mirrored ends of the bar.
+	for _, foot := range []struct{ id, back, next string }{
+		{"topoWizFoot", "topoWizBack", "topoWizNext"},
+		{"topoCreateFoot", "topoCreateBack", "topoCreateNext"},
+	} {
+		re := regexp.MustCompile(`(?s)<div class="ent-modal-f" id="` + foot.id + `">(.*?)</div>`)
+		m := re.FindStringSubmatch(html)
+		if m == nil {
+			t.Errorf("index.html must keep the %s footer wrapper", foot.id)
+			continue
+		}
+		back, next := strings.Index(m[1], `id="`+foot.back+`"`), strings.Index(m[1], `id="`+foot.next+`"`)
+		if back < 0 || next < 0 || back > next {
+			t.Errorf("%s must render %s first and %s last so space-between separates them", foot.id, foot.back, foot.next)
+		}
+		if strings.Contains(m[1], "Cancel") {
+			t.Errorf("%s must hold only Back and Next, got a Cancel button too", foot.id)
 		}
 	}
 	if strings.Contains(html, `id="tunnelsAddBtn" onclick`) {
@@ -181,7 +211,8 @@ func TestTopologyWizardMarkup(t *testing.T) {
 		`$('topologyAddTunnelBtn').onclick = topologyNewTunnel`,
 		`$('topoWizNext').onclick = topoWizNext`,
 		`$('topoWizBack').onclick = topoWizBack`,
-		`$('topoWizCancelBtn').onclick = topoWizCancel`,
+		`$('topoWizFoot').classList.toggle('next-only'`, // Back hidden: Next keeps the reading end
+		`$('topoCreateFoot').classList.toggle('next-only'`,
 		`data-wiz-type=`,
 		`data-wiz-step=`,
 		`Step {x} of {n}`,
@@ -222,5 +253,67 @@ func TestTopologyWizardMarkup(t *testing.T) {
 		!strings.Contains(css, `.topo-wiz-bundle[readonly]`) ||
 		!strings.Contains(css, `.topo-wiz-bundle-actions`) {
 		t.Error("enterprise.css must style the wizard Matrix bundle textareas and copy action")
+	}
+}
+
+// The native country <select> opened as a plain OS popup outside the dialog.
+// Every country selector now renders through the custom dropdown component:
+// a flag+name trigger with an absolutely-positioned listbox inside the modal.
+func TestTopologyCountryDropdown(t *testing.T) {
+	html := topologyListTestSource(t, "index.html")
+	js := topologyListTestSource(t, "topology.js")
+	css := topologyListTestSource(t, "enterprise.css")
+
+	// No native select may remain for the country, in the edit form markup or
+	// in the create wizard's generated step markup.
+	if strings.Contains(html, `<select id="topologyCountry"`) {
+		t.Error("the topology form country field must not be a native select")
+	}
+	if strings.Contains(js, `<select class="quantum-input" id="topoCreateCountry"`) {
+		t.Error("the create wizard country step must not generate a native select")
+	}
+	// The settings form keeps its value wiring: the hidden input carries the
+	// code that the save PATCH reads, the dropdown host renders beside it.
+	for _, want := range []string{`id="topologyCountry"`, `id="topologyCountryDD"`, `id="topologyCountryLbl"`} {
+		if !strings.Contains(html, want) {
+			t.Errorf("index.html must keep the country field element %s", want)
+		}
+	}
+	for _, want := range []string{
+		`function topoCountryMount(`,              // the shared component entry point
+		`topoCountryMount('topoCreateCountryDD'`,  // add-topology wizard country step
+		`topoCountryMount('topologyCountryDD'`,    // edit-topology form
+		`role="listbox"`,                          // listbox semantics
+		`role="option"`,                           // option semantics
+		`aria-haspopup="listbox"`,                 // trigger announces the popup
+		`aria-expanded=`,                          // open state on the trigger
+		`aria-activedescendant`,                   // keyboard highlight without moving focus
+		`aria-selected=`,                          // the picked option is marked
+		`data-dd-value=`,                          // option rows carry the ISO code
+		`topologyFlagSvg(cc)`,                     // trigger uses the embedded SVG flags
+		`topologyFlagSvg(c[0])`,                   // so does every option row
+		`'ArrowDown'`, `'ArrowUp'`,                // arrows navigate
+		`'Escape'`,                                // Escape closes
+		`topoCountrySetOpen(id, false)`,           // click-outside / Escape close path
+		`e.stopImmediatePropagation`,              // Escape must not also close the wizard
+	} {
+		if !strings.Contains(js, want) {
+			t.Errorf("topology.js lacks country dropdown wiring/markup: %s", want)
+		}
+	}
+	for _, rule := range []struct{ name, pattern string }{
+		{"host is the positioning context", `\.topo-dd\s*\{[^}]*position\s*:\s*relative`},
+		{"listbox is absolutely positioned inside the modal", `\.topo-dd-list\s*\{[^}]*position\s*:\s*absolute`},
+		{"listbox scrolls internally with a max height", `\.topo-dd-list\s*\{[^}]*max-height\s*:[^}]*overflow(?:-y)?\s*:\s*auto`},
+		{"listbox spans the trigger per direction", `\.topo-dd-list\s*\{[^}]*inset-inline\s*:\s*0`},
+		{"listbox keeps the modal radius", `\.topo-dd-list\s*\{[^}]*border-radius\s*:\s*var\(--r-lg\)`},
+		{"selected option carries the checkmark", `\.topo-dd-opt\.on::after\s*\{[^}]*content\s*:\s*"\\2713"`},
+		{"checkmark aligns to the reading end", `\.topo-dd-opt\.on::after\s*\{[^}]*margin-inline-start\s*:\s*auto`},
+		{"wizard footer spreads Back and Next", `#topoWizModal \.ent-modal-f[^}]*justify-content\s*:\s*space-between`},
+		{"next-only footer keeps the reading end", `\.ent-modal-f\.next-only[^}]*justify-content\s*:\s*flex-end`},
+	} {
+		if !regexp.MustCompile(rule.pattern).MatchString(css) {
+			t.Errorf("enterprise.css lacks country dropdown/footer rule: %s", rule.name)
+		}
 	}
 }

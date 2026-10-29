@@ -6,6 +6,8 @@ const test = require('node:test');
 
 const source = fs.readFileSync(path.join(__dirname, 'topology.js'), 'utf8');
 const faSource = fs.readFileSync(path.join(__dirname, 'i18n-fa.js'), 'utf8');
+const pageSource = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+const cssSource = fs.readFileSync(path.join(__dirname, 'enterprise.css'), 'utf8');
 
 function harness({ fa = false, topologies, tunnels, failOn, failCode, failMessage, instances = [], localRole = '' } = {}) {
   const elements = new Map();
@@ -86,6 +88,29 @@ test('topologyNewTunnel opens the wizard modal instead of navigating to Setup', 
   const half = harness({ topologies: [topo({ local_ip: '' })], tunnels: [] });
   half.sandbox.topologyNewTunnel();
   assert.equal(half.wiz('topoWiz'), null, 'wizard stays closed until both IPs are set');
+});
+
+test('the wizard footer has no Cancel; Back and Next render on opposite ends', () => {
+  // Cancel next to Back/Next was redundant: the header × (topoWizX -> topoWizCancel)
+  // stays the only cancel affordance.
+  assert.ok(!source.includes('topoWizCancelBtn'), 'topology.js no longer wires a footer Cancel button');
+  assert.ok(!pageSource.includes('id="topoWizCancelBtn"'), 'index.html drops the wizard Cancel button');
+  const foot = pageSource.match(/<div class="ent-modal-f" id="topoWizFoot">([\s\S]*?)<\/div>/);
+  assert.ok(foot, 'the wizard footer keeps its own id');
+  const back = foot[1].indexOf('id="topoWizBack"'), next = foot[1].indexOf('id="topoWizNext"');
+  assert.ok(back >= 0 && next > back, 'Back renders before Next so space-between pulls them to opposite ends');
+  assert.ok(!foot[1].includes('Cancel'), 'the footer holds only Back and Next');
+  assert.ok(/#topoWizModal \.ent-modal-f[^}]*justify-content\s*:\s*space-between/.test(cssSource),
+    'footer CSS spreads Back and Next to opposite ends (flex mirrors with the dir attribute)');
+  assert.ok(/#topoWizModal \.ent-modal-f\.next-only[^}]*justify-content\s*:\s*flex-end/.test(cssSource),
+    'with Back hidden the single Next keeps its reading-end spot');
+  // The render keeps next-only in sync with Back's visibility.
+  const h = harness({ topologies: [topo()], tunnels: [] });
+  h.sandbox.topologyNewTunnel();
+  h.sandbox.topoWizRender();
+  assert.ok(h.el('topoWizFoot').classList._s.has('next-only'), 'step 1 has no Back: the footer goes next-only');
+  h.sandbox.topoWizPick('frp');
+  assert.ok(!h.el('topoWizFoot').classList._s.has('next-only'), 'from step 2 on Back shows and the footer spreads both actions');
 });
 
 test('header shows step progress and completed steps get a checkmark', () => {
@@ -370,7 +395,7 @@ test('hub side: the Matrix wizard ends on a bundle hand-off screen with a copy b
   assert.equal(h.el('topoWizProgress').textContent, 'Step 4 of 4');
   assert.equal(h.el('topoWizNext').textContent, 'Done', 'the primary footer button becomes «Done»');
   assert.equal(h.el('topoWizBack').hidden, true, 'Back is gone after creation');
-  assert.equal(h.el('topoWizCancelBtn').hidden, true, 'Cancel is gone after creation');
+  assert.ok(h.el('topoWizFoot').classList._s.has('next-only'), 'the bundle screen keeps only «Done» at the reading end');
   const out = h.el('topoWizBundleOut');
   assert.ok(out, 'a readonly bundle textarea is rendered');
   assert.equal(out.value, 'hmx1_QnVuZGxl', 'it carries the bundle returned by /api/matrix/setup');
