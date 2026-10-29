@@ -118,8 +118,15 @@ func TestTopologyCRUDPersistenceAndGroupingOnly(t *testing.T) {
 		t.Fatalf("PATCH changed immutable/unmentioned fields: %+v", stored[0])
 	}
 	deleted := topologyRequest(http.MethodDelete, group.ID, "")
+	if deleted.Code != http.StatusConflict {
+		t.Fatalf("configured tunnels must block topology deletion: %d %s", deleted.Code, deleted.Body.String())
+	}
+	// Simulate engines removed through their own controls; stale bindings do
+	// not require a separate detach operation.
+	topologyInventory = func() []topologyTunnel { return []topologyTunnel{} }
+	deleted = topologyRequest(http.MethodDelete, group.ID, "")
 	if deleted.Code != http.StatusOK {
-		t.Fatalf("DELETE bound group: %d %s", deleted.Code, deleted.Body.String())
+		t.Fatalf("DELETE group after tunnel removal: %d %s", deleted.Code, deleted.Body.String())
 	}
 	stored, err = loadTopologies()
 	if err != nil || len(stored) != 0 {
@@ -138,7 +145,10 @@ func TestTopologyCRUDPersistenceAndGroupingOnly(t *testing.T) {
 	if w := topologyRequest(http.MethodDelete, group.ID, ""); w.Code != http.StatusNotFound {
 		t.Fatalf("second DELETE: %d", w.Code)
 	}
-	// A deleted grouping releases ownership but leaves its tunnel assignable.
+	// Restoring inventory models a newly configured tunnel after deletion.
+	topologyInventory = func() []topologyTunnel {
+		return []topologyTunnel{{ID: "main", Name: "Legacy FRP", RemoteIP: "203.0.113.2"}}
+	}
 	topologyCreated(t, `{"name":"Reassigned","remote_ip":"203.0.113.2","tunnel_ids":["main"]}`)
 }
 

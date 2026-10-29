@@ -1,5 +1,5 @@
-// A topology groups existing tunnels between a pair of servers. It never
-// deletes a tunnel when its grouping is removed.
+// A topology groups existing tunnels between a pair of servers. Only an empty
+// grouping can be deleted; tunnels and engines are never removed automatically.
 let topologyData = { topologies: [], tunnels: [] };
 let topologySelected = null;
 let topologyBusy = false;
@@ -8,6 +8,13 @@ let topologyWasConfigured = false;
 
 function topologyCurrent() {
   return topologyData.topologies.find(t => t.id === topologySelected) || null;
+}
+function topologyExistingTunnelCount(topo) {
+  const bound = new Set(topo ? topo.tunnel_ids || [] : []);
+  return topologyData.tunnels.filter(t => bound.has(t.id)).length;
+}
+function topologyDeleteNotice(count) {
+  return tr('', '{n} tunnel(s) still exist. Delete all tunnels in this topology first, including stopped tunnels.').replace('{n}', String(count));
 }
 function topologyTunnelKey(kind) {
   return typeof kind === 'number' ? 'peer:' + kind : String(kind);
@@ -77,13 +84,17 @@ function topologyRender() {
   if (!topo) $('tunnelsListCard').hidden = true;
   $('topologyCount').textContent = String(topologyData.topologies.length);
   $('topologiesList').innerHTML = topologyData.topologies.length
-    ? topologyData.topologies.map(t => `<div class="topo-list-row">
+    ? topologyData.topologies.map(t => {
+        const remaining = topologyExistingTunnelCount(t);
+        return `<div class="topo-list-row">
         <button type="button" class="topo-name" data-topo-open="${esc(t.id)}">${esc(t.name)}</button>
         <span class="u-mono" dir="ltr">${esc(t.local_ip || '—')} ↔ ${esc(t.remote_ip || '—')}</span>
-        <span class="badge info">${(t.tunnel_ids || []).length} ${esc(tr('', 'tunnels'))}</span>
+        <span class="badge info">${remaining} ${esc(tr('', 'tunnels'))}</span>
         <button type="button" class="hashem-btn hashem-btn-secondary" data-topo-open="${esc(t.id)}">${esc(tr('', 'View'))}</button>
-        <button type="button" class="hashem-btn hashem-btn-danger" data-topo-delete="${esc(t.id)}">${esc(tr('', 'Delete topology'))}</button>
-      </div>`).join('')
+        <button type="button" class="hashem-btn hashem-btn-danger" data-topo-delete="${esc(t.id)}"${remaining ? ` disabled title="${esc(tr('', 'Delete all tunnels in this topology first'))}"` : ''}>${esc(tr('', 'Delete topology'))}</button>
+        ${remaining ? `<span class="qs-hint">${esc(topologyDeleteNotice(remaining))}</span>` : ''}
+      </div>`;
+      }).join('')
     : `<div class="ent-empty"><b>${esc(tr('', 'No topology yet'))}</b><span>${esc(tr('', 'Create a topology, set the server roles, then add tunnels between them.'))}</span></div>`;
   const assigned = new Set(topologyData.topologies.flatMap(t => t.tunnel_ids || []));
   const unassigned = topologyData.tunnels.filter(t => !assigned.has(t.id));
@@ -164,7 +175,10 @@ async function topologyDetach(id) {
   } catch(e) { toastErr(tr('', 'Topology save failed'), e.message); }
 }
 async function topologyDelete(id) {
-  if (!await entConfirm(tr('', 'Delete topology?'), tr('', 'Only the topology grouping is removed. Its tunnels and services keep running.'), tr('', 'Delete topology'))) return;
+  const topo = topologyData.topologies.find(t => t.id === id);
+  const remaining = topologyExistingTunnelCount(topo);
+  if (remaining) { toastWarn(topologyDeleteNotice(remaining)); return; }
+  if (!await entConfirm(tr('', 'Delete topology?'), tr('', 'This empty topology will be removed.'), tr('', 'Delete topology'))) return;
   try { await api('/api/topologies/' + encodeURIComponent(id), {}, 'DELETE'); await topologyReload(); }
   catch(e) { toastErr(tr('', 'Topology save failed'), e.message); }
 }

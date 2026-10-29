@@ -38,6 +38,9 @@ _tunnelDetail=null;topologyRender();assert.equal($('topologyDetailCard').hidden,
 `,sandbox);
 (async()=>{
  calls=[];await sandbox.topologyDelete('t');
+ assert.equal(calls.length,0,'configured tunnel blocks topology deletion');
+ vm.runInContext('topologyData.tunnels=[]',sandbox);
+ await sandbox.topologyDelete('t');
  assert.equal(calls[0].path,'/api/topologies/t');assert.equal(calls[0].method,'DELETE');
  assert.ok(!calls.some(c=>/api\/action|matrix\/remove/.test(c.path)));
  console.log('Topology UI: 1/5 cables, escaping, filters, view/back and safe grouping deletion PASS');

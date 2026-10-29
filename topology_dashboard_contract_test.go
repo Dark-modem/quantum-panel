@@ -164,9 +164,17 @@ func TestTopologyDashboardNameContract(t *testing.T) {
 		assertPhysicalUnchanged()
 	}
 	w = topologyRequest(http.MethodDelete, group.ID, "")
-	if w.Code != http.StatusOK {
-		t.Fatalf("group DELETE failed: %d %s", w.Code, w.Body.String())
+	if w.Code != http.StatusConflict {
+		t.Fatalf("assigned tunnels must block deletion: %d %s", w.Code, w.Body.String())
 	}
+	assertPhysicalUnchanged()
+	originalInventory := topologyInventory
+	topologyInventory = func() []topologyTunnel { return []topologyTunnel{} }
+	w = topologyRequest(http.MethodDelete, group.ID, "")
+	if w.Code != http.StatusOK {
+		t.Fatalf("group DELETE after engine removal failed: %d %s", w.Code, w.Body.String())
+	}
+	topologyInventory = originalInventory
 	assertPhysicalUnchanged()
 }
 

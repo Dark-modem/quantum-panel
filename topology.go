@@ -415,13 +415,21 @@ func handleTopologyPatch(w http.ResponseWriter, r *http.Request) {
 	topologyError(w, http.StatusNotFound, "topology not found")
 }
 
-// DELETE removes only grouping metadata, even when tunnels are assigned. There
-// is intentionally no resource-delete/detach option and no engine side effect.
+// DELETE removes only grouping metadata after its assigned tunnels have been
+// deleted. Stopped/unhealthy tunnels still exist; missing stored IDs do not
+// require a separate detach. No engine resource or service is changed here.
 func handleTopologyDelete(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if !topologyIDRE.MatchString(id) {
 		topologyError(w, http.StatusBadRequest, "invalid topology ID")
 		return
+	}
+	// Read inventory before the metadata lock: inventory may take engine/cache
+	// locks, but must never collect status, probe links or run host commands.
+	inventory := topologyInventory()
+	present := make(map[string]bool, len(inventory))
+	for _, tunnel := range inventory {
+		present[tunnel.ID] = true
 	}
 	topologyMu.Lock()
 	defer topologyMu.Unlock()
@@ -433,6 +441,26 @@ func handleTopologyDelete(w http.ResponseWriter, r *http.Request) {
 	for i, t := range all {
 		if t.ID != id {
 			continue
+		}
+		if inventory == nil && len(t.TunnelIDs) > 0 {
+			topologyError(w, http.StatusServiceUnavailable, "cannot verify tunnel inventory")
+			return
+		}
+		remaining := []string{}
+		for _, tunnelID := range t.TunnelIDs {
+			if present[tunnelID] {
+				remaining = append(remaining, tunnelID)
+			}
+		}
+		if len(remaining) > 0 {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusConflict)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"error":                "delete assigned tunnels before deleting this topology",
+				"code":                 "topology_has_tunnels",
+				"remaining_tunnel_ids": remaining,
+			})
+			return
 		}
 		all = append(all[:i], all[i+1:]...)
 		if err := saveTopologies(all); err != nil {
@@ -578,7 +606,6 @@ func readTopologyInventory() []topologyTunnel {
 	links := loadXrayState().Links
 	xrayMu.Unlock()
 	xrayHealthCache.Lock()
-	defer xrayHealthCache.Unlock()
 	for _, link := range links {
 		if link.ID <= 0 {
 			continue
@@ -605,6 +632,113 @@ func readTopologyInventory() []topologyTunnel {
 		out = append(out, topologyTunnel{ID: "xray:" + strconv.Itoa(link.ID), Name: link.Name,
 			Engine: "xray", RemoteIP: topologyIP(link.Remote), State: state, LatencyMs: latency,
 			Ports: append([]int{}, link.Ports...), role: topologyRole(link.Side)})
+	}
+	xrayHealthCache.Unlock()
+	return topologyConfiguredInventory(out)
+}
+
+// Supplement published health with fresh config reads: a cold/old snapshot must
+// not make a stopped configured tunnel look deleted. Snapshot-only legacy
+// resources remain conservatively present until the collector drops them.
+// nil means a source could not be read/decoded, not a confirmed empty inventory.
+func topologyConfiguredInventory(out []topologyTunnel) []topologyTunnel {
+	seen := make(map[string]bool, len(out))
+	for _, tunnel := range out {
+		seen[tunnel.ID] = true
+	}
+	add := func(t topologyTunnel) {
+		if !seen[t.ID] {
+			seen[t.ID] = true
+			t.State, t.LatencyMs = "unknown", -1
+			if t.Ports == nil {
+				t.Ports = []int{}
+			}
+			out = append(out, t)
+		}
+	}
+	read := func(path string, dst any) error {
+		data, err := os.ReadFile(path)
+		if os.IsNotExist(err) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if strings.TrimSpace(string(data)) == "null" {
+			return fmt.Errorf("invalid inventory source")
+		}
+		return json.Unmarshal(data, dst)
+	}
+	var peers struct {
+		Peers []peerRecord `json:"peers"`
+	}
+	if err := read(peersFile(), &peers); err != nil {
+		return nil
+	}
+	for _, p := range peers.Peers {
+		if p.ID > 0 {
+			add(topologyTunnel{ID: "peer:" + strconv.Itoa(p.ID), Name: p.Name, Engine: p.Engine,
+				RemoteIP: topologyIP(p.RemotePub), Ports: append([]int{}, p.Ports...), role: "iran", localIP: topologyIP(p.LocalPub)})
+		}
+	}
+	var mx matrixState
+	matrixMu.Lock()
+	err := read(matrixStatePath(), &mx)
+	matrixMu.Unlock()
+	if err != nil {
+		return nil
+	}
+	if mx.Enabled || mx.Role != "" {
+		add(topologyTunnel{ID: "matrix", Name: "Matrix", Engine: "matrix", Family: mx.Family,
+			RemoteIP: topologyIP(mx.Addr), Ports: append([]int{}, mx.Ports...), role: topologyRole(mx.Role)})
+	}
+	var bagher SSHFwdConfig
+	sshFwdMu.Lock()
+	err = read(sshFwdConfigFile(), &bagher)
+	sshFwdMu.Unlock()
+	if err != nil {
+		return nil
+	}
+	if bagher.Enabled || strings.TrimSpace(bagher.RemoteHost) != "" || len(bagher.Ports) > 0 {
+		add(topologyTunnel{ID: "bagher", Name: "Bagher", Engine: "bagher", RemoteIP: topologyIP(bagher.RemoteHost),
+			Ports: append([]int{}, bagher.Ports...), role: topologyRole(bagher.Role)})
+	}
+	for _, link := range bagher.Links {
+		if link.ID > 0 {
+			id := "bagher"
+			if link.ID != 1 {
+				id += ":" + strconv.Itoa(link.ID)
+			}
+			add(topologyTunnel{ID: id, Name: "Bagher", Engine: "bagher", RemoteIP: topologyIP(link.RemoteHost),
+				Ports: append([]int{}, link.Ports...), role: topologyRole(bagher.Role)})
+		}
+	}
+	// Validate Xray's source too: loadXrayState otherwise silently maps a read
+	// or decode failure to zero links. Disabled links are deliberately retained.
+	var xray xrayState
+	xrayMu.Lock()
+	err = read(xrayStatePath(), &xray)
+	xrayMu.Unlock()
+	if err != nil {
+		return nil
+	}
+	for _, link := range xray.Links {
+		if link.ID > 0 {
+			add(topologyTunnel{ID: "xray:" + strconv.Itoa(link.ID), Name: link.Name, Engine: "xray",
+				RemoteIP: topologyIP(link.Remote), Ports: append([]int{}, link.Ports...), role: topologyRole(link.Side)})
+		}
+	}
+	for _, c := range staleConfigCandidates() {
+		if _, err := os.Stat(c.path); err == nil {
+			engine := "frp"
+			if c.engine == "backhaul" {
+				engine = "backhaul"
+			}
+			add(topologyTunnel{ID: "main", Name: "Tunnel", Engine: engine, role: topologyRole(c.role)})
+			break
+		} else if !os.IsNotExist(err) {
+			return nil
+		}
 	}
 	return out
 }
