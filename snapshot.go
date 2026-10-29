@@ -178,6 +178,7 @@ func parseNetDev(data string) map[string]devCounters {
 
 func unitsFor(recs []peerRecord) []string {
 	units := append([]string{}, baseUnits...)
+	units = append(units, matrixUnit)
 	seen := map[string]bool{}
 	for _, u := range units {
 		seen[u] = true
@@ -266,9 +267,17 @@ func collectHost(recs []peerRecord, prev map[string]devCounters) *hostView {
 }
 
 // pingOnce is one ICMP echo with a hard timeout; ms is the wall time.
+// Matrix probes have a distinct key and bind to qmx0: a reply through another
+// tunnel or the host's default route is not evidence of a connected Matrix mesh.
+func matrixProbeKey(target string) string { return matrixIfaceName + "|" + target }
+
 func pingOnce(target string) (bool, float64) {
 	start := time.Now()
-	if _, err := runCmdTimeout(4*time.Second, "ping", "-c", "1", "-W", "2", target); err != nil {
+	args := []string{"-c", "1", "-W", "2", target}
+	if ip, ok := strings.CutPrefix(target, matrixIfaceName+"|"); ok {
+		args = []string{"-I", matrixIfaceName, "-c", "1", "-W", "2", ip}
+	}
+	if _, err := runCmdTimeout(4*time.Second, "ping", args...); err != nil {
 		return false, -1
 	}
 	return true, float64(time.Since(start).Microseconds()) / 1000
@@ -382,6 +391,48 @@ func (s *HubSnapshot) All() []peerLive {
 	return out
 }
 
+// MatrixLinks are independent fleet spokes, not the legacy GRE/FRP main tunnel.
+// Negative IDs cannot collide with configured peer IDs or mainTunnelID (-1).
+func (s *HubSnapshot) MatrixLinks() []peerLive {
+	mx := s.Local.Matrix
+	if mx == nil || !mx.Enabled {
+		return nil
+	}
+	peers := mx.Peers
+	if mx.Role == "node" {
+		peers = []matrixPeerStatus{{Name: "Iran hub", Addr: mx.Addr, IP: matrixHubIP,
+			PingOK: mx.HubPingOK, LatencyMs: mx.LatencyMs}}
+	} else if len(peers) == 0 {
+		peers = []matrixPeerStatus{{Name: "Matrix · waiting for foreign node", LatencyMs: -1}}
+	}
+	out := make([]peerLive, 0, len(peers))
+	for i, p := range peers {
+		state := stateDown
+		if mx.Service {
+			state = stateDegraded
+		}
+		if mx.Service && p.PingOK {
+			state = stateHealthy
+		}
+		l := peerLive{peerRecord: peerRecord{ID: -200000 - i, Name: p.Name, RemotePub: p.Addr,
+			Engine: "matrix", Transport: mx.Family, NoGre: true, Ports: mx.Ports, FrpPort: mx.Port},
+			Linked: mx.Service && p.PingOK, PingOK: mx.Service && p.PingOK, HealthState: state,
+			LatencyMs: -1, ICMPMs: -1, GreInner: mx.Inner, SnapshotAgeMs: s.AgeMs(), Reasons: []string{}}
+		if l.PingOK {
+			l.LatencyMs, l.LatencyKind, l.ICMPMs, l.ICMPOK = p.LatencyMs, "icmp", p.LatencyMs, true
+			l.PingMs = strconv.FormatFloat(p.LatencyMs, 'f', 0, 64) + "ms"
+		} else {
+			l.Reasons = append(l.Reasons, mx.Reasons...)
+		}
+		// qmx0 counters belong to this pair, never invent per-peer counters.
+		if len(peers) == 1 {
+			l.Rx, l.Tx = mx.Rx, mx.Tx
+		}
+		out = append(out, l)
+	}
+	return out
+}
+
 // PeersAged is Peers (without the main tunnel) with the snapshot age set.
 func (s *HubSnapshot) PeersAged() []peerLive {
 	age := s.AgeMs()
@@ -453,6 +504,9 @@ func buildSnapshot() *HubSnapshot {
 	v.owners = portOwners(controlPortsOf(recs, local.BindPort))
 	v.icmp = snapIcmp.lookup
 	v.connect = snapProbe.lookup
+	// The initial local read supplies control ports before the cached probes
+	// are attached. Rebuild Matrix only, without commands, to use those probes.
+	local.Matrix = matrixStatusFrom(loadMatrix(), v)
 
 	s := &HubSnapshot{Local: local, Seq: snapSeq.Add(1)}
 	timedStep("peers", func() {
@@ -507,6 +561,9 @@ func localTraffic(st tunnelStatus, v *hostView) (rx, tx *uint64) {
 	if rx, tx = v.carrierTraffic(st.FrpSvc); rx != nil {
 		return rx, tx
 	}
+	if st.Engine == "matrix" && st.Matrix != nil {
+		return v.traffic(matrixIfaceName)
+	}
 	if st.FrpSvc == "" && !st.Gre.Exists { // Bagher only: its links
 		var r, t uint64
 		have := false
@@ -547,6 +604,16 @@ func icmpTargets(s *HubSnapshot) map[string]bool {
 	m := map[string]bool{}
 	if s.Local.Gre.Inner != "" {
 		m[grePeerInner(s.Local.Gre.Inner)] = s.LocalSession
+	}
+	if mx := s.Local.Matrix; mx != nil && mx.Enabled && mx.Service {
+		if mx.Role == "node" {
+			m[matrixProbeKey(matrixHubIP)] = false
+		}
+		for _, p := range mx.Peers {
+			if p.IP != "" {
+				m[matrixProbeKey(p.IP)] = false
+			}
+		}
 	}
 	for _, l := range s.All() {
 		if l.icmpTarget != "" {

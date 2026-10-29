@@ -298,6 +298,11 @@ func handleFleet(w http.ResponseWriter, r *http.Request) {
 	setSnapshotAgeHeader(w, snap)
 	recs := loadPeers()
 	all := snap.All()
+	matrixLinks := snap.MatrixLinks()
+	all = append(all, matrixLinks...)
+	for _, l := range matrixLinks {
+		recs = append(recs, l.peerRecord)
+	}
 	live := make(map[int]peerLive, len(all))
 	for _, l := range all {
 		live[l.ID] = l
@@ -382,7 +387,8 @@ func startFleetSampler() {
 			// collects on its own.
 			tick := func() {
 				defer func(t time.Time) { recordSampler("fleetSampler", time.Since(t)) }(time.Now())
-				fleetRecord(currentSnapshot().All(), time.Now())
+				snap := currentSnapshot()
+				fleetRecord(append(snap.All(), snap.MatrixLinks()...), time.Now())
 			}
 			tick()
 			sample := time.NewTicker(fleetSampleEvery)

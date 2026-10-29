@@ -69,12 +69,24 @@ func handleDashboard(w http.ResponseWriter, r *http.Request) {
 	icmpFiltered := false
 	latMs, latKind := -1.0, ""
 	all := snap.All()
+	matrixLinks := snap.MatrixLinks()
+	// Foreign-side legacy tunnels have no hub Main record. Do not drop their
+	// existing health verdict when the additive Matrix spokes enable rollup.
+	if len(matrixLinks) > 0 && snap.Main == nil && (st.Gre.Exists || st.FrpUp || st.FrpSvc != "") {
+		h := ComputeHealth(LinkSignals{ServiceActive: st.FrpUp, GreIfUp: st.Gre.Exists,
+			Session: snap.LocalSession, TCPRTTms: snap.LocalRTT, ICMPOK: st.PingOK,
+			ICMPms: parsePingMs(st.PingMs), ICMPFresh: st.PingOK || snap.LocalSession})
+		all = append(all, peerLive{peerRecord: peerRecord{ID: mainTunnelID, Name: "Main tunnel", Engine: st.Engine},
+			GreUp: st.Gre.Exists, FrpUp: st.FrpUp, HealthState: h.State, Reasons: h.Reasons,
+			ICMPFiltered: h.ICMPFiltered, LatencyMs: h.LatencyMs, LatencyKind: h.LatencyKind})
+	}
+	all = append(all, matrixLinks...)
 	if len(all) > 0 {
 		healthy, up := 0, 0
 		anyUp = false
 		total := len(all)
 		for _, p := range all {
-			if p.GreUp || p.FrpUp {
+			if p.GreUp || p.FrpUp || (p.Engine == "matrix" && st.Matrix != nil && st.Matrix.Service) {
 				anyUp = true
 			}
 			switch fleetHealth(p) {
@@ -192,6 +204,7 @@ func handleDashboard(w http.ResponseWriter, r *http.Request) {
 		"system":      systemInfo(),
 		"conns":       snap.ActiveConns,
 		"bagher":      bagherStatus,
+		"matrix":      st.Matrix,
 		"xray":        xrayDashLinks(snap),
 		"checked":     time.Now().UTC().Format(time.RFC3339),
 	}
@@ -358,7 +371,7 @@ func isTunnelInterface(ifname string) bool {
 		strings.HasPrefix(ifname, "enp") || strings.HasPrefix(ifname, "wl") {
 		return false
 	}
-	if strings.HasPrefix(ifname, "gre-") || strings.HasPrefix(ifname, "tun") || ifname == spoofIface {
+	if strings.HasPrefix(ifname, "gre-") || strings.HasPrefix(ifname, "tun") || ifname == spoofIface || ifname == matrixIfaceName {
 		return true
 	}
 	known := getKnownPeerIfs()

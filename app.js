@@ -1100,7 +1100,38 @@ function tokenRGB(name) {
 const rgba = (c, a) => 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + a + ')';
 function engLabel(e) {
   e = String(e || '').toLowerCase();
-  return e === 'backhaul' ? 'Backhaul' : e === 'frp' ? 'FRP' : e === 'bagher' ? 'Bagher' : '';
+  return e === 'backhaul' || e === 'gre-backhaul' ? 'Backhaul' : e === 'frp' ? 'FRP' : e === 'bagher' ? 'Bagher' : e === 'matrix' ? 'Matrix' : '';
+}
+// Snapshot Matrix is authoritative, including null after removal. The separate
+// endpoint remains a compatibility fallback, never a reason to invent GRE/FRP.
+function dashboardMatrix(d) {
+  return d && Object.prototype.hasOwnProperty.call(d, 'matrix') ? d.matrix : window._matrixState;
+}
+function matrixSummary(mx) {
+  if (!mx || !mx.enabled) return { enabled: false, service: false, connected: false, state: 'down', peers: [] };
+  const peers = Array.isArray(mx.peers) ? mx.peers : [];
+  const connected = !!mx.service && !mx.peer_sync_required && (mx.role === 'hub' ? peers.some(p => p.ping_ok) : !!mx.hub_ping_ok);
+  const allConnected = !mx.peer_sync_required && (mx.role === 'hub' ? peers.length > 0 && peers.every(p => p.ping_ok) : !!mx.hub_ping_ok);
+  return { ...mx, peers, connected, state: !mx.service ? 'down' : allConnected ? 'ok' : 'warn',
+    remote: mx.role === 'hub' ? ((peers[0] || {}).addr || '') : (mx.addr || ''),
+    localMesh: mx.ip || (mx.role === 'hub' ? '10.254.231.1' : '10.254.231.2'),
+    remoteMesh: mx.role === 'hub' ? ((peers[0] || {}).ip || '10.254.231.2') : '10.254.231.1' };
+}
+function dashboardModel(d, empty) {
+  const matrix = matrixSummary(dashboardMatrix(d)), g = d.gre || {}, f = d.frp || {}, peers = d.peers || [];
+  const b = d.bagher || {}, bagherUp = !!(b.is_active || b.enabled || b.connected), xray = d.xray || [];
+  const legacy = !!(g.exists || f.up || f.svc || f.port || peers.length);
+  const unset = empty === true && !d.online && !bagherUp && !xray.length && !matrix.enabled;
+  let state = dashState(d, unset, bagherUp || (!legacy && xray.some(x => x.link === 'up' || x.link === 'listening')));
+  // Old servers do not yet include Matrix in their rollup. Merge conservatively:
+  // a healthy FRP link never becomes down, and a running tinc is not connected.
+  if (matrix.enabled && !Object.prototype.hasOwnProperty.call(d, 'matrix')) {
+    const mxState = matrix.state === 'down' ? 'err' : matrix.state;
+    state = !legacy && !bagherUp && !xray.length ? mxState : state === mxState ? state : 'warn';
+  }
+  let role = String(d.role || '').toLowerCase();
+  if (!legacy && matrix.enabled) role = matrix.role === 'hub' ? 'iran (matrix hub)' : 'foreign (matrix node)';
+  return { matrix, legacy, unset, state, role, on: !!d.online || matrix.service };
 }
 // Dashboard state: unset (fresh install), ok, warn, err.
 function dashState(d, unset, bagherUp) {
@@ -1610,6 +1641,7 @@ function renderMatrixBody(targetId) {
       <textarea aria-label="Matrix bundle" class="hashem-input u-mono u-w-full" rows="3" readonly dir="ltr" onclick="this.select()">${esc(st.bundle)}</textarea>
     </div>` : ''}
     <div class="tc-acts u-flex u-wrap u-gap-8 u-mt-4">
+      <button type="button" class="hashem-btn hashem-btn-secondary u-btn-30" data-matrix-edit="${esc(targetId)}" onclick="matrixEditOpen()">${esc(tr('', 'Edit'))}</button>
       <button type="button" class="hashem-btn hashem-btn-secondary u-btn-30" onclick="matrixRestartClick()">${esc(tr('', 'Restart'))}</button>
       <button type="button" class="hashem-btn hashem-btn-danger u-btn-30" onclick="matrixRemoveClick()">${esc(tr('', 'Remove Matrix'))}</button>
     </div>`;
@@ -1643,6 +1675,7 @@ async function mxRegisterClick() {
   } catch (e) { toastErr('matrix registration failed', e.message); }
   finally { mxSetSetupBusy(false); }
 }
+function matrixEditOpen() { return window.matrixEditPanelOpen(); }
 function matrixRestartClick() {
   return api('/api/matrix/restart', {}).then(() => { toastOk(tr('', 'Matrix service restarted')); loadMatrix(); })
     .catch(e => toastErr('matrix restart failed', e.message));
@@ -1700,14 +1733,12 @@ function renderTunnelsList() {
     });
   }
   if (mx && mx.enabled) {
-    const meshOk = mx.role === 'hub'
-      ? (mx.peers || []).some(p => p.ping_ok)
-      : !!mx.hub_ping_ok;
+    const mesh = matrixSummary(mx);
     rows.push({
       kind: 'matrix',
       name: 'Matrix tunnel',
-      ip: mx.role === 'hub' ? (mx.addr || '') : (mx.addr || ''),
-      state: (mx.service && meshOk) ? 'ok' : (mx.service ? 'warn' : 'down'),
+      ip: mesh.remote || (mx.role === 'hub' ? tr('', 'Waiting for foreign node') : ''),
+      state: mesh.state,
       engine: 'matrix-' + (mx.family || 'ipv4'),
       ports: (mx.ports || []).length || null,
     });
@@ -2015,6 +2046,11 @@ async function refresh() {
     _statusCountersAt = s.counters_at || null;
     // peers first: renderTunChips (called inside renderTunnel) reads the cache
     tunPeerCache = s.peers || null;
+    if (s.local && Object.prototype.hasOwnProperty.call(s.local, 'matrix')) {
+      const bundle = window._matrixState && window._matrixState.bundle;
+      window._matrixState = s.local.matrix ? { ...s.local.matrix, bundle: bundle || '' } : { enabled: false };
+      renderMatrixSetup();
+    }
     renderTunnel(s.local);
     renderPeers(s.peers);
     updatePeerHints(s);
@@ -2680,7 +2716,8 @@ async function refreshDash() {
     const d = await api('/api/dashboard?range=' + dashRange);
     if (!d || typeof d !== 'object') return;
     window._lastDash = d;
-    const on = !!d.online;
+    const model = dashboardModel(d, window._hashemEmpty);
+    const { matrix: mx, legacy: legacyConfigured, unset, state, role, on } = model;
     const peers = d.peers || [];
     const nPeers = d.peer_count || peers.length;
     { const g0 = $('dashGrid'); if (g0) g0.classList.remove('dash-loading'); }
@@ -2688,14 +2725,15 @@ async function refreshDash() {
     const bObj = d.bagher || {};
     window._lastBagher = bObj;
     const bagherUp = !!(bObj.is_active || bObj.enabled || bObj.connected);
-    // Fresh install: nothing to be "down" yet, so no red state (onboarding card explains next steps).
     const xrLinks = d.xray || [];
-    const unset = window._hashemEmpty === true && !on && !bagherUp && !xrLinks.length;
-    // a server whose only tunnel is Xray is as healthy as its links
-    const xrOnly = xrLinks.length && !on && !(d.gre || {}).exists && !(d.frp || {}).svc;
-    const state = dashState(d, unset, bagherUp || (xrOnly && xrLinks.some(x => x.link === 'up' || x.link === 'listening')));
+    if (Object.prototype.hasOwnProperty.call(d, 'matrix')) {
+      const bundle = window._matrixState && window._matrixState.bundle;
+      window._matrixState = d.matrix ? { ...d.matrix, bundle: bundle || '' } : { enabled: false };
+      renderMatrixSetup(); renderTunnelsList();
+      if (_tunnelDetail === 'matrix') renderMatrixDetail();
+    }
+    if (mx.enabled) { window._hashemEmpty = false; const c = $('onbCard'); if (c) c.hidden = true; }
     const g = d.gre || {}, f = d.frp || {};
-    const role = String(d.role || '').toLowerCase();
     const iran = /iran|master/.test(role), foreign = /foreign/.test(role);
     const engine = engLabel(d.active_engine);
     const upPeers = peers.filter(p => p.gre_up || p.frp_up).length;
@@ -2715,6 +2753,10 @@ async function refreshDash() {
     if (unset) { remName = 'Not linked yet'; remIp = '—'; }
     else if (multi && nPeers > 1) { remName = nPeers + ' ' + tr('', 'foreign servers'); remIp = upPeers + ' / ' + nPeers + ' ' + tr('', 'up'); }
     else if (multi) { remName = peers[0].name || 'Foreign server'; remIp = peers[0].remote_pub || '—'; }
+    else if (mx.enabled && !legacyConfigured && !bagherUp) {
+      remName = mx.role === 'hub' ? ((mx.peers[0] || {}).name || 'Foreign node (not registered)') : 'Iran hub';
+      remIp = mx.remote || '—';
+    }
     else {
       remName = d.main_name || (bagherUp && !(d.gre || {}).exists && bObj.name) || (iran ? 'Foreign server' : foreign ? 'Iran server' : 'Other server');
       remIp = d.remote_pub || g.peer || (bagherUp ? bObj.remote_host : '') || '—';
@@ -2726,18 +2768,21 @@ async function refreshDash() {
     if (multi) {
       const greUp = peers.filter(p => p.gre_up).length, frpUp = peers.filter(p => p.frp_up).length;
       chips.push(chip('GRE ' + greUp + '/' + nPeers, greUp ? 'ok' : 'err'), chip(engName + ' ' + frpUp + '/' + nPeers, frpUp ? 'ok' : 'err'));
-    } else if (!unset) {
-      // Backhaul and Bagher run without GRE: a missing GRE there is not a fault.
+    } else if (!unset && legacyConfigured) {
       if (g.exists || (!/backhaul/.test(role) && !(bagherUp && !f.up))) chips.push(chip('GRE', g.exists ? 'ok' : 'err'));
       if (f.up || f.svc || !bagherUp) chips.push(chip(engName, f.up ? 'ok' : 'err'));
     }
     if (bagherUp) chips.push(chip('Bagher', bObj.connected ? 'ok' : 'warn'));
+    if (mx.enabled) {
+      chips.push(chip('Matrix · ' + (mx.family || 'ipv4').toUpperCase(), mx.state === 'down' ? 'err' : mx.state));
+      chips.push(chip(tr('', mx.connected ? 'Mesh connected' : mx.service ? 'Service running · mesh unverified' : 'Service stopped'), mx.state === 'down' ? 'err' : mx.state));
+    }
     if (xrLinks.length) {
       const xrUp = xrLinks.filter(x => x.link === 'up' || x.link === 'listening').length;
       chips.push(chip('Xray ' + xrUp + '/' + xrLinks.length, xrUp === xrLinks.length ? 'ok' : xrUp ? 'warn' : 'err'));
     }
     setHTML('kpiLinks', chips.join(''));
-    const nPorts = (f.proxy_ports || []).length || (bObj.ports || []).length;
+    const nPorts = new Set([...(f.proxy_ports || []), ...(Array.isArray(bObj.ports) ? bObj.ports : []), ...(mx.enabled ? mx.ports || [] : [])].map(String)).size;
     const carrier = d.active_carrier && d.active_carrier !== 'direct' ? String(d.active_carrier).toUpperCase() : '';
     set('kpiLinksSub', unset ? tr('', 'Not configured')
       : [carrier ? tr('', 'via') + ' ' + carrier : '', nPorts ? nPorts + ' ' + tr('', nPorts === 1 ? 'port' : 'ports') : ''].filter(Boolean).join(' · '));
@@ -2752,7 +2797,8 @@ async function refreshDash() {
       host.querySelectorAll('[data-goto-link]').forEach(b => {
         b.onclick = () => {
           const k = b.dataset.gotoLink;
-          if (/^xray\d+$/.test(k)) gotoXrayLink(k.slice(4)); else if (k) gotoPeerCard(k); else goTab('tunnel');
+          if (k === 'matrix') { goTab('tunnel'); openTunnelDetail('matrix'); }
+          else if (/^xray\d+$/.test(k)) gotoXrayLink(k.slice(4)); else if (k) gotoPeerCard(k); else goTab('tunnel');
         };
       });
     }
@@ -2763,6 +2809,7 @@ async function refreshDash() {
       ms = d.ping_ok && d.ping ? parseFloat(d.ping) : (d.health_state === 'healthy' && d.latency_ms >= 0 ? d.latency_ms : null);
       if (ms == null && bagherUp && bObj.latency_ms > 0) ms = bObj.latency_ms;
     }
+    if (ms == null && mx.enabled && mx.connected && mx.latency_ms != null && mx.latency_ms >= 0) ms = mx.latency_ms;
     const hasMs = ms != null && isFinite(ms);
     set('kpiPing', hasMs ? Math.round(ms) + ' ms' : '—');
     setHTML('kpiPingSub', hasMs ? latBadge(ms) + (d.icmp_filtered ? icmpChip() : '') : esc(tr('', unset ? 'No tunnel yet' : 'No answer')));
@@ -2997,7 +3044,7 @@ async function refreshDash() {
     const proxyPorts = (f.proxy_ports || []).filter(p => p && String(p) !== bindPort);
     const isFrpc = (f.svc === 'frpc') || foreign;
     const portLabel = isFrpc ? tr('lbl_control_port', 'Server Port') : tr('lbl_bind_port', 'Bind Port');
-    const proxyList = (f.proxy_ports && f.proxy_ports.length) ? f.proxy_ports.join(', ') : ((f.proxies || []).join(', ') || '—');
+    const proxyList = (f.proxy_ports && f.proxy_ports.length) ? f.proxy_ports.join(', ') : ((f.proxies || []).join(', ') || (mx.enabled && (mx.ports || []).join(', ')) || '—');
     const ICO_BOLT = '<svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>';
     const serverCard = detCard(ICO_SRV, tr('card_server_title', 'Server & Role'), detRow(tr('lbl_public_ip', 'Public IP'), dmono(d.local_pub)) + detRow(tr('lbl_role', 'Role'), roleCell)
       + (unset ? '' : detRow(tr('lbl_forwarded_ports', 'Forwarded'), dval(proxyList))));
@@ -3015,6 +3062,17 @@ async function refreshDash() {
         + ((f.svc || f.up || f.port) ? detCard(ICO_FRP, tr('card_frp_title', 'Tunnel Engine'), detRow(tr('x007', 'Engine'), dval(engine || f.svc || '—')) + detRow(tr('lbl_frp_status', 'Status'), engCell) + detRow(portLabel, bindPort ? dmono(bindPort) : dval('—'))
           + (proxyPorts.length ? detRow(tr('lbl_tunnel_ports', 'Tunnel Ports'), `<span class="det-v det-ports">${proxyPorts.map(p => `<span class="det-v mono">${esc(String(p))}</span>`).join('')}</span>`) : '')
           + (u.frp_since ? detRow(tr('lbl_uptime_since', 'Since'), dval(u.frp_since)) : '')) : '')
+        + (mx.enabled ? detCard(ICO_GRE, 'Matrix · tinc',
+          detRow(tr('', 'Role'), dval(tr('', mx.role === 'hub' ? 'Hub (Iran)' : 'Node (foreign)')))
+          + detRow(tr('', 'Service'), dbadge(tr('', mx.service ? 'Running' : 'Stopped'), mx.service ? 'ok' : 'err'))
+          + detRow(tr('', 'Mesh'), dbadge(tr('', mx.connected ? 'Connected' : mx.service ? 'Not verified' : 'Disconnected'), mx.state === 'down' ? 'err' : mx.state))
+          + detRow(tr('', 'Remote endpoint'), dmono(mx.remote))
+          + detRow(tr('', 'Internal mesh (IPv4)'), dmono(mx.localMesh + ' → ' + mx.remoteMesh))
+          + detRow(tr('', 'Interface'), dmono(mx.interface || 'qmx0'))
+          + detRow(tr('', 'Transport family'), dval((mx.family || 'ipv4').toUpperCase()))
+          + detRow(tr('', 'Tinc port (TCP + UDP)'), dmono(String(mx.port || 2097)))
+          + detRow(tr('', 'Forwarded ports (TCP + UDP)'), dmono((mx.ports || []).join(', ') || '—'))
+          + detRow(tr('', 'qmx0 traffic'), dval(mx.rx != null && mx.tx != null ? '↓ ' + fmtBytes(mx.rx) + ' · ↑ ' + fmtBytes(mx.tx) : '—'))) : '')
         + detCard(ICO_BOLT, tr('x008', 'Carrier & Failover'), detRow(tr('x009', 'Active Carrier'), dmono(String(d.active_carrier || 'direct'))) + detRow(tr('x010', 'Failover Policy'), failCell) + detRow(tr('x011', 'Diagnostics'), diagCell));
     }
     setHTML('dashDetails', det);
@@ -3215,6 +3273,17 @@ function dashLinks(d, bObj, iran, foreign) {
     state: x.link === 'up' ? 'ok' : (x.link === 'listening' || x.link === 'checking') ? 'warn' : 'down',
     eng: 'Xray · ' + xrWireName(x), gre: false, lat: x.ping_ms > 0 ? Math.round(x.ping_ms) + 'ms' : '',
     rate: linkRate('xray-' + x.id, x.rx, x.tx, d.counters_at) }));
+  const mx = matrixSummary(dashboardMatrix(d));
+  if (mx.enabled) {
+    const rate = linkRate('matrix-qmx0', mx.rx, mx.tx, d.counters_at);
+    const meshPeers = mx.role === 'node' ? [{ name: 'Iran hub', addr: mx.addr, ip: mx.remoteMesh, ping_ok: mx.hub_ping_ok }] : mx.peers;
+    (meshPeers.length ? meshPeers : [{ name: tr('', 'Waiting for foreign node'), addr: '' }]).forEach(p => {
+      L.push({ key: 'matrix', name: p.name || (mx.role === 'hub' ? 'Foreign node' : 'Iran hub'), ip: p.addr || '',
+        state: !mx.service ? 'down' : p.ping_ok && !mx.peer_sync_required ? 'ok' : 'warn', eng: 'Matrix · ' + (mx.family || 'ipv4').toUpperCase(),
+        gre: false, lat: p.ping_ok && !mx.peer_sync_required ? tr('', 'mesh connected') : tr('', mx.service ? 'mesh unverified' : 'service stopped'),
+        rate: meshPeers.length === 1 ? rate : null });
+    });
+  }
   return L;
 }
 // xrWireName: a link's transport in a word (Reality, XHTTP, CDN, mKCP...).
@@ -8143,10 +8212,10 @@ function fleetLinks(nodes) {
     const p = peers.find(x => x.id === n.id);
     const ms = fleetMs(n) >= 0 ? Math.round(fleetMs(n)) + ' ms' : '';
     return {
-      key: p ? String(n.id) : 'main', name: n.name, ip: n.remote_pub || '',
+      key: n.engine === 'matrix' ? 'matrix' : p ? String(n.id) : 'main', name: n.name, ip: n.remote_pub || '',
       state: n.health === 'healthy' ? 'ok' : n.health === 'degraded' ? 'warn' : 'down',
-      eng: /backhaul/.test(n.engine || '') ? 'Backhaul' : 'FRP', gre: n.engine !== 'backhaul',
-      lat: ms, rate: p ? linkRate('p' + p.id, p.rx, p.tx, _statusCountersAt) : linkRate('main', L.rx, L.tx, _statusCountersAt),
+      eng: n.engine === 'matrix' ? 'Matrix' : /backhaul/.test(n.engine || '') ? 'Backhaul' : 'FRP', gre: n.engine !== 'backhaul' && n.engine !== 'matrix',
+      lat: ms, rate: n.engine === 'matrix' ? linkRate('matrix-qmx0', n.rx, n.tx, _statusCountersAt) : p ? linkRate('p' + p.id, p.rx, p.tx, _statusCountersAt) : linkRate('main', L.rx, L.tx, _statusCountersAt),
     };
   });
 }
@@ -8168,10 +8237,13 @@ function fleetRender(d) {
   $('fleetMeta').textContent = fleetFmt('fleet_meta', { time: String(d.checked || '').slice(11, 19) + ' UTC', s: d.interval_s || 15 }) + (d.snapshot_age_ms >= 0 ? ' · ' + tr('fleet_updated', 'updated') + ' ' + Math.round(d.snapshot_age_ms / 1000) + 's ' + tr('fleet_ago', 'ago') : '');
   const topo = $('fleetTopo');
   topo.innerHTML = heroTopo(fleetLinks(nodes), tr('fleet_hub', 'Iran hub'), d.hub || '');
-  topo.querySelectorAll('[data-goto-link]').forEach(b => b.onclick = () => gotoPeerCard(b.dataset.gotoLink || 'main'));
+  topo.querySelectorAll('[data-goto-link]').forEach(b => b.onclick = () => {
+    if (b.dataset.gotoLink === 'matrix') openTunnelDetail('matrix');
+    else gotoPeerCard(b.dataset.gotoLink || 'main');
+  });
   $('fleetGrid').innerHTML = nodes.map(n => {
     const st = n.stats || {}, ms = fleetMs(n) >= 0 ? Math.round(fleetMs(n)) : null;
-    const eng = n.engine === 'backhaul' ? 'Backhaul (no GRE)' : n.engine === 'gre-backhaul' ? 'Backhaul (with GRE)' : 'FRP';
+    const eng = n.engine === 'matrix' ? 'Matrix (tinc mesh)' : n.engine === 'backhaul' ? 'Backhaul (no GRE)' : n.engine === 'gre-backhaul' ? 'Backhaul (with GRE)' : 'FRP';
     const cls = n.health === 'healthy' ? 'ok' : n.health === 'degraded' ? 'warn' : 'err';
     return '<article class="fl-card fl-' + n.health + '" aria-label="' + esc(n.name) + '"' + (reasonsTip(n) ? ' title="' + reasonsTip(n) + '"' : '') + '>'
       + '<header class="fl-head"><span class="fl-name" title="' + esc(n.name) + '">' + esc(n.name) + '</span><span class="badge ' + cls + '"><span class="dot"></span>' + esc(tr('fleet_' + n.health, n.health)) + '</span></header>'
@@ -8370,12 +8442,14 @@ function uiObserve(s) {
   let bad = peers.filter(p => p.health_state ? p.health_state !== 'healthy' : !(p.gre_up && p.frp_up && p.ping_ok)).length;
   const anyDown = peers.some(p => !p.gre_up && !p.frp_up);
   if (!peers.length && L.gre && L.gre.exists && !L.frp_up) bad = 1;
-  navBadge('tunnel', bad, (anyDown || (!peers.length && bad)) ? 'err' : 'warn', 'badge_tunnel');
+    const mx = matrixSummary(L.matrix || dashboardMatrix(window._lastDash));
+    if (mx.enabled && mx.state !== 'ok') bad++;
+    navBadge('tunnel', bad, (anyDown || (mx.enabled && mx.state === 'down') || (!peers.length && bad)) ? 'err' : 'warn', 'badge_tunnel');
   // onboarding: only when nothing is configured at all
   // `role` is always populated (it has a default), so it cannot signal "configured".
   const bObj = (_sshfwdData || (window._lastDash && window._lastDash.bagher) || window._lastBagher || {});
   const bagherConfigured = !!(bObj.is_active || bObj.enabled || bObj.connected || bObj.has_config || (bObj.remote_host && bObj.remote_host.length) || (Array.isArray(bObj.ports) && bObj.ports.length));
-  const empty = !peers.length && !(L.gre && L.gre.exists) && !L.frp_up && !bagherConfigured;
+  const empty = !peers.length && !(L.gre && L.gre.exists) && !L.frp_up && !L.frp_svc && !bagherConfigured && !mx.enabled;
   let dismissed = false; try { dismissed = localStorage.getItem('hashem_onb_done') === '1'; } catch (e) { /* storage blocked */ }
   window._hashemEmpty = empty; // refreshDash shows a neutral "not set up" state instead of errors
   const c = $('onbCard'); if (c) c.hidden = !empty || dismissed;

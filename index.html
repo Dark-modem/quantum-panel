@@ -3428,6 +3428,14 @@
 
 
 
+<div class="ent-modal-ov" id="matrixEditModal" hidden>
+  <div class="ent-modal mx-help-modal" role="dialog" aria-modal="true" aria-labelledby="matrixEditTitle">
+    <div class="ent-modal-h"><b id="matrixEditTitle">Edit Matrix tunnel</b><button type="button" class="ent-x" id="matrixEditX" aria-label="Close">×</button></div>
+    <div class="ent-modal-b" id="matrixEditBody"></div>
+    <div class="qs-hint u-mt-8" id="matrixEditMsg" role="status" aria-live="polite"></div>
+    <div class="ent-modal-f"><button type="button" class="hashem-btn hashem-btn-ghost" id="matrixEditCancel">Close</button><button type="button" class="hashem-btn hashem-btn-primary" id="matrixEditSave">Save changes</button></div>
+  </div>
+</div>
 <!-- Read-only Matrix help: separate from the global delete confirmation. -->
 <div class="ent-modal-ov" id="mxHelpModal" hidden>
   <div class="ent-modal mx-help-modal" role="dialog" aria-modal="true" aria-labelledby="mxHelpTitle">
@@ -3759,6 +3767,7 @@
   </div>
 </div>
 <script src="app.js"></script>
+<script src="matrix_edit.js"></script>
 </body>
 </html>
 

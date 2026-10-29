@@ -52,19 +52,21 @@ type matrixPeer struct {
 	KeyHash string `json:"key_hash"`
 }
 type matrixState struct {
-	Enabled       bool         `json:"enabled"`
-	Network       string       `json:"network"`
-	Role          string       `json:"role"`
-	Family        string       `json:"family"`
-	Port          int          `json:"port"`
-	Addr          string       `json:"addr"`
-	Token         string       `json:"token,omitempty"`
-	Ports         []int        `json:"ports"`
-	Peers         []matrixPeer `json:"peers"`
-	Name          string       `json:"name"`
-	Panel         string       `json:"panel,omitempty"`
-	IP            string       `json:"ip"`
-	ForwardBefore string       `json:"forward_before,omitempty"`
+	Enabled          bool         `json:"enabled"`
+	Network          string       `json:"network"`
+	Role             string       `json:"role"`
+	Family           string       `json:"family"`
+	Port             int          `json:"port"`
+	Addr             string       `json:"addr"`
+	Token            string       `json:"token,omitempty"`
+	Ports            []int        `json:"ports"`
+	Peers            []matrixPeer `json:"peers"`
+	Name             string       `json:"name"`
+	Panel            string       `json:"panel,omitempty"`
+	IP               string       `json:"ip"`
+	ForwardBefore    string       `json:"forward_before,omitempty"`
+	Revision         string       `json:"revision,omitempty"`
+	PeerSyncRequired bool         `json:"peer_sync_required,omitempty"`
 }
 type matrixBundlePayload struct {
 	Panel    string `json:"panel"`
@@ -76,6 +78,7 @@ type matrixBundlePayload struct {
 	Ports    []int  `json:"ports"`
 	MainHost string `json:"main_host"`
 	Network  string `json:"network"`
+	Revision string `json:"revision,omitempty"`
 }
 
 func matrixDir() string       { return filepath.Join(configDir, "matrix-tinc") }
@@ -546,7 +549,7 @@ func matrixBundle(st matrixState, r *http.Request) string {
 			panelHost = net.JoinHostPort(getOutboundIP(), strconv.Itoa(cfg.Port))
 		}
 	}
-	b, _ := json.Marshal(matrixBundlePayload{Panel: scheme + "://" + panelHost + "/" + strings.Trim(cfg.BasePath, "/"), Token: st.Token, Family: st.Family, Addr: st.Addr, Port: st.Port, FIP: matrixFirstPeer, Ports: st.Ports, MainHost: string(host), Network: matrixNetname})
+	b, _ := json.Marshal(matrixBundlePayload{Panel: scheme + "://" + panelHost + "/" + strings.Trim(cfg.BasePath, "/"), Token: st.Token, Family: st.Family, Addr: st.Addr, Port: st.Port, FIP: matrixFirstPeer, Ports: st.Ports, MainHost: string(host), Network: matrixNetname, Revision: st.Revision})
 	return matrixBundlePfx + base64.StdEncoding.EncodeToString(b)
 }
 func handleMatrixSetupPost(w http.ResponseWriter, r *http.Request) {
@@ -592,6 +595,7 @@ func handleMatrixRegister(w http.ResponseWriter, r *http.Request) {
 		Token    string `json:"token"`
 		Name     string `json:"name"`
 		HostFile string `json:"host_file"`
+		Revision string `json:"revision,omitempty"`
 	}
 	if e := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16<<10)).Decode(&q); e != nil {
 		http.Error(w, "invalid JSON", 400)
@@ -606,6 +610,10 @@ func handleMatrixRegister(w http.ResponseWriter, r *http.Request) {
 	}
 	if !matrixNameRe.MatchString(q.Name) || q.Name == "main" {
 		http.Error(w, "invalid node name", 400)
+		return
+	}
+	if st.Revision != q.Revision {
+		http.Error(w, "bundle revision changed; copy the current hub bundle", http.StatusConflict)
 		return
 	}
 	key, e := matrixPublicKey(q.HostFile)
@@ -629,6 +637,7 @@ func handleMatrixRegister(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, r, "E-MATRIX-07", e.Error())
 		return
 	}
+	st.PeerSyncRequired = false
 	if e = saveMatrix(st); e != nil {
 		writeAPIError(w, r, "E-MATRIX-07", e.Error())
 		return
@@ -665,7 +674,7 @@ func handleMatrixForeignSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	self, _ := os.ReadFile(filepath.Join(matrixDir(), "hosts", st.Name))
-	payload, _ := json.Marshal(map[string]string{"token": b.Token, "name": st.Name, "host_file": string(self)})
+	payload, _ := json.Marshal(map[string]string{"token": b.Token, "name": st.Name, "host_file": string(self), "revision": b.Revision})
 	client := &http.Client{Timeout: 25 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	resp, e := client.Post(b.Panel+"/api/matrix/register", "application/json", strings.NewReader(string(payload)))
 	if e != nil {
@@ -692,12 +701,15 @@ func matrixPublicState(st matrixState) map[string]any {
 }
 func handleMatrixStatus(w http.ResponseWriter, r *http.Request) {
 	matrixMu.Lock()
-	defer matrixMu.Unlock()
 	st := loadMatrix()
-	v := matrixPublicState(st)
+	bundle := ""
 	if st.Enabled && st.Role == "hub" && st.Network == matrixNetname {
-		v["bundle"] = matrixBundle(st, r)
+		bundle = matrixBundle(st, r)
 	}
+	matrixMu.Unlock()
+	v := matrixPublicState(st)
+	v["bundle"] = bundle
+	v["peer_sync_required"] = st.PeerSyncRequired
 	writeJSON(w, v)
 }
 func handleMatrixRemovePost(w http.ResponseWriter, r *http.Request) {

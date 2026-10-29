@@ -32,6 +32,9 @@ func handleStatus(w http.ResponseWriter, r *http.Request) {
 	if m := snap.Main; m != nil {
 		lv.HealthState, lv.ICMPFiltered, lv.LatencyMs, lv.LatencyKind, lv.Reasons = m.HealthState, m.ICMPFiltered, m.LatencyMs, m.LatencyKind, m.Reasons
 		lv.Rx, lv.Tx = m.Rx, m.Tx
+	} else if mx := snap.Local.Matrix; mx != nil && mx.Enabled && snap.Local.Engine == "matrix" {
+		lv.HealthState, lv.LatencyMs, lv.LatencyKind, lv.Reasons = mx.HealthState, mx.LatencyMs, mx.LatencyKind, mx.Reasons
+		lv.Rx, lv.Tx = mx.Rx, mx.Tx
 	}
 	lv.CarrierID = mainCarrierID(snap.Local)
 	lv.Name = linkLabel("main")
@@ -635,6 +638,106 @@ type tunnelStatus struct {
 	BindPort     int      `json:"bind_port"`
 	// TuneBackup: hashem.sh optimize saved the previous settings, so Restore works.
 	TuneBackup bool `json:"tune_backup"`
+	// Matrix is additive: its service/mesh must never masquerade as GRE or FRP.
+	Matrix *matrixStatus `json:"matrix,omitempty"`
+}
+
+// Public Matrix snapshot. No token, key hash or registration bundle is exposed.
+// Presence, service state and a verified mesh connection are separate signals.
+type matrixPeerStatus struct {
+	Name      string  `json:"name"`
+	Addr      string  `json:"addr"`
+	IP        string  `json:"ip"`
+	PingOK    bool    `json:"ping_ok"`
+	PingKnown bool    `json:"ping_known"`
+	LatencyMs float64 `json:"latency_ms"`
+}
+
+type matrixStatus struct {
+	Enabled          bool               `json:"enabled"`
+	Role             string             `json:"role"`
+	Family           string             `json:"family"`
+	Port             int                `json:"port"`
+	Addr             string             `json:"addr"`
+	Ports            []int              `json:"ports"`
+	Service          bool               `json:"service"`
+	Peers            []matrixPeerStatus `json:"peers"`
+	Name             string             `json:"name"`
+	IP               string             `json:"ip"`
+	HubPingOK        bool               `json:"hub_ping_ok"`
+	PeerSyncRequired bool               `json:"peer_sync_required"`
+	Connected        bool               `json:"connected"`
+	HealthState      string             `json:"health_state"`
+	Reasons          []string           `json:"reasons"`
+	RemotePub        string             `json:"remote_pub"`
+	Inner            string             `json:"inner"`
+	Interface        string             `json:"interface"`
+	LatencyMs        float64            `json:"latency_ms"`
+	LatencyKind      string             `json:"latency_kind"`
+	Rx               *uint64            `json:"rx"`
+	Tx               *uint64            `json:"tx"`
+}
+
+func matrixStatusFrom(st matrixState, v *hostView) *matrixStatus {
+	if !st.Enabled || st.Network != matrixNetname || (st.Role != "hub" && st.Role != "node") {
+		return nil
+	}
+	mx := &matrixStatus{Enabled: true, Role: st.Role, Family: st.Family, Port: st.Port,
+		Addr: st.Addr, Ports: append([]int{}, st.Ports...), Name: st.Name, IP: st.IP,
+		Interface: matrixIfaceName, Inner: v.inner[matrixIfaceName], Service: v.active[matrixUnit], PeerSyncRequired: st.PeerSyncRequired,
+		Peers: []matrixPeerStatus{}, HealthState: stateDown, LatencyMs: -1, Reasons: []string{}}
+	mx.Rx, mx.Tx = v.traffic(matrixIfaceName)
+	connected, total := 0, len(st.Peers)
+	addPing := func(target string) icmpResult {
+		if !mx.Service || mx.PeerSyncRequired {
+			return icmpResult{}
+		}
+		ic := v.icmpFor(matrixProbeKey(target))
+		if mx.Service && ic.OK {
+			connected++
+			if mx.LatencyMs < 0 || ic.Ms < mx.LatencyMs {
+				mx.LatencyMs, mx.LatencyKind = ic.Ms, "icmp"
+			}
+		}
+		return ic
+	}
+	for _, p := range st.Peers {
+		ic := addPing(p.IP)
+		ms := -1.0
+		if mx.Service && ic.OK {
+			ms = ic.Ms
+		}
+		mx.Peers = append(mx.Peers, matrixPeerStatus{Name: p.Name, Addr: p.Addr, IP: p.IP,
+			PingOK: mx.Service && ic.OK, PingKnown: ic.Known, LatencyMs: ms})
+	}
+	if st.Role == "node" {
+		total = 1
+		mx.RemotePub = st.Addr
+		mx.HubPingOK = mx.Service && addPing(matrixHubIP).OK
+	} else if len(st.Peers) > 0 {
+		mx.RemotePub = st.Peers[0].Addr
+	}
+	mx.Connected = connected > 0
+	switch {
+	case !mx.Service:
+		mx.Reasons = append(mx.Reasons, "Matrix service stopped")
+	case mx.PeerSyncRequired:
+		mx.HealthState = stateDegraded
+		mx.Reasons = append(mx.Reasons, "Matrix transport changed; foreign node registration required")
+	case total > 0 && connected == total:
+		mx.HealthState = stateHealthy
+	case connected > 0:
+		mx.HealthState = stateDegraded
+		mx.Reasons = append(mx.Reasons, "Some Matrix mesh nodes are not answering")
+	default:
+		mx.HealthState = stateDegraded
+		if total == 0 {
+			mx.Reasons = append(mx.Reasons, "Matrix is waiting for a foreign node")
+		} else {
+			mx.Reasons = append(mx.Reasons, "Matrix service running; mesh connection not verified")
+		}
+	}
+	return mx
 }
 
 // engineBinDirs / backhaulExtraBins are where hashem.sh installs engine
@@ -907,6 +1010,21 @@ func localStatusFrom(v *hostView) tunnelStatus {
 		st.RemotePub = st.Gre.PeerIP
 	}
 	st.Ports = st.ProxyPorts
+	st.Matrix = matrixStatusFrom(loadMatrix(), v)
+	if mx := st.Matrix; mx != nil && !st.Gre.Exists && !st.FrpUp && st.FrpSvc == "" {
+		st.Engine, st.TunnelEngine, st.TunnelType = "matrix", "matrix", "matrix"
+		st.Transport = mx.Family
+		if mx.Role == "hub" {
+			st.Role = "iran (matrix hub)"
+		} else {
+			st.Role = "foreign (matrix node)"
+		}
+		st.RemotePub = mx.RemotePub
+		st.Proxies, st.ProxyPorts = nil, nil
+		st.FrpPort, st.BindPort = 0, 0
+		st.Ports = mx.Ports
+		// FRP fields remain empty, including its listener and proxy ports.
+	}
 	return st
 }
 
