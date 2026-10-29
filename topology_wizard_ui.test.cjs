@@ -7,9 +7,9 @@ const test = require('node:test');
 const source = fs.readFileSync(path.join(__dirname, 'topology.js'), 'utf8');
 const faSource = fs.readFileSync(path.join(__dirname, 'i18n-fa.js'), 'utf8');
 
-function harness({ fa = false, topologies, tunnels, failOn, failCode, failMessage, instances = [] } = {}) {
+function harness({ fa = false, topologies, tunnels, failOn, failCode, failMessage, instances = [], localRole = '' } = {}) {
   const elements = new Map();
-  const calls = [], toasts = [];
+  const calls = [], toasts = [], clipboard = [];
   let created = null;
   function el(id) {
     if (!elements.has(id)) elements.set(id, {
@@ -23,12 +23,16 @@ function harness({ fa = false, topologies, tunnels, failOn, failCode, failMessag
   const NEW_BY_URL = {
     '/api/setup': body => ({ id: 'main', name: body.name || 'main', engine: body.engine || 'frp', state: 'healthy' }),
     '/api/sshfwd': body => ({ id: 'bagher-1', name: body.name || 'bagher-1', engine: 'bagher', state: 'healthy' }),
-    '/api/matrix/setup': body => ({ id: 'matrix', name: 'Matrix', engine: 'matrix', state: 'healthy', port: body.port || 21007 }),
+    '/api/matrix/setup': body => ({ id: 'matrix', name: 'Matrix', engine: 'matrix', state: 'healthy', port: body.port || 21007, bundle: 'hmx1_QnVuZGxl', instance: 'matrix' }),
+    '/api/matrix/foreign-setup': body => ({ id: 'matrix', name: 'Matrix', engine: 'matrix', state: 'healthy', status: 'ok', detail: 'matrix node registered with the hub and started' }),
     '/api/xray': () => ({ id: 'xray:1', name: 'xr', engine: 'xray', state: 'healthy' })
   };
   const sandbox = {
-    window: {}, document: { activeElement: null, hidden: false, querySelectorAll() { return []; } },
-    $: el, _tunnelDetail: null, setInterval() {}, renderTunnelsList() {},
+    // addEventListener/querySelector keep the document-level wiring in
+    // topology.js (menus, Escape handling) loadable inside the sandbox.
+    window: {}, document: { activeElement: null, hidden: false, querySelectorAll() { return []; }, querySelector() { return null; }, addEventListener() {} },
+    $: el, _tunnelDetail: null, setInterval() {}, setTimeout() {}, renderTunnelsList() {},
+    copyTextSafe: (...a) => { clipboard.push(a); },
     esc: v => String(v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'),
     toastOk: (...a) => toasts.push(['ok', ...a]), toastErr: (...a) => toasts.push(['err', ...a]), toastWarn: (...a) => toasts.push(['warn', ...a]),
     entConfirm: async () => true,
@@ -49,6 +53,8 @@ function harness({ fa = false, topologies, tunnels, failOn, failCode, failMessag
       return {};
     }
   };
+  // app.js stores the local role snapshot on window (e.g. "foreign (matrix node)").
+  if (localRole) sandbox.window._lastLocal = { role: localRole };
   vm.createContext(sandbox);
   vm.runInContext(faSource, sandbox, { filename: 'i18n-fa.js' });
   sandbox.tr = (_k, fb) => fa ? (sandbox.window.FA_TEXT[fb] || fb) : fb;
@@ -57,7 +63,7 @@ function harness({ fa = false, topologies, tunnels, failOn, failCode, failMessag
   vm.runInContext("topologySelected = " + JSON.stringify(topologies[0] ? topologies[0].id : null) + ";", sandbox);
   // `let` bindings are not sandbox properties: read them inside the context
   const wiz = expr => vm.runInContext(expr, sandbox);
-  return { sandbox, el, calls, toasts, wiz };
+  return { sandbox, el, calls, toasts, clipboard, wiz };
 }
 function topo(over = {}) {
   return Object.assign({ id: 'pair', name: 'Pair', role: 'iran', local_ip: '192.0.2.1', remote_ip: '192.0.2.2', tunnel_ids: [] }, over);
@@ -196,7 +202,15 @@ for (const [type, expect] of [
     assert.equal(patch.url, '/api/topologies/pair');
     assert.deepEqual(Array.from(patch.body.tunnel_ids), [NEW_ID], 'attach payload carries the new tunnel');
     assert.ok(h.toasts.some(t => t[0] === 'ok'), 'success toast shown');
-    assert.equal(h.el('topoWizModal').hidden, true, 'modal closes on success');
+    if (type === 'matrix') {
+      // Hub side: the wizard stays open on the bundle hand-off screen — the
+      // tunnel only works once its bundle is pasted on the foreign server.
+      assert.equal(h.el('topoWizModal').hidden, false, 'hub matrix: the wizard does not auto-close');
+      assert.equal(h.wiz('topoWiz.step'), 4, 'it moves to the bundle step instead');
+      assert.equal(h.el('topoWizBundleOut').value, 'hmx1_QnVuZGxl', 'the setup response bundle is shown');
+    } else {
+      assert.equal(h.el('topoWizModal').hidden, true, 'modal closes on success');
+    }
   });
 }
 
@@ -298,7 +312,12 @@ test('wizard strings carry unique Persian translations', () => {
     'The new tunnel is attached to this topology.', 'Mesh tunnel (tinc): the servers join one virtual network.',
     "This server's IPv6 address", 'Stealth tunnel over an SSH connection pool.', 'Type',
     'Mesh port', 'A free TCP+UDP port for the tinc mesh — NOT the traffic port. Leave empty/0 to pick automatically.',
-    'Matrix mesh port: {port}'];
+    'Matrix mesh port: {port}',
+    'Bundle', 'The Matrix tunnel is ready.', 'Matrix bundle', 'Done', 'Copy bundle', 'Copied ✓',
+    'Copy this bundle and paste it on the foreign server, in the new-tunnel wizard under Matrix.',
+    'Enter the hub bundle here', 'On the Iran server, create the Matrix tunnel, copy the bundle it shows, and paste it here.',
+    'Hub bundle', 'Paste the hub bundle from the Iran server.', 'The bundle must start with hmx1_.',
+    'Matrix tunnel connected to the hub.'];
   for (const key of keys) {
     assert.equal(faSource.split(JSON.stringify(key) + ':').length - 1, 1, `unique translation: ${key}`);
     assert.ok(map[key], `Persian entry exists: ${key}`);
@@ -309,6 +328,11 @@ test('wizard strings carry unique Persian translations', () => {
   assert.equal(h.el('topoWizProgress').textContent, map['Step {x} of {n}'].replace('{x}', '1').replace('{n}', '3'));
   h.sandbox.topoWizPick('matrix');
   assert.ok(h.el('topoWizBody').innerHTML.includes('پورت مش'), 'the mesh-port label renders in Persian');
+  // The node side renders its paste screen in Persian too.
+  const fh = harness({ fa: true, topologies: [topo()], tunnels: [], localRole: 'foreign (matrix node)' });
+  fh.sandbox.topologyNewTunnel();
+  fh.sandbox.topoWizPick('matrix');
+  assert.ok(fh.el('topoWizBody').innerHTML.includes('باندل هاب را اینجا وارد کنید'), 'the node-side paste label renders in Persian');
 });
 
 test('with existing Matrix instances the wizard requests a fresh isolated one', async () => {
@@ -328,4 +352,100 @@ test('with existing Matrix instances the wizard requests a fresh isolated one', 
   assert.ok(gi < si, 'the instances check happens before the setup call');
   const patch = h.calls.find(c => c.method === 'PATCH');
   assert.ok(patch, 'the new instance tunnel is attached to the topology');
+});
+
+test('hub side: the Matrix wizard ends on a bundle hand-off screen with a copy button', async () => {
+  const h = harness({ topologies: [topo()], tunnels: [] });
+  h.sandbox.topologyNewTunnel();
+  h.sandbox.topoWizPick('matrix');
+  assert.equal(h.el('topoWizProgress').textContent, 'Step 2 of 4', 'picking Matrix grows the header to the extra bundle step');
+  assert.ok(h.el('topoWizSteps').innerHTML.includes('data-wiz-step="4"'), 'the header lists the Bundle step');
+  assert.equal(h.el('topoWizNext').textContent, 'Next', 'the create caption is untouched before creation');
+  h.sandbox.topoWizRead();
+  h.sandbox.topoWizNext(); // review
+  await h.sandbox.topoWizNext(); // create
+  assert.equal(h.el('topoWizModal').hidden, false, 'the wizard does not auto-close after hub-side matrix creation');
+  assert.equal(h.wiz('topoWiz.step'), 4, 'it sits on the bundle step');
+  assert.ok(h.el('topoWizSteps').innerHTML.match(/class="topo-wiz-step done"/g).length === 3, 'the three done steps carry checkmarks');
+  assert.equal(h.el('topoWizProgress').textContent, 'Step 4 of 4');
+  assert.equal(h.el('topoWizNext').textContent, 'Done', 'the primary footer button becomes «Done»');
+  assert.equal(h.el('topoWizBack').hidden, true, 'Back is gone after creation');
+  assert.equal(h.el('topoWizCancelBtn').hidden, true, 'Cancel is gone after creation');
+  const out = h.el('topoWizBundleOut');
+  assert.ok(out, 'a readonly bundle textarea is rendered');
+  assert.equal(out.value, 'hmx1_QnVuZGxl', 'it carries the bundle returned by /api/matrix/setup');
+  const body = h.el('topoWizBody').innerHTML;
+  assert.ok(body.includes('Copy bundle'), 'a copy button is offered');
+  assert.ok(body.includes('in the new-tunnel wizard under Matrix'), 'the hint says where to paste the bundle');
+  // Copy: the shared clipboard helper is called with the bundle, the button
+  // flips to «Copied ✓» and back after 2s.
+  h.el('topoWizCopyBundle').onclick();
+  assert.equal(h.clipboard.length, 1, 'the copy button calls the clipboard helper');
+  assert.equal(h.clipboard[0][0], 'hmx1_QnVuZGxl', 'the helper receives the bundle text');
+  assert.equal(h.el('topoWizCopyBundle').textContent, 'Copied ✓');
+  // «Done» closes the wizard without another API call.
+  const before = h.calls.length;
+  h.sandbox.topoWizNext();
+  assert.equal(h.el('topoWizModal').hidden, true, '«Done» closes the wizard');
+  assert.equal(h.wiz('topoWiz'), null);
+  assert.equal(h.calls.length, before, 'closing needs no further API calls');
+  // The tunnel was still created and attached on the way to the bundle screen.
+  assert.ok(h.calls.find(c => c.method === 'PATCH'), 'the mesh tunnel is attached before the hand-off');
+});
+
+test('foreign side: the Matrix step asks for the hub bundle instead of mesh settings', () => {
+  const h = harness({ topologies: [topo()], tunnels: [], localRole: 'foreign (matrix node)' });
+  h.sandbox.topologyNewTunnel();
+  h.sandbox.topoWizPick('matrix');
+  const body = h.el('topoWizBody').innerHTML;
+  assert.ok(body.includes('id="topoWizFBundle"'), 'a large paste textarea replaces the mesh settings');
+  assert.ok(body.includes('Enter the hub bundle here'), 'the textarea is labelled for the hub bundle');
+  assert.ok(body.includes('hmx1_'), 'the hint names the bundle format');
+  assert.ok(!body.includes('id="topoWizFFamily"'), 'no family select on the node side');
+  assert.ok(!body.includes('id="topoWizFPort"'), 'no mesh port field on the node side');
+  assert.equal(h.el('topoWizProgress').textContent, 'Step 2 of 3', 'the node side keeps 3 steps, no extra bundle step');
+  assert.ok(!h.el('topoWizSteps').innerHTML.includes('data-wiz-step="4"'), 'no Bundle step in the header');
+});
+
+test('foreign side: an empty or non-hmx1 bundle is rejected inline without an API call', () => {
+  const h = harness({ topologies: [topo()], tunnels: [], localRole: 'foreign (matrix node)' });
+  h.sandbox.topologyNewTunnel();
+  h.sandbox.topoWizPick('matrix');
+  h.sandbox.topoWizRead();
+  h.sandbox.topoWizNext(); // empty paste
+  assert.equal(h.wiz('topoWiz.step'), 2, 'stays on the paste step');
+  assert.ok(h.el('topoWizErr').textContent.length > 0, 'an inline error explains the empty bundle');
+  h.el('topoWizFBundle').value = '   \n  ';
+  h.sandbox.topoWizRead();
+  h.sandbox.topoWizNext(); // whitespace-only paste
+  assert.equal(h.wiz('topoWiz.step'), 2, 'whitespace counts as empty');
+  h.el('topoWizFBundle').value = 'bh1_notamatrixbundle';
+  h.sandbox.topoWizRead();
+  h.sandbox.topoWizNext(); // wrong bundle kind
+  assert.ok(h.el('topoWizErr').textContent.includes('hmx1_'), 'the error names the hmx1_ prefix');
+  assert.equal(h.wiz('topoWiz.step'), 2, 'still on the paste step');
+  assert.equal(h.calls.filter(c => c.url === '/api/matrix/foreign-setup').length, 0, 'no API call was made');
+  assert.equal(h.calls.filter(c => c.url === '/api/matrix/setup').length, 0, 'the hub setup is never called');
+});
+
+test('foreign side: a valid bundle pairs via foreign-setup, attaches, and closes', async () => {
+  const h = harness({ topologies: [topo()], tunnels: [], localRole: 'foreign (matrix node)' });
+  h.sandbox.topologyNewTunnel();
+  h.sandbox.topoWizPick('matrix');
+  h.el('topoWizFBundle').value = '  hmx1_QnVuZGxl \n';
+  h.sandbox.topoWizRead();
+  h.sandbox.topoWizNext(); // review
+  assert.equal(h.wiz('topoWiz.step'), 3, 'a valid bundle reaches the review');
+  assert.ok(h.el('topoWizBody').innerHTML.includes('hmx1_QnVuZGxl'), 'the review shows the pasted bundle');
+  await h.sandbox.topoWizNext(); // create
+  const call = h.calls.find(c => c.url === '/api/matrix/foreign-setup');
+  assert.ok(call, '/api/matrix/foreign-setup is called');
+  assert.equal(call.body.bundle, 'hmx1_QnVuZGxl', 'the trimmed bundle is sent');
+  assert.equal(h.calls.filter(c => c.url === '/api/matrix/setup').length, 0, 'the hub setup endpoint is never used on the node side');
+  const patch = h.calls.find(c => c.method === 'PATCH');
+  assert.ok(patch, 'the paired node tunnel is attached to the topology');
+  assert.deepEqual(Array.from(patch.body.tunnel_ids), ['matrix'], 'the matrix inventory id attaches like on the hub');
+  assert.ok(h.toasts.some(t => t[0] === 'ok' && String(t[1]).includes('Matrix tunnel connected to the hub')), 'the pairing success toast is shown');
+  assert.equal(h.el('topoWizModal').hidden, true, 'the node side closes without a bundle screen');
+  assert.equal(h.wiz('topoWiz'), null);
 });

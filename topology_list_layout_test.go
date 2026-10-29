@@ -194,9 +194,33 @@ func TestTopologyWizardMarkup(t *testing.T) {
 	if strings.Contains(js, "goTab('setup')") {
 		t.Error("topologyNewTunnel must not navigate to the Setup tab anymore")
 	}
+	// The Matrix wizard is role-aware: the Iran/hub side ends on a bundle
+	// hand-off screen (the hmx1_ bundle to paste on the foreign server), while
+	// the foreign/node side pairs through /api/matrix/foreign-setup.
+	for _, want := range []string{
+		`function topoWizForeignSide()`,  // role detection from window._lastLocal
+		`window._lastLocal`,              // the dashboard snapshot carries the role
+		`/api/matrix/foreign-setup`,      // node side pairs with the hub bundle
+		`/^hmx1_/`,                       // inline bundle validation before any API call
+		`function topoWizRenderBundle()`, // hub-side bundle hand-off screen
+		`id="topoWizBundleOut"`,          // readonly bundle output textarea
+		`id="topoWizFBundle"`,            // node-side bundle paste textarea
+		`topoWizCopyBundle`,              // copy button wired to the clipboard helper
+		`copyTextSafe`,                   // the shared clipboard helper is reused
+		`topo-wiz-bundle`,                // shared bundle textarea styling class
+	} {
+		if !strings.Contains(js, want) {
+			t.Errorf("topology.js lacks Matrix bundle wiring: %s", want)
+		}
+	}
 	css := topologyListTestSource(t, "enterprise.css")
 	if !regexp.MustCompile(`\.topo-wiz-step\.done\s*\{[^}]*`).MatchString(css) ||
 		!strings.Contains(css, `content: "\2713"`) {
 		t.Error("enterprise.css must style completed wizard steps with a checkmark")
+	}
+	if !regexp.MustCompile(`\.topo-wiz-bundle\s*\{[^}]*min-height`).MatchString(css) ||
+		!strings.Contains(css, `.topo-wiz-bundle[readonly]`) ||
+		!strings.Contains(css, `.topo-wiz-bundle-actions`) {
+		t.Error("enterprise.css must style the wizard Matrix bundle textareas and copy action")
 	}
 }

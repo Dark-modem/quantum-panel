@@ -3137,5 +3137,15 @@ window.FA_TEXT = {
 "Mesh port": "پورت مش",
 "A free TCP+UDP port for the tinc mesh — NOT the traffic port. Leave empty/0 to pick automatically.": "یک پورت آزاد TCP+UDP برای مش tinc — پورت ترافیک نیست. برای انتخاب خودکار، خالی بگذارید یا 0 وارد کنید.",
 "Matrix mesh port: {port}": "پورت مش ماتریکس: {port}",
+"The Matrix tunnel is ready.": "تونل ماتریکس آماده است.",
+"Matrix bundle": "باندل ماتریکس",
+"Copy this bundle and paste it on the foreign server, in the new-tunnel wizard under Matrix.": "این باندل را کپی کنید و در سرور خارج، در ویزارد ایجاد تونل ← ماتریکس، وارد کنید.",
+"Copied ✓": "کپی شد ✓",
+"Enter the hub bundle here": "باندل هاب را اینجا وارد کنید",
+"On the Iran server, create the Matrix tunnel, copy the bundle it shows, and paste it here.": "در سرور ایران تونل ماتریکس را بسازید، باندلی که نشان می‌دهد را کپی کنید و اینجا بچسبانید.",
+"Hub bundle": "باندل هاب",
+"Paste the hub bundle from the Iran server.": "باندل هاب را از سرور ایران وارد کنید.",
+"The bundle must start with hmx1_.": "باندل باید با hmx1_ شروع شود.",
+"Matrix tunnel connected to the hub.": "تونل ماتریس به هاب متصل شد.",
 "Stealth tunnel over an SSH connection pool.": "تونل پنهان‌کار روی استخر اتصال SSH."
 };

@@ -461,9 +461,30 @@ const TOPO_WIZ_TYPES = [
   { id: 'matrix', label: 'Matrix', desc: 'Mesh tunnel (tinc): the servers join one virtual network.' },
   { id: 'xray', label: 'Xray', desc: 'Forward ports from the Iran server to a foreign server over Xray: Reality, XHTTP, gRPC or mKCP, direct or reverse.' }
 ];
-const TOPO_WIZ_STEPS = ['Type', 'Settings', 'Review'];
+const TOPO_WIZ_BASE_STEPS = ['Type', 'Settings', 'Review'];
 let topoWiz = null;
 let topoWizBusy = false;
+// Role of THIS server, from the dashboard snapshot app.js keeps in
+// window._lastLocal: a role containing "foreign" (plain "foreign" or
+// "foreign (matrix node)") is the foreign/node side. Everywhere else —
+// including a missing snapshot — counts as the Iran/hub side.
+function topoWizForeignSide() {
+  const local = (typeof window !== 'undefined' && window._lastLocal) || {};
+  return /foreign/.test(String(local.role || ''));
+}
+// Step list for the current wizard state. The hub side gets one extra final
+// step for the Matrix bundle hand-off (type -> settings -> review -> bundle);
+// other tunnel types and the foreign (node) side keep the 3-step flow.
+function topoWizSteps() {
+  const steps = [...TOPO_WIZ_BASE_STEPS];
+  if (topoWiz && topoWiz.type === 'matrix' && !topoWizForeignSide()) steps.push('Bundle');
+  return steps;
+}
+// True once a hub-side Matrix setup succeeded and the wizard shows the bundle
+// hand-off screen instead of a step body.
+function topoWizOnBundle() {
+  return !!(topoWiz && topoWiz.bundle);
+}
 function topoWizType() {
   return (topoWiz && TOPO_WIZ_TYPES.find(t => t.id === topoWiz.type)) || null;
 }
@@ -486,9 +507,9 @@ function topoWizOpen() {
   const topo = topologyCurrent();
   if (!topo) return;
   topoWiz = {
-    step: 1, type: '',
+    step: 1, type: '', bundle: '',
     values: { name: topo.name || '', local: topo.local_ip || '', remote: topo.remote_ip || '', gre: true,
-      transport: '', port: 0, ports: '', ssh_port: 22, pool: 25, udp: false, family: 'ipv4', addr: '', mode: 'direct' }
+      transport: '', port: 0, ports: '', ssh_port: 22, pool: 25, udp: false, family: 'ipv4', addr: '', mode: 'direct', bundle: '' }
   };
   topoWizShow();
   topoWizRender();
@@ -510,17 +531,22 @@ function topoWizError(msg) {
 }
 function topoWizRender() {
   if (!topoWiz) return;
-  const step = topoWiz.step;
-  $('topoWizProgress').textContent = tr('', 'Step {x} of {n}').replace('{x}', String(step)).replace('{n}', String(TOPO_WIZ_STEPS.length));
-  $('topoWizSteps').innerHTML = TOPO_WIZ_STEPS.map((lb, i) =>
+  const steps = topoWizSteps();
+  const step = topoWiz.step, bundle = topoWizOnBundle();
+  $('topoWizProgress').textContent = tr('', 'Step {x} of {n}').replace('{x}', String(step)).replace('{n}', String(steps.length));
+  $('topoWizSteps').innerHTML = steps.map((lb, i) =>
     `<span class="topo-wiz-step${i + 1 < step ? ' done' : ''}${i + 1 === step ? ' on' : ''}" data-wiz-step="${i + 1}"${i + 1 === step ? ' aria-current="step"' : ''}>${esc(tr('', lb))}</span>`).join('');
-  $('topoWizBack').hidden = step === 1;
+  // The bundle hand-off screen is terminal: Back and Cancel would only confuse
+  // after the tunnel already exists; the header × still closes it.
+  $('topoWizBack').hidden = step === 1 || bundle;
+  $('topoWizCancelBtn').hidden = bundle;
   const next = $('topoWizNext');
-  next.textContent = step === 3 ? tr('', 'Create the tunnel') : tr('', 'Next');
+  next.textContent = bundle ? tr('', 'Done') : (step === 3 ? tr('', 'Create the tunnel') : tr('', 'Next'));
   next.disabled = step === 1 && !topoWiz.type;
   topoWizError('');
   if (step === 1) topoWizRenderTypes();
   else if (step === 2) topoWizRenderFields();
+  else if (bundle) topoWizRenderBundle();
   else topoWizRenderReview();
 }
 function topoWizRenderTypes() {
@@ -568,6 +594,12 @@ function topoWizRenderFields() {
       + topoWizInput('topoWizFPort', tr('', 'FRP bind port'), String(v.port || 55400), 'type="number" min="1" inputmode="numeric"')
       + topoWizInput('topoWizFPool', tr('', 'Pool size'), String(v.pool || 25), 'type="number" min="1" inputmode="numeric"')
       + topoWizCheckbox('topoWizFUdp', 'UDP', !!v.udp);
+  } else if (t.id === 'matrix' && topoWizForeignSide()) {
+    // Node side: this server joins an existing hub mesh, so the wizard asks
+    // for the hub bundle instead of the hub's mesh settings.
+    html = `<p class="qs-hint u-m-0">${esc(tr('', 'On the Iran server, create the Matrix tunnel, copy the bundle it shows, and paste it here.'))}</p>`
+      + `<div class="fg"><label class="qs-label" for="topoWizFBundle">${esc(tr('', 'Enter the hub bundle here'))}</label>`
+      + `<textarea class="quantum-input u-mono topo-wiz-bundle" id="topoWizFBundle" rows="6" dir="ltr" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="hmx1_...">${esc(v.bundle || '')}</textarea></div>`;
   } else if (t.id === 'matrix') {
     html = topoWizSelect('topoWizFFamily', tr('', 'Family'), v.family || 'ipv4', [['ipv4', 'IPv4'], ['ipv6', 'IPv6']])
       + (v.family === 'ipv6' ? topoWizInput('topoWizFAddr', tr('', 'This server\'s IPv6 address'), v.addr || '', 'dir="ltr"') : '')
@@ -613,12 +645,23 @@ function topoWizRead() {
   const portEl = $('topoWizFPort');
   const wt = topoWizType();
   if (portEl && wt && wt.id === 'matrix' && String(portEl.value).trim() === '') v.port = 0;
+  // The hub bundle textarea reads as-is (trimmed): clearing the field must
+  // clear the stored bundle too, so validation cannot pass on a stale paste.
+  const bundleEl = $('topoWizFBundle');
+  if (bundleEl) v.bundle = String(bundleEl.value || '').trim();
 }
 function topoWizValidate() {
   const t = topoWizType(), v = topoWiz.values;
   if (!t) return tr('', 'Choose the tunnel type');
   if (t.id !== 'matrix' && !v.remote) return tr('', 'Enter the foreign server public IP.');
   if ((t.id === 'bagher' || t.id === 'xray') && !v.ports) return tr('', 'Enter at least one port to forward, for example 443, 8443.');
+  if (t.id === 'matrix' && topoWizForeignSide()) {
+    // Node side: validate the pasted bundle inline, before any API call.
+    const b = String(v.bundle || '').trim();
+    if (!b) return tr('', 'Paste the hub bundle from the Iran server.');
+    if (!/^hmx1_/.test(b)) return tr('', 'The bundle must start with hmx1_.');
+    return '';
+  }
   // The Matrix mesh port is optional: blank/0 asks the server to pick a free one.
   if (t.id === 'matrix') {
     if (v.port && (v.port < 0 || v.port > 65535)) return tr('', 'Enter a port number.');
@@ -649,10 +692,14 @@ function topoWizRenderReview() {
     rows.push([tr('', 'Pool size'), String(v.pool || 25)]);
     if (v.udp) rows.push(['UDP', tr('', 'On')]);
   } else if (t.id === 'matrix') {
-    rows.push([tr('', 'Family'), (v.family || 'ipv4').toUpperCase()]);
-    if (v.family === 'ipv6' && v.addr) rows.push([tr('', 'This server\'s IPv6 address'), v.addr]);
-    rows.push([tr('', 'Mesh port'), v.port ? String(v.port) : tr('', 'Automatic')]);
-    if (v.ports) rows.push([tr('', 'Forwarded ports'), v.ports]);
+    if (topoWizForeignSide()) {
+      rows.push([tr('', 'Hub bundle'), v.bundle ? String(v.bundle).slice(0, 21) + '…' : '']);
+    } else {
+      rows.push([tr('', 'Family'), (v.family || 'ipv4').toUpperCase()]);
+      if (v.family === 'ipv6' && v.addr) rows.push([tr('', 'This server\'s IPv6 address'), v.addr]);
+      rows.push([tr('', 'Mesh port'), v.port ? String(v.port) : tr('', 'Automatic')]);
+      if (v.ports) rows.push([tr('', 'Forwarded ports'), v.ports]);
+    }
   } else {
     if (v.name) rows.push([tr('', 'Tunnel name'), v.name]);
     rows.push([tr('', 'Mode'), tr('', v.mode === 'reverse' ? 'Reverse' : 'Direct')]);
@@ -663,8 +710,43 @@ function topoWizRenderReview() {
   }
   $('topoWizBody').innerHTML = `<div class="topo-wiz-review">${rows.map(r => topoWizRow(r[0], r[1])).join('')}</div>`;
 }
+// Final hub-side screen: the bundle /api/matrix/setup returned, ready to copy
+// to the foreign server. Readonly and monospace so a triple-click selects the
+// whole bundle even without the copy button.
+function topoWizRenderBundle() {
+  if (!topoWiz) return;
+  const bundle = String(topoWiz.bundle || '');
+  $('topoWizBody').innerHTML = `<p class="qs-hint u-m-0">${esc(tr('', 'The Matrix tunnel is ready.'))}</p>`
+    + `<div class="fg"><label class="qs-label" for="topoWizBundleOut">${esc(tr('', 'Matrix bundle'))}</label>`
+    + `<textarea class="quantum-input u-mono topo-wiz-bundle" id="topoWizBundleOut" rows="6" readonly dir="ltr" spellcheck="false" autocapitalize="off" autocomplete="off">${esc(bundle)}</textarea></div>`
+    + `<p class="qs-hint u-m-0">${esc(tr('', 'Copy this bundle and paste it on the foreign server, in the new-tunnel wizard under Matrix.'))}</p>`
+    + `<div class="topo-wiz-bundle-actions"><button type="button" class="quantum-btn quantum-btn-primary" id="topoWizCopyBundle">${esc(tr('', 'Copy bundle'))}</button></div>`;
+  const out = $('topoWizBundleOut');
+  if (out) out.value = bundle;
+  const btn = $('topoWizCopyBundle');
+  if (btn) btn.onclick = () => {
+    let copied = false;
+    // app.js ships copyTextSafe (clipboard API plus fallbacks); the direct
+    // navigator.clipboard branch is only a safety net for bare embeds.
+    if (typeof copyTextSafe === 'function') {
+      copyTextSafe(bundle, tr('', 'Bundle copied'), tr('', 'Paste it on the foreign server.'));
+      copied = true;
+    } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(bundle).then(() => {}, () => {});
+      copied = true;
+    }
+    if (!copied) return;
+    btn.textContent = tr('', 'Copied ✓');
+    setTimeout(() => { btn.textContent = tr('', 'Copy bundle'); }, 2000);
+  };
+}
 function topoWizNext() {
   if (!topoWiz || topoWizBusy) return;
+  if (topoWizOnBundle()) { // «Done» closes the wizard from the bundle screen
+    topoWiz = null;
+    topoWizHide();
+    return;
+  }
   topoWizRead();
   if (topoWiz.step === 1) {
     if (!topoWiz.type) { topoWizError(tr('', 'Choose the tunnel type')); return; }
@@ -677,7 +759,7 @@ function topoWizNext() {
   topoWizRender();
 }
 function topoWizBack() {
-  if (!topoWiz || topoWizBusy || topoWiz.step === 1) return;
+  if (!topoWiz || topoWizBusy || topoWiz.step === 1 || topoWizOnBundle()) return;
   topoWizRead(); // Back keeps everything typed so far
   topoWiz.step = Math.max(1, topoWiz.step - 1);
   topoWizRender();
@@ -732,22 +814,28 @@ async function topoWizCreate() {
         frp_bind_port: v.port || 55400, name: v.name || undefined
       });
     } else if (t.id === 'matrix') {
-      // Multiple Matrix instances: with none on this server use the legacy
-      // body (no instance field); otherwise ask for a fresh isolated one.
-      let instance = '';
-      try {
-        const st = await api('/api/matrix/instances');
-        const list = Array.isArray(st) ? st : ((st && st.instances) || []);
-        if (list.length) instance = 'next';
-      } catch (_) { /* endpoint unavailable: keep the legacy first-instance path */ }
-      // port 0 = "pick a free mesh port automatically": 443-style defaults
-      // made setups fail wherever the default port was already taken.
-      const mxBody = {
-        family: v.family || 'ipv4', port: Number(v.port) || 0,
-        ports: topoWizPortsList(), addr: v.family === 'ipv6' ? (v.addr || '') : ''
-      };
-      if (instance) mxBody.instance = instance;
-      mxResult = await api('/api/matrix/setup', mxBody);
+      if (topoWizForeignSide()) {
+        // Node side: pair with the hub using the pasted bundle. Calling
+        // /api/matrix/setup here would wrongly create a second hub mesh.
+        mxResult = await api('/api/matrix/foreign-setup', { bundle: String(v.bundle || '').trim() });
+      } else {
+        // Multiple Matrix instances: with none on this server use the legacy
+        // body (no instance field); otherwise ask for a fresh isolated one.
+        let instance = '';
+        try {
+          const st = await api('/api/matrix/instances');
+          const list = Array.isArray(st) ? st : ((st && st.instances) || []);
+          if (list.length) instance = 'next';
+        } catch (_) { /* endpoint unavailable: keep the legacy first-instance path */ }
+        // port 0 = "pick a free mesh port automatically": 443-style defaults
+        // made setups fail wherever the default port was already taken.
+        const mxBody = {
+          family: v.family || 'ipv4', port: Number(v.port) || 0,
+          ports: topoWizPortsList(), addr: v.family === 'ipv6' ? (v.addr || '') : ''
+        };
+        if (instance) mxBody.instance = instance;
+        mxResult = await api('/api/matrix/setup', mxBody);
+      }
     } else {
       const profile = typeof xrPresetOf === 'function' ? xrPresetOf('reality') : { security: 'reality' };
       await api('/api/xray', {
@@ -769,8 +857,21 @@ async function topoWizCreate() {
     if (t.id === 'matrix' && mxResult && mxResult.port) {
       toastOk(tr('', 'Matrix mesh port: {port}').replace('{port}', String(mxResult.port)));
     }
-    topoWiz = null;
-    topoWizHide();
+    if (t.id === 'matrix' && topoWizForeignSide()) {
+      toastOk(tr('', 'Matrix tunnel connected to the hub.'));
+      topoWiz = null;
+      topoWizHide();
+    } else if (t.id === 'matrix' && mxResult && mxResult.bundle) {
+      // Hub side: the tunnel exists but is useless until its bundle is pasted
+      // on the foreign server, so the wizard ends on a bundle hand-off screen
+      // instead of closing.
+      topoWiz.bundle = String(mxResult.bundle);
+      topoWiz.step = topoWizSteps().length;
+      topoWizRender();
+    } else {
+      topoWiz = null;
+      topoWizHide();
+    }
   } catch(e) {
     topoWizError(e.message);
     // Self-explanatory API errors (the mesh-port code already names the port
@@ -780,7 +881,9 @@ async function topoWizCreate() {
   } finally {
     topoWizBusy = false;
     btn.disabled = false;
-    btn.textContent = oldTxt;
+    // The bundle hand-off screen renames the primary button to «Done»; keep
+    // that label instead of restoring the pre-create caption over it.
+    btn.textContent = (topoWiz && topoWiz.bundle) ? tr('', 'Done') : oldTxt;
   }
 }
 function topologyNewTunnel() {

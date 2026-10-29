@@ -14,7 +14,8 @@ function el(id) {
 }
 let calls=[];
 const sandbox={
- assert, console, Set, document:{activeElement:null,querySelectorAll(){return []}},
+ // addEventListener/querySelector keep the document-level wiring in topology.js (menus, Escape) loadable
+ assert, console, Set, document:{activeElement:null,querySelectorAll(){return []},querySelector(){return null},addEventListener(){}},
  window:{_lastLocal:{role:'iran (matrix hub)',local_pub:'185.226.119.74'}},
  $:el, el, tr:(_k,fb)=>fb, esc:s=>String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'),
  _tunnelDetail:null, applyTunnelDetail(){},renderTunnelsList(){},toastErr(){},toastOk(){},toastWarn(){},goTab(){},setRole(){},openTunnelDetail(){},

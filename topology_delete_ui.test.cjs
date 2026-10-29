@@ -22,7 +22,9 @@ function harness(topologies, tunnels, { fa = false, confirm = true, conflict = f
     return elements.get(id);
   }
   const sandbox = {
-    window: {}, document: { activeElement: null, hidden: false, querySelectorAll() { return []; } },
+    // addEventListener/querySelector keep the document-level wiring in
+    // topology.js (menus, Escape handling) loadable inside the sandbox.
+    window: {}, document: { activeElement: null, hidden: false, querySelectorAll() { return []; }, querySelector() { return null; }, addEventListener() {} },
     $: el, _tunnelDetail: null, setInterval() {}, renderTunnelsList() {},
     esc: value => String(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'),
     toastWarn: (message, sub) => warnings.push([message, sub]), toastErr: (...args) => errors.push(args),
