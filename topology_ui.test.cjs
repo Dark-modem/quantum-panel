@@ -163,7 +163,7 @@ topologyData={topologies:[topo],tunnels:one};
 // Tunnels and Actions on fixed tracks, and the embedded flags get a fixed
 // footprint so they line up with the mono IP in both directions.
 const entCss=fs.readFileSync(path.join(__dirname,'enterprise.css'),'utf8');
-assert.ok(/\.topo-list-head\s*,\s*\.topo-list-row\s*\{[^}]*grid-template-columns\s*:[^;}]*minmax\(0,[^;}]*72px\s+176px/.test(entCss),'shared grid strips content minimums and fixes the Tunnels/Actions tracks');
+assert.ok(/\.topo-list-head\s*,\s*\.topo-list-row\s*\{[^}]*grid-template-columns\s*:[^;}]*minmax\(0,[^;}]*72px\s+152px/.test(entCss),'shared grid strips content minimums and fixes the Tunnels/Actions tracks');
 assert.ok(/\.topo-list-head\s+th:nth-child\(4\)\s*\{[^}]*text-align\s*:\s*center/.test(entCss),'Tunnels header is centred over its column');
 assert.ok(/\.topo-list-head\s+th:nth-child\(5\)\s*\{[^}]*text-align\s*:\s*end/.test(entCss),'Actions header is end-aligned like its buttons');
 assert.ok(/\.topo-flag-svg\s*\{[^}]*width\s*:\s*20px[^}]*height\s*:\s*14px/.test(entCss),'embedded flags keep a fixed 20x14 footprint');

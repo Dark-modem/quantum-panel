@@ -1194,14 +1194,17 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
    three tracks are pure fr (minmax(0,…) strips content-based minimums, the
    usual source of header/body drift); Tunnels and Actions are fixed so the
    header can never drift against a row. */
-.topo-list-head, .topo-list-row { display:grid; grid-template-columns:minmax(0,1.05fr) minmax(0,1.2fr) minmax(0,1.2fr) 72px 176px; gap:14px; align-items:center; padding:14px 18px; }
+.topo-list-head, .topo-list-row { display:grid; grid-template-columns:minmax(0,1.05fr) minmax(0,1.2fr) minmax(0,1.2fr) 72px 152px; gap:14px; align-items:center; padding:14px 18px; }
 .topo-list-head { background:var(--s2); border-bottom:1px solid var(--ln); }
 .topo-list-head th { min-width:0; padding:0; color:var(--mu); font-size:var(--fs-caption); font-weight:650; text-align:start; text-transform:uppercase; letter-spacing:.07em; }
 /* Tunnels count sits centred under its header; Actions hugs the end edge in
-   both header and rows so LTR and RTL align the same way. */
+   both header and rows so LTR and RTL align the same way. The actions column
+   is 8px narrower than the row's inset so the buttons tuck into the corner. */
 .topo-list-head th:nth-child(4) { text-align:center; white-space:nowrap; }
 .topo-list-row .topo-cell-tunnels { text-align:center; }
 .topo-list-head th:nth-child(5) { text-align:end; }
+.topo-list-table:not(.topo-grid) .topo-list-head th:nth-child(5),
+.topo-list-table:not(.topo-grid) .topo-cell-actions { margin-inline-end:-8px; }
 .topo-list-row { min-height:76px; border-bottom:1px solid var(--ln); transition:background .15s; cursor:pointer; }
 .topo-list-row:last-child { border-bottom:0; }
 .topo-list-row:hover { background:var(--sunk); }

@@ -133,8 +133,8 @@ func TestTopologyListSharedResponsiveColumns(t *testing.T) {
 	}
 	// Tunnels and Actions sit on fixed tracks so the headers stay over their
 	// cells no matter how the flexible name/endpoints columns squeeze.
-	if !regexp.MustCompile(`grid-template-columns\s*:[^}]*72px\s+176px`).MatchString(shared[1]) {
-		t.Error("shared grid must keep fixed 72px (Tunnels) and 176px (Actions) tracks")
+	if !regexp.MustCompile(`grid-template-columns\s*:[^}]*72px\s+152px`).MatchString(shared[1]) {
+		t.Error("shared grid must keep fixed 72px (Tunnels) and 152px (Actions) tracks")
 	}
 
 	media := regexp.MustCompile(`@media\s*\(\s*max-width\s*:\s*799px\s*\)`).FindStringIndex(css)
