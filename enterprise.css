@@ -1272,25 +1272,29 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
    well, health-colored cables, halo'd labels, legend row below */
 .topo-map { display:grid; gap:8px; }
 .topo-map-scroll { overflow-x:auto; border:1px solid var(--ln); border-radius:var(--r-md); background:var(--sunk); direction:ltr; }
-.topo-graph { display:block; width:100%; min-width:640px; height:auto; user-select:none; overflow:visible; font-family:inherit; }
+/* The map never stretches past its natural width: on wide screens it stays
+   near 1:1 and centers in the well instead of ballooning the type. */
+.topo-graph { display:block; width:100%; max-width:900px; min-width:640px; margin-inline:auto; height:auto; user-select:none; overflow:visible; font-family:inherit; }
+.topo-graph text { font-family:inherit; }
 .topo-node { outline:none; }
 .topo-n-bg { fill:var(--s1); stroke:var(--ln2); stroke-width:1.5; transition:stroke var(--dur-fast) ease; }
 .topo-node:hover > .topo-n-bg, .topo-node:focus-visible > .topo-n-bg { stroke:var(--ac); }
 .topo-cap { fill:var(--mu); font-size:12px; }
-.topo-t1 { fill:var(--tx); font-size:15px; font-weight:600; }
-.topo-ip { fill:var(--mu); font-size:13px; font-variant-numeric:tabular-nums; }
+.topo-t1 { fill:var(--tx); font-size:16px; font-weight:600; }
+.topo-ip { fill:var(--mu); font-size:13px; font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
 .topo-dot.ok { fill:var(--ok); } .topo-dot.warn { fill:var(--wr); }
-.topo-dot.err { fill:var(--er); } .topo-dot.off { fill:var(--mu); }
+.topo-dot.err { fill:var(--er); }
 .topo-e-hit { fill:none; stroke:transparent; stroke-width:16; }
 .topo-cable .topo-e-line { fill:none; stroke-linecap:round; stroke-width:3; transition:stroke var(--dur-fast) ease; }
 .topo-cable.topo-ok .topo-e-line { stroke:var(--ok); }
 .topo-cable.topo-warn .topo-e-line { stroke:var(--wr); stroke-dasharray:8 6; }
 .topo-cable.topo-err .topo-e-line { stroke:var(--er); stroke-dasharray:3 7; }
+.topo-cable.topo-idle .topo-e-line { stroke:var(--mu); stroke-dasharray:2 7; opacity:.5; }
 .topo-cable:hover .topo-e-line, .topo-cable:focus-visible .topo-e-line { stroke:var(--ac); }
 .topo-e-flow { fill:none; stroke:var(--tx); stroke-opacity:.45; stroke-width:2; stroke-dasharray:3 13; animation:cl-flow 1s linear infinite; pointer-events:none; }
 @media (prefers-reduced-motion: reduce) { .topo-e-flow { display:none; } }
 .topo-e-tag { fill:var(--tx); font-size:12px; font-weight:600; text-anchor:middle; paint-order:stroke; stroke:var(--sunk); stroke-width:4px; pointer-events:none; }
-.topo-empty { fill:var(--mu)!important; font-size:14px; }
+.topo-empty { fill:var(--mu)!important; font-size:13px; font-weight:600; text-anchor:middle; paint-order:stroke; stroke:var(--sunk); stroke-width:4px; }
 @media(max-width:799px) {
   .topo-list-table thead { display:none; }
   .topo-list-row { grid-template-columns:minmax(0,1fr); gap:12px; padding:16px; }

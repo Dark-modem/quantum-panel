@@ -42,7 +42,9 @@ assert.ok(designed.includes('topo-e-flow'),'healthy cables carry the flow animat
 assert.ok(!topologyGraph(topo,five.slice(1)).includes('topo-e-flow'),'down cables never animate flow');
 assert.ok(designed.includes('topo-dot ok'),'all-healthy tunnels light the node dot green');
 assert.ok(topologyGraph(topo,five).includes('topo-dot warn'),'mixed tunnel health marks the node dot warn');
-assert.ok(topologyGraph(topo,[]).includes('topo-dot off'),'no tunnels leaves the node dot muted');
+const empty=topologyGraph(topo,[]);
+assert.ok(!empty.includes('topo-dot'),'no tunnels hides the health dot instead of a dead grey one');
+assert.ok(empty.includes('topo-idle')&&empty.includes('No tunnel attached yet'),'the empty state draws a quiet placeholder cable with its label');
 assert.ok(designed.includes('topo-flag-svg'),'graph nodes embed the flag as inline SVG, not emoji in <text>');
 assert.ok(topologyGraph({...topo,country:'de'},one).includes('#000000')&&topologyGraph({...topo,country:'de'},one).includes('#dd0000'),'foreign graph node draws the chosen country flag');
 assert.equal(topologyTunnelKey(2),'peer:2');assert.equal(topologyKind('peer:2'),2);

@@ -183,10 +183,12 @@ function topologyGraph(topo, tunnels) {
   const foreign = topo.role === 'foreign' ? topo.local_ip : topo.remote_ip;
   // Same drawing language as the cluster map: rounded node cards on a sunken
   // well, cubic cables whose color and dash carry the tunnel health, and a
-  // halo'd label on every cable so it stays readable where lines cross.
-  const W = 800, NW = 240, NH = 96, ix = 30, fx = W - 30 - NW, GAP = 90;
+  // halo'd label on every cable so it stays readable where lines cross. The
+  // svg never stretches past its natural width (the CSS caps .topo-graph), so
+  // the cards keep their proportions and the type stays crisp on wide screens.
+  const W = 840, NW = 260, NH = 104, ix = 40, fx = W - 40 - NW, GAP = 100;
   const n = tunnels.length;
-  const H = n ? Math.max(260, 150 + n * 54) : 240;
+  const H = n ? Math.max(250, 140 + n * 54) : 210;
   const cy = H / 2;
   const stateOf = t => {
     const s = String(t.state || '');
@@ -194,7 +196,7 @@ function topologyGraph(topo, tunnels) {
       : ['down', 'err', 'stopped'].includes(s) ? 'err' : 'warn';
   };
   const kinds = tunnels.map(stateOf);
-  const nodeKind = !n ? 'off' : kinds.every(k => k === 'ok') ? 'ok' : kinds.every(k => k === 'err') ? 'err' : 'warn';
+  const nodeKind = !n ? '' : kinds.every(k => k === 'ok') ? 'ok' : kinds.every(k => k === 'err') ? 'err' : 'warn';
   const cables = tunnels.map((t, i) => {
     const y = cy + (i - (n - 1) / 2) * 54;
     const d = `M ${ix + NW} ${cy} C ${ix + NW + GAP} ${y}, ${fx - GAP} ${y}, ${fx} ${cy}`;
@@ -210,21 +212,27 @@ function topologyGraph(topo, tunnels) {
   const cc = String(topo.country || '').toLowerCase();
   const countryLabel = (TOPO_COUNTRIES.find(c => c[0] === cc) || ['', 'Other'])[1];
   const top = cy - NH / 2;
+  // No tunnels means there is no health to show: the dot stays hidden and a
+  // quiet dashed placeholder links the pair instead of an empty void.
+  const dot = x => nodeKind ? `<circle class="topo-dot ${nodeKind}" cx="${x + 20}" cy="${top + 27}" r="5"/>` : '';
+  const flagX = x => nodeKind ? x + 34 : x + 20;
+  const capX = x => nodeKind ? x + 62 : x + 48;
   const node = (x, caption, title, ip, flag) =>
     `<g class="topo-node"><title>${text(title)} · ${text(ip)}</title>` +
     `<rect class="topo-n-bg" x="${x}" y="${top}" width="${NW}" height="${NH}" rx="12"/>` +
-    `<circle class="topo-dot ${nodeKind}" cx="${x + 18}" cy="${top + 24}" r="5"/>` +
-    topologyFlagSvg(flag, `x="${x + 28}" y="${top + 17}"`) +
-    `<text class="topo-cap" x="${x + 54}" y="${top + 28}">${caption}</text>` +
-    `<text class="topo-t1" x="${x + 16}" y="${top + 52}">${text(title)}</text>` +
-    `<text class="topo-ip" x="${x + 16}" y="${top + 74}">${text(ip)}</text>` +
+    dot(x) +
+    topologyFlagSvg(flag, `x="${flagX(x)}" y="${top + 20}"`) +
+    `<text class="topo-cap" x="${capX(x)}" y="${top + 31}">${caption}</text>` +
+    `<text class="topo-t1" x="${x + 18}" y="${top + 60}">${text(title)}</text>` +
+    `<text class="topo-ip" x="${x + 18}" y="${top + 84}">${text(ip)}</text>` +
     `</g>`;
   return `<div class="topo-map"><div class="topo-map-scroll">` +
     `<svg class="topo-graph" viewBox="0 0 ${W} ${H}" role="img" aria-label="${text(tr('', 'Topology connections'))}" dir="ltr">` +
+    (n ? '' : `<g class="topo-cable topo-idle"><path class="topo-e-line" d="M ${ix + NW} ${cy} C ${ix + NW + GAP} ${cy}, ${fx - GAP} ${cy}, ${fx} ${cy}"/></g>` +
+      `<text class="topo-empty" x="${W / 2}" y="${cy - 10}" text-anchor="middle">${text(tr('', 'No tunnel attached yet'))}</text>`) +
     cables +
     node(ix, esc(tr('', 'Iran')), tr('', 'Iran server'), iran, 'ir') +
     node(fx, esc(tr('', countryLabel)), tr('', 'Foreign server'), foreign, topo.country) +
-    (n ? '' : `<text class="topo-empty" x="${W / 2}" y="${cy + 4}" text-anchor="middle">${text(tr('', 'No tunnel attached yet'))}</text>`) +
     `</svg></div>` +
     `<div class="cl-legend">` +
     `<span><i class="ok"></i>${esc(tr('', 'Connected'))}</span>` +
