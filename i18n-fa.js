@@ -3143,11 +3143,15 @@ window.FA_TEXT = {
 "Copy this bundle and paste it on the foreign server, in the new-tunnel wizard under Matrix.": "این باندل را کپی کنید و در سرور خارج، در ویزارد ایجاد تونل ← ماتریکس، وارد کنید.",
 "Copied ✓": "کپی شد ✓",
 "Enter the hub bundle here": "باندل هاب را اینجا وارد کنید",
-"On the Iran server, create the Matrix tunnel, copy the bundle it shows, and paste it here.": "در سرور ایران تونل ماتریکس را بسازید، باندلی که نشان می‌دهد را کپی کنید و اینجا بچسبانید.",
 "Hub bundle": "باندل هاب",
 "Paste the hub bundle from the Iran server.": "باندل هاب را از سرور ایران وارد کنید.",
-"The bundle must start with hmx1_.": "باندل باید با hmx1_ شروع شود.",
 "Matrix tunnel connected to the hub.": "تونل ماتریس به هاب متصل شد.",
 "Local mesh port: {port}": "پورت مش محلی: {port}",
-"Stealth tunnel over an SSH connection pool.": "تونل پنهان‌کار روی استخر اتصال SSH."
+"Stealth tunnel over an SSH connection pool.": "تونل پنهان‌کار روی استخر اتصال SSH.",
+"Create": "ایجاد",
+"Matrix": "ماتریکس",
+"Everything is detected from the bundle: the tunnel type, the server and the ports.": "همه‌چیز از باندل تشخیص داده می‌شود: نوع تونل، سرور و پورت‌ها.",
+"Copy the bundle from the Iran server and paste it here.": "باندل را از سرور ایران کپی کنید و اینجا بچسبانید.",
+"Detected: {engine}": "تشخیص داده شد: {engine}",
+"Unrecognised bundle: it must start with hmx1_, hsh1_, bh1_, gh1_ or BAGHER:.": "باندل شناخته نشد: باید با hmx1_، hsh1_، bh1_، gh1_ یا BAGHER: شروع شود."
 };

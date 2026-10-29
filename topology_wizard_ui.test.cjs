@@ -8,6 +8,12 @@ const source = fs.readFileSync(path.join(__dirname, 'topology.js'), 'utf8');
 const faSource = fs.readFileSync(path.join(__dirname, 'i18n-fa.js'), 'utf8');
 const pageSource = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 const cssSource = fs.readFileSync(path.join(__dirname, 'enterprise.css'), 'utf8');
+// The foreign bundle flow sends the very request app.js's Setup-tab Connect
+// builds: extract the real join builder (plus its IP helpers) instead of
+// re-implementing it, so the wizard tests prove the shared code path.
+const appSource = fs.readFileSync(path.join(__dirname, 'app.js'), 'utf8');
+const joinCode = appSource.slice(appSource.indexOf('const isIPv4'), appSource.indexOf('// jsArg renders'))
+  + '\n' + appSource.slice(appSource.indexOf('function parseBundleClient'), appSource.indexOf('function joinBundleSync'));
 
 function harness({ fa = false, topologies, tunnels, failOn, failCode, failMessage, instances = [], localRole = '', foreignPort = 0 } = {}) {
   const elements = new Map();
@@ -15,7 +21,7 @@ function harness({ fa = false, topologies, tunnels, failOn, failCode, failMessag
   let created = null;
   function el(id) {
     if (!elements.has(id)) elements.set(id, {
-      hidden: false, disabled: false, value: '', textContent: '', innerHTML: '', dataset: {},
+      hidden: false, disabled: false, value: id === 'jFRPTransport' ? 'tcp' : id === 'jDial' ? 'auto' : '', textContent: '', innerHTML: '', dataset: {},
       classList: { _s: new Set(), toggle(c, v) { if (v === undefined) this._s.has(c) ? this._s.delete(c) : this._s.add(c); else v ? this._s.add(c) : this._s.delete(c); }, add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); }, contains(c) { return this._s.has(c); } },
       contains() { return false; },
       addEventListener(type, cb) { this[type] = cb; }
@@ -38,9 +44,12 @@ function harness({ fa = false, topologies, tunnels, failOn, failCode, failMessag
     esc: v => String(v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'),
     toastOk: (...a) => toasts.push(['ok', ...a]), toastErr: (...a) => toasts.push(['err', ...a]), toastWarn: (...a) => toasts.push(['warn', ...a]),
     entConfirm: async () => true,
+    // LS_ENGINE backs the extracted `const JOIN_ENGINE = LS_ENGINE;` line.
+    LS_ENGINE: { frp: 'GRE + FRP', backhaul: 'Backhaul (no GRE)', 'gre-backhaul': 'Backhaul (with GRE)', bagher: 'Bagher' },
     api: async (url, body, method) => {
-      calls.push({ url, body, method: method || 'POST' });
-      if (failOn && failOn(url, body, method)) {
+      const m = method || (body ? 'POST' : 'GET'); // mirrors the real api() defaulting
+      calls.push({ url, body, method: m });
+      if (failOn && failOn(url, body, m)) {
         const err = new Error(failMessage || 'boom');
         if (failCode) err.code = failCode;
         throw err;
@@ -50,7 +59,8 @@ function harness({ fa = false, topologies, tunnels, failOn, failCode, failMessag
         if (created && !tunnels.some(t => t.id === created.id)) tunnels = [...tunnels, created];
         return { topologies, tunnels };
       }
-      const mk = (!method || method === 'POST') && NEW_BY_URL[url];
+      if (!body && !method) return {}; // a bodyless call is a GET: creates nothing
+      const mk = NEW_BY_URL[url];
       if (mk) { created = mk(body || {}); return created; }
       return {};
     }
@@ -60,6 +70,7 @@ function harness({ fa = false, topologies, tunnels, failOn, failCode, failMessag
   vm.createContext(sandbox);
   vm.runInContext(faSource, sandbox, { filename: 'i18n-fa.js' });
   sandbox.tr = (_k, fb) => fa ? (sandbox.window.FA_TEXT[fb] || fb) : fb;
+  vm.runInContext(joinCode, sandbox, { filename: 'app.js [join builder]' });
   vm.runInContext(source, sandbox, { filename: 'topology.js' });
   vm.runInContext(`topologyData = ${JSON.stringify({ topologies, tunnels })};`, sandbox);
   vm.runInContext("topologySelected = " + JSON.stringify(topologies[0] ? topologies[0].id : null) + ";", sandbox);
@@ -340,9 +351,13 @@ test('wizard strings carry unique Persian translations', () => {
     'Matrix mesh port: {port}',
     'Bundle', 'The Matrix tunnel is ready.', 'Matrix bundle', 'Done', 'Copy bundle', 'Copied ✓',
     'Copy this bundle and paste it on the foreign server, in the new-tunnel wizard under Matrix.',
-    'Enter the hub bundle here', 'On the Iran server, create the Matrix tunnel, copy the bundle it shows, and paste it here.',
-    'Hub bundle', 'Paste the hub bundle from the Iran server.', 'The bundle must start with hmx1_.',
-    'Matrix tunnel connected to the hub.', 'Local mesh port: {port}'];
+    'Enter the hub bundle here',
+    'Hub bundle', 'Paste the hub bundle from the Iran server.',
+    'Matrix tunnel connected to the hub.', 'Local mesh port: {port}',
+    'Create', 'Matrix',
+    'Everything is detected from the bundle: the tunnel type, the server and the ports.',
+    'Copy the bundle from the Iran server and paste it here.', 'Detected: {engine}',
+    'Unrecognised bundle: it must start with hmx1_, hsh1_, bh1_, gh1_ or BAGHER:.'];
   for (const key of keys) {
     assert.equal(faSource.split(JSON.stringify(key) + ':').length - 1, 1, `unique translation: ${key}`);
     assert.ok(map[key], `Persian entry exists: ${key}`);
@@ -353,11 +368,15 @@ test('wizard strings carry unique Persian translations', () => {
   assert.equal(h.el('topoWizProgress').textContent, map['Step {x} of {n}'].replace('{x}', '1').replace('{n}', '3'));
   h.sandbox.topoWizPick('matrix');
   assert.ok(h.el('topoWizBody').innerHTML.includes('پورت مش'), 'the mesh-port label renders in Persian');
-  // The node side renders its paste screen in Persian too.
-  const fh = harness({ fa: true, topologies: [topo()], tunnels: [], localRole: 'foreign (matrix node)' });
+  // The foreign side renders its bundle-only paste screen in Persian too.
+  const fh = harness({ fa: true, topologies: [topo()], tunnels: [], localRole: 'foreign' });
   fh.sandbox.topologyNewTunnel();
-  fh.sandbox.topoWizPick('matrix');
-  assert.ok(fh.el('topoWizBody').innerHTML.includes('باندل هاب را اینجا وارد کنید'), 'the node-side paste label renders in Persian');
+  assert.ok(fh.el('topoWizBody').innerHTML.includes('باندل هاب را اینجا وارد کنید'), 'the paste label renders in Persian');
+  assert.ok(fh.el('topoWizBody').innerHTML.includes('همه‌چیز از باندل تشخیص داده می‌شود'), 'the auto-detect hint renders in Persian');
+  assert.ok(fh.el('topoWizSteps').innerHTML.includes('ایجاد'), 'the Create step chip renders in Persian');
+  fh.el('topoWizFBundle').value = 'hsh1_192.0.2.10_25000_10.10.10.1_10.10.10.2_tok_443';
+  fh.el('topoWizFBundle').oninput();
+  assert.equal(fh.el('topoWizBundleChip').textContent, 'تشخیص داده شد: GRE + FRP', 'the detection chip renders with the detected engine');
 });
 
 test('with existing Matrix instances the wizard requests a fresh isolated one', async () => {
@@ -418,55 +437,81 @@ test('hub side: the Matrix wizard ends on a bundle hand-off screen with a copy b
   assert.ok(h.calls.find(c => c.method === 'PATCH'), 'the mesh tunnel is attached before the hand-off');
 });
 
-test('foreign side: the Matrix step asks for the hub bundle instead of mesh settings', () => {
-  const h = harness({ topologies: [topo()], tunnels: [], localRole: 'foreign (matrix node)' });
+// ---- Foreign side: bundle-only flow (every engine) ----
+
+test('foreign side: the wizard becomes bundle-only with Bundle → Review → Create steps', () => {
+  const h = harness({ topologies: [topo()], tunnels: [], localRole: 'foreign' });
   h.sandbox.topologyNewTunnel();
-  h.sandbox.topoWizPick('matrix');
+  assert.equal(h.wiz('topoWiz.step'), 1);
   const body = h.el('topoWizBody').innerHTML;
-  assert.ok(body.includes('id="topoWizFBundle"'), 'a large paste textarea replaces the mesh settings');
-  assert.ok(body.includes('Enter the hub bundle here'), 'the textarea is labelled for the hub bundle');
-  assert.ok(body.includes('hmx1_'), 'the hint names the bundle format');
-  assert.ok(!body.includes('id="topoWizFFamily"'), 'no family select on the node side');
-  assert.ok(!body.includes('id="topoWizFPort"'), 'no mesh port field on the node side');
-  assert.equal(h.el('topoWizProgress').textContent, 'Step 2 of 3', 'the node side keeps 3 steps, no extra bundle step');
-  assert.ok(!h.el('topoWizSteps').innerHTML.includes('data-wiz-step="4"'), 'no Bundle step in the header');
+  assert.ok(body.includes('id="topoWizFBundle"'), 'step 1 is a large paste field for the bundle');
+  assert.ok(body.includes('Everything is detected from the bundle'), 'the hint says everything is auto-detected');
+  assert.ok(!body.includes('data-wiz-type='), 'no type cards: the bundle decides the engine');
+  assert.equal(h.el('topoWizProgress').textContent, 'Step 1 of 3', 'three steps: Bundle, Review, Create');
+  const chips = h.el('topoWizSteps').innerHTML;
+  for (const label of ['Bundle', 'Review', 'Create']) assert.ok(chips.includes('>' + label + '<'), label + ' step listed');
+  assert.equal(h.el('topoWizBack').hidden, true, 'no Back on the paste step');
+  assert.equal(h.el('topoWizNext').disabled, false, 'Next is clickable so validation can explain what is missing');
 });
 
-test('foreign side: an empty or non-hmx1 bundle is rejected inline without an API call', () => {
-  const h = harness({ topologies: [topo()], tunnels: [], localRole: 'foreign (matrix node)' });
-  h.sandbox.topologyNewTunnel();
-  h.sandbox.topoWizPick('matrix');
-  h.sandbox.topoWizRead();
-  h.sandbox.topoWizNext(); // empty paste
-  assert.equal(h.wiz('topoWiz.step'), 2, 'stays on the paste step');
-  assert.ok(h.el('topoWizErr').textContent.length > 0, 'an inline error explains the empty bundle');
-  h.el('topoWizFBundle').value = '   \n  ';
-  h.sandbox.topoWizRead();
-  h.sandbox.topoWizNext(); // whitespace-only paste
-  assert.equal(h.wiz('topoWiz.step'), 2, 'whitespace counts as empty');
-  h.el('topoWizFBundle').value = 'bh1_notamatrixbundle';
-  h.sandbox.topoWizRead();
-  h.sandbox.topoWizNext(); // wrong bundle kind
-  assert.ok(h.el('topoWizErr').textContent.includes('hmx1_'), 'the error names the hmx1_ prefix');
-  assert.equal(h.wiz('topoWiz.step'), 2, 'still on the paste step');
-  assert.equal(h.calls.filter(c => c.url === '/api/matrix/foreign-setup').length, 0, 'no API call was made');
-  assert.equal(h.calls.filter(c => c.url === '/api/matrix/setup').length, 0, 'the hub setup is never called');
+test('foreign side: pasting any bundle shows the detected engine chip without an API call', () => {
+  for (const [raw, engine] of [
+    ['hmx1_QnVuZGxl', 'Matrix'],
+    ['hsh1_192.0.2.10_25000_10.10.10.1_10.10.10.2_tok_443', 'GRE + FRP'],
+    ['bh1_192.0.2.10_25000_tcpmux_tok_443,8443', 'Backhaul'],
+    ['gh1_192.0.2.10_25000_10.10.10.1_10.10.10.2_tcpmux_tok_443', 'Backhaul (with GRE)'],
+    ['BAGHER:{"ports":[443]}', 'Bagher']
+  ]) {
+    const h = harness({ topologies: [topo()], tunnels: [], localRole: 'foreign' });
+    h.sandbox.topologyNewTunnel();
+    h.el('topoWizFBundle').value = raw;
+    h.el('topoWizFBundle').oninput(); // live paste path
+    const chip = h.el('topoWizBundleChip');
+    assert.ok(!chip.classList._s.has('hidden'), 'chip visible for ' + raw.slice(0, 5));
+    assert.equal(chip.textContent, 'Detected: ' + engine, 'the chip names the engine for ' + raw.slice(0, 5));
+    assert.equal(h.el('topoWizErr').textContent, '', 'a valid paste shows no error');
+    assert.equal(h.calls.length, 0, 'detection makes zero API calls for ' + raw.slice(0, 5));
+  }
 });
 
-test('foreign side: a valid bundle pairs via foreign-setup, attaches, and closes', async () => {
+test('foreign side: an unknown, empty or malformed bundle errors inline with zero API calls', () => {
+  const h = harness({ topologies: [topo()], tunnels: [], localRole: 'foreign' });
+  h.sandbox.topologyNewTunnel();
+  // Live path: unknown prefix.
+  h.el('topoWizFBundle').value = 'totally-not-a-bundle';
+  h.el('topoWizFBundle').oninput();
+  assert.ok(h.el('topoWizErr').textContent.includes('hmx1_'), 'the error names the accepted prefixes');
+  assert.ok(h.el('topoWizBundleChip').classList._s.has('hidden'), 'no engine chip for junk');
+  // Next-click path: empty paste.
+  h.el('topoWizFBundle').value = '   ';
+  h.sandbox.topoWizRead();
+  h.sandbox.topoWizNext();
+  assert.equal(h.wiz('topoWiz.step'), 1, 'stays on the paste step');
+  assert.ok(h.el('topoWizErr').textContent.length > 0, 'an inline error explains the empty paste');
+  // Valid prefix but malformed payload (parsed by the shared app.js parser).
+  h.el('topoWizFBundle').value = 'bh1_notanip';
+  h.sandbox.topoWizRead();
+  h.sandbox.topoWizNext();
+  assert.equal(h.wiz('topoWiz.step'), 1, 'a malformed bundle stays on the paste step');
+  assert.ok(h.el('topoWizErr').textContent.length > 0, 'the parse error is shown inline');
+  assert.equal(h.calls.length, 0, 'zero API calls for invalid input');
+});
+
+test('foreign side: a Matrix bundle pairs via foreign-setup, attaches, and closes', async () => {
   const h = harness({ topologies: [topo()], tunnels: [], localRole: 'foreign (matrix node)' });
   h.sandbox.topologyNewTunnel();
-  h.sandbox.topoWizPick('matrix');
   h.el('topoWizFBundle').value = '  hmx1_QnVuZGxl \n';
-  h.sandbox.topoWizRead();
+  h.el('topoWizFBundle').oninput();
+  assert.equal(h.el('topoWizBundleChip').textContent, 'Detected: Matrix', 'the chip detects the Matrix bundle');
   h.sandbox.topoWizNext(); // review
-  assert.equal(h.wiz('topoWiz.step'), 3, 'a valid bundle reaches the review');
+  assert.equal(h.wiz('topoWiz.step'), 2, 'a valid bundle reaches the review');
   assert.ok(h.el('topoWizBody').innerHTML.includes('hmx1_QnVuZGxl'), 'the review shows the pasted bundle');
   await h.sandbox.topoWizNext(); // create
   const call = h.calls.find(c => c.url === '/api/matrix/foreign-setup');
   assert.ok(call, '/api/matrix/foreign-setup is called');
   assert.equal(call.body.bundle, 'hmx1_QnVuZGxl', 'the trimmed bundle is sent');
   assert.equal(h.calls.filter(c => c.url === '/api/matrix/setup').length, 0, 'the hub setup endpoint is never used on the node side');
+  assert.equal(h.calls.filter(c => c.url === '/api/setup').length, 0, 'the join endpoint is never used for a Matrix bundle');
   const patch = h.calls.find(c => c.method === 'PATCH');
   assert.ok(patch, 'the paired node tunnel is attached to the topology');
   assert.deepEqual(Array.from(patch.body.tunnel_ids), ['matrix'], 'the matrix inventory id attaches like on the hub');
@@ -481,7 +526,6 @@ test('foreign side: a shifted local mesh port is appended to the pairing toast',
   // is the hub's); the pairing toast must say so in the same message.
   const h = harness({ topologies: [topo()], tunnels: [], localRole: 'foreign (matrix node)', foreignPort: 21001 });
   h.sandbox.topologyNewTunnel();
-  h.sandbox.topoWizPick('matrix');
   h.el('topoWizFBundle').value = 'hmx1_QnVuZGxl';
   h.sandbox.topoWizRead();
   h.sandbox.topoWizNext();
@@ -490,4 +534,122 @@ test('foreign side: a shifted local mesh port is appended to the pairing toast',
   assert.ok(toast, 'the pairing success toast is shown');
   assert.ok(String(toast[1]).includes('Local mesh port: 21001'), 'the toast appends the node-local mesh port, got ' + JSON.stringify(h.toasts));
   assert.ok(!h.toasts.some(t => String(t[1]).includes('Matrix mesh port:')), 'no separate hub-style mesh-port toast on the node side');
+});
+
+for (const [raw, kind, endpoint, newId] of [
+  ['hsh1_192.0.2.10_25000_10.10.10.1_10.10.10.2_tok_443', 'GRE + FRP', '/api/setup', 'main'],
+  ['bh1_192.0.2.10_25000_tcpmux_tok_443,8443', 'Backhaul', '/api/setup', 'main'],
+  ['gh1_192.0.2.10_25000_10.10.10.1_10.10.10.2_tcpmux_tok_443', 'Backhaul (with GRE)', '/api/setup', 'main'],
+  ['BAGHER:{"ports":[443]}', 'Bagher', '/api/sshfwd', 'bagher-1']
+]) {
+  test(`foreign side: a ${kind} bundle creates via ${endpoint}, attaches and closes`, async () => {
+    const h = harness({ topologies: [topo()], tunnels: [], localRole: 'foreign' });
+    h.sandbox.topologyNewTunnel();
+    h.el('topoWizFBundle').value = raw;
+    h.sandbox.topoWizRead();
+    h.sandbox.topoWizNext(); // review
+    assert.equal(h.wiz('topoWiz.step'), 2, 'a valid bundle reaches the review');
+    const review = h.el('topoWizBody').innerHTML;
+    assert.ok(review.includes(kind), 'the review names the detected engine');
+    if (endpoint === '/api/setup') {
+      assert.ok(review.includes('192.0.2.10'), 'the review shows the Iran server from the parsed bundle');
+    } else {
+      // Bagher bundles are opaque: the review shows the kind and a preview,
+      // and the server validates the payload on apply.
+      assert.ok(review.includes(raw.slice(0, 7)), 'the review previews the opaque bundle');
+    }
+    assert.equal(h.el('topoWizNext').textContent, 'Create the tunnel', 'the review step is the create step');
+    await h.sandbox.topoWizNext(); // create (header moves to the Create step)
+    const call = h.calls.find(c => c.url === endpoint && c.body);
+    assert.ok(call, endpoint + ' called with a body');
+    assert.equal(call.method, 'POST');
+    const body = call.body;
+    if (endpoint === '/api/setup') {
+      assert.equal(body.role, 'foreign', 'the join body carries the foreign role');
+      assert.equal(body.token, raw, 'the raw bundle rides along as the token');
+      assert.equal(body.remote_public, '192.0.2.10', 'the Iran server comes from the bundle');
+      assert.equal(body.force, true);
+      if (kind === 'GRE + FRP') {
+        assert.equal(body.engine, 'frp');
+        assert.equal(body.frp_port, 25000);
+        assert.equal(body.local_gre, '10.10.10.2', 'the foreign GRE IP comes from the bundle');
+        assert.equal(body.peer_gre, '10.10.10.1', 'the Iran GRE IP comes from the bundle');
+        assert.equal(body.ports, '443', 'the forwarded ports come from the bundle');
+      } else if (kind === 'Backhaul') {
+        assert.equal(body.engine, 'backhaul');
+        assert.equal(body.ports, '443,8443', 'the forwarded ports come from the bundle');
+        assert.equal(body.dial, '', 'plain Backhaul dials without GRE');
+      } else {
+        assert.equal(body.engine, 'gre-backhaul');
+        assert.equal(body.local_gre, '10.10.10.2', 'the foreign GRE IP comes from the bundle');
+      }
+    } else {
+      assert.equal(body.action, 'apply_bundle', 'Bagher joins through the bundle apply action');
+      assert.equal(body.bundle, raw, 'the BAGHER: bundle is sent as-is');
+      assert.equal(body.name, '', 'the wizard sends no join-form name');
+    }
+    const patch = h.calls.find(c => c.method === 'PATCH');
+    assert.ok(patch, 'the new tunnel is attached to the topology');
+    assert.equal(patch.url, '/api/topologies/pair');
+    assert.deepEqual(Array.from(patch.body.tunnel_ids), [newId], 'the created tunnel attaches');
+    assert.ok(h.toasts.some(t => t[0] === 'ok' && String(t[1]).includes('Tunnel created')), 'success toast shown');
+    assert.equal(h.el('topoWizModal').hidden, true, 'the wizard closes on success');
+    assert.equal(h.wiz('topoWiz'), null);
+  });
+}
+
+test('foreign side: the bundle transport wins over the hidden join form default', async () => {
+  // The kcp transport rides in the bundle (tr-kcp); the wizard sends it even
+  // though the Setup tab's transport select still holds its TCP default.
+  const h = harness({ topologies: [topo()], tunnels: [], localRole: 'foreign' });
+  h.sandbox.topologyNewTunnel();
+  h.el('topoWizFBundle').value = 'hsh1_192.0.2.10_25000_10.10.10.1_10.10.10.2_tok_tr-kcp_443';
+  h.sandbox.topoWizRead();
+  h.sandbox.topoWizNext();
+  await h.sandbox.topoWizNext();
+  const call = h.calls.find(c => c.url === '/api/setup' && c.body);
+  assert.ok(call, '/api/setup called');
+  assert.equal(call.body.frp_transport, 'kcp', 'the FRP transport is detected from the bundle');
+  assert.equal(h.el('jFRPTransport').value, 'tcp', 'the hidden join form was never touched');
+});
+
+test('foreign side: a failed create drops back to the review with the API error inline', async () => {
+  const h = harness({
+    topologies: [topo()], tunnels: [], localRole: 'foreign',
+    failOn: (url, body) => url === '/api/setup' && !!body
+  });
+  h.sandbox.topologyNewTunnel();
+  h.el('topoWizFBundle').value = 'hsh1_192.0.2.10_25000_10.10.10.1_10.10.10.2_tok_443';
+  h.sandbox.topoWizRead();
+  h.sandbox.topoWizNext();
+  await h.sandbox.topoWizNext();
+  assert.equal(h.el('topoWizModal').hidden, false, 'modal stays open');
+  assert.equal(h.wiz('topoWiz.step'), 2, 'back on the review step');
+  assert.ok(h.el('topoWizErr').textContent.includes('boom'), 'inline error shows the API message');
+  const patch = h.calls.find(c => c.method === 'PATCH');
+  assert.ok(!patch, 'nothing is attached after a failed create');
+});
+
+test('the wizard and the Setup join flow send the identical request for the same bundle', async () => {
+  // Both paths call the shared joinRequestBody builder; the wizard adds no
+  // drift: with a fresh join form its body is byte-equal to the Connect one.
+  for (const raw of [
+    'hsh1_192.0.2.10_25000_10.10.10.1_10.10.10.2_tok_443,2083',
+    'bh1_192.0.2.10_25000_wssmux+udp_tok_443,8443',
+    'gh1_192.0.2.10_25000_10.10.10.1_10.10.10.2_tcpmux_tok_443',
+    'BAGHER:{"ports":[443]}'
+  ]) {
+    const h = harness({ topologies: [topo()], tunnels: [], localRole: 'foreign' });
+    h.sandbox.topologyNewTunnel();
+    h.el('topoWizFBundle').value = raw;
+    h.sandbox.topoWizRead();
+    h.sandbox.topoWizNext();
+    await h.sandbox.topoWizNext();
+    const wizard = h.calls.find(c => (c.url === '/api/setup' || c.url === '/api/sshfwd') && c.body);
+    assert.ok(wizard, 'the wizard sent its request for ' + raw.slice(0, 5));
+    const join = await h.sandbox.joinRequestBody(raw); // what the Connect button sends
+    assert.equal(wizard.url, join.path, 'same endpoint for ' + raw.slice(0, 5));
+    assert.deepEqual(wizard.body, join.body, 'same body for ' + raw.slice(0, 5));
+    if (raw.startsWith('BAGHER:')) assert.equal(join.body.action, 'apply_bundle', 'Bagher joins through apply_bundle on both paths');
+  }
 });

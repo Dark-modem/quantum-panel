@@ -594,6 +594,9 @@ const TOPO_WIZ_TYPES = [
   { id: 'xray', label: 'Xray', desc: 'Forward ports from the Iran server to a foreign server over Xray: Reality, XHTTP, gRPC or mKCP, direct or reverse.' }
 ];
 const TOPO_WIZ_BASE_STEPS = ['Type', 'Settings', 'Review'];
+// Foreign side: bundle-only. The pasted bundle decides the engine, server and
+// ports, so the type step disappears: paste -> review -> create.
+const TOPO_WIZ_FOREIGN_STEPS = ['Bundle', 'Review', 'Create'];
 let topoWiz = null;
 let topoWizBusy = false;
 // Role of THIS server, from the dashboard snapshot app.js keeps in
@@ -604,12 +607,13 @@ function topoWizForeignSide() {
   const local = (typeof window !== 'undefined' && window._lastLocal) || {};
   return /foreign/.test(String(local.role || ''));
 }
-// Step list for the current wizard state. The hub side gets one extra final
-// step for the Matrix bundle hand-off (type -> settings -> review -> bundle);
-// other tunnel types and the foreign (node) side keep the 3-step flow.
+// Step list for the current wizard state. The foreign side gets the 3-step
+// bundle-only flow; the hub side gets one extra final step for the Matrix
+// bundle hand-off (type -> settings -> review -> bundle).
 function topoWizSteps() {
+  if (topoWizForeignSide()) return TOPO_WIZ_FOREIGN_STEPS;
   const steps = [...TOPO_WIZ_BASE_STEPS];
-  if (topoWiz && topoWiz.type === 'matrix' && !topoWizForeignSide()) steps.push('Bundle');
+  if (topoWiz && topoWiz.type === 'matrix') steps.push('Bundle');
   return steps;
 }
 // True once a hub-side Matrix setup succeeded and the wizard shows the bundle
@@ -639,7 +643,7 @@ function topoWizOpen() {
   const topo = topologyCurrent();
   if (!topo) return;
   topoWiz = {
-    step: 1, type: '', bundle: '',
+    step: 1, type: '', bundle: '', detect: null,
     values: { name: topo.name || '', local: topo.local_ip || '', remote: topo.remote_ip || '', gre: true,
       transport: '', port: 0, ports: '', ssh_port: 22, pool: 25, udp: false, family: 'ipv4', addr: '', mode: 'direct', bundle: '' }
   };
@@ -661,10 +665,111 @@ function topoWizError(msg) {
   el.textContent = msg || '';
   el.classList.toggle('hidden', !msg);
 }
+// ---- Foreign side: bundle-only flow ----
+// The pasted text decides everything. Recognised prefixes: hmx1_ (Matrix),
+// hsh1_ (main GRE+FRP), bh1_ (Backhaul), gh1_ (GRE-Backhaul) and BAGHER:.
+// Returns { kind, parsed } for a known prefix — parsed carries the app.js
+// parse (which can still fail: parsed.error then says why) — or null when the
+// prefix matches no bundle at all. Parsing only, no API call.
+function topoWizDetect(raw) {
+  const s = String(raw || '').trim();
+  if (!s) return null;
+  if (/^hmx1_/.test(s)) return { kind: 'matrix', parsed: null };
+  if (typeof isBagherBundle === 'function' && isBagherBundle(s)) return { kind: 'bagher', parsed: null };
+  if (/^(hsh1_|bh1_|gh1_)/.test(s)) {
+    const parsed = typeof parseBundleClient === 'function' ? parseBundleClient(s) : null;
+    return { kind: parsed && !parsed.error ? parsed.engine : '', parsed };
+  }
+  return null;
+}
+// Translated engine name for the detection chip and the review.
+function topoWizEngineLabel(kind) {
+  return tr('', { matrix: 'Matrix', frp: 'GRE + FRP', backhaul: 'Backhaul', 'gre-backhaul': 'Backhaul (with GRE)', bagher: 'Bagher' }[kind] || kind);
+}
+// Inline error for the pasted bundle: empty paste, unknown prefix, or a
+// malformed payload (the parse error text comes from app.js, like the Setup
+// tab's join flow). Empty string means the bundle is ready to use.
+function topoWizBundleError(raw, det) {
+  const s = String(raw || '').trim();
+  if (!s) return tr('', 'Paste the hub bundle from the Iran server.');
+  if (!det || !det.kind) return tr('', 'Unrecognised bundle: it must start with hmx1_, hsh1_, bh1_, gh1_ or BAGHER:.');
+  if (det.parsed && det.parsed.error) return tr('', det.parsed.error);
+  return '';
+}
+// Refresh the auto-detected chip and the inline error under the paste field.
+function topoWizPaintBundle() {
+  const chip = $('topoWizBundleChip');
+  const det = topoWiz ? topoWiz.detect : null;
+  const raw = topoWiz ? topoWiz.values.bundle : '';
+  if (chip) {
+    if (det && det.kind) {
+      chip.textContent = tr('', 'Detected: {engine}').replace('{engine}', topoWizEngineLabel(det.kind));
+      chip.classList.remove('hidden');
+    } else {
+      chip.textContent = '';
+      chip.classList.add('hidden');
+    }
+  }
+  topoWizError(topoWizBundleError(raw, det));
+}
+// Live paste handling: reads the textarea, re-detects and repaints the chip.
+function topoWizForeignBundleInput() {
+  if (!topoWiz) return;
+  topoWizRead();
+  topoWizPaintBundle();
+}
+// Step-1 body: a large paste field plus the detection chip. The wizard's hint
+// says it all: the bundle carries the type, the server and the ports.
+function topoWizRenderForeignPaste() {
+  const v = topoWiz.values;
+  $('topoWizBody').innerHTML = `<p class="qs-hint u-m-0">${esc(tr('', 'Everything is detected from the bundle: the tunnel type, the server and the ports.'))}</p>`
+    + `<div class="fg"><label class="qs-label" for="topoWizFBundle">${esc(tr('', 'Enter the hub bundle here'))}</label>`
+    + `<textarea class="quantum-input u-mono topo-wiz-bundle" id="topoWizFBundle" rows="6" dir="ltr" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="hmx1_... / hsh1_... / bh1_... / gh1_... / BAGHER:...">${esc(v.bundle || '')}</textarea></div>`
+    + `<p class="qs-hint u-m-0">${esc(tr('', 'Copy the bundle from the Iran server and paste it here.'))}</p>`
+    + `<span class="badge ok hidden" id="topoWizBundleChip" aria-live="polite"></span>`;
+  const ta = $('topoWizFBundle');
+  if (ta) ta.oninput = topoWizForeignBundleInput;
+  topoWizPaintBundle();
+}
+// Step-2 body: everything the bundle carried, so the paste can be checked
+// before creating. Matrix and Bagher bundles are opaque (the server validates
+// them), so only the bundle kind and a preview are shown.
+function topoWizRenderForeignReview() {
+  const topo = topologyCurrent(), v = topoWiz.values, det = topoWiz.detect || {};
+  const rows = [[tr('', 'Topology'), topo ? topo.name : '']];
+  if (det.kind) rows.push([tr('', 'Type'), topoWizEngineLabel(det.kind)]);
+  const p = det.parsed && !det.parsed.error ? det.parsed : null;
+  if (p) {
+    rows.push([tr('', 'Iran server'), p.iranPub]);
+    rows.push([tr('', 'Port'), String(p.port || '')]);
+    rows.push([tr('', 'Transport'), String(p.transport || '').toUpperCase()]);
+    if (p.iranGre) rows.push([tr('', 'Iran GRE IP'), p.iranGre]);
+    if (p.foreignGre) rows.push([tr('', 'Foreign GRE IP'), p.foreignGre]);
+    const ports = p.rawPorts || (p.ports || []).join(', ');
+    if (ports) rows.push([tr('', 'Forwarded ports'), ports]);
+    if (p.udp) rows.push(['UDP', tr('', 'On')]);
+  } else {
+    rows.push([tr('', 'Hub bundle'), v.bundle ? String(v.bundle).slice(0, 21) + '…' : '']);
+  }
+  $('topoWizBody').innerHTML = `<div class="topo-wiz-review">${rows.map(r => topoWizRow(r[0], r[1])).join('')}</div>`;
+}
+// Fields the wizard pins instead of reading the hidden Setup-tab join form:
+// the bundle carries the ports, and the FRP transport rides along exactly as
+// the Setup tab's own paste-sync would have set it.
+function topoWizBundleOverrides(det) {
+  const p = det && det.parsed;
+  if (!p || p.error) return { name: '' };
+  return {
+    ports: p.rawPorts || (p.ports && p.ports.length ? p.ports.join(', ') : undefined),
+    frp_transport: p.engine === 'frp' ? (p.transport || 'tcp') : undefined,
+    name: ''
+  };
+}
 function topoWizRender() {
   if (!topoWiz) return;
   const steps = topoWizSteps();
   const step = topoWiz.step, bundle = topoWizOnBundle();
+  const foreign = topoWizForeignSide();
   $('topoWizProgress').textContent = tr('', 'Step {x} of {n}').replace('{x}', String(step)).replace('{n}', String(steps.length));
   $('topoWizSteps').innerHTML = steps.map((lb, i) =>
     `<span class="topo-wiz-step${i + 1 < step ? ' done' : ''}${i + 1 === step ? ' on' : ''}" data-wiz-step="${i + 1}"${i + 1 === step ? ' aria-current="step"' : ''}>${esc(tr('', lb))}</span>`).join('');
@@ -673,9 +778,17 @@ function topoWizRender() {
   $('topoWizBack').hidden = step === 1 || bundle;
   $('topoWizFoot').classList.toggle('next-only', step === 1 || bundle);
   const next = $('topoWizNext');
-  next.textContent = bundle ? tr('', 'Done') : (step === 3 ? tr('', 'Create the tunnel') : tr('', 'Next'));
-  next.disabled = step === 1 && !topoWiz.type;
+  // The create caption sits on the step whose Next launches creation: the
+  // review (step 2) on the foreign bundle flow, the review (step 3) on the hub.
+  const createAt = foreign ? 2 : 3;
+  next.textContent = bundle ? tr('', 'Done') : (step >= createAt ? tr('', 'Create the tunnel') : tr('', 'Next'));
+  next.disabled = step === 1 && !topoWiz.type && !foreign;
   topoWizError('');
+  if (foreign) { // bundle-only flow: paste -> review -> create
+    if (step === 1) topoWizRenderForeignPaste();
+    else topoWizRenderForeignReview();
+    return;
+  }
   if (step === 1) topoWizRenderTypes();
   else if (step === 2) topoWizRenderFields();
   else if (bundle) topoWizRenderBundle();
@@ -726,12 +839,6 @@ function topoWizRenderFields() {
       + topoWizInput('topoWizFPort', tr('', 'FRP bind port'), String(v.port || 55400), 'type="number" min="1" inputmode="numeric"')
       + topoWizInput('topoWizFPool', tr('', 'Pool size'), String(v.pool || 25), 'type="number" min="1" inputmode="numeric"')
       + topoWizCheckbox('topoWizFUdp', 'UDP', !!v.udp);
-  } else if (t.id === 'matrix' && topoWizForeignSide()) {
-    // Node side: this server joins an existing hub mesh, so the wizard asks
-    // for the hub bundle instead of the hub's mesh settings.
-    html = `<p class="qs-hint u-m-0">${esc(tr('', 'On the Iran server, create the Matrix tunnel, copy the bundle it shows, and paste it here.'))}</p>`
-      + `<div class="fg"><label class="qs-label" for="topoWizFBundle">${esc(tr('', 'Enter the hub bundle here'))}</label>`
-      + `<textarea class="quantum-input u-mono topo-wiz-bundle" id="topoWizFBundle" rows="6" dir="ltr" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="hmx1_...">${esc(v.bundle || '')}</textarea></div>`;
   } else if (t.id === 'matrix') {
     html = topoWizSelect('topoWizFFamily', tr('', 'Family'), v.family || 'ipv4', [['ipv4', 'IPv4'], ['ipv6', 'IPv6']])
       + (v.family === 'ipv6' ? topoWizInput('topoWizFAddr', tr('', 'This server\'s IPv6 address'), v.addr || '', 'dir="ltr"') : '')
@@ -755,7 +862,20 @@ function topoWizRenderFields() {
   if ($('topoWizFFamily')) $('topoWizFFamily').onchange = () => { topoWizRead(); topoWizRenderFields(); };
 }
 function topoWizRead() {
-  if (!topoWiz || topoWiz.step !== 2) return;
+  if (!topoWiz) return;
+  // Foreign side: the only field is the bundle textarea on step 1; its paste
+  // is re-detected here too, so a programmatic value change (no input event)
+  // still lands in the wizard state.
+  if (topoWizForeignSide()) {
+    if (topoWiz.step !== 1) return;
+    const bundleEl = $('topoWizFBundle');
+    if (bundleEl) {
+      topoWiz.values.bundle = String(bundleEl.value || '').trim();
+      topoWiz.detect = topoWizDetect(topoWiz.values.bundle);
+    }
+    return;
+  }
+  if (topoWiz.step !== 2) return;
   const v = topoWiz.values;
   const str = (id, key) => { const el = $(id); if (el && String(el.value).trim() !== '') v[key] = String(el.value).trim(); };
   const num = (id, key, dflt) => { const el = $(id); if (el && String(el.value).trim() !== '') { const n = parseInt(el.value, 10); v[key] = isNaN(n) ? dflt : n; } };
@@ -777,23 +897,15 @@ function topoWizRead() {
   const portEl = $('topoWizFPort');
   const wt = topoWizType();
   if (portEl && wt && wt.id === 'matrix' && String(portEl.value).trim() === '') v.port = 0;
-  // The hub bundle textarea reads as-is (trimmed): clearing the field must
-  // clear the stored bundle too, so validation cannot pass on a stale paste.
-  const bundleEl = $('topoWizFBundle');
-  if (bundleEl) v.bundle = String(bundleEl.value || '').trim();
 }
 function topoWizValidate() {
   const t = topoWizType(), v = topoWiz.values;
+  // Foreign side: the bundle is the only input — an empty paste, an unknown
+  // prefix or a malformed payload is rejected inline, before any API call.
+  if (topoWizForeignSide()) return topoWizBundleError(v.bundle, topoWiz.detect);
   if (!t) return tr('', 'Choose the tunnel type');
   if (t.id !== 'matrix' && !v.remote) return tr('', 'Enter the foreign server public IP.');
   if ((t.id === 'bagher' || t.id === 'xray') && !v.ports) return tr('', 'Enter at least one port to forward, for example 443, 8443.');
-  if (t.id === 'matrix' && topoWizForeignSide()) {
-    // Node side: validate the pasted bundle inline, before any API call.
-    const b = String(v.bundle || '').trim();
-    if (!b) return tr('', 'Paste the hub bundle from the Iran server.');
-    if (!/^hmx1_/.test(b)) return tr('', 'The bundle must start with hmx1_.');
-    return '';
-  }
   // The Matrix mesh port is optional: blank/0 asks the server to pick a free one.
   if (t.id === 'matrix') {
     if (v.port && (v.port < 0 || v.port > 65535)) return tr('', 'Enter a port number.');
@@ -824,14 +936,10 @@ function topoWizRenderReview() {
     rows.push([tr('', 'Pool size'), String(v.pool || 25)]);
     if (v.udp) rows.push(['UDP', tr('', 'On')]);
   } else if (t.id === 'matrix') {
-    if (topoWizForeignSide()) {
-      rows.push([tr('', 'Hub bundle'), v.bundle ? String(v.bundle).slice(0, 21) + '…' : '']);
-    } else {
-      rows.push([tr('', 'Family'), (v.family || 'ipv4').toUpperCase()]);
-      if (v.family === 'ipv6' && v.addr) rows.push([tr('', 'This server\'s IPv6 address'), v.addr]);
-      rows.push([tr('', 'Mesh port'), v.port ? String(v.port) : tr('', 'Automatic')]);
-      if (v.ports) rows.push([tr('', 'Forwarded ports'), v.ports]);
-    }
+    rows.push([tr('', 'Family'), (v.family || 'ipv4').toUpperCase()]);
+    if (v.family === 'ipv6' && v.addr) rows.push([tr('', 'This server\'s IPv6 address'), v.addr]);
+    rows.push([tr('', 'Mesh port'), v.port ? String(v.port) : tr('', 'Automatic')]);
+    if (v.ports) rows.push([tr('', 'Forwarded ports'), v.ports]);
   } else {
     if (v.name) rows.push([tr('', 'Tunnel name'), v.name]);
     rows.push([tr('', 'Mode'), tr('', v.mode === 'reverse' ? 'Reverse' : 'Direct')]);
@@ -880,14 +988,16 @@ function topoWizNext() {
     return;
   }
   topoWizRead();
+  const foreign = topoWizForeignSide();
   if (topoWiz.step === 1) {
-    if (!topoWiz.type) { topoWizError(tr('', 'Choose the tunnel type')); return; }
+    const err = topoWizValidate();
+    if (err) { topoWizError(err); return; }
     topoWiz.step = 2;
-  } else if (topoWiz.step === 2) {
+  } else if (topoWiz.step === 2 && !foreign) {
     const err = topoWizValidate();
     if (err) { topoWizError(err); return; }
     topoWiz.step = 3;
-  } else { return topoWizCreate(); }
+  } else { return topoWizCreate(); } // hub review (3) and foreign review (2) both create
   topoWizRender();
 }
 function topoWizBack() {
@@ -903,7 +1013,10 @@ function topoWizFindNewTunnel(type) {
   const assigned = new Set(topologyData.topologies.flatMap(x => x.tunnel_ids || []));
   const match = {
     frp: t => t.id === 'main' || t.engine === 'frp' || t.engine === 'gre-frp',
+    // /api/setup always keys the single tunnel it configures "main"; the
+    // engine string distinguishes plain Backhaul from GRE-Backhaul.
     backhaul: t => /backhaul/.test(String(t.engine || '')),
+    'gre-backhaul': t => /backhaul/.test(String(t.engine || '')),
     bagher: t => /^bagher/.test(String(t.id)),
     matrix: t => /matrix/.test(String(t.id)) || /matrix/.test(String(t.engine || '')),
     xray: t => /^xray:/.test(String(t.id))
@@ -913,8 +1026,11 @@ function topoWizFindNewTunnel(type) {
   return found ? found.id : null;
 }
 async function topoWizCreate() {
-  const t = topoWizType(), topo = topologyCurrent();
-  if (!t || !topo || topoWizBusy) return;
+  const topo = topologyCurrent();
+  if (!topo || topoWizBusy) return;
+  if (topoWizForeignSide()) return topoWizCreateForeign(topo);
+  const t = topoWizType();
+  if (!t) return;
   topoWizBusy = true;
   topoWizError('');
   const btn = $('topoWizNext');
@@ -946,28 +1062,22 @@ async function topoWizCreate() {
         frp_bind_port: v.port || 55400, name: v.name || undefined
       });
     } else if (t.id === 'matrix') {
-      if (topoWizForeignSide()) {
-        // Node side: pair with the hub using the pasted bundle. Calling
-        // /api/matrix/setup here would wrongly create a second hub mesh.
-        mxResult = await api('/api/matrix/foreign-setup', { bundle: String(v.bundle || '').trim() });
-      } else {
-        // Multiple Matrix instances: with none on this server use the legacy
-        // body (no instance field); otherwise ask for a fresh isolated one.
-        let instance = '';
-        try {
-          const st = await api('/api/matrix/instances');
-          const list = Array.isArray(st) ? st : ((st && st.instances) || []);
-          if (list.length) instance = 'next';
-        } catch (_) { /* endpoint unavailable: keep the legacy first-instance path */ }
-        // port 0 = "pick a free mesh port automatically": 443-style defaults
-        // made setups fail wherever the default port was already taken.
-        const mxBody = {
-          family: v.family || 'ipv4', port: Number(v.port) || 0,
-          ports: topoWizPortsList(), addr: v.family === 'ipv6' ? (v.addr || '') : ''
-        };
-        if (instance) mxBody.instance = instance;
-        mxResult = await api('/api/matrix/setup', mxBody);
-      }
+      // Multiple Matrix instances: with none on this server use the legacy
+      // body (no instance field); otherwise ask for a fresh isolated one.
+      let instance = '';
+      try {
+        const st = await api('/api/matrix/instances');
+        const list = Array.isArray(st) ? st : ((st && st.instances) || []);
+        if (list.length) instance = 'next';
+      } catch (_) { /* endpoint unavailable: keep the legacy first-instance path */ }
+      // port 0 = "pick a free mesh port automatically": 443-style defaults
+      // made setups fail wherever the default port was already taken.
+      const mxBody = {
+        family: v.family || 'ipv4', port: Number(v.port) || 0,
+        ports: topoWizPortsList(), addr: v.family === 'ipv6' ? (v.addr || '') : ''
+      };
+      if (instance) mxBody.instance = instance;
+      mxResult = await api('/api/matrix/setup', mxBody);
     } else {
       const profile = typeof xrPresetOf === 'function' ? xrPresetOf('reality') : { security: 'reality' };
       await api('/api/xray', {
@@ -985,21 +1095,11 @@ async function topoWizCreate() {
     await topologyReload();
     toastOk(tr('', 'Tunnel created'), tr('', 'The new tunnel is attached to this topology.'));
     // The server answers with the mesh port it picked (or accepted); showing
-    // it spares the user a round-trip to the Matrix card to look it up. On the
-    // node side the port is appended to the pairing toast instead.
-    if (t.id === 'matrix' && !topoWizForeignSide() && mxResult && mxResult.port) {
+    // it spares the user a round-trip to the Matrix card to look it up.
+    if (t.id === 'matrix' && mxResult && mxResult.port) {
       toastOk(tr('', 'Matrix mesh port: {port}').replace('{port}', String(mxResult.port)));
     }
-    if (t.id === 'matrix' && topoWizForeignSide()) {
-      // The node may have shifted its own local mesh port away from the
-      // bundle's (that port only binds the hub); say so in the same toast.
-      const localPort = mxResult && mxResult.port
-        ? ' ' + tr('', 'Local mesh port: {port}').replace('{port}', String(mxResult.port))
-        : '';
-      toastOk(tr('', 'Matrix tunnel connected to the hub.') + localPort);
-      topoWiz = null;
-      topoWizHide();
-    } else if (t.id === 'matrix' && mxResult && mxResult.bundle) {
+    if (t.id === 'matrix' && mxResult && mxResult.bundle) {
       // Hub side: the tunnel exists but is useless until its bundle is pasted
       // on the foreign server, so the wizard ends on a bundle hand-off screen
       // instead of closing.
@@ -1022,6 +1122,64 @@ async function topoWizCreate() {
     // The bundle hand-off screen renames the primary button to «Done»; keep
     // that label instead of restoring the pre-create caption over it.
     btn.textContent = (topoWiz && topoWiz.bundle) ? tr('', 'Done') : oldTxt;
+  }
+}
+// Foreign side, bundle-only creation: the detected bundle kind picks the
+// endpoint. hmx1_ keeps its dedicated pairing call; everything else sends the
+// exact request the Setup tab's Connect builds (joinRequestBody), so the two
+// foreign flows cannot drift. Creation lands on the «Create» header step and
+// drops back to the review with an inline error when it fails.
+async function topoWizCreateForeign(topo) {
+  const det = topoWiz.detect || {};
+  const raw = String(topoWiz.values.bundle || '').trim();
+  topoWizBusy = true;
+  topoWizError('');
+  topoWiz.step = 3; // the «Create» header step shows while the request runs
+  topoWizRender();
+  const btn = $('topoWizNext');
+  btn.disabled = true;
+  const oldTxt = btn.textContent;
+  btn.innerHTML = '<span class="ent-spinner"></span> ' + esc(tr('', 'Applying…'));
+  let mxResult = null;
+  try {
+    if (det.kind === 'matrix') {
+      // Node side: pair with the hub using the pasted bundle. Calling
+      // /api/matrix/setup here would wrongly create a second hub mesh.
+      mxResult = await api('/api/matrix/foreign-setup', { bundle: raw });
+    } else {
+      const req = await joinRequestBody(raw, topoWizBundleOverrides(det));
+      if (req.error) throw new Error(req.error);
+      await api(req.path, req.body);
+    }
+    await topologyReload();
+    const tid = topoWizFindNewTunnel(det.kind);
+    const cur = topologyCurrent();
+    if (tid && cur && !(cur.tunnel_ids || []).includes(tid)) {
+      await api('/api/topologies/' + encodeURIComponent(cur.id), { tunnel_ids: [...(cur.tunnel_ids || []), tid] }, 'PATCH');
+    }
+    await topologyReload();
+    toastOk(tr('', 'Tunnel created'), tr('', 'The new tunnel is attached to this topology.'));
+    if (det.kind === 'matrix') {
+      // The node may have shifted its own local mesh port away from the
+      // bundle's (that port only binds the hub); say so in the same toast.
+      const localPort = mxResult && mxResult.port
+        ? ' ' + tr('', 'Local mesh port: {port}').replace('{port}', String(mxResult.port))
+        : '';
+      toastOk(tr('', 'Matrix tunnel connected to the hub.') + localPort);
+    }
+    topoWiz = null;
+    topoWizHide();
+  } catch (e) {
+    if (topoWiz) { topoWiz.step = 2; topoWizRender(); }
+    topoWizError(e.message);
+    // Self-explanatory API errors surface as-is instead of wrapped in a
+    // generic toast title (same rule as the hub side).
+    if (e && e.code === 'E-MATRIX-10') toastErr(e.message);
+    else toastErr(tr('', 'Setup failed'), e.message);
+  } finally {
+    topoWizBusy = false;
+    btn.disabled = false;
+    btn.textContent = topoWiz ? tr('', 'Create the tunnel') : oldTxt;
   }
 }
 function topologyNewTunnel() {

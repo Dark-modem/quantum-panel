@@ -3871,6 +3871,89 @@ function parseBundleClient(s) {
 // form shows them and hides options the engine does not use.
 const JOIN_ENGINE = LS_ENGINE;
 const isBagherBundle = s => /^BAGHER:/i.test(s || '');
+
+// Shared request builder for the foreign "join" flow: the Setup tab's Connect
+// button and the topology wizard's bundle-only foreign side both call it, so
+// the requests they send can never drift. Returns { path, body } ready for
+// api(), or { error } with an inline message (nothing has been sent yet).
+// `over` lets a caller pin fields the join form would otherwise supply (the
+// wizard runs without the join form): ports, frp_transport, name, dial,
+// use_encryption, use_compression, proxy_protocol. Invalid input is rejected
+// here before any API call is made.
+async function joinRequestBody(raw, over) {
+  over = over || {};
+  raw = String(raw || '').trim();
+  if (isBagherBundle(raw)) {
+    return { path: '/api/sshfwd', body: { action: 'apply_bundle', bundle: raw, name: over.name !== undefined ? over.name : ($('jName') ? $('jName').value.trim() : '') } };
+  }
+  const isBundle = raw.startsWith('hsh1_') || raw.startsWith('bh1_') || raw.startsWith('gh1_');
+  let bundle = null, token = raw;
+  if (isBundle) {
+    bundle = parseBundleClient(raw);
+    if (!bundle || bundle.error) {
+      return { error: tr('', bundle ? bundle.error : 'bad bundle') + '. ' + tr('', 'Check the paste, or use a legacy token and the manual fields.') };
+    }
+    token = bundle.token;
+    if (over.ports === undefined && $('jPorts') && !$('jPorts').value.trim() && bundle.ports.length) {
+      $('jPorts').value = bundle.rawPorts || bundle.ports.join(', ');
+    }
+  }
+  if (!token) {
+    return { error: tr('', 'Paste the bundle from the Iran server first: its Setup tab after Apply Setup, or Copy Bundle on its Tunnel tab.') };
+  }
+  const st = await api('/api/status').then(s => s.local || {}).catch(() => ({}));
+  const d = await api('/api/setup').catch(() => ({}));
+  const jPorts = $('jPorts');
+  const ports = over.ports !== undefined ? over.ports
+    : ((jPorts && jPorts.value.trim()) || ((st.proxy_ports || []).join(', ') || (st.proxies || []).join(', ')));
+  const m = (st.gre || {});
+  const adv = id => { const el = $(id); return el ? el.value.trim() : ''; };
+  const ppVal = over.proxy_protocol !== undefined ? over.proxy_protocol : ($('jProxyProtocol') && $('jProxyProtocol').checked ? 'v2' : 'off');
+  const frpTransVal = over.frp_transport !== undefined ? over.frp_transport : ($('jFRPTransport') ? $('jFRPTransport').value : 'tcp');
+  const encVal = over.use_encryption !== undefined ? over.use_encryption : ($('jEncryption') && $('jEncryption').checked);
+  const compVal = over.use_compression !== undefined ? over.use_compression : ($('jCompression') && $('jCompression').checked);
+  const nameVal = over.name !== undefined ? over.name : ($('jName') ? $('jName').value.trim() : '');
+  const dialVal = over.dial !== undefined ? over.dial : ($('jDial') ? $('jDial').value : 'auto');
+  const body = bundle ? {
+    role: 'foreign',
+    engine: bundle.engine || 'frp',
+    transport: bundle.transport || 'tcpmux',
+    frp_transport: frpTransVal,
+    use_encryption: encVal,
+    use_compression: compVal,
+    proxy_protocol: ppVal,
+    local_public: adv('fLocalPub') || m.local || d.local_public || '',
+    remote_public: bundle.iranPub || m.peer_ip || '',
+    local_gre: bundle.foreignGre || (m.inner || '').split('/')[0] || '',
+    peer_gre: bundle.iranGre || '',
+    frp_port: bundle.port,
+    token: raw,
+    dial: bundle.engine === 'backhaul' ? '' : dialVal,
+    accept_udp: !!bundle.udp,
+    name: nameVal,
+    ports, force: true,
+  } : {
+    role: 'foreign',
+    frp_transport: frpTransVal,
+    use_encryption: encVal,
+    use_compression: compVal,
+    proxy_protocol: ppVal,
+    local_public: m.local || adv('fLocalPub') || d.local_public || '',
+    remote_public: m.peer_ip || adv('fRemotePub') || $('sRemotePub').value.trim(),
+    local_gre: (m.inner || '').split('/')[0] || adv('fLocalGre') || $('sLocalGre').value.trim(),
+    peer_gre: peerInnerHint(st) || adv('fPeerGre') || $('sPeerGre').value.trim(),
+    frp_port: st.frp_port || parseInt(adv('fFrpPort') || $('sFrpPort').value, 10) || 7000,
+    name: nameVal,
+    token, ports, force: true,
+  };
+  if (!body.ports) {
+    return { error: bundle && bundle.ports.length === 0
+      ? tr('', 'This bundle has no ports. Enter the reverse ports (for example 443, 2083) above.')
+      : tr('', 'Enter the reverse ports, for example 443, 2083.') };
+  }
+  return { path: '/api/setup', body };
+}
+
 function joinBundleSync() {
   const w = $('joinWarn'), info = $('joinBundleInfo'), sel = $('jFRPTransport');
   const raw = $('jToken').value.trim();
@@ -3934,79 +4017,17 @@ $('joinBtn').onclick = async () => {
   }
   b.innerHTML = '<span class="ent-spinner"></span> ' + esc(tr('', 'Connecting…'));
   try {
-    const st = await api('/api/status').then(s => s.local || {}).catch(() => ({}));
-    const d = await api('/api/setup').catch(() => ({}));
-    const rawToken = $('jToken').value.trim();
-    let token = rawToken, bundle = null;
-    const isBundle = rawToken.startsWith('hsh1_') || rawToken.startsWith('bh1_') || rawToken.startsWith('gh1_');
-    if (isBundle) {
-      bundle = parseBundleClient(rawToken);
-      if (!bundle || bundle.error) {
-        const w = $('joinWarn');
-        w.textContent = tr('', bundle ? bundle.error : 'bad bundle') + '. ' + tr('', 'Check the paste, or use a legacy token and the manual fields.');
-        w.classList.remove('hidden');
-        b.disabled = false; b.textContent = oldTxt; return;
-      }
-      token = bundle.token;
-      if (!$('jPorts').value.trim() && bundle.ports.length) {
-        $('jPorts').value = bundle.rawPorts || bundle.ports.join(', ');
-      }
-    }
-    const ports = $('jPorts').value.trim() || ((st.proxy_ports || []).join(', ') || (st.proxies || []).join(', '));
-    if (!token) {
+    // Same builder the topology wizard's foreign flow sends through: one
+    // shared body, so the two join paths can never drift. Invalid input is
+    // rejected inside without any API call.
+    const req = await joinRequestBody($('jToken').value.trim());
+    if (req.error) {
       const w = $('joinWarn');
-      w.textContent = tr('', 'Paste the bundle from the Iran server first: its Setup tab after Apply Setup, or Copy Bundle on its Tunnel tab.');
+      w.textContent = req.error;
       w.classList.remove('hidden');
       b.disabled = false; b.textContent = oldTxt; return;
     }
-    const m = (st.gre || {});
-    const adv = id => { const el = $(id); return el ? el.value.trim() : ''; };
-    const ppVal = $('jProxyProtocol') && $('jProxyProtocol').checked ? 'v2' : 'off';
-    const frpTransVal = $('jFRPTransport') ? $('jFRPTransport').value : 'tcp';
-    const encVal = $('jEncryption') && $('jEncryption').checked;
-    const compVal = $('jCompression') && $('jCompression').checked;
-    const body = bundle ? {
-      role: 'foreign',
-      engine: bundle.engine || 'frp',
-      transport: bundle.transport || 'tcpmux',
-      frp_transport: frpTransVal,
-      use_encryption: encVal,
-      use_compression: compVal,
-      proxy_protocol: ppVal,
-      local_public: adv('fLocalPub') || m.local || d.local_public || '',
-      remote_public: bundle.iranPub || m.peer_ip || '',
-      local_gre: bundle.foreignGre || (m.inner || '').split('/')[0] || '',
-      peer_gre: bundle.iranGre || '',
-      frp_port: bundle.port,
-      token: rawToken,
-      dial: bundle.engine === 'backhaul' ? '' : ($('jDial') ? $('jDial').value : 'auto'),
-      accept_udp: !!bundle.udp,
-      name: $('jName') ? $('jName').value.trim() : '',
-      ports, force: true,
-    } : {
-      role: 'foreign',
-      frp_transport: frpTransVal,
-      use_encryption: encVal,
-      use_compression: compVal,
-      proxy_protocol: ppVal,
-      local_public: m.local || adv('fLocalPub') || d.local_public || '',
-      remote_public: m.peer_ip || adv('fRemotePub') || $('sRemotePub').value.trim(),
-      local_gre: (m.inner || '').split('/')[0] || adv('fLocalGre') || $('sLocalGre').value.trim(),
-      peer_gre: peerInnerHint(st) || adv('fPeerGre') || $('sPeerGre').value.trim(),
-      frp_port: st.frp_port || parseInt(adv('fFrpPort') || $('sFrpPort').value, 10) || 7000,
-      name: $('jName') ? $('jName').value.trim() : '',
-      token, ports, force: true,
-    };
-    if (!body.ports) {
-      const w = $('joinWarn');
-      const bundleNoPorts = bundle && bundle.ports.length === 0;
-      w.textContent = bundleNoPorts
-        ? tr('', 'This bundle has no ports. Enter the reverse ports (for example 443, 2083) above.')
-        : tr('', 'Enter the reverse ports, for example 443, 2083.');
-      w.classList.remove('hidden');
-      b.disabled = false; b.textContent = oldTxt; return;
-    }
-    const r = await api('/api/setup', body);
+    const r = await api(req.path, req.body);
     const out = $('joinOut');
     out.classList.remove('hidden');
     out.textContent = (r.steps || []).join('\n');
@@ -9701,7 +9722,10 @@ async function bagherForeignConnectClick(bundle) {
   const w = $('joinWarn'), out = $('joinOut');
   w.classList.add('hidden');
   try {
-    const res = await api('/api/sshfwd', { action: 'apply_bundle', bundle, name: $('jName') ? $('jName').value.trim() : '' });
+    // The body comes from the shared join builder, so the Setup tab, this
+    // click and the topology wizard's foreign flow all send the same request.
+    const req = await joinRequestBody(bundle);
+    const res = await api(req.path, req.body);
     out.classList.remove('hidden');
     out.textContent = (res && res.message) || tr('', 'Connected to the Iran server');
     toastOk(tr('', 'Connected to the Iran server'));
