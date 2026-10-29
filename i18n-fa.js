@@ -3059,5 +3059,10 @@ window.FA_TEXT = {
 "SSH port": "پورت SSH",
 "Server pair": "سرورهای دو طرف",
 "Empty": "خالی",
-"{n} existing tunnel(s)": "{n} تونل موجود"
+"{n} existing tunnel(s)": "{n} تونل موجود",
+"Search topologies…": "جستجوی توپولوژی‌ها…",
+"List view": "نمای فهرستی",
+"Grid view": "نمای کارتی",
+"No topology matches your search.": "هیچ توپولوژی‌ای با جستجوی شما مطابقت ندارد.",
+"Clear the search to see all topologies.": "برای دیدن همه توپولوژی‌ها جستجو را پاک کنید."
 };

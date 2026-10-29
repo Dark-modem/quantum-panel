@@ -2,6 +2,8 @@
 // grouping can be deleted; tunnels and engines are never removed automatically.
 let topologyData = { topologies: [], tunnels: [] };
 let topologySelected = null;
+let topologySearchQuery = '';
+let topologyViewMode = 'list';
 let topologyBusy = false;
 let topologyLoading = false;
 let topologyWasConfigured = false;
@@ -86,6 +88,19 @@ async function topologyReload() {
     $('topologyError').hidden = false;
   } finally { topologyLoading = false; }
 }
+function topologyEndpointPair(topo) {
+  return {
+    iran: topo.role === 'foreign' ? topo.remote_ip : topo.local_ip,
+    foreign: topo.role === 'foreign' ? topo.local_ip : topo.remote_ip
+  };
+}
+function topologySearchMatches(t, tunnels) {
+  const query = topologySearchQuery.trim().toLowerCase();
+  if (!query) return true;
+  const endpoints = topologyEndpointPair(t);
+  return [t.name, endpoints.iran, endpoints.foreign, topologyListStatus(tunnels).label]
+    .some(value => String(value || '').toLowerCase().includes(query));
+}
 function topologyRender() {
   const topo = topologyCurrent();
   const inTunnel = typeof _tunnelDetail !== 'undefined' && _tunnelDetail !== null;
@@ -100,24 +115,31 @@ function topologyRender() {
   $('tunnelsEmpty').hidden = !topo || inTunnel;
   if (!topo) $('tunnelsListCard').hidden = true;
   $('topologyCount').textContent = String(topologyData.topologies.length);
-  $('topologiesList').innerHTML = topologyData.topologies.length
-    ? topologyData.topologies.map(t => {
+  const listTable = $('topologyListTable');
+  if (listTable && listTable.classList) listTable.classList.toggle('topo-grid', topologyViewMode === 'grid');
+  const searching = topologySearchQuery.trim() !== '';
+  const visible = topologyData.topologies.filter(t => topologySearchMatches(t, topologyExistingTunnels(t)));
+  const swapIcon = '<svg class="topo-icon topo-swap" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4 3 8l4 4"/><path d="M3 8h17"/><path d="M17 20l4-4-4-4"/><path d="M21 16H4"/></svg>';
+  const pairLabel = `${tr('', 'Iran')} – ${tr('', 'Foreign')}`;
+  $('topologiesList').innerHTML = visible.length
+    ? visible.map(t => {
         const tunnels = topologyExistingTunnels(t);
         const remaining = tunnels.length;
         const status = topologyListStatus(tunnels);
-        const iran = t.role === 'foreign' ? t.remote_ip : t.local_ip;
-        const foreign = t.role === 'foreign' ? t.local_ip : t.remote_ip;
+        const endpoints = topologyEndpointPair(t);
         const countLabel = tr('', '{n} existing tunnel(s)').replace('{n}', String(remaining));
         const deleteTitle = remaining ? topologyDeleteNotice(remaining) : tr('', 'Delete topology');
         return `<tr class="topo-list-row" role="row" data-topo-id="${esc(t.id)}">
-        <td role="cell" class="topo-cell-name" data-label="${esc(tr('', 'Name'))}"><button type="button" class="topo-name" data-topo-open="${esc(t.id)}"><svg class="topo-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="6" height="6" rx="1.5"/><rect x="15" y="15" width="6" height="6" rx="1.5"/><path d="M6 9v9h9M15 6h6M18 3v6"/></svg><bdi>${esc(t.name)}</bdi></button></td>
-        <td role="cell" class="topo-cell-servers" data-label="${esc(tr('', 'Server pair'))}"><div class="topo-server-pair"><span class="topo-endpoint"><span class="topo-server-role">${esc(tr('', 'Iran'))}</span><bdi class="u-mono" dir="ltr">${esc(iran || '—')}</bdi></span><span class="topo-endpoint"><span class="topo-server-role">${esc(tr('', 'Foreign'))}</span><bdi class="u-mono" dir="ltr">${esc(foreign || '—')}</bdi></span></div></td>
+        <td role="cell" class="topo-cell-name" data-label="${esc(tr('', 'Name'))}"><button type="button" class="topo-name" data-topo-open="${esc(t.id)}"><span class="topo-dot" data-topo-status="${status.key}" aria-hidden="true"></span><bdi>${esc(t.name)}</bdi></button></td>
+        <td role="cell" class="topo-cell-servers" data-label="${esc(tr('', 'Server pair'))}"><div class="topo-server-pair"><span class="topo-location">${esc(pairLabel)}</span><span class="topo-ips"><bdi class="u-mono" dir="ltr">${esc(endpoints.iran || '—')}</bdi>${swapIcon}<bdi class="u-mono" dir="ltr">${esc(endpoints.foreign || '—')}</bdi></span></div></td>
         <td role="cell" class="topo-cell-tunnels" data-label="${esc(tr('', 'Tunnels'))}"><span class="topo-count" aria-label="${esc(countLabel)}">${remaining}</span></td>
         <td role="cell" class="topo-cell-status" data-label="${esc(tr('', 'Status'))}"><span class="topo-status" data-topo-status="${status.key}"><i aria-hidden="true"></i>${esc(status.label)}</span></td>
         <td role="cell" class="topo-cell-actions" data-label="${esc(tr('', 'Actions'))}"><div class="topo-actions"><button type="button" class="hashem-btn hashem-btn-primary topo-view" data-topo-open="${esc(t.id)}">${esc(tr('', 'View'))}</button><span class="topo-delete-wrap" title="${esc(deleteTitle)}"><button type="button" class="hashem-btn topo-delete" data-topo-delete="${esc(t.id)}" aria-label="${esc(tr('', 'Delete topology'))}"${remaining ? ` disabled title="${esc(tr('', 'Delete all tunnels in this topology first'))}"` : ''}><svg class="topo-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg>${esc(tr('', 'Delete'))}</button></span></div></td>
       </tr>`;
       }).join('')
-    : `<tr class="topo-list-empty"><td colspan="5"><div class="ent-empty"><b>${esc(tr('', 'No topology yet'))}</b><span>${esc(tr('', 'Create a topology, set the server roles, then add tunnels between them.'))}</span></div></td></tr>`;
+    : searching
+      ? `<tr class="topo-list-empty"><td colspan="5"><div class="ent-empty"><b>${esc(tr('', 'No topology matches your search.'))}</b><span>${esc(tr('', 'Clear the search to see all topologies.'))}</span></div></td></tr>`
+      : `<tr class="topo-list-empty"><td colspan="5"><div class="ent-empty"><b>${esc(tr('', 'No topology yet'))}</b><span>${esc(tr('', 'Create a topology, set the server roles, then add tunnels between them.'))}</span></div></td></tr>`;
   const assigned = new Set(topologyData.topologies.flatMap(t => t.tunnel_ids || []));
   if (!topo) return;
   const cables = (topo.tunnel_ids || []).map(id => topologyData.tunnels.find(t => t.id === id) || {id, name: id, engine: '—', state: 'down'});
@@ -222,6 +244,13 @@ function topologySelectForTunnel(kind) {
 }
 function topologyDisplayMode() { topologyRender(); }
 
+function topologySetView(mode) {
+  topologyViewMode = mode === 'grid' ? 'grid' : 'list';
+  const listBtn = $('topologyViewListBtn'), gridBtn = $('topologyViewGridBtn');
+  if (listBtn && typeof listBtn.setAttribute === 'function') listBtn.setAttribute('aria-pressed', String(topologyViewMode === 'list'));
+  if (gridBtn && typeof gridBtn.setAttribute === 'function') gridBtn.setAttribute('aria-pressed', String(topologyViewMode === 'grid'));
+  topologyRender();
+}
 $('topologyCreateBtn').onclick = topologyCreate;
 $('topologyBackBtn').onclick = topologyBack;
 $('topologySaveBtn').onclick = topologySave;
@@ -229,6 +258,9 @@ $('topologyAttachBtn').onclick = topologyAttach;
 $('topologySetupBack').onclick = topologyResume;
 $('tunnelsAddBtn').onclick = topologyNewTunnel;
 $('topologyAddTunnelBtn').onclick = topologyNewTunnel;
+$('topologySearch').addEventListener('input', e => { topologySearchQuery = (e && e.target ? e.target.value : '') || ''; topologyRender(); });
+$('topologyViewListBtn').onclick = () => topologySetView('list');
+$('topologyViewGridBtn').onclick = () => topologySetView('grid');
 document.querySelectorAll('[data-topo-role]').forEach(b => { b.onclick = () => topologyChooseRole(b.dataset.topoRole); });
 $('tab-tunnel').addEventListener('click', e => {
   const target = e.target.closest('button'); if (!target) return;

@@ -8,14 +8,15 @@ const elements = new Map();
 function el(id) {
   if (id === 'topologyUnassignedCard' || id === 'topologyUnassigned') return null;
   if (!elements.has(id)) elements.set(id, {id, hidden:false, disabled:false, value:'', textContent:'',innerHTML:'',
-    classList:{toggle(){},add(){},remove(){}},contains(){return false}, focus(){}});
+    classList:{_toggles:[],toggle(c,v){this._toggles.push([c,v]);},add(){},remove(){}},
+    setAttribute(){}, addEventListener(){}, contains(){return false}, focus(){}});
   return elements.get(id);
 }
 let calls=[];
 const sandbox={
  assert, console, Set, document:{activeElement:null,querySelectorAll(){return []}},
  window:{_lastLocal:{role:'iran (matrix hub)',local_pub:'185.226.119.74'}},
- $:el, tr:(_k,fb)=>fb, esc:s=>String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'),
+ $:el, el, tr:(_k,fb)=>fb, esc:s=>String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'),
  _tunnelDetail:null, applyTunnelDetail(){},renderTunnelsList(){},toastErr(){},toastOk(){},toastWarn(){},goTab(){},setRole(){},openTunnelDetail(){},
  api:async(path,body,method)=>{calls.push({path,body,method});if(path==='/api/topologies'&&!body)return {topologies:[],tunnels:[]};return {topology:{id:'new'}};},
  entConfirm:async()=>true
@@ -57,10 +58,20 @@ assert.ok(listHTML.includes('data-topo-id="'+esc(unsafePair.id)+'"'),'row ID is 
 assert.equal((listHTML.match(/<tr\\b/g)||[]).length,1,'one semantic row per topology');
 assert.equal((listHTML.match(/<td\\b/g)||[]).length,5,'name, server pair, count, status and actions cells');
 for(const cell of ['name','servers','tunnels','status','actions']) assert.ok(listHTML.includes('class="topo-cell-'+cell+'" data-label='),cell+' supports narrow-screen labels');
+assert.ok(listHTML.includes('class="topo-dot" data-topo-status="empty"'),'status dot sits next to the topology name');
+const nameCell=listHTML.match(/<td\\b[^>]*class="topo-cell-name"[^>]*>([\\s\\S]*?)<\\/td>/)[1];
+assert.ok(nameCell.indexOf('topo-dot')<nameCell.indexOf('<bdi>'),'status dot precedes the name');
 assert.equal(listHTML.split('data-topo-open="'+esc(unsafePair.id)+'"').length-1,2,'name and explicit View target the same topology');
 const serverCell=listHTML.match(/<td\\b[^>]*class="topo-cell-servers"[^>]*>([\\s\\S]*?)<\\/td>/)[1];
-assert.ok(serverCell.includes('>Iran</span>'));assert.ok(serverCell.includes('>Foreign</span>'));
+assert.ok(serverCell.includes('class="topo-location"'),'server pair carries an accent location label');
+assert.ok(serverCell.includes('Iran – Foreign'),'location label names both roles');
+assert.ok(serverCell.includes('class="topo-ips"'));
+assert.ok(serverCell.includes('topo-swap'),'server pair shows the swap icon between endpoints');
 assert.ok(serverCell.indexOf(esc(unsafePair.remote_ip))<serverCell.indexOf(esc(unsafePair.local_ip)),'role labels map remote Iran/local Foreign correctly');
+const statusCell=listHTML.match(/<td\\b[^>]*class="topo-cell-status"[^>]*>([\\s\\S]*?)<\\/td>/)[1];
+assert.ok(statusCell.includes('data-topo-status="empty"'),'status column repeats the truthful status key');
+const countCell=listHTML.match(/<td\\b[^>]*class="topo-cell-tunnels"[^>]*>([\\s\\S]*?)<\\/td>/)[1];
+assert.ok(countCell.includes('class="topo-count"'),'tunnel count renders as a badge');
 const actionCell=listHTML.match(/<td\\b[^>]*class="topo-cell-actions"[^>]*>([\\s\\S]*?)<\\/td>/)[1];
 const actionText=actionCell.replace(/<[^>]*>/g,'').trim();
 assert.ok(actionText.includes('View'));assert.ok(actionText.includes('Delete'));
@@ -96,6 +107,17 @@ for(const id of ['matrix','other-pair','assigned-elsewhere']) assert.ok(!options
 assert.ok($('topologyGraph').innerHTML.includes('data-topology-cable="matrix"'));
 assert.ok($('topologyBoundList').innerHTML.includes('data-topo-view-tunnel="matrix"'));
 assert.equal($('topologyUnassignedCard'),null);assert.equal($('topologyUnassigned'),null);
+topologySearchQuery='zzz-nomatch';topologyRender();
+assert.ok($('topologiesList').innerHTML.includes('No topology matches your search.'),'search miss explains itself');
+assert.ok(!$('topologiesList').innerHTML.includes('topo-list-row'),'search miss renders no topology row');
+topologySearchQuery=String(topo.local_ip);topologyRender();
+assert.ok($('topologiesList').innerHTML.includes('data-topo-id="'+esc(topo.id)+'"'),'search matches the server IP');
+topologySearchQuery=topo.name.toLowerCase();topologyRender();
+assert.ok($('topologiesList').innerHTML.includes('data-topo-id="'+esc(topo.id)+'"'),'search is case-insensitive on the name');
+topologySearchQuery='';topologySetView('grid');
+assert.ok(el('topologyListTable').classList._toggles.some(([c,v])=>c==='topo-grid'&&v===true),'grid view toggles the card class on the table');
+topologySetView('list');
+assert.ok(el('topologyListTable').classList._toggles.some(([c,v])=>c==='topo-grid'&&v===false),'list view restores the row layout');
 topologyData={topologies:[topo],tunnels:one};
 `,sandbox);
 (async()=>{

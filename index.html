@@ -1484,7 +1484,14 @@
         <div class="xr-err" id="topologyError" role="alert" hidden></div>
         <div class="tunnel-card" id="topologyListCard">
           <div class="tc-header topo-list-toolbar"><div class="topo-list-title"><p class="tc-title" data-i18n="nav_topology">Topology</p><span class="badge dim" id="topologyCount">0</span></div><button type="button" class="hashem-btn hashem-btn-primary" id="topologyCreateBtn"><svg class="topo-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span data-i18n="topology_create">Add topology</span></button></div>
-          <div class="topo-list-wrap"><table class="topo-list-table" role="table">
+          <div class="topo-list-tools">
+            <input type="search" id="topologySearch" class="hashem-input topo-search" data-i18n-ph="topology_search_ph" placeholder="Search topologies…" aria-label="Search topologies" data-i18n-aria="topology_search_ph" autocomplete="off">
+            <div class="qs-seg topo-view-toggle" role="group" aria-label="View" data-i18n-aria="topology_view_label">
+              <button type="button" id="topologyViewListBtn" aria-pressed="true" aria-label="List view" data-i18n-aria="topology_view_list" title="List view"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+              <button type="button" id="topologyViewGridBtn" aria-pressed="false" aria-label="Grid view" data-i18n-aria="topology_view_grid" title="Grid view"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="1.5"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/></svg></button>
+            </div>
+          </div>
+          <div class="topo-list-wrap"><table class="topo-list-table" id="topologyListTable" role="table">
             <thead role="rowgroup"><tr class="topo-list-head" role="row"><th scope="col" role="columnheader" data-i18n="topology_list_name">Name</th><th scope="col" role="columnheader" data-i18n="topology_list_servers">Server pair</th><th scope="col" role="columnheader" data-i18n="tunnels_title">Tunnels</th><th scope="col" role="columnheader" data-i18n="topology_list_status">Status</th><th scope="col" role="columnheader" data-i18n="topology_list_actions">Actions</th></tr></thead>
             <tbody id="topologiesList" role="rowgroup"></tbody>
           </table></div>
