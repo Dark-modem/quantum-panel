@@ -650,6 +650,7 @@ func main() {
 	mux.HandleFunc("POST "+base+"/api/matrix/remove", requireAuth(requireCSRF(handleMatrixRemovePost)))
 	mux.HandleFunc("POST "+base+"/api/matrix/restart", requireAuth(requireCSRF(handleMatrixRestartPost)))
 	mux.HandleFunc("POST "+base+"/api/matrix/foreign-setup", requireAuth(requireCSRF(handleMatrixForeignSetup)))
+	mux.HandleFunc("POST "+base+"/api/matrix/foreign-remove", requireAuth(requireCSRF(handleMatrixForeignRemove)))
 	mux.HandleFunc("POST "+base+"/api/matrix/register", handleMatrixRegister)
 	mux.HandleFunc("GET "+base+"/api/update/peer", requireAuth(handleUpdatePeer))
 	mux.HandleFunc("POST "+base+"/api/setup", requireAuth(requireCSRF(handleSetupPost)))
