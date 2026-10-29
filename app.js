@@ -261,6 +261,12 @@ function skel(n) {
   return '<div class="u-grid u-gap-8">' + s + '</div>';
 }
 function goTab(name) {
+  if (name === 'topology') name = 'tunnel';
+  if (name === 'setup' && typeof topologyCurrent === 'function' && !topologyCurrent()) {
+    goTab('tunnel');
+    toastWarn(tr('', 'Create and configure a topology first'));
+    return;
+  }
   if (name === 'terminal' && !$('termNav').classList.contains('hidden') && $('tab-terminal').hidden && !termState.ready) { /* allowed: overlay shows connect */ }
   if (name === 'terminal' && $('termNav').classList.contains('hidden')) return; // flag off: tab doesn't exist
   if (name === 'add-peer') { goTab('setup'); const c = $('setupAddPeerStep'); if (c && c.scrollIntoView) c.scrollIntoView({behavior: 'smooth', block: 'start'}); return; }
@@ -281,7 +287,7 @@ function goTab(name) {
     loadClusterStatus();
   }
   if (name === 'perf') loadPerf();
-  if (name === 'tunnel') { loadCarrier(); loadFleet(); loadTunnelHealth(); loadLimits(); loadMatrix(); loadXray(true); }
+  if (name === 'tunnel') { if (typeof topologyReload === 'function') topologyReload(); loadCarrier(); loadFleet(); loadTunnelHealth(); loadLimits(); loadMatrix(); loadXray(true); }
   if (name === 'dashboard') loadUsage();
   if (name === 'watchdog') loadWatchdog();
   if (name === 'doctor') loadDoctor();
@@ -392,7 +398,23 @@ if (sysLight && sysLight.addEventListener) sysLight.addEventListener('change', e
 const I18N = {
   en: {
     nav_dashboard: "Dashboard",
-    nav_tunnel: "Tunnel",
+    topology_return_tunnel: "Back to topology",
+    nav_topology: "Topology",
+    topology_create: "Add topology",
+    topology_hint: "A topology groups tunnels between two servers. Create the topology first, then add or attach tunnels.",
+    topology_unassigned: "Unassigned tunnels",
+    topology_preserve: "Existing tunnels keep running. Open a topology to attach them without recreating them.",
+    topology_back: "Back to topologies",
+    topology_name: "Topology name",
+    topology_role: "This server's role",
+    topology_local: "This server's IP",
+    topology_remote: "Other server's IP",
+    topology_save: "Save topology",
+    topology_attach: "Attach an existing tunnel",
+    topology_attach_btn: "Attach tunnel",
+    topology_return: "Back to topology and attach the new tunnel",
+    topology_cables: "Each cable represents one tunnel. Green: connected; amber: unverified; red: stopped.",
+    nav_tunnel: "Topology",
     nav_cluster: "Cluster",
     nav_setup: "Setup",
     nav_logs: "Logs",
@@ -1743,13 +1765,14 @@ function renderTunnelsList() {
       ports: (mx.ports || []).length || null,
     });
   }
-  // the markup ships with the hidden ATTRIBUTE — clear it, not just the class
-  card.hidden = !rows.length;
+  const visibleRows = typeof topologyFilterRows === 'function' ? topologyFilterRows(rows) : rows;
+  // The empty group still has its topology diagram and Add Tunnel action.
+  card.hidden = !visibleRows.length;
   const badge = $('tunnelsCountBadge');
-  if (badge) badge.textContent = rows.length ? String(rows.length) : '—';
-  if (!rows.length) { box.innerHTML = ''; return; }
+  if (badge) badge.textContent = visibleRows.length ? String(visibleRows.length) : '—';
+  if (!visibleRows.length) { box.innerHTML = ''; return; }
   const ICO_TRASH = '<svg class="i" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H8a2 2 0 01-2-2V6"/></svg>';
-  box.innerHTML = rows.map(r => {
+  box.innerHTML = visibleRows.map(r => {
     const eng = { frp: 'GRE + FRP', backhaul: 'Backhaul', 'gre-backhaul': 'Backhaul + GRE', bagher: 'Bagher' }[r.engine] || (r.engine && r.engine.startsWith('matrix-') ? 'Matrix · ' + r.engine.slice(7).toUpperCase() : '—');
     // string args must be esc()aped like jsArg: raw JSON quotes break the attribute
     const arg = typeof r.kind === 'number' ? String(r.kind) : esc(JSON.stringify(r.kind));
@@ -1805,7 +1828,7 @@ async function tunnelListRemove(kind, name) {
 }
 
 // Detail (drill-in) mode: View opens one tunnel's full settings and hides the rest.
-function openTunnelDetail(kind) { _tunnelDetail = kind; if (kind === 'matrix') renderMatrixDetail(); applyTunnelDetail(true); }
+function openTunnelDetail(kind) { if (typeof topologySelectForTunnel === 'function') topologySelectForTunnel(kind); _tunnelDetail = kind; if (kind === 'matrix') renderMatrixDetail(); applyTunnelDetail(true); }
 function closeTunnelDetail() { _tunnelDetail = null; applyTunnelDetail(false); }
 
 function applyTunnelDetail(scroll) {
@@ -1847,6 +1870,7 @@ function applyTunnelDetail(scroll) {
       : m === 'bagher' ? tr('', 'Bagher tunnel settings')
       : (m ? tr('', 'Tunnel settings') + ' — ' + String(((tunPeerCache || []).find(p => p.id === m) || {}).name || ('peer-' + m)) : '');
   }
+  if (typeof topologyDisplayMode === 'function') topologyDisplayMode();
   if (m && scroll && bar && bar.scrollIntoView) bar.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 // Two-step remove (inline confirm, no modal): 1st click arms 5s + Undo,

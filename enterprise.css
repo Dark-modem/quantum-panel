@@ -1168,3 +1168,24 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
   .tnl-acts { grid-area: acts; justify-content: flex-start; }
   .tnl-eng, .tnl-ports { display: none; }
 }
+
+/* Server-pair topology overview and one cable per assigned tunnel. */
+.topo-list-row { display:grid; grid-template-columns:minmax(140px,1.1fr) minmax(180px,1.7fr) auto auto auto; gap:12px; align-items:center; padding:16px 8px; border-bottom:1px solid var(--ln); }
+.topo-name { text-align:start; background:none; border:0; color:var(--ac); cursor:pointer; font:inherit; font-weight:650; }
+.topo-name:hover { text-decoration:underline; }
+.topo-settings { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin:16px 0; }
+.topo-attach { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+.topo-attach select { min-width:180px; max-width:360px; }
+.topo-binding { display:flex; flex-wrap:wrap; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--ln); }
+.topo-binding b { flex:1; }
+.topo-graph { width:100%; height:auto; max-height:680px; min-height:220px; display:block; overflow:visible; }
+.topo-graph text { fill:var(--tx); stroke:none; font-size:14px; font-family:inherit; }
+.topo-graph .topo-ip { font-size:12px; fill:var(--tx2); }
+.topo-node rect { fill:var(--s2); stroke:var(--ac); stroke-width:2; }
+.topo-cable path { fill:none; stroke-width:3; }
+.topo-cable rect { fill:var(--s1); stroke:var(--ln); }
+.topo-cable.topo-ok path { stroke:var(--ok); }
+.topo-cable.topo-warn path { stroke:var(--wr); stroke-dasharray:6 4; }
+.topo-cable.topo-err path { stroke:var(--er); stroke-dasharray:3 5; }
+.topo-empty { fill:var(--tx2)!important; }
+@media(max-width:800px) { .topo-list-row{grid-template-columns:1fr auto;} .topo-list-row .u-mono{grid-column:1/-1;} .topo-settings{grid-template-columns:1fr;} .topo-graph{min-height:150px;} }

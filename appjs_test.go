@@ -20,7 +20,10 @@ func TestAppJSExtracted(t *testing.T) {
 	if !strings.Contains(string(html), `<script src="matrix_edit.js"></script>`) {
 		t.Error("index.html must load the Matrix edit module")
 	}
-	if strings.Count(string(html), "<script") != 3 { // theme-before-paint, app and Matrix edit module
+	if !strings.Contains(string(html), `<script src="topology.js"></script>`) {
+		t.Error("index.html must load the topology module")
+	}
+	if strings.Count(string(html), "<script") != 4 { // theme, app, Matrix edit and topology
 		t.Errorf("unexpected number of <script> tags: %d", strings.Count(string(html), "<script"))
 	}
 	if strings.Contains(string(html), "async function api(") {
@@ -45,6 +48,9 @@ func TestIndexCacheBustsAppJS(t *testing.T) {
 	cfg.BasePath = "x"
 	rr := httptest.NewRecorder()
 	serveIndex(rr, httptest.NewRequest("GET", "/x/", nil))
+	if !strings.Contains(rr.Body.String(), `src="topology.js?v=`) {
+		t.Error("topology module must be cache-busted per build")
+	}
 	if !strings.Contains(rr.Body.String(), `src="matrix_edit.js?v=`) {
 		t.Error("Matrix edit module must be cache-busted per build")
 	}
