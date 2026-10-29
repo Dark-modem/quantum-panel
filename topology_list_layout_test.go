@@ -46,6 +46,27 @@ func TestTopologyListSemanticTable(t *testing.T) {
 	if strings.Contains(html, `data-i18n="topology_list_status"`) || strings.Contains(html, "topology_list_servers") {
 		t.Error("status and server-pair columns must be gone from the header row")
 	}
+	// The Topology sidebar entry draws a network-topology icon (nodes joined by
+	// links) in the same stroked style as the other nav icons; the lightning
+	// bolt stays reserved for the other panel sections that still use it.
+	nav := regexp.MustCompile(`(?s)<button\b[^>]*data-tab="tunnel"[^>]*>(.*?)</button>`).FindStringSubmatch(html)
+	if len(nav) != 2 {
+		t.Fatal("topology sidebar nav item must exist")
+	}
+	for _, part := range []string{
+		`fill="none" stroke="currentColor"`,
+		`<circle cx="5" cy="6" r="2.5"/>`,
+		`<circle cx="19" cy="6" r="2.5"/>`,
+		`<circle cx="12" cy="19" r="2.5"/>`,
+		`M7.5 6h9M6.3 8l4.7 8.8M17.7 8l-4.7 8.8`,
+	} {
+		if !strings.Contains(nav[1], part) {
+			t.Errorf("topology nav icon must draw nodes joined by links, missing %q", part)
+		}
+	}
+	if strings.Contains(nav[1], "M13 2L3 14h7l-1 8 10-12h-7l1-8z") {
+		t.Error("topology nav item must not use the lightning bolt icon")
+	}
 	js := topologyListTestSource(t, "topology.js")
 	for _, want := range []string{
 		`country: $('topologyCountry').value`,  // PATCH persists the country
@@ -77,6 +98,7 @@ func TestTopologyListModernChrome(t *testing.T) {
 		{"clickable rows", `\.topo-list-row\s*\{[^}]*cursor\s*:\s*pointer`},
 		{"keyboard focus ring on rows", `\.topo-list-row:focus-visible\s*\{[^}]*outline\s*:\s*2px\s+solid\s+var\(--ent-focus\)`},
 		{"flag plus IP server cell", `\.topo-server\s*\{[^}]*display\s*:\s*flex`},
+		{"embedded SVG flag footprint", `\.topo-flag-svg\s*\{[^}]*width\s*:\s*20px[^}]*height\s*:\s*14px`},
 		{"pill action buttons", `\.topo-actions\s+\.quantum-btn\s*\{[^}]*border-radius\s*:\s*999px`},
 		{"red danger delete button", `\.topo-actions\s+\.topo-delete\s*\{[^}]*border\s*:\s*1px\s+solid\s+var\(--er\)`},
 		{"search box styling", `\.topo-search\s*\{[^}]*min-height\s*:`},
@@ -108,6 +130,11 @@ func TestTopologyListSharedResponsiveColumns(t *testing.T) {
 		if !regexp.MustCompile(property).MatchString(shared[1]) {
 			t.Errorf("shared header/row rule lacks %s", property)
 		}
+	}
+	// Tunnels and Actions sit on fixed tracks so the headers stay over their
+	// cells no matter how the flexible name/endpoints columns squeeze.
+	if !regexp.MustCompile(`grid-template-columns\s*:[^}]*72px\s+176px`).MatchString(shared[1]) {
+		t.Error("shared grid must keep fixed 72px (Tunnels) and 176px (Actions) tracks")
 	}
 
 	media := regexp.MustCompile(`@media\s*\(\s*max-width\s*:\s*799px\s*\)`).FindStringIndex(css)
