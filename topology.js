@@ -801,13 +801,16 @@ function topoCreateError(msg) {
   el.classList.toggle('hidden', !msg);
 }
 // Circular step counter: a ring whose arc fills with progress, "1/6" inside.
+// The text carries its size and stroke:none inline: tokens.css strokes every
+// svg at 1.9px, and inherited values beat presentation attributes, so a
+// class alone left the number fat and outlined inside the ring.
 function topoCreateRing(step, n) {
-  const r = 15, c = 2 * Math.PI * r;
+  const r = 18, c = 2 * Math.PI * r;
   const label = tr('', 'Step {x} of {n}').replace('{x}', String(step)).replace('{n}', String(n));
-  return `<svg viewBox="0 0 40 40" width="40" height="40" role="img" aria-label="${esc(label)}">` +
-    `<circle class="topo-create-ring-track" cx="20" cy="20" r="${r}"/>` +
-    `<circle class="topo-create-ring-arc" cx="20" cy="20" r="${r}" stroke-dasharray="${(c * step / n).toFixed(2)} ${c.toFixed(2)}"/>` +
-    `<text class="topo-create-ring-txt" x="20" y="20" text-anchor="middle" dominant-baseline="central">${step}/${n}</text></svg>`;
+  return `<svg viewBox="0 0 44 44" width="44" height="44" role="img" aria-label="${esc(label)}">` +
+    `<circle class="topo-create-ring-track" cx="22" cy="22" r="${r}"/>` +
+    `<circle class="topo-create-ring-arc" cx="22" cy="22" r="${r}" stroke-dasharray="${(c * step / n).toFixed(2)} ${c.toFixed(2)}"/>` +
+    `<text class="topo-create-ring-txt" x="22" y="22" text-anchor="middle" dominant-baseline="central" style="font-size:12px;font-weight:700;stroke:none;fill:var(--tx, #f4f4f5)">${step}/${n}</text></svg>`;
 }
 function topoCreateRender() {
   if (!topoCreate) return;

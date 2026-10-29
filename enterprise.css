@@ -1273,8 +1273,10 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 .topo-map { display:grid; gap:8px; }
 .topo-map-scroll { overflow-x:auto; border:1px solid var(--ln); border-radius:var(--r-md); background:var(--sunk); direction:ltr; }
 /* The map never stretches past its natural width: on wide screens it stays
-   near 1:1 and centers in the well instead of ballooning the type. */
-.topo-graph { display:block; width:100%; max-width:900px; min-width:640px; margin-inline:auto; height:auto; user-select:none; overflow:visible; font-family:inherit; }
+   near 1:1 and centers in the well instead of ballooning the type. The svg
+   also resets the global svg stroke (like #clMap) so text and dots stay
+   plain — cables and halos set their own stroke. */
+.topo-graph { display:block; width:100%; max-width:900px; min-width:640px; margin-inline:auto; height:auto; user-select:none; overflow:visible; font-family:inherit; stroke:none; stroke-width:0; }
 .topo-graph text { font-family:inherit; }
 .topo-node { outline:none; }
 .topo-n-bg { fill:var(--s1); stroke:var(--ln2); stroke-width:1.5; transition:stroke var(--dur-fast) ease; }
@@ -1351,14 +1353,16 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 }
 
 /* ---------- Add-topology wizard modal ---------- */
-.topo-create-ring svg { display: block; }
+/* tokens.css strokes every svg at 1.9px — reset it here: the arc and track
+   set their own stroke, and the counter text must stay plain. */
+.topo-create-ring svg { display: block; stroke: none; stroke-width: 0; }
 .topo-create-ring-track { fill: none; stroke: var(--ln2); stroke-width: 3; }
 .topo-create-ring-arc {
-  fill: none; stroke: var(--ac); stroke-width: 3; stroke-linecap: round;
+  fill: none; stroke: var(--ac); stroke-width: 3.5; stroke-linecap: round;
   transform: rotate(-90deg); transform-origin: 50% 50%;
   transition: stroke-dasharray var(--dur) var(--spring);
 }
-.topo-create-ring-txt { fill: var(--tx); font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.topo-create-ring-txt { fill: var(--tx); stroke: none; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .topo-create-dots { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .topo-create-dot { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--ln2); background: transparent; }
 .topo-create-dot.on { border-color: var(--ac); background: var(--ac); }
