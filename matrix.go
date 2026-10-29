@@ -1,514 +1,693 @@
 package main
 
-// Matrix tunnel (tinc mesh, netname "matrix"): a server-to-server encrypted
-// private network between this panel's server and its peer, running beside
-// the main tunnel. Two families: ipv4 (tinc transport over IPv4) and ipv6
-// (transport over IPv6); user forwarding is IPv4 DNAT to the peer's mesh
-// address either way, matching the upstream matrix-network tool.
-//
-// Hub (Iran)  = tinc "main" node: listens on the tinc port, holds every
-//               peer's host file, owns the DNAT rules for forwarded ports.
-// Node (foreign) = dials the hub (ConnectTo = main), gets a fixed mesh
-//               address (172.16.1.2 for the first peer).
-//
-// Registration: the foreign panel parses the hmx1_ bundle, builds its node,
-// then POSTs its host file (public key) to /api/matrix/register with the
-// one-time token from the bundle; the hub answers with its own host file.
-// Everything created is tagged: iptables rules carry the "hashem-matrix"
-// comment, configs live in /etc/tinc/matrix, state in <configDir>/matrix.json.
-
 import (
-	"bytes"
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/subtle"
+	"crypto/x509"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 )
 
 const (
-	matrixNetname   = "matrix"
-	matrixConfDir   = "/etc/tinc/matrix"
-	matrixTag       = "hashem-matrix"
-	matrixHubIP     = "172.16.1.1"
-	matrixFirstPeer = "172.16.1.2"
+	matrixNetname   = "quantum_matrix"
+	matrixIfaceName = "qmx0"
+	matrixTag       = "quantum-matrix"
+	matrixUnit      = "quantum-matrix.service"
+	matrixHubIP     = "10.254.231.1"
+	matrixFirstPeer = "10.254.231.2"
+	matrixSubnet    = "10.254.231.0/30"
 	matrixBundlePfx = "hmx1_"
 )
 
-type matrixPeer struct {
-	Name     string `json:"name"`
-	Addr     string `json:"addr"` // public address seen at registration
-	HostFile string `json:"-"`    // hosts/<name> content
-	IP       string `json:"ip"`   // mesh address (172.16.1.x)
-}
-
-// One state file for both roles: the hub (Iran) keeps the token, forwarded
-// ports and the registered peers; a node (foreign) keeps its name and the
-// hub's panel URL + transport address.
-type matrixState struct {
-	Enabled bool         `json:"enabled"`
-	Role    string       `json:"role"` // "hub" | "node"
-	Family  string       `json:"family"`
-	Port    int          `json:"port"`
-	Addr    string       `json:"addr"` // hub transport address (v4 or v6)
-	Token   string       `json:"token"`
-	Ports   []int        `json:"ports"`
-	Peers   []matrixPeer `json:"peers"`
-	Name    string       `json:"name"`  // node-side: local node name
-	Panel   string       `json:"panel"` // node-side: hub panel base URL
-	IP      string       `json:"ip"`    // node-side: local mesh address
-}
-
 var matrixMu sync.Mutex
+var matrixNameRe = regexp.MustCompile(`^[a-zA-Z0-9_]{1,32}$`)
+var matrixExec = runMatrixCmd
+var matrixUnitDir = "/etc/systemd/system"
+var matrixTincPath = func() (string, error) { return exec.LookPath("tincd") }
 
+// One owned network per server; a hub admits one node. Legacy tinc networks
+// are deliberately not adopted or removed.
+type matrixPeer struct {
+	Name    string `json:"name"`
+	Addr    string `json:"addr"`
+	IP      string `json:"ip"`
+	KeyHash string `json:"key_hash"`
+}
+type matrixState struct {
+	Enabled       bool         `json:"enabled"`
+	Network       string       `json:"network"`
+	Role          string       `json:"role"`
+	Family        string       `json:"family"`
+	Port          int          `json:"port"`
+	Addr          string       `json:"addr"`
+	Token         string       `json:"token,omitempty"`
+	Ports         []int        `json:"ports"`
+	Peers         []matrixPeer `json:"peers"`
+	Name          string       `json:"name"`
+	Panel         string       `json:"panel,omitempty"`
+	IP            string       `json:"ip"`
+	ForwardBefore string       `json:"forward_before,omitempty"`
+}
+type matrixBundlePayload struct {
+	Panel    string `json:"panel"`
+	Token    string `json:"token"`
+	Family   string `json:"family"`
+	Addr     string `json:"addr"`
+	Port     int    `json:"port"`
+	FIP      string `json:"fip"`
+	Ports    []int  `json:"ports"`
+	MainHost string `json:"main_host"`
+	Network  string `json:"network"`
+}
+
+func matrixDir() string       { return filepath.Join(configDir, "matrix-tinc") }
 func matrixStatePath() string { return filepath.Join(configDir, "matrix.json") }
-
+func matrixUnitPath() string  { return filepath.Join(matrixUnitDir, matrixUnit) }
 func loadMatrix() matrixState {
-	st := matrixState{}
-	if data, err := os.ReadFile(matrixStatePath()); err == nil {
-		_ = json.Unmarshal(data, &st)
+	var st matrixState
+	b, e := os.ReadFile(matrixStatePath())
+	if e == nil {
+		_ = json.Unmarshal(b, &st)
 	}
 	return st
 }
-
 func saveMatrix(st matrixState) error {
-	if err := os.MkdirAll(configDir, 0700); err != nil {
-		return err
+	if e := os.MkdirAll(configDir, 0700); e != nil {
+		return e
 	}
-	data, _ := json.MarshalIndent(st, "", "  ")
-	return os.WriteFile(matrixStatePath(), append(data, '\n'), 0600)
+	b, e := json.MarshalIndent(st, "", "  ")
+	if e != nil {
+		return e
+	}
+	f, e := os.CreateTemp(configDir, ".matrix-state-*")
+	if e != nil {
+		return e
+	}
+	defer os.Remove(f.Name())
+	if e = f.Chmod(0600); e == nil {
+		_, e = f.Write(append(b, '\n'))
+	}
+	if e == nil {
+		e = f.Sync()
+	}
+	ce := f.Close()
+	if e == nil {
+		e = ce
+	}
+	if e != nil {
+		return e
+	}
+	return os.Rename(f.Name(), matrixStatePath())
 }
-
-func clearMatrixState() { _ = os.Remove(matrixStatePath()) }
-
 func runMatrixCmd(name string, args ...string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 240*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, name, args...)
-	cmd.Env = append(os.Environ(), "DEBIAN_FRONTEND=noninteractive")
-	out, err := cmd.CombinedOutput()
-	return string(out), err
+	c := exec.CommandContext(ctx, name, args...)
+	c.Env = append(os.Environ(), "DEBIAN_FRONTEND=noninteractive")
+	b, e := c.CombinedOutput()
+	if e != nil {
+		return string(b), fmt.Errorf("%s failed: %w: %s", name, e, trimLen(string(b), 400))
+	}
+	return string(b), nil
 }
-
-// matrixInstallTinc installs the tinc package when missing (both roles).
 func matrixInstallTinc() error {
-	if _, err := exec.LookPath("tincd"); err == nil {
+	if _, e := exec.LookPath("tincd"); e == nil {
 		return nil
 	}
-	if _, err := exec.LookPath("apt-get"); err != nil {
-		return fmt.Errorf("tinc is not installed and apt-get is unavailable")
+	if _, e := matrixExec("apt-get", "update"); e != nil {
+		return e
 	}
-	if out, err := runMatrixCmd("apt-get", "update"); err != nil {
-		return fmt.Errorf("apt-get update: %v: %s", err, trimLen(out, 200))
+	_, e := matrixExec("apt-get", "install", "-y", "--no-install-recommends", "tinc")
+	return e
+}
+func validateMatrixSettings(family, addr string, port int, ports []int) error {
+	ip := net.ParseIP(addr)
+	if (family != "ipv4" && family != "ipv6") || ip == nil || ip.IsUnspecified() || ip.IsLoopback() || ip.IsMulticast() {
+		return fmt.Errorf("valid transport address and family ipv4 or ipv6 required")
 	}
-	if out, err := runMatrixCmd("apt-get", "install", "-y", "tinc"); err != nil {
-		return fmt.Errorf("apt-get install tinc: %v: %s", err, trimLen(out, 200))
+	if (family == "ipv4") != (ip.To4() != nil) {
+		return fmt.Errorf("address does not match selected family")
+	}
+	if port < 1024 || port > 65535 {
+		return fmt.Errorf("tinc port must be 1024-65535")
+	}
+	if len(ports) == 0 || len(ports) > 20 {
+		return fmt.Errorf("choose 1-20 forwarded ports")
+	}
+	seen := map[int]bool{}
+	for _, p := range ports {
+		if p < 1 || p > 65535 || p == port || p == cfg.Port || p == 22 || seen[p] {
+			return fmt.Errorf("forwarded ports must be unique, 1-65535, and exclude SSH, panel and tinc ports")
+		}
+		seen[p] = true
 	}
 	return nil
 }
-
-// matrixWriteHub builds /etc/tinc/matrix for the hub (main node).
-func matrixWriteHub(family, addr string, port int) error {
-	if err := os.MkdirAll(filepath.Join(matrixConfDir, "hosts"), 0755); err != nil {
-		return err
-	}
-	conf := strings.Join([]string{
-		"Name = main",
-		"Device = /dev/net/tun",
-		"AddressFamily = " + family,
-		"DirectOnly = yes",
-		"AutoConnect = yes",
-		"PingInterval = 10",
-		"ProcessPriority = high",
-		"",
-	}, "\n")
-	if err := os.WriteFile(filepath.Join(matrixConfDir, "tinc.conf"), []byte(conf), 0600); err != nil {
-		return err
-	}
-	host := strings.Join([]string{
-		"Address = " + addr,
-		"Subnet = " + matrixHubIP + "/32",
-		fmt.Sprintf("Port = %d", port),
-		"Cipher = aes-128-cbc",
-		"Digest = md5",
-		"PTMU = 1514",
-		"",
-	}, "\n")
-	if err := os.WriteFile(filepath.Join(matrixConfDir, "hosts", "main"), []byte(host), 0644); err != nil {
-		return err
-	}
-	up := strings.Join([]string{
-		"#!/bin/bash",
-		"/sbin/ip link set $INTERFACE up",
-		"/sbin/ip addr add " + matrixHubIP + "/32 dev $INTERFACE",
-		"/sbin/ip route add 172.16.1.0/24 dev $INTERFACE",
-		"",
-	}, "\n")
-	down := strings.Join([]string{
-		"#!/bin/bash",
-		"/sbin/ip route del 172.16.1.0/24 dev $INTERFACE 2>/dev/null || true",
-		"/sbin/ip addr del " + matrixHubIP + "/32 dev $INTERFACE 2>/dev/null || true",
-		"/sbin/ip link set $INTERFACE down",
-		"",
-	}, "\n")
-	if err := os.WriteFile(filepath.Join(matrixConfDir, "tinc-up"), []byte(up), 0755); err != nil {
-		return err
-	}
-	return os.WriteFile(filepath.Join(matrixConfDir, "tinc-down"), []byte(down), 0755)
-}
-
-// matrixDNATAdd / matrixDNATClear manage the forwarding rules; every rule
-// carries the hashem-matrix comment so removal is exact.
-func matrixDNATAdd(ports []int, peerIP string) {
-	iface := strings.TrimSpace(matrixIface())
-	for _, p := range ports {
-		dest := net.JoinHostPort(peerIP, fmt.Sprint(p))
-		for _, proto := range []string{"tcp", "udp"} {
-			_ = exec.Command("iptables", "-t", "nat", "-A", "PREROUTING", "-p", proto, "--dport",
-				fmt.Sprint(p), "-j", "DNAT", "--to-destination", dest,
-				"-m", "comment", "--comment", matrixTag).Run()
-		}
-	}
-	if iface != "" {
-		_ = exec.Command("iptables", "-t", "nat", "-A", "POSTROUTING", "-s", "172.16.1.0/24", "-o", iface,
-			"-j", "MASQUERADE", "-m", "comment", "--comment", matrixTag).Run()
-	}
-	_ = os.WriteFile("/etc/sysctl.d/99-hashem-matrix.conf", []byte("net.ipv4.ip_forward=1\n"), 0644)
-	_ = exec.Command("sysctl", "-w", "net.ipv4.ip_forward=1").Run()
-}
-
-func matrixIface() string {
-	out, err := exec.Command("ip", "route", "show", "default").CombinedOutput()
-	for _, f := range strings.Fields(string(out)) {
-		if f != "default" && f != "via" && f != "dev" && !strings.Contains(f, ".") && !strings.Contains(f, ":") {
-			return f
-		}
-	}
-	if err != nil {
+func matrixDetectV6() string {
+	b, e := matrixExec("ip", "-j", "-6", "addr", "show", "scope", "global")
+	if e != nil {
 		return ""
 	}
-	return ""
-}
-
-// matrixKeygen runs tincd -K (interactive in tinc 1.0: both key paths are
-// answered with their defaults via stdin) so the key files land in place.
-func matrixKeygen() error {
-	cmd := exec.Command("tincd", "-n", matrixNetname, "-K4096")
-	cmd.Stdin = strings.NewReader(strings.Repeat("\n", 10))
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("tincd keygen: %v: %s", err, trimLen(string(out), 200))
+	var rows []struct {
+		Info []struct {
+			Local string `json:"local"`
+		} `json:"addr_info"`
 	}
-	return nil
-}
-
-// matrixEnsureHostKey guarantees hosts/<name> carries a public key, appending
-// rsa_key.pub when tincd left it beside the private key instead.
-func matrixEnsureHostKey(name string) error {
-	hf := filepath.Join(matrixConfDir, "hosts", name)
-	data, err := os.ReadFile(hf)
-	if err != nil {
-		return err
+	if json.Unmarshal([]byte(b), &rows) != nil {
+		return ""
 	}
-	if strings.Contains(string(data), "PUBLIC KEY") {
-		return nil
-	}
-	pub, err := os.ReadFile(filepath.Join(matrixConfDir, "rsa_key.pub"))
-	if err != nil {
-		return fmt.Errorf("no public key was generated for %s", name)
-	}
-	return os.WriteFile(hf, append(bytes.TrimRight(data, "\n"), []byte("\n"+string(pub)+"\n")...), 0644)
-}
-
-// matrixFreshDir wipes our netname directory for a clean (re)setup — a
-// previous manual matrix-network install must not leak into ours.
-func matrixFreshDir() { _ = os.RemoveAll(matrixConfDir) }
-
-func matrixDNATClear() {
-	for _, c := range []string{"PREROUTING", "POSTROUTING"} {
-		out, _ := exec.Command("iptables", "-t", "nat", "-S", c).CombinedOutput()
-		var rules [][]string
-		for _, line := range strings.Split(string(out), "\n") {
-			line = strings.TrimSpace(line)
-			if strings.HasPrefix(line, "-A "+c+" ") && strings.Contains(line, matrixTag) {
-				rules = append(rules, strings.Fields(line))
+	for _, r := range rows {
+		for _, a := range r.Info {
+			p := net.ParseIP(a.Local)
+			if p != nil && p.IsGlobalUnicast() {
+				return a.Local
 			}
 		}
-		// delete in reverse so the remaining -A positions stay valid
-		for i := len(rules) - 1; i >= 0; i-- {
-			f := rules[i]
-			f[0] = "-D"
-			_ = exec.Command("iptables", append([]string{"-t", "nat"}, f...)...).Run()
-		}
-	}
-	_ = os.Remove("/etc/sysctl.d/99-hashem-matrix.conf")
-}
-
-func matrixServiceStart() error {
-	_ = exec.Command("systemctl", "enable", "tinc@"+matrixNetname).Run()
-	return exec.Command("systemctl", "restart", "tinc@"+matrixNetname).Run()
-}
-
-func matrixServiceActive() bool {
-	out, err := exec.Command("systemctl", "is-active", "--quiet", "tinc@"+matrixNetname).CombinedOutput()
-	_ = out
-	return err == nil
-}
-
-func matrixMeshPing(ip string) bool {
-	return exec.Command("ping", "-c", "2", "-i", "0.3", "-W", "2", ip).Run() == nil
-}
-
-// matrixDetectV6 returns this server's first global IPv6 address ("" if none).
-func matrixDetectV6() string {
-	out, err := exec.Command("ip", "-6", "addr", "show", "scope", "global").CombinedOutput()
-	if err != nil {
-		return ""
-	}
-	for _, line := range strings.Split(string(out), "\n") {
-		line = strings.TrimSpace(line)
-		if !strings.HasPrefix(line, "inet6 ") {
-			continue
-		}
-		ip := strings.Fields(line)[1]
-		if strings.HasPrefix(ip, "fe80") || strings.Contains(ip, "%") {
-			continue
-		}
-		return strings.Split(ip, "/")[0]
 	}
 	return ""
 }
-
-// ---- handlers ----
-
-var matrixNameRe = regexp.MustCompile(`^[a-z0-9-]{1,32}$`)
-
+func matrixCheckResources(st matrixState) error {
+	for _, p := range []string{matrixDir(), matrixUnitPath()} {
+		if _, e := os.Lstat(p); e == nil {
+			return fmt.Errorf("resource already exists, refusing to overwrite %s", p)
+		} else if !os.IsNotExist(e) {
+			return e
+		}
+	}
+	routes, e := matrixExec("ip", "-j", "-4", "route", "show", "table", "all")
+	if e != nil {
+		return e
+	}
+	var rows []struct {
+		Dst string `json:"dst"`
+	}
+	if json.Unmarshal([]byte(routes), &rows) != nil {
+		return fmt.Errorf("cannot read routes")
+	}
+	_, own, _ := net.ParseCIDR(matrixSubnet)
+	for _, r := range rows {
+		if r.Dst == "default" || r.Dst == "" {
+			continue
+		}
+		ip, n, e := net.ParseCIDR(r.Dst)
+		if e != nil {
+			ip = net.ParseIP(r.Dst)
+			if ip != nil && own.Contains(ip) {
+				return fmt.Errorf("mesh IP conflicts with an existing route")
+			}
+			continue
+		}
+		if own.Contains(ip) || n.Contains(net.ParseIP(matrixHubIP)) {
+			return fmt.Errorf("mesh subnet conflicts with existing route %s", r.Dst)
+		}
+	}
+	if _, e = matrixExec("ip", "link", "show", matrixIfaceName); e == nil {
+		return fmt.Errorf("interface %s already exists", matrixIfaceName)
+	}
+	for _, c := range []struct{ table, chain string }{{"nat", "QMX_IN"}, {"nat", "QMX_OUT"}, {"filter", "QMX_FWD"}, {"mangle", "QMX_MSS"}} {
+		if _, err := matrixExec("iptables", "-t", c.table, "-S", c.chain); err == nil {
+			return fmt.Errorf("firewall chain %s already exists; refusing to adopt it", c.chain)
+		}
+	}
+	checkPorts := []int{st.Port}
+	if st.Role == "hub" {
+		checkPorts = append(checkPorts, st.Ports...)
+	}
+	for _, p := range checkPorts {
+		l, e := net.Listen("tcp", net.JoinHostPort("", strconv.Itoa(p)))
+		if e != nil {
+			return fmt.Errorf("TCP port %d is occupied", p)
+		}
+		l.Close()
+		u, e := net.ListenPacket("udp", net.JoinHostPort("", strconv.Itoa(p)))
+		if e != nil {
+			return fmt.Errorf("UDP port %d is occupied", p)
+		}
+		u.Close()
+	}
+	return nil
+}
+func matrixPublicKey(host string) (string, error) {
+	start := strings.Index(host, "-----BEGIN RSA PUBLIC KEY-----")
+	if start < 0 {
+		return "", fmt.Errorf("RSA public key missing")
+	}
+	block, rest := pem.Decode([]byte(host[start:]))
+	if block == nil || block.Type != "RSA PUBLIC KEY" || len(strings.TrimSpace(string(rest))) != 0 {
+		return "", fmt.Errorf("invalid public key payload")
+	}
+	k, e := x509.ParsePKCS1PublicKey(block.Bytes)
+	if e != nil || k.N.BitLen() < 2048 {
+		return "", fmt.Errorf("RSA key must have at least 2048 bits")
+	}
+	return string(pem.EncodeToMemory(block)), nil
+}
+func matrixWriteConfig(st matrixState, mainHost string) error {
+	if e := os.MkdirAll(filepath.Join(matrixDir(), "hosts"), 0700); e != nil {
+		return e
+	}
+	key, e := rsa.GenerateKey(rand.Reader, 3072)
+	if e != nil {
+		return e
+	}
+	priv := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
+	pub := pem.EncodeToMemory(&pem.Block{Type: "RSA PUBLIC KEY", Bytes: x509.MarshalPKCS1PublicKey(&key.PublicKey)})
+	conf := "Name = " + st.Name + "\nInterface = " + matrixIfaceName + "\nDevice = /dev/net/tun\nAddressFamily = " + st.Family + "\nPort = " + strconv.Itoa(st.Port) + "\nDirectOnly = yes\nPingInterval = 10\nCipher = aes-256-cbc\nDigest = sha256\n"
+	if st.Role == "node" {
+		conf += "ConnectTo = main\n"
+	}
+	self := "Subnet = " + st.IP + "/32\nPort = " + strconv.Itoa(st.Port) + "\nCipher = aes-256-cbc\nDigest = sha256\n"
+	if st.Role == "hub" {
+		self = "Address = " + st.Addr + "\n" + self
+	}
+	files := map[string][]byte{"tinc.conf": []byte(conf), "rsa_key.priv": priv, "hosts/" + st.Name: append([]byte(self), pub...)}
+	if st.Role == "node" {
+		files["hosts/main"] = []byte(mainHost)
+	}
+	// A /30 creates an on-link route on both ends without touching the default route.
+	files["tinc-up"] = []byte("#!/bin/sh\nset -eu\nip address add " + st.IP + "/30 dev \"$INTERFACE\"\nip link set \"$INTERFACE\" mtu 1380 up\n")
+	files["tinc-down"] = []byte("#!/bin/sh\nip link set \"$INTERFACE\" down 2>/dev/null || true\n")
+	for name, data := range files {
+		mode := os.FileMode(0600)
+		if name == "tinc-up" || name == "tinc-down" {
+			mode = 0700
+		}
+		if e = os.WriteFile(filepath.Join(matrixDir(), name), data, mode); e != nil {
+			return e
+		}
+	}
+	tinc, e := matrixTincPath()
+	if e != nil {
+		return e
+	}
+	if strings.ContainsAny(matrixDir(), "\n\r\"") {
+		return fmt.Errorf("unsupported configuration directory")
+	}
+	unit := "[Unit]\nDescription=Quantum Matrix tinc tunnel\nAfter=network-online.target\nWants=network-online.target\n[Service]\nType=simple\nExecStart=" + tinc + " -D -c \"" + matrixDir() + "\" --pidfile=/run/quantum-matrix.pid\nExecStartPost=/bin/sh -c 'if [ -f \"" + matrixDir() + "/forward-up\" ]; then /bin/sh \"" + matrixDir() + "/forward-up\"; fi'\nRestart=on-failure\nRestartSec=3\n[Install]\nWantedBy=multi-user.target\n"
+	return os.WriteFile(matrixUnitPath(), []byte(unit), 0644)
+}
+func matrixServiceStart() error {
+	for _, args := range [][]string{{"daemon-reload"}, {"enable", "--now", matrixUnit}} {
+		if _, e := matrixExec("systemctl", args...); e != nil {
+			return e
+		}
+	}
+	for i := 0; i < 15; i++ {
+		if matrixServiceActive() {
+			return nil
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	return fmt.Errorf("Matrix service did not start")
+}
+func matrixServiceActive() bool {
+	_, e := matrixExec("systemctl", "is-active", "--quiet", matrixUnit)
+	return e == nil
+}
+func matrixMeshPing(ip string) bool {
+	_, e := matrixExec("ping", "-I", matrixIfaceName, "-c", "1", "-W", "1", ip)
+	return e == nil
+}
+func matrixForwardScript(st matrixState) string {
+	// Dedicated chains make deletion exact, even on machines with unrelated NAT rules.
+	s := "#!/bin/sh\nset -eu\n" +
+		"iptables -t nat -N QMX_IN 2>/dev/null || iptables -t nat -F QMX_IN\n" +
+		"iptables -t nat -N QMX_OUT 2>/dev/null || iptables -t nat -F QMX_OUT\n" +
+		"iptables -N QMX_FWD 2>/dev/null || iptables -F QMX_FWD\n" +
+		"iptables -t mangle -N QMX_MSS 2>/dev/null || iptables -t mangle -F QMX_MSS\n" +
+		"iptables -t mangle -A QMX_MSS -o qmx0 -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1340\n" +
+		"iptables -t mangle -A QMX_MSS -i qmx0 -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1340\n" +
+		"iptables -t mangle -C FORWARD -m comment --comment quantum-matrix -j QMX_MSS 2>/dev/null || iptables -t mangle -A FORWARD -m comment --comment quantum-matrix -j QMX_MSS\n" +
+		"sysctl -w net.ipv4.ip_forward=1 >/dev/null\n"
+	for _, p := range st.Ports {
+		for _, proto := range []string{"tcp", "udp"} {
+			s += fmt.Sprintf("iptables -t nat -A QMX_IN -d %s -p %s --dport %d -j DNAT --to-destination %s\n", st.Addr, proto, p, net.JoinHostPort(matrixFirstPeer, strconv.Itoa(p)))
+		}
+	}
+	s += "iptables -t nat -A QMX_OUT -o " + matrixIfaceName + " -d " + matrixFirstPeer + " -j SNAT --to-source " + matrixHubIP + "\n"
+	s += "iptables -A QMX_FWD -i " + matrixIfaceName + " -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT\n"
+	for _, p := range st.Ports {
+		for _, proto := range []string{"tcp", "udp"} {
+			s += fmt.Sprintf("iptables -A QMX_FWD -o %s -d %s -p %s --dport %d -j ACCEPT\n", matrixIfaceName, matrixFirstPeer, proto, p)
+		}
+	}
+	s += "iptables -t nat -C PREROUTING -m comment --comment " + matrixTag + " -j QMX_IN 2>/dev/null || iptables -t nat -A PREROUTING -m comment --comment " + matrixTag + " -j QMX_IN\n" +
+		"iptables -t nat -C POSTROUTING -m comment --comment " + matrixTag + " -j QMX_OUT 2>/dev/null || iptables -t nat -A POSTROUTING -m comment --comment " + matrixTag + " -j QMX_OUT\n" +
+		"iptables -C FORWARD -m comment --comment " + matrixTag + " -j QMX_FWD 2>/dev/null || iptables -I FORWARD 1 -m comment --comment " + matrixTag + " -j QMX_FWD\n"
+	return s
+}
+func matrixDNATClear() error {
+	var errs []string
+	for _, r := range []struct{ table, parent, chain string }{{"nat", "PREROUTING", "QMX_IN"}, {"nat", "POSTROUTING", "QMX_OUT"}, {"filter", "FORWARD", "QMX_FWD"}, {"mangle", "FORWARD", "QMX_MSS"}} {
+		if _, e := matrixExec("iptables", "-t", r.table, "-S", r.chain); e != nil {
+			continue
+		}
+		for {
+			if _, e := matrixExec("iptables", "-t", r.table, "-C", r.parent, "-m", "comment", "--comment", matrixTag, "-j", r.chain); e != nil {
+				break
+			}
+			if _, e := matrixExec("iptables", "-t", r.table, "-D", r.parent, "-m", "comment", "--comment", matrixTag, "-j", r.chain); e != nil {
+				errs = append(errs, e.Error())
+				break
+			}
+		}
+		for _, op := range []string{"-F", "-X"} {
+			if _, e := matrixExec("iptables", "-t", r.table, op, r.chain); e != nil {
+				errs = append(errs, e.Error())
+			}
+		}
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("forwarding cleanup failed: %s", strings.Join(errs, "; "))
+	}
+	return nil
+}
+func matrixActivateForward(st *matrixState) error {
+	if st.Role != "hub" {
+		return nil
+	}
+	// A v6 outer transport still forwards IPv4 user ports using the hub's public IPv4.
+	fwd := *st
+	if st.Family == "ipv6" {
+		fwd.Addr = getOutboundIP()
+	}
+	if e := matrixDNATClear(); e != nil {
+		return e
+	}
+	if st.ForwardBefore == "" {
+		v, e := matrixExec("sysctl", "-n", "net.ipv4.ip_forward")
+		if e != nil {
+			return e
+		}
+		st.ForwardBefore = strings.TrimSpace(v)
+	}
+	if _, e := matrixExec("sysctl", "-w", "net.ipv4.ip_forward=1"); e != nil {
+		return e
+	}
+	script := filepath.Join(matrixDir(), "forward-up")
+	if e := os.WriteFile(script, []byte(matrixForwardScript(fwd)), 0700); e != nil {
+		return e
+	}
+	_, e := matrixExec("sh", script)
+	if e != nil {
+		_ = matrixDNATClear()
+	}
+	return e
+}
+func matrixRemove(st matrixState) error {
+	if st.Network != matrixNetname {
+		return fmt.Errorf("refusing to remove an unowned legacy Matrix network")
+	}
+	if _, err := os.Stat(matrixUnitPath()); err == nil {
+		if _, e := matrixExec("systemctl", "stop", matrixUnit); e != nil {
+			return e
+		}
+		if _, e := matrixExec("systemctl", "disable", matrixUnit); e != nil {
+			return e
+		}
+	}
+	if e := matrixDNATClear(); e != nil {
+		return e
+	}
+	if st.ForwardBefore == "0" {
+		_, _ = matrixExec("sysctl", "-w", "net.ipv4.ip_forward=0")
+	}
+	if e := os.Remove(matrixUnitPath()); e != nil && !os.IsNotExist(e) {
+		return e
+	}
+	_, _ = matrixExec("systemctl", "daemon-reload")
+	if e := os.RemoveAll(matrixDir()); e != nil {
+		return e
+	}
+	if e := os.Remove(matrixStatePath()); e != nil && !os.IsNotExist(e) {
+		return e
+	}
+	return nil
+}
+func matrixSetup(st matrixState, mainHost string) error {
+	if e := matrixCheckResources(st); e != nil {
+		return e
+	}
+	if e := matrixInstallTinc(); e != nil {
+		return e
+	}
+	// Save ownership before creating resources, so failed setup remains removable.
+	st.Network = matrixNetname
+	if e := saveMatrix(st); e != nil {
+		return e
+	}
+	if e := matrixWriteConfig(st, mainHost); e != nil {
+		_ = matrixRemove(st)
+		return e
+	}
+	if e := matrixServiceStart(); e != nil {
+		_ = matrixRemove(st)
+		return e
+	}
+	return nil
+}
+func parseMatrixBundle(s string) (matrixBundlePayload, error) {
+	var b matrixBundlePayload
+	if len(s) > 32<<10 || !strings.HasPrefix(strings.TrimSpace(s), matrixBundlePfx) {
+		return b, fmt.Errorf("invalid Matrix bundle")
+	}
+	data, e := base64.StdEncoding.DecodeString(strings.TrimPrefix(strings.TrimSpace(s), matrixBundlePfx))
+	if e != nil {
+		return b, e
+	}
+	if e = json.Unmarshal(data, &b); e != nil {
+		return b, e
+	}
+	if b.Network != matrixNetname || b.FIP != matrixFirstPeer || len(b.Token) < 32 {
+		return b, fmt.Errorf("unsupported or incomplete Matrix bundle")
+	}
+	if e = validateMatrixSettings(b.Family, b.Addr, b.Port, b.Ports); e != nil {
+		return b, e
+	}
+	u, e := url.Parse(b.Panel)
+	if e != nil || u.User != nil || u.RawQuery != "" || u.Fragment != "" || (u.Scheme != "http" && u.Scheme != "https") || net.ParseIP(u.Hostname()) == nil {
+		return b, fmt.Errorf("panel URL must be an explicit HTTP(S) IP endpoint")
+	}
+	key, e := matrixPublicKey(b.MainHost)
+	if e != nil {
+		return b, e
+	}
+	b.MainHost = "Address = " + b.Addr + "\nSubnet = " + matrixHubIP + "/32\nPort = " + strconv.Itoa(b.Port) + "\nCipher = aes-256-cbc\nDigest = sha256\n" + key
+	return b, nil
+}
+func matrixBundle(st matrixState, r *http.Request) string {
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	host, _ := os.ReadFile(filepath.Join(matrixDir(), "hosts/main"))
+	panelHost := r.Host
+	if h, _, err := net.SplitHostPort(panelHost); err == nil {
+		if ip := net.ParseIP(h); ip != nil && ip.IsLoopback() {
+			panelHost = net.JoinHostPort(getOutboundIP(), strconv.Itoa(cfg.Port))
+		}
+	}
+	b, _ := json.Marshal(matrixBundlePayload{Panel: scheme + "://" + panelHost + "/" + strings.Trim(cfg.BasePath, "/"), Token: st.Token, Family: st.Family, Addr: st.Addr, Port: st.Port, FIP: matrixFirstPeer, Ports: st.Ports, MainHost: string(host), Network: matrixNetname})
+	return matrixBundlePfx + base64.StdEncoding.EncodeToString(b)
+}
 func handleMatrixSetupPost(w http.ResponseWriter, r *http.Request) {
-	var req struct {
+	var q struct {
 		Family string `json:"family"`
 		Port   int    `json:"port"`
 		Addr   string `json:"addr"`
 		Ports  []int  `json:"ports"`
 	}
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8<<10)).Decode(&req); err != nil {
-		writeAPIError(w, r, "E-ACTION-01", "invalid json")
+	if e := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8<<10)).Decode(&q); e != nil {
+		writeAPIError(w, r, "E-MATRIX-02", "invalid JSON")
 		return
 	}
-	mu.Lock()
-	defer mu.Unlock()
-	st := loadMatrix()
-	if st.Enabled {
-		writeAPIError(w, r, "E-MATRIX-01", "matrix tunnel is already set up on this server — remove it first")
+	matrixMu.Lock()
+	defer matrixMu.Unlock()
+	if loadMatrix().Enabled {
+		writeAPIError(w, r, "E-MATRIX-01", "")
 		return
 	}
-	family := strings.ToLower(strings.TrimSpace(req.Family))
-	if family != "ipv4" && family != "ipv6" {
-		writeAPIError(w, r, "E-MATRIX-02", "family must be ipv4 or ipv6")
-		return
-	}
-	if req.Port < 22 || req.Port > 65535 {
-		writeAPIError(w, r, "E-MATRIX-03", "tinc port must be 22-65535")
-		return
-	}
-	ports := req.Ports
-	if len(ports) > 20 {
-		ports = ports[:20]
-	}
-	for _, p := range ports {
-		if p < 1 || p > 65535 {
-			writeAPIError(w, r, "E-MATRIX-04", "forwarded ports must be 1-65535")
-			return
+	q.Family = strings.TrimSpace(q.Family)
+	q.Addr = strings.TrimSpace(q.Addr)
+	if q.Addr == "" {
+		if q.Family == "ipv6" {
+			q.Addr = matrixDetectV6()
+		} else {
+			q.Addr = getOutboundIP()
 		}
 	}
-	addr := strings.TrimSpace(req.Addr)
-	if family == "ipv6" {
-		if addr == "" {
-			addr = matrixDetectV6()
-		}
-		if addr == "" {
-			writeAPIError(w, r, "E-MATRIX-05", "no global IPv6 address found on this server — enter one manually")
-			return
-		}
-		if net.ParseIP(addr) == nil || !strings.Contains(addr, ":") {
-			writeAPIError(w, r, "E-MATRIX-06", "the IPv6 address is not valid")
-			return
-		}
-	} else if addr == "" {
-		addr = getOutboundIP()
-	}
-	if err := matrixInstallTinc(); err != nil {
-		writeAPIError(w, r, "E-MATRIX-07", err.Error())
+	if e := validateMatrixSettings(q.Family, q.Addr, q.Port, q.Ports); e != nil {
+		writeAPIError(w, r, "E-MATRIX-02", e.Error())
 		return
 	}
-	matrixFreshDir() // a clean (re)setup: stale matrix configs from manual installs go away
-	if err := matrixWriteHub(family, addr, req.Port); err != nil {
-		writeAPIError(w, r, "E-MATRIX-07", err.Error())
+	st := matrixState{Enabled: true, Network: matrixNetname, Role: "hub", Family: q.Family, Port: q.Port, Addr: q.Addr, Token: randHex(32), Ports: q.Ports, Name: "main", IP: matrixHubIP}
+	if e := matrixSetup(st, ""); e != nil {
+		writeAPIError(w, r, "E-MATRIX-07", e.Error())
 		return
 	}
-	if err := matrixKeygen(); err != nil {
-		writeAPIError(w, r, "E-MATRIX-07", err.Error())
-		return
-	}
-	if err := matrixEnsureHostKey("main"); err != nil {
-		writeAPIError(w, r, "E-MATRIX-07", err.Error())
-		return
-	}
-	if err := matrixServiceStart(); err != nil {
-		writeAPIError(w, r, "E-MATRIX-07", "tinc@matrix start: "+err.Error())
-		return
-	}
-	token := randHex(24)
-	st = matrixState{Enabled: true, Role: "hub", Family: family, Port: req.Port, Addr: addr, Token: token, Ports: ports}
-	if err := saveMatrix(st); err != nil {
-		writeAPIError(w, r, "E-MATRIX-07", err.Error())
-		return
-	}
-	LogSecurityAudit("matrix_setup", cfg.Username, ClientIP(r), "family="+family+" port="+fmt.Sprint(req.Port))
+	LogSecurityAudit("matrix_setup", cfg.Username, ClientIP(r), "family="+st.Family)
 	writeJSON(w, map[string]any{"status": "ok", "bundle": matrixBundle(st, r), "state": matrixPublicState(st)})
 }
-
-// matrixBundle builds the hmx1_ payload the foreign panel pastes.
-func matrixBundle(st matrixState, r *http.Request) string {
-	scheme := "http"
-	if r != nil && r.TLS != nil {
-		scheme = "https"
-	}
-	host := ""
-	if r != nil {
-		host = r.Host
-	}
-	payload, _ := json.Marshal(map[string]any{
-		"panel":  scheme + "://" + host + "/" + strings.Trim(cfg.BasePath, "/"),
-		"token":  st.Token,
-		"family": st.Family,
-		"addr":   st.Addr,
-		"port":   st.Port,
-		"fip":    matrixFirstPeer,
-		"ports":  st.Ports,
-	})
-	return matrixBundlePfx + base64.StdEncoding.EncodeToString(payload)
-}
-
-// handleMatrixRegister is called server-to-server by the foreign panel with
-// the one-time token from the bundle: it exchanges host files and opens the
-// DNAT rules for the forwarded ports.
 func handleMatrixRegister(w http.ResponseWriter, r *http.Request) {
-	var req struct {
+	var q struct {
 		Token    string `json:"token"`
 		Name     string `json:"name"`
 		HostFile string `json:"host_file"`
 	}
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 32<<10)).Decode(&req); err != nil {
-		writeAPIError(w, r, "E-ACTION-01", "invalid json")
+	if e := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16<<10)).Decode(&q); e != nil {
+		http.Error(w, "invalid JSON", 400)
 		return
 	}
-	mu.Lock()
-	defer mu.Unlock()
+	matrixMu.Lock()
+	defer matrixMu.Unlock()
 	st := loadMatrix()
-	if !st.Enabled || st.Role != "hub" {
-		writeJSON(w, map[string]string{"error": "matrix hub is not set up on this server"})
+	if !st.Enabled || st.Network != matrixNetname || st.Role != "hub" || st.Token == "" || subtle.ConstantTimeCompare([]byte(q.Token), []byte(st.Token)) != 1 {
+		http.Error(w, "registration denied", 403)
 		return
 	}
-	if subtle.ConstantTimeCompare([]byte(strings.TrimSpace(req.Token)), []byte(st.Token)) != 1 {
-		writeJSON(w, map[string]string{"error": "bad matrix token"})
+	if !matrixNameRe.MatchString(q.Name) || q.Name == "main" {
+		http.Error(w, "invalid node name", 400)
 		return
 	}
-	name := strings.ToLower(strings.TrimSpace(req.Name))
-	if !matrixNameRe.MatchString(name) || name == "main" {
-		writeJSON(w, map[string]string{"error": "invalid node name"})
+	key, e := matrixPublicKey(q.HostFile)
+	if e != nil {
+		http.Error(w, "invalid public key", 400)
 		return
 	}
-	hf := strings.TrimSpace(req.HostFile)
-	if len(hf) < 64 || len(hf) > 16<<10 || !strings.Contains(hf, "PUBLIC KEY") || strings.Contains(hf, "PRIVATE KEY") {
-		writeJSON(w, map[string]string{"error": "host file must contain the tinc public key only"})
+	hash := sha256.Sum256([]byte(key))
+	fingerprint := hex.EncodeToString(hash[:])
+	if len(st.Peers) > 0 && (st.Peers[0].Name != q.Name || st.Peers[0].KeyHash != fingerprint) {
+		http.Error(w, "hub already paired; remove and recreate to pair another node", 409)
 		return
 	}
-	peerAddr := ClientIP(r)
-	if host, _, err := net.SplitHostPort(peerAddr); err == nil {
-		peerAddr = host
-	}
-	hostFile := "Address = " + peerAddr + "\nSubnet = " + matrixFirstPeer + "/32\n" +
-		fmt.Sprintf("Port = %d\n", st.Port) + hf + "\n"
-	if err := os.WriteFile(filepath.Join(matrixConfDir, "hosts", name), []byte(hostFile), 0644); err != nil {
-		writeJSON(w, map[string]string{"error": err.Error()})
+	hf := "Subnet = " + matrixFirstPeer + "/32\nPort = " + strconv.Itoa(st.Port) + "\nCipher = aes-256-cbc\nDigest = sha256\n" + key
+	if e = os.WriteFile(filepath.Join(matrixDir(), "hosts", q.Name), []byte(hf), 0600); e != nil {
+		writeAPIError(w, r, "E-MATRIX-07", e.Error())
 		return
 	}
-	mainConf, _ := os.ReadFile(filepath.Join(matrixConfDir, "tinc.conf"))
-	if !strings.Contains(string(mainConf), "ConnectTo = "+name) {
-		_ = os.WriteFile(filepath.Join(matrixConfDir, "tinc.conf"),
-			append(bytes.TrimRight(mainConf, "\n"), []byte("\nConnectTo = "+name+"\n")...), 0600)
+	st.Peers = []matrixPeer{{Name: q.Name, Addr: ClientIP(r), IP: matrixFirstPeer, KeyHash: fingerprint}}
+	if e = matrixActivateForward(&st); e != nil {
+		writeAPIError(w, r, "E-MATRIX-07", e.Error())
+		return
 	}
-	_ = exec.Command("systemctl", "restart", "tinc@"+matrixNetname).Run()
-	matrixDNATAdd(st.Ports, matrixFirstPeer)
-	mainHost, _ := os.ReadFile(filepath.Join(matrixConfDir, "hosts", "main"))
-	replaced := false
-	for i := range st.Peers {
-		if st.Peers[i].Name == name {
-			st.Peers[i] = matrixPeer{Name: name, Addr: peerAddr, HostFile: hostFile, IP: matrixFirstPeer}
-			replaced = true
-		}
+	if e = saveMatrix(st); e != nil {
+		writeAPIError(w, r, "E-MATRIX-07", e.Error())
+		return
 	}
-	if !replaced {
-		st.Peers = append(st.Peers, matrixPeer{Name: name, Addr: peerAddr, HostFile: hostFile, IP: matrixFirstPeer})
+	if _, e = matrixExec("systemctl", "restart", matrixUnit); e != nil {
+		writeAPIError(w, r, "E-MATRIX-07", e.Error())
+		return
 	}
-	_ = saveMatrix(st)
-	LogSecurityAudit("matrix_register", "matrix-node", peerAddr, "name="+name)
-	writeJSON(w, map[string]string{"status": "ok", "main_host": string(mainHost)})
+	host, _ := os.ReadFile(filepath.Join(matrixDir(), "hosts/main"))
+	writeJSON(w, map[string]string{"status": "ok", "main_host": string(host)})
 }
-
+func handleMatrixForeignSetup(w http.ResponseWriter, r *http.Request) {
+	var q struct {
+		Bundle string `json:"bundle"`
+	}
+	if e := json.NewDecoder(http.MaxBytesReader(w, r.Body, 40<<10)).Decode(&q); e != nil {
+		writeAPIError(w, r, "E-MATRIX-02", "invalid JSON")
+		return
+	}
+	b, e := parseMatrixBundle(q.Bundle)
+	if e != nil {
+		writeAPIError(w, r, "E-MATRIX-02", e.Error())
+		return
+	}
+	matrixMu.Lock()
+	defer matrixMu.Unlock()
+	if loadMatrix().Enabled {
+		writeAPIError(w, r, "E-MATRIX-01", "")
+		return
+	}
+	st := matrixState{Enabled: true, Network: matrixNetname, Role: "node", Family: b.Family, Port: b.Port, Addr: b.Addr, Ports: b.Ports, Name: "node" + randHex(8), IP: matrixFirstPeer, Panel: b.Panel}
+	if e = matrixSetup(st, b.MainHost); e != nil {
+		writeAPIError(w, r, "E-MATRIX-07", e.Error())
+		return
+	}
+	self, _ := os.ReadFile(filepath.Join(matrixDir(), "hosts", st.Name))
+	payload, _ := json.Marshal(map[string]string{"token": b.Token, "name": st.Name, "host_file": string(self)})
+	client := &http.Client{Timeout: 25 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	resp, e := client.Post(b.Panel+"/api/matrix/register", "application/json", strings.NewReader(string(payload)))
+	if e != nil {
+		_ = matrixRemove(st)
+		writeAPIError(w, r, "E-MATRIX-08", "hub registration unavailable")
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		_ = matrixRemove(st)
+		writeAPIError(w, r, "E-MATRIX-08", fmt.Sprintf("hub registration returned HTTP %d", resp.StatusCode))
+		return
+	}
+	LogSecurityAudit("matrix_node_setup", cfg.Username, ClientIP(r), "family="+st.Family)
+	writeJSON(w, map[string]string{"status": "ok", "detail": "matrix node registered with the hub and started"})
+}
 func matrixPublicState(st matrixState) map[string]any {
 	peers := []map[string]any{}
+	active := st.Enabled && st.Network == matrixNetname && matrixServiceActive()
 	for _, p := range st.Peers {
-		peers = append(peers, map[string]any{"name": p.Name, "addr": p.Addr, "ip": p.IP,
-			"ping_ok": matrixMeshPing(p.IP)})
+		peers = append(peers, map[string]any{"name": p.Name, "addr": p.Addr, "ip": p.IP, "ping_ok": active && matrixMeshPing(p.IP)})
 	}
-	out := map[string]any{
-		"enabled": st.Enabled, "role": st.Role, "family": st.Family, "port": st.Port,
-		"addr": st.Addr, "ports": st.Ports, "service": matrixServiceActive(), "peers": peers,
-		"name": st.Name, "ip": st.IP, "bundle": "",
-	}
-	if st.Role == "node" && st.IP != "" {
-		out["hub_ping_ok"] = matrixMeshPing(matrixHubIP)
-	}
-	return out
+	return map[string]any{"enabled": st.Enabled, "role": st.Role, "family": st.Family, "port": st.Port, "addr": st.Addr, "ports": st.Ports, "service": active, "peers": peers, "name": st.Name, "ip": st.IP, "hub_ping_ok": active && st.Role == "node" && matrixMeshPing(matrixHubIP), "bundle": ""}
 }
-
 func handleMatrixStatus(w http.ResponseWriter, r *http.Request) {
-	mu.Lock()
-	defer mu.Unlock()
+	matrixMu.Lock()
+	defer matrixMu.Unlock()
 	st := loadMatrix()
-	out := matrixPublicState(st)
-	if st.Enabled && st.Role == "hub" {
-		out["bundle"] = matrixBundle(st, r)
+	v := matrixPublicState(st)
+	if st.Enabled && st.Role == "hub" && st.Network == matrixNetname {
+		v["bundle"] = matrixBundle(st, r)
 	}
-	writeJSON(w, out)
+	writeJSON(w, v)
 }
-
 func handleMatrixRemovePost(w http.ResponseWriter, r *http.Request) {
-	mu.Lock()
-	defer mu.Unlock()
+	matrixMu.Lock()
+	defer matrixMu.Unlock()
 	st := loadMatrix()
-	_ = exec.Command("systemctl", "stop", "tinc@"+matrixNetname).Run()
-	_ = exec.Command("systemctl", "disable", "tinc@"+matrixNetname).Run()
-	matrixDNATClear()
-	_ = os.RemoveAll(matrixConfDir)
-	clearMatrixState()
-	LogSecurityAudit("matrix_remove", cfg.Username, ClientIP(r), "role="+st.Role)
-	writeJSON(w, map[string]string{"status": "ok", "detail": "matrix removed — configs, service and forwarding rules cleared"})
+	if st.Enabled {
+		if e := matrixRemove(st); e != nil {
+			writeAPIError(w, r, "E-MATRIX-07", e.Error())
+			return
+		}
+	}
+	LogSecurityAudit("matrix_remove", cfg.Username, ClientIP(r), "removed owned network")
+	writeJSON(w, map[string]string{"status": "ok", "detail": "Matrix removed; unrelated tinc networks and firewall rules preserved"})
 }
-
 func handleMatrixRestartPost(w http.ResponseWriter, r *http.Request) {
-	if err := matrixServiceStart(); err != nil {
-		writeAPIError(w, r, "E-MATRIX-07", err.Error())
+	matrixMu.Lock()
+	defer matrixMu.Unlock()
+	st := loadMatrix()
+	if !st.Enabled || st.Network != matrixNetname {
+		writeAPIError(w, r, "E-MATRIX-01", "no owned Matrix network")
 		return
+	}
+	if _, e := matrixExec("systemctl", "restart", matrixUnit); e != nil {
+		writeAPIError(w, r, "E-MATRIX-07", e.Error())
+		return
+	}
+	if st.Role == "hub" && len(st.Peers) > 0 {
+		if e := matrixActivateForward(&st); e != nil {
+			writeAPIError(w, r, "E-MATRIX-07", e.Error())
+			return
+		}
 	}
 	writeJSON(w, map[string]string{"status": "ok"})
 }

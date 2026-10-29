@@ -276,7 +276,7 @@ function goTab(name) {
   document.querySelectorAll('.sidebar-nav [data-tab]').forEach(markTab);
   const dr = $('drawerNav');
   if (dr) dr.querySelectorAll('[data-tab]').forEach(markTab);
-  if (name === 'setup' || name === 'tunnel') loadSSHFwd();
+  if (name === 'setup' || name === 'tunnel') { loadSSHFwd(); loadMatrix(); }
   if (name === 'cluster') {
     loadClusterStatus();
   }
@@ -1462,6 +1462,7 @@ async function loadMatrix() {
   } catch (e) { window._matrixState = null; }
   renderMatrixSetup();
   renderTunnelsList();
+  applyTunnelDetail(false);
   if (_tunnelDetail === 'matrix') renderMatrixDetail();
 }
 
@@ -1483,7 +1484,7 @@ function renderMatrixSetup() {
       <div class="u-mt-12">
         <p class="qs-hint">${esc(tr('', 'Foreign server? Paste the Matrix bundle from the Iran panel here and register it.'))}</p>
         <div class="u-flex-center-wrap10 u-mt-4">
-          <input class="hashem-input u-flex-1 u-mono" id="mxBundle" placeholder="hmx1_…" dir="ltr" autocomplete="off" spellcheck="false">
+          <input aria-label="Matrix bundle" class="hashem-input u-flex-1 u-mono" id="mxBundle" placeholder="hmx1_…" dir="ltr" autocomplete="off" spellcheck="false">
           <button type="button" class="hashem-btn hashem-btn-secondary" id="mxRegisterBtn">${esc(tr('', 'Register'))}</button>
         </div>
       </div>`;
@@ -1525,7 +1526,7 @@ function renderMatrixBody(targetId) {
     </div>
     ${st.role === 'hub' && st.bundle ? `<div class="u-mt-8">
       <p class="qs-hint">${esc(tr('', 'Matrix bundle — paste it on the foreign panel to register that server:'))}</p>
-      <textarea class="hashem-input u-mono u-w-full" rows="3" readonly dir="ltr" onclick="this.select()">${esc(st.bundle)}</textarea>
+      <textarea aria-label="Matrix bundle" class="hashem-input u-mono u-w-full" rows="3" readonly dir="ltr" onclick="this.select()">${esc(st.bundle)}</textarea>
     </div>` : ''}
     <div class="tc-acts u-flex u-wrap u-gap-8 u-mt-4">
       <button type="button" class="hashem-btn hashem-btn-secondary u-btn-30" onclick="matrixRestartClick()">${esc(tr('', 'Restart'))}</button>
@@ -1539,7 +1540,8 @@ async function mxApplyClick() {
   try {
     const r = await api('/api/matrix/setup', body);
     toastOk(tr('', 'Matrix hub started — copy the bundle to the foreign panel'));
-    window._matrixState = Object.assign({}, window._matrixState || {}, { enabled: true, role: 'hub', family: body.family, port: body.port, bundle: r.bundle });
+    window._matrixState = r.state;
+    window._matrixState.bundle = r.bundle;
     renderMatrixSetup();
     renderTunnelsList();
   } catch (e) { toastErr('matrix setup failed', e.message); }
@@ -1670,6 +1672,7 @@ function renderTunnelsList() {
 // the global modal: the inline arm/undo box lives inside the status card,
 // which is hidden while the table is the active view.
 async function tunnelListRemove(kind, name) {
+  if (kind === 'matrix') return matrixRemoveClick();
   if (kind === 'main') { const b = $('removeTunnelBtn'); if (b) b.click(); return; }
   if (kind === 'bagher') { if (typeof cleanBagherTunnelClick === 'function') cleanBagherTunnelClick(); return; }
   const ok = await entConfirm(
@@ -1681,7 +1684,7 @@ async function tunnelListRemove(kind, name) {
 }
 
 // Detail (drill-in) mode: View opens one tunnel's full settings and hides the rest.
-function openTunnelDetail(kind) { _tunnelDetail = kind; applyTunnelDetail(true); }
+function openTunnelDetail(kind) { _tunnelDetail = kind; if (kind === 'matrix') renderMatrixDetail(); applyTunnelDetail(true); }
 function closeTunnelDetail() { _tunnelDetail = null; applyTunnelDetail(false); }
 
 function applyTunnelDetail(scroll) {
@@ -1708,6 +1711,10 @@ function applyTunnelDetail(scroll) {
   hide.forEach(id => { const c = $(id); if (c) c.classList.add('td-hide'); });
   ['tunnelsListCard', 'tunnelStatusCard', 'rescueCard', 'fleetCard', 'limitsCard', 'tunnelHealthCard', 'carriersCard', 'carrierCard', 'dialCard', 'matrixDetailCard']
     .filter(id => !hide.includes(id)).forEach(id => { const c = $(id); if (c) c.classList.remove('td-hide'); });
+  const mxCard = $('matrixDetailCard');
+  if (mxCard) mxCard.hidden = m !== 'matrix';
+  const emptySlot = $('tunnelsEmpty');
+  if (emptySlot) emptySlot.classList.toggle('td-hide', !!m || !!window._matrixState?.enabled);
   // the active peer card is marked on every rebuild (renderPeers rebuilds the DOM)
   document.querySelectorAll('#peerCards > .peer-card.td-keep').forEach(c => c.classList.remove('td-keep'));
   if (m && m !== 'main') { const c = $('peer-card-' + m); if (c) c.classList.add('td-keep'); }
@@ -1715,6 +1722,7 @@ function applyTunnelDetail(scroll) {
   const ttl = $('tunnelDetailTitle');
   if (ttl) {
     ttl.textContent = m === 'main' ? tr('', 'Main tunnel settings')
+      : m === 'matrix' ? tr('', 'Matrix tunnel')
       : m === 'bagher' ? tr('', 'Bagher tunnel settings')
       : (m ? tr('', 'Tunnel settings') + ' — ' + String(((tunPeerCache || []).find(p => p.id === m) || {}).name || ('peer-' + m)) : '');
   }
