@@ -58,17 +58,18 @@ func TestMatrixLocalBridgeRejectsWrongRoleAndProtectedPorts(t *testing.T) {
 	if e := saveMatrix(st); e != nil {
 		t.Fatal(e)
 	}
-	if e := matrixConfigureLocalService(matrixLocalService{443, 443}, false); e == nil {
+	inst := matrixLegacyInstance()
+	if e := matrixConfigureLocalService(inst, matrixLocalService{443, 443}, false); e == nil {
 		t.Fatal("hub bridge accepted")
 	}
 	st.Role = "node"
 	if e := saveMatrix(st); e != nil {
 		t.Fatal(e)
 	}
-	if e := matrixConfigureLocalService(matrixLocalService{443, 22}, false); e == nil {
+	if e := matrixConfigureLocalService(inst, matrixLocalService{443, 22}, false); e == nil {
 		t.Fatal("SSH target accepted")
 	}
-	if e := matrixConfigureLocalService(matrixLocalService{8080, 443}, false); e == nil {
+	if e := matrixConfigureLocalService(inst, matrixLocalService{8080, 443}, false); e == nil {
 		t.Fatal("unforwarded port accepted")
 	}
 }
@@ -82,10 +83,11 @@ func TestMatrixLocalBridgeStateAndExactRemoval(t *testing.T) {
 		return "", nil
 	}
 	t.Cleanup(func() { configDir, matrixUnitDir, matrixExec = oldDir, oldUnits, oldExec })
-	if e := saveMatrixLocalServices([]matrixLocalService{{443, 443}}); e != nil {
+	inst := matrixLegacyInstance()
+	if e := saveMatrixLocalServices(inst, []matrixLocalService{{443, 443}}); e != nil {
 		t.Fatal(e)
 	}
-	ours := filepath.Join(matrixUnitDir, matrixLocalUnit(443))
+	ours := filepath.Join(matrixUnitDir, matrixLocalUnit(inst, 443))
 	other := filepath.Join(matrixUnitDir, "xray.service")
 	if e := os.WriteFile(ours, []byte("owned"), 0600); e != nil {
 		t.Fatal(e)
@@ -93,7 +95,7 @@ func TestMatrixLocalBridgeStateAndExactRemoval(t *testing.T) {
 	if e := os.WriteFile(other, []byte("unrelated"), 0600); e != nil {
 		t.Fatal(e)
 	}
-	if e := matrixRemoveLocalServices(); e != nil {
+	if e := matrixRemoveLocalServices(inst); e != nil {
 		t.Fatal(e)
 	}
 	if _, e := os.Stat(other); e != nil {
@@ -102,7 +104,7 @@ func TestMatrixLocalBridgeStateAndExactRemoval(t *testing.T) {
 	if _, e := os.Stat(ours); !os.IsNotExist(e) {
 		t.Fatal("owned unit remains")
 	}
-	if _, e := os.Stat(matrixLocalPath()); !os.IsNotExist(e) {
+	if _, e := os.Stat(matrixLocalPath(inst)); !os.IsNotExist(e) {
 		t.Fatal("bridge state remains")
 	}
 	for _, c := range calls {

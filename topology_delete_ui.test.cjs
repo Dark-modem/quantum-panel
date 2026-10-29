@@ -74,7 +74,7 @@ for (const state of ['healthy', 'up', 'down', 'stopped']) {
     assertCount(html, 1);
     assertNoticeTooltip(html, notice.replace('{n}', '1'));
     await h.sandbox.topologyDelete('pair');
-    assert.deepEqual(h.warnings, [notice.replace('{n}', '1')]);
+    assert.equal(h.warnings.length, 0, 'no visible toast: the tooltip is the only delivery');
     assert.equal(h.confirms.length, 0, 'guard runs before confirmation');
     assert.deepEqual(h.calls, [], 'blocked deletion sends no API request, including DELETE');
   });
@@ -88,7 +88,7 @@ test('mixed live/down inventory is counted, while stale and unrelated IDs are ig
   assertCount(html, 2);
   assertNoticeTooltip(html, notice.replace('{n}', '2'));
   await h.sandbox.topologyDelete('pair');
-  assert.deepEqual(h.warnings, [notice.replace('{n}', '2')]);
+  assert.equal(h.warnings.length, 0, 'no visible toast: the tooltip is the only delivery');
   assert.equal(h.confirms.length, 0);
   assert.equal(h.calls.length, 0);
 });
@@ -97,7 +97,7 @@ test('guard checks the requested topology, not the currently selected empty topo
   const h = harness([topo([], 'empty'), topo(['matrix'])], [tunnel('matrix', 'healthy')]);
   vm.runInContext("topologySelected = 'empty';", h.sandbox);
   await h.sandbox.topologyDelete('pair');
-  assert.equal(h.warnings.length, 1);
+  assert.equal(h.warnings.length, 0);
   assert.equal(h.confirms.length, 0);
   assert.equal(h.calls.length, 0);
 });
@@ -106,7 +106,7 @@ test('delegated click cannot bypass the function guard on a disabled delete butt
   const h = harness([topo(['peer:2'])], [tunnel('peer:2', 'stopped')]);
   h.el('tab-tunnel').click({ target: { closest() { return { dataset: { topoDelete: 'pair' } }; } } });
   await Promise.resolve();
-  assert.equal(h.warnings.length, 1);
+  assert.equal(h.warnings.length, 0);
   assert.equal(h.confirms.length, 0);
   assert.equal(h.calls.length, 0);
 });
@@ -135,7 +135,7 @@ test('guard rechecks current inventory when a tunnel appears after an enabled ro
   assert.doesNotMatch(button, / disabled(?: |>|$)/);
   vm.runInContext(`topologyData.tunnels = ${JSON.stringify([tunnel('peer:2', 'stopped')])}`, h.sandbox);
   await h.sandbox.topologyDelete('pair');
-  assert.deepEqual(h.warnings, [notice.replace('{n}', '1')]);
+  assert.equal(h.warnings.length, 0, 'no visible toast: the tooltip is the only delivery');
   assert.equal(h.confirms.length, 0, 'late inventory guard runs before confirmation');
   assert.deepEqual(h.calls, [], 'a stale enabled row cannot send a DELETE');
 });
@@ -144,7 +144,7 @@ test('duplicate and stale bindings do not inflate the existing inventory count',
   const h = harness([topo(['matrix', 'matrix', 'deleted'])], [tunnel('matrix', 'stopped')]);
   assert.equal(h.sandbox.topologyExistingTunnelCount(topo(['matrix', 'matrix', 'deleted'])), 1);
   await h.sandbox.topologyDelete('pair');
-  assert.deepEqual(h.warnings, [notice.replace('{n}', '1')]);
+  assert.equal(h.warnings.length, 0, 'no visible toast: the tooltip is the only delivery');
   assert.equal(h.confirms.length, 0);
   assert.deepEqual(h.calls, []);
 });
@@ -175,7 +175,7 @@ test('Persian title, count notice and empty confirmation are translated with uni
   assertNoticeTooltip(html, map[notice].replace('{n}', '1'));
   assertCount(html, 1, (map['{n} existing tunnel(s)'] || '{n} existing tunnel(s)').replace('{n}', '1'));
   await h.sandbox.topologyDelete('pair');
-  assert.deepEqual(h.warnings, [map[notice].replace('{n}', '1')]);
+  assert.equal(h.warnings.length, 0, 'no visible toast: the tooltip is the only delivery');
   assert.equal(h.confirms.length, 0);
   assert.equal(h.calls.length, 0);
   const empty = harness([topo()], [], { fa: true });

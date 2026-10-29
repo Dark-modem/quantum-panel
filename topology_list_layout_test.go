@@ -101,3 +101,41 @@ func TestTopologyListSharedResponsiveColumns(t *testing.T) {
 		}
 	}
 }
+
+// The new-tunnel wizard opens in a modal on the topology view: its markup,
+// step indicators and event wiring must stay in place.
+func TestTopologyWizardMarkup(t *testing.T) {
+	html := topologyListTestSource(t, "index.html")
+	for _, id := range []string{"topoWizModal", "topoWizProgress", "topoWizSteps", "topoWizBody", "topoWizErr", "topoWizCancelBtn", "topoWizBack", "topoWizNext", "topoWizX"} {
+		if !strings.Contains(html, `id="`+id+`"`) {
+			t.Errorf("index.html must keep the wizard element %s", id)
+		}
+	}
+	if strings.Contains(html, `id="tunnelsAddBtn" onclick`) {
+		t.Error("tunnelsAddBtn must not jump to Setup inline; topology.js opens the wizard")
+	}
+	js := topologyListTestSource(t, "topology.js")
+	for _, want := range []string{
+		`$('tunnelsAddBtn').onclick = topologyNewTunnel`,
+		`$('topologyAddTunnelBtn').onclick = topologyNewTunnel`,
+		`$('topoWizNext').onclick = topoWizNext`,
+		`$('topoWizBack').onclick = topoWizBack`,
+		`$('topoWizCancelBtn').onclick = topoWizCancel`,
+		`data-wiz-type=`,
+		`data-wiz-step=`,
+		`Step {x} of {n}`,
+		`' done' : ''`,
+	} {
+		if !strings.Contains(js, want) {
+			t.Errorf("topology.js lacks wizard wiring/markup: %s", want)
+		}
+	}
+	if strings.Contains(js, "goTab('setup')") {
+		t.Error("topologyNewTunnel must not navigate to the Setup tab anymore")
+	}
+	css := topologyListTestSource(t, "enterprise.css")
+	if !regexp.MustCompile(`\.topo-wiz-step\.done\s*\{[^}]*`).MatchString(css) ||
+		!strings.Contains(css, `content: "\2713"`) {
+		t.Error("enterprise.css must style completed wizard steps with a checkmark")
+	}
+}

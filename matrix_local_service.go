@@ -22,10 +22,14 @@ type matrixLocalService struct {
 	TargetPort int `json:"target_port"`
 }
 
-func matrixLocalPath() string { return filepath.Join(configDir, "matrix-local-services.json") }
-func matrixLocalServices() ([]matrixLocalService, error) {
+// Each Matrix instance owns its own local-service registry file so instances
+// never share mutable state.
+func matrixLocalPath(in matrixInstance) string {
+	return filepath.Join(configDir, "matrix"+in.suffix()+"-local-services.json")
+}
+func matrixLocalServices(in matrixInstance) ([]matrixLocalService, error) {
 	var services []matrixLocalService
-	b, e := os.ReadFile(matrixLocalPath())
+	b, e := os.ReadFile(matrixLocalPath(in))
 	if os.IsNotExist(e) {
 		return services, nil
 	}
@@ -35,9 +39,9 @@ func matrixLocalServices() ([]matrixLocalService, error) {
 	e = json.Unmarshal(b, &services)
 	return services, e
 }
-func saveMatrixLocalServices(services []matrixLocalService) error {
+func saveMatrixLocalServices(in matrixInstance, services []matrixLocalService) error {
 	if len(services) == 0 {
-		e := os.Remove(matrixLocalPath())
+		e := os.Remove(matrixLocalPath(in))
 		if os.IsNotExist(e) {
 			return nil
 		}
@@ -62,13 +66,13 @@ func saveMatrixLocalServices(services []matrixLocalService) error {
 	if closeErr != nil {
 		return closeErr
 	}
-	return os.Rename(f.Name(), matrixLocalPath())
+	return os.Rename(f.Name(), matrixLocalPath(in))
 }
-func matrixLocalUnit(port int) string {
-	return "quantum-matrix-local-" + strconv.Itoa(port) + ".service"
+func matrixLocalUnit(in matrixInstance, port int) string {
+	return "quantum-matrix" + in.suffix() + "-local-" + strconv.Itoa(port) + ".service"
 }
-func matrixRemoveLocalService(port int) error {
-	unit := matrixLocalUnit(port)
+func matrixRemoveLocalService(in matrixInstance, port int) error {
+	unit := matrixLocalUnit(in, port)
 	path := filepath.Join(matrixUnitDir, unit)
 	if _, e := os.Stat(path); os.IsNotExist(e) {
 		return nil
@@ -83,25 +87,25 @@ func matrixRemoveLocalService(port int) error {
 	}
 	return os.Remove(path)
 }
-func matrixRemoveLocalServices() error {
-	services, e := matrixLocalServices()
+func matrixRemoveLocalServices(in matrixInstance) error {
+	services, e := matrixLocalServices(in)
 	if e != nil {
 		return e
 	}
 	for _, s := range services {
-		if e = matrixRemoveLocalService(s.Port); e != nil {
+		if e = matrixRemoveLocalService(in, s.Port); e != nil {
 			return e
 		}
 	}
-	if e = saveMatrixLocalServices(nil); e != nil {
+	if e = saveMatrixLocalServices(in, nil); e != nil {
 		return e
 	}
 	_, e = matrixExec("systemctl", "daemon-reload")
 	return e
 }
-func matrixConfigureLocalService(q matrixLocalService, remove bool) error {
-	st := loadMatrix()
-	if !st.Enabled || st.Network != matrixNetname || st.Role != "node" {
+func matrixConfigureLocalService(in matrixInstance, q matrixLocalService, remove bool) error {
+	st := loadMatrixInstance(in)
+	if !st.Enabled || st.Network != in.network() || st.Role != "node" {
 		return fmt.Errorf("connect a local service on the foreign Matrix node, not the Iran hub")
 	}
 	if q.Port < 1 || q.Port > 65535 || q.TargetPort < 1 || q.TargetPort > 65535 || q.Port == 22 || q.TargetPort == 22 || q.Port == cfg.Port || q.TargetPort == cfg.Port {
@@ -116,7 +120,7 @@ func matrixConfigureLocalService(q matrixLocalService, remove bool) error {
 	if !found && !remove {
 		return fmt.Errorf("the user port must be present in the Matrix forwarded-port list")
 	}
-	services, e := matrixLocalServices()
+	services, e := matrixLocalServices(in)
 	if e != nil {
 		return e
 	}
@@ -130,11 +134,11 @@ func matrixConfigureLocalService(q matrixLocalService, remove bool) error {
 		if idx < 0 {
 			return nil
 		}
-		if e = matrixRemoveLocalService(q.Port); e != nil {
+		if e = matrixRemoveLocalService(in, q.Port); e != nil {
 			return e
 		}
 		services = append(services[:idx], services[idx+1:]...)
-		if e = saveMatrixLocalServices(services); e != nil {
+		if e = saveMatrixLocalServices(in, services); e != nil {
 			return e
 		}
 		_, e = matrixExec("systemctl", "daemon-reload")
@@ -147,11 +151,11 @@ func matrixConfigureLocalService(q matrixLocalService, remove bool) error {
 	}
 	conn.Close()
 	if idx < 0 {
-		unitPath := filepath.Join(matrixUnitDir, matrixLocalUnit(q.Port))
+		unitPath := filepath.Join(matrixUnitDir, matrixLocalUnit(in, q.Port))
 		if _, e = os.Lstat(unitPath); e == nil {
 			return fmt.Errorf("service unit already exists; refusing to overwrite")
 		}
-		ln, e := net.Listen("tcp4", net.JoinHostPort(matrixFirstPeer, strconv.Itoa(q.Port)))
+		ln, e := net.Listen("tcp4", net.JoinHostPort(in.firstPeer(), strconv.Itoa(q.Port)))
 		if e != nil {
 			return fmt.Errorf("Matrix mesh port %d is occupied; service may already listen there", q.Port)
 		}
@@ -164,14 +168,14 @@ func matrixConfigureLocalService(q matrixLocalService, remove bool) error {
 	if strings.ContainsAny(exe, "\n\r\"") {
 		return fmt.Errorf("invalid executable path")
 	}
-	unit := matrixLocalUnit(q.Port)
-	unitBody := "[Unit]\nDescription=Quantum Matrix local TCP service bridge\nRequires=" + matrixUnit + "\nAfter=" + matrixUnit + "\nPartOf=" + matrixUnit + "\n[Service]\nType=simple\nExecStart=\"" + exe + "\" matrix-local-proxy " + strconv.Itoa(q.Port) + " " + strconv.Itoa(q.TargetPort) + "\nRestart=on-failure\nRestartSec=2\nNoNewPrivileges=true\n[Install]\nWantedBy=" + matrixUnit + "\n"
+	unit := matrixLocalUnit(in, q.Port)
+	unitBody := "[Unit]\nDescription=Quantum Matrix local TCP service bridge\nRequires=" + in.unit() + "\nAfter=" + in.unit() + "\nPartOf=" + in.unit() + "\n[Service]\nType=simple\nExecStart=\"" + exe + "\" matrix-local-proxy " + strconv.Itoa(q.Port) + " " + strconv.Itoa(q.TargetPort) + "\nRestart=on-failure\nRestartSec=2\nNoNewPrivileges=true\n[Install]\nWantedBy=" + in.unit() + "\n"
 	if idx < 0 {
 		services = append(services, q)
 	} else {
 		services[idx] = q
 	}
-	if e = saveMatrixLocalServices(services); e != nil {
+	if e = saveMatrixLocalServices(in, services); e != nil {
 		return e
 	}
 	if e = os.WriteFile(filepath.Join(matrixUnitDir, unit), []byte(unitBody), 0644); e != nil {
@@ -183,7 +187,7 @@ func matrixConfigureLocalService(q matrixLocalService, remove bool) error {
 		}
 	}
 	for i := 0; i < 15; i++ {
-		conn, e = net.DialTimeout("tcp", net.JoinHostPort(matrixFirstPeer, strconv.Itoa(q.Port)), time.Second)
+		conn, e = net.DialTimeout("tcp", net.JoinHostPort(in.firstPeer(), strconv.Itoa(q.Port)), time.Second)
 		if e == nil {
 			conn.Close()
 			return nil
@@ -195,8 +199,13 @@ func matrixConfigureLocalService(q matrixLocalService, remove bool) error {
 func handleMatrixLocalService(w http.ResponseWriter, r *http.Request) {
 	matrixMu.Lock()
 	defer matrixMu.Unlock()
+	in, e := matrixResolveInstance(strings.TrimSpace(r.URL.Query().Get("instance")))
+	if e != nil {
+		writeAPIError(w, r, "E-MATRIX-02", e.Error())
+		return
+	}
 	if r.Method == http.MethodGet {
-		services, e := matrixLocalServices()
+		services, e := matrixLocalServices(in)
 		if e != nil {
 			writeAPIError(w, r, "E-MATRIX-07", e.Error())
 			return
@@ -219,7 +228,7 @@ func handleMatrixLocalService(w http.ResponseWriter, r *http.Request) {
 	if q.Remove && q.TargetPort == 0 {
 		q.TargetPort = q.Port
 	}
-	if e := matrixConfigureLocalService(matrixLocalService{Port: q.Port, TargetPort: q.TargetPort}, q.Remove); e != nil {
+	if e := matrixConfigureLocalService(in, matrixLocalService{Port: q.Port, TargetPort: q.TargetPort}, q.Remove); e != nil {
 		writeAPIError(w, r, "E-MATRIX-07", e.Error())
 		return
 	}

@@ -644,6 +644,10 @@ func handleSetupPost(w http.ResponseWriter, r *http.Request) {
 			writeAPIError(w, r, "E-PEER-08", "Foreign IP is already used by tunnel '"+clash+"' — you cannot add multiple tunnels to the exact same server")
 			return
 		}
+		if clash := matrixPortClash(ports); clash != "" {
+			writeAPIError(w, r, "E-PEER-02", "port is already reserved by "+clash+" — pick a different port")
+			return
+		}
 		if clash := peerPortClash(ports, -1); clash != "" {
 			writeAPIError(w, r, "E-PEER-02", "port "+clash+" is already served by another tunnel — pick a different port")
 			return

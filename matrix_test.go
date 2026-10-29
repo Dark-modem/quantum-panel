@@ -70,7 +70,8 @@ func TestMatrixNamespacedConfigAndRoutes(t *testing.T) {
 	matrixTincPath = func() (string, error) { return "/usr/sbin/tincd", nil }
 	t.Cleanup(func() { configDir, matrixUnitDir, matrixTincPath = oldDir, oldUnit, oldTinc })
 	st := matrixState{Role: "node", Name: "node123", Family: "ipv6", Port: 21097, IP: matrixFirstPeer, Network: matrixNetname}
-	if e := matrixWriteConfig(st, "public host file"); e != nil {
+	in := matrixLegacyInstance()
+	if e := matrixWriteConfig(in, st, "public host file"); e != nil {
 		t.Fatal(e)
 	}
 	for _, name := range []string{"tinc.conf", "tinc-up", "hosts/node123", "rsa_key.priv"} {
@@ -96,7 +97,7 @@ func TestMatrixNamespacedConfigAndRoutes(t *testing.T) {
 }
 func TestMatrixForwardingScopedAndReversible(t *testing.T) {
 	st := matrixState{Addr: "185.226.119.74", Ports: []int{18080}}
-	script := matrixForwardScript(st)
+	script := matrixForwardScript(matrixLegacyInstance(), st)
 	for _, v := range []string{"-d 185.226.119.74", "--dport 18080", "-o qmx0", "--to-source " + matrixHubIP, "--comment quantum-matrix"} {
 		if !strings.Contains(script, v) {
 			t.Errorf("missing %s", v)
@@ -116,7 +117,7 @@ func TestMatrixForwardingScopedAndReversible(t *testing.T) {
 		return "", nil
 	}
 	t.Cleanup(func() { matrixExec = old })
-	if e := matrixDNATClear(); e != nil {
+	if e := matrixDNATClear(matrixLegacyInstance()); e != nil {
 		t.Fatal(e)
 	}
 	for _, c := range calls {
@@ -126,7 +127,7 @@ func TestMatrixForwardingScopedAndReversible(t *testing.T) {
 	}
 }
 func TestMatrixRefusesUnownedRemoval(t *testing.T) {
-	if e := matrixRemove(matrixState{Network: "matrix", Enabled: true}); e == nil {
+	if e := matrixRemove(matrixLegacyInstance(), matrixState{Network: "matrix", Enabled: true}); e == nil {
 		t.Fatal("would remove legacy network")
 	}
 }

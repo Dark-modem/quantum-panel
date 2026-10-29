@@ -351,6 +351,10 @@ func handlePeersPatch(w http.ResponseWriter, r *http.Request) {
 				writeAPIError(w, r, "E-PEER-02", "port "+clash+" is already served by another tunnel")
 				return
 			}
+			if clash := matrixPortClash(*body.Ports); clash != "" {
+				writeAPIError(w, r, "E-PEER-02", "port is already reserved by "+clash)
+				return
+			}
 		}
 		warnMsg, err := editMainTunnelDirect(body, legacyPeer)
 		if err != nil {
@@ -378,6 +382,10 @@ func handlePeersPatch(w http.ResponseWriter, r *http.Request) {
 	if body.Ports != nil {
 		if clash := peerPortClash(*body.Ports, body.ID); clash != "" {
 			writeAPIError(w, r, "E-PEER-02", "port "+clash+" is already served by another tunnel")
+			return
+		}
+		if clash := matrixPortClash(*body.Ports); clash != "" {
+			writeAPIError(w, r, "E-PEER-02", "port is already reserved by "+clash)
 			return
 		}
 	}

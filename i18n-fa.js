@@ -3064,5 +3064,19 @@ window.FA_TEXT = {
 "List view": "نمای فهرستی",
 "Grid view": "نمای کارتی",
 "No topology matches your search.": "هیچ توپولوژی‌ای با جستجوی شما مطابقت ندارد.",
-"Clear the search to see all topologies.": "برای دیدن همه توپولوژی‌ها جستجو را پاک کنید."
+"Clear the search to see all topologies.": "برای دیدن همه توپولوژی‌ها جستجو را پاک کنید.",
+"Step {x} of {n}": "مرحله {x} از {n}",
+"Choose the tunnel type": "نوع تونل را انتخاب کنید",
+"Type": "نوع",
+"Tunnel name": "نام تونل",
+"Local public IP": "IP عمومی این سرور",
+"Remote public IP": "IP عمومی سرور دیگر",
+"GRE under the tunnel": "GRE زیر تونل",
+"FRP bind port": "پورت اتصال FRP",
+"Pool size": "اندازه‌ی استخر",
+"This server's IPv6 address": "نشانی IPv6 این سرور",
+"Enter a port number.": "شماره‌ی پورت وارد کنید.",
+"The new tunnel is attached to this topology.": "تونل تازه به این توپولوژی متصل شد.",
+"Mesh tunnel (tinc): the servers join one virtual network.": "تونل مش (tinc): سرورها به یک شبکه‌ی مجازی می‌پیوندند.",
+"Stealth tunnel over an SSH connection pool.": "تونل پنهان‌کار روی استخر اتصال SSH."
 };

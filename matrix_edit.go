@@ -14,10 +14,11 @@ import (
 )
 
 type matrixEditRequest struct {
-	Ports  *[]int `json:"ports,omitempty"`
-	Family string `json:"family,omitempty"`
-	Addr   string `json:"addr,omitempty"`
-	Bundle string `json:"bundle,omitempty"`
+	Ports    *[]int `json:"ports,omitempty"`
+	Family   string `json:"family,omitempty"`
+	Addr     string `json:"addr,omitempty"`
+	Bundle   string `json:"bundle,omitempty"`
+	Instance string `json:"instance,omitempty"`
 }
 
 func matrixSetDirective(data []byte, key, value string) []byte {
@@ -67,7 +68,7 @@ func matrixEditPortConflicts(old, next []int) error {
 
 // Back up only mutable Matrix-owned files. Keys and interface addressing are
 // never rewritten by an edit, including when changing the outer IP family.
-func matrixEditCommit(old, next matrixState, mainHost []byte) error {
+func matrixEditCommit(in matrixInstance, old, next matrixState, mainHost []byte) error {
 	names := []string{"tinc.conf", "hosts/" + old.Name, "forward-up"}
 	if old.Role == "node" {
 		names = append(names, "hosts/main")
@@ -75,7 +76,7 @@ func matrixEditCommit(old, next matrixState, mainHost []byte) error {
 	backup := map[string][]byte{}
 	absent := map[string]bool{}
 	for _, name := range names {
-		b, e := os.ReadFile(filepath.Join(matrixDir(), name))
+		b, e := os.ReadFile(filepath.Join(matrixDirOf(in), name))
 		if os.IsNotExist(e) {
 			absent[name] = true
 			continue
@@ -90,53 +91,53 @@ func matrixEditCommit(old, next matrixState, mainHost []byte) error {
 	}
 	rollback := func(err error) error {
 		for _, name := range names {
-			path := filepath.Join(matrixDir(), name)
+			path := filepath.Join(matrixDirOf(in), name)
 			if absent[name] {
 				_ = os.Remove(path)
 			} else {
 				_ = os.WriteFile(path, backup[name], 0600)
 			}
 		}
-		_ = saveMatrix(old)
+		_ = saveMatrixInstance(in, old)
 		if old.Role == "hub" && len(old.Peers) > 0 {
-			_ = matrixActivateForward(&old)
+			_ = matrixActivateForward(in, &old)
 		}
-		_, _ = matrixExec("systemctl", "restart", matrixUnit)
+		_, _ = matrixExec("systemctl", "restart", in.unit())
 		return fmt.Errorf("Matrix edit failed; previous configuration restored: %w", err)
 	}
 	conf := matrixSetDirective(backup["tinc.conf"], "AddressFamily", next.Family)
 	conf = matrixSetDirective(conf, "Port", strconv.Itoa(next.Port))
-	if e := os.WriteFile(filepath.Join(matrixDir(), "tinc.conf"), conf, 0600); e != nil {
+	if e := os.WriteFile(filepath.Join(matrixDirOf(in), "tinc.conf"), conf, 0600); e != nil {
 		return rollback(e)
 	}
 	self := backup["hosts/"+old.Name]
 	if old.Role == "hub" {
 		self = matrixSetDirective(self, "Address", next.Addr)
 	}
-	if e := os.WriteFile(filepath.Join(matrixDir(), "hosts", old.Name), self, 0600); e != nil {
+	if e := os.WriteFile(filepath.Join(matrixDirOf(in), "hosts", old.Name), self, 0600); e != nil {
 		return rollback(e)
 	}
 	if old.Role == "node" {
-		if e := os.WriteFile(filepath.Join(matrixDir(), "hosts/main"), mainHost, 0600); e != nil {
+		if e := os.WriteFile(filepath.Join(matrixDirOf(in), "hosts/main"), mainHost, 0600); e != nil {
 			return rollback(e)
 		}
 	}
 	if old.Role == "hub" && len(next.Peers) > 0 {
-		if e := matrixActivateForward(&next); e != nil {
+		if e := matrixActivateForward(in, &next); e != nil {
 			return rollback(e)
 		}
 	}
-	if e := saveMatrix(next); e != nil {
+	if e := saveMatrixInstance(in, next); e != nil {
 		return rollback(e)
 	}
 	// User port-only edits do not restart the transport or disconnect sessions.
 	if old.Family != next.Family || old.Addr != next.Addr || old.Port != next.Port {
-		if _, e := matrixExec("systemctl", "restart", matrixUnit); e != nil {
+		if _, e := matrixExec("systemctl", "restart", in.unit()); e != nil {
 			return rollback(e)
 		}
 		started := false
 		for attempt := 0; attempt < 15; attempt++ {
-			if matrixServiceActive() {
+			if matrixServiceActive(in) {
 				started = true
 				break
 			}
@@ -150,10 +151,11 @@ func matrixEditCommit(old, next matrixState, mainHost []byte) error {
 }
 
 func matrixApplyEdit(old matrixState, q matrixEditRequest) (matrixState, error) {
-	next := old
-	if !old.Enabled || old.Network != matrixNetname {
+	in, ok := matrixInstanceOfNetwork(old.Network)
+	if !ok || !old.Enabled {
 		return old, fmt.Errorf("no owned Matrix tunnel to edit")
 	}
+	next := old
 	if old.Role != "hub" {
 		return old, fmt.Errorf("edit on the Iran hub, then apply its updated bundle on this node")
 	}
@@ -178,24 +180,41 @@ func matrixApplyEdit(old matrixState, q matrixEditRequest) (matrixState, error) 
 	if e := matrixEditPortConflicts(old.Ports, next.Ports); e != nil {
 		return old, e
 	}
+	added := []int{}
+	oldPorts := map[int]bool{}
+	for _, p := range old.Ports {
+		oldPorts[p] = true
+	}
+	for _, p := range next.Ports {
+		if !oldPorts[p] {
+			added = append(added, p)
+		}
+	}
+	if owner := matrixInstancePortsBusy(in, added); owner != "" {
+		return old, fmt.Errorf("port is already used by Matrix instance %s", owner)
+	}
+	if owner := matrixTopologyPortOwner(added); owner != "" {
+		return old, fmt.Errorf("port is already owned by another topology's tunnel (%s)", owner)
+	}
 	if next.Family != old.Family || next.Addr != old.Addr {
 		next.Revision = randHex(16)
 		next.PeerSyncRequired = len(old.Peers) > 0
 	}
-	if e := matrixEditCommit(old, next, nil); e != nil {
+	if e := matrixEditCommit(in, old, next, nil); e != nil {
 		return old, e
 	}
 	return next, nil
 }
 
 func matrixApplyNodeBundle(old matrixState, b matrixBundlePayload) error {
-	if old.Role != "node" || old.Network != matrixNetname {
+	in, ok := matrixInstanceOfNetwork(old.Network)
+	if !ok || old.Role != "node" {
 		return fmt.Errorf("only an owned Matrix node may apply an edited bundle")
 	}
 	if strings.TrimRight(old.Panel, "/") != strings.TrimRight(b.Panel, "/") {
 		return fmt.Errorf("updated bundle is from a different hub")
 	}
-	current, e := os.ReadFile(filepath.Join(matrixDir(), "hosts/main"))
+	current, e := os.ReadFile(filepath.Join(matrixDirOf(in), "hosts/main"))
 	if e != nil {
 		return e
 	}
@@ -217,7 +236,7 @@ func matrixApplyNodeBundle(old matrixState, b matrixBundlePayload) error {
 	next.Ports = b.Ports
 	next.Revision = b.Revision
 	next.PeerSyncRequired = old.Family != b.Family || old.Addr != b.Addr || old.Port != b.Port || old.Revision != b.Revision || old.PeerSyncRequired
-	if e = matrixEditCommit(old, next, []byte(b.MainHost)); e != nil {
+	if e = matrixEditCommit(in, old, next, []byte(b.MainHost)); e != nil {
 		return e
 	}
 	// Port-only node refreshes merely update displayed settings; no transport
@@ -226,7 +245,7 @@ func matrixApplyNodeBundle(old matrixState, b matrixBundlePayload) error {
 		return nil
 	}
 	// Register the same key/identity to acknowledge this revision on the hub.
-	self, e := os.ReadFile(filepath.Join(matrixDir(), "hosts", old.Name))
+	self, e := os.ReadFile(filepath.Join(matrixDirOf(in), "hosts", old.Name))
 	if e != nil {
 		return e
 	}
@@ -253,9 +272,17 @@ func handleMatrixEdit(w http.ResponseWriter, r *http.Request) {
 	}
 	matrixMu.Lock()
 	defer matrixMu.Unlock()
-	old := loadMatrix()
+	in, e := matrixResolveInstance(strings.TrimSpace(q.Instance))
+	if e != nil {
+		writeAPIError(w, r, "E-MATRIX-02", e.Error())
+		return
+	}
+	old := loadMatrixInstance(in)
 	if q.Bundle != "" {
-		b, e := parseMatrixBundle(q.Bundle)
+		b, bin, e := parseMatrixBundleFor(q.Bundle)
+		if e == nil && bin.ID != in.ID {
+			e = fmt.Errorf("bundle is for Matrix instance %s", bin.ID)
+		}
 		if e == nil {
 			e = matrixApplyNodeBundle(old, b)
 		}
@@ -263,7 +290,7 @@ func handleMatrixEdit(w http.ResponseWriter, r *http.Request) {
 			writeAPIError(w, r, "E-MATRIX-07", e.Error())
 			return
 		}
-		LogSecurityAudit("matrix_edit", cfg.Username, ClientIP(r), "node applied hub bundle")
+		LogSecurityAudit("matrix_edit", cfg.Username, ClientIP(r), "instance="+in.ID+" node applied hub bundle")
 		writeJSON(w, map[string]any{"status": "ok", "peer_sync_required": false})
 		return
 	}
@@ -272,6 +299,6 @@ func handleMatrixEdit(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, r, "E-MATRIX-07", e.Error())
 		return
 	}
-	LogSecurityAudit("matrix_edit", cfg.Username, ClientIP(r), "hub settings saved")
-	writeJSON(w, map[string]any{"status": "ok", "bundle": matrixBundle(st, r), "peer_sync_required": st.PeerSyncRequired})
+	LogSecurityAudit("matrix_edit", cfg.Username, ClientIP(r), "instance="+in.ID+" hub settings saved")
+	writeJSON(w, map[string]any{"status": "ok", "instance": in.ID, "bundle": matrixBundle(in, st, r), "peer_sync_required": st.PeerSyncRequired})
 }

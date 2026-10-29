@@ -1270,3 +1270,41 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
   .topo-list-table.topo-grid .topo-list-row td::before { display:block; content:attr(data-label); }
 }
 @media(max-width:800px) { .topo-settings{grid-template-columns:1fr;} .topo-graph{min-height:150px;} }
+
+/* ---------- New-tunnel wizard modal (topology view) ---------- */
+.topo-wiz-modal { width: min(94vw, 620px); }
+.topo-wiz-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  padding: 10px 16px; border-bottom: 1px solid var(--ln);
+}
+.topo-wiz-progress { color: var(--mu); font-size: var(--fs-caption); font-weight: 700; }
+.topo-wiz-steps { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.topo-wiz-step {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px;
+  border: 1px solid var(--ln2); background: var(--s2); color: var(--mu);
+  font-size: var(--fs-caption); font-weight: 600;
+}
+.topo-wiz-step.on { color: var(--tx); border-color: var(--ac); background: var(--ac-soft); }
+.topo-wiz-step.done { color: var(--ok); border-color: var(--ok); background: transparent; }
+.topo-wiz-step.done::after { content: "\2713"; font-weight: 800; }
+.topo-wiz-types { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.topo-wiz-type {
+  display: grid; gap: 4px; text-align: start; padding: 12px; border-radius: var(--r-md);
+  border: 1px solid var(--ln2); background: var(--s2); color: var(--tx); cursor: pointer; font: inherit;
+}
+.topo-wiz-type:hover { border-color: var(--ac); }
+.topo-wiz-type.on { border-color: var(--ac); background: var(--ac-soft); box-shadow: inset 0 0 0 1px var(--ac); }
+.topo-wiz-type b { font-size: var(--fs-body); }
+.topo-wiz-type span { color: var(--mu); font-size: var(--fs-caption); line-height: 1.5; }
+.topo-wiz-review { display: grid; gap: 8px; }
+.topo-wiz-row {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  padding: 8px 12px; border: 1px solid var(--ln); border-radius: var(--r-md); background: var(--s2);
+}
+.topo-wiz-row > span { color: var(--mu); font-size: var(--fs-caption); font-weight: 600; flex: none; }
+.topo-wiz-row bdi { color: var(--tx); overflow-wrap: anywhere; }
+.topo-wiz-check { flex-direction: row; align-items: center; gap: 10px; }
+@media(max-width:799px) {
+  .topo-wiz-types { grid-template-columns: 1fr; }
+  .topo-wiz-head { align-items: flex-start; flex-direction: column; }
+}

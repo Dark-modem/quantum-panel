@@ -1522,7 +1522,7 @@
             <p class="tc-title" data-i18n="tunnels_title">Tunnels</p>
             <span class="badge dim" id="tunnelsCountBadge">—</span>
             <span class="u-flex-1"></span>
-            <button type="button" class="hashem-btn hashem-btn-primary u-btn-30" id="tunnelsAddBtn" onclick="goTab('setup')">+ <span data-i18n="tunnels_new">New Tunnel</span></button>
+            <button type="button" class="hashem-btn hashem-btn-primary u-btn-30" id="tunnelsAddBtn">+ <span data-i18n="tunnels_new">New Tunnel</span></button>
           </div>
           <div class="tnl-table" role="table" aria-label="Tunnels">
             <div class="tnl-head" role="row">
@@ -3528,6 +3528,21 @@
       <div class="xr-err hidden" id="nameModalErr"></div>
     </div>
     <div class="ent-modal-f"><button class="hashem-btn hashem-btn-ghost" id="nameModalNo">Cancel</button><button class="hashem-btn hashem-btn-primary" id="nameModalYes">Save</button></div>
+  </div>
+</div>
+
+<!-- New-tunnel wizard: type -> settings -> review, opened from the topology view -->
+<div class="ent-modal-ov" id="topoWizModal" hidden>
+  <div class="ent-modal topo-wiz-modal" role="dialog" aria-modal="true" aria-labelledby="topoWizTitle">
+    <div class="ent-modal-h"><b id="topoWizTitle">Add a new tunnel</b><button type="button" class="ent-x" id="topoWizX" aria-label="Close" data-i18n-aria="aria_close">×</button></div>
+    <div class="topo-wiz-head"><span class="topo-wiz-progress" id="topoWizProgress"></span><span class="topo-wiz-steps" id="topoWizSteps" role="group" aria-label="Steps"></span></div>
+    <div class="ent-modal-b" id="topoWizBody"></div>
+    <div class="xr-err hidden" id="topoWizErr" role="alert"></div>
+    <div class="ent-modal-f">
+      <button type="button" class="hashem-btn hashem-btn-ghost" id="topoWizCancelBtn">Cancel</button>
+      <button type="button" class="hashem-btn hashem-btn-secondary" id="topoWizBack">Back</button>
+      <button type="button" class="hashem-btn hashem-btn-primary" id="topoWizNext">Next</button>
+    </div>
   </div>
 </div>
 

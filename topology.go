@@ -54,9 +54,11 @@ const (
 )
 
 var (
-	topologyMu        sync.Mutex // independent of engine, peer and panel locks
-	topologyIDRE      = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`)
-	topologyTunnelRE  = regexp.MustCompile(`^(main|matrix|bagher|peer:[1-9][0-9]*|xray:[1-9][0-9]*|bagher:[1-9][0-9]*)$`)
+	topologyMu   sync.Mutex // independent of engine, peer and panel locks
+	topologyIDRE = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`)
+	// "matrix" is the legacy first Matrix instance; matrix2, matrix3, ... are
+	// additional independent instances hosted on the same server.
+	topologyTunnelRE  = regexp.MustCompile(`^(main|matrix(?:[2-9][0-9]*)?|bagher|peer:[1-9][0-9]*|xray:[1-9][0-9]*|bagher:[1-9][0-9]*)$`)
 	topologyInventory = readTopologyInventory // injectable, deterministic inventory for tests
 )
 
@@ -473,6 +475,39 @@ func handleTopologyDelete(w http.ResponseWriter, r *http.Request) {
 	topologyError(w, http.StatusNotFound, "topology not found")
 }
 
+// topologyBoundTunnelPorts maps every port owned by a tunnel already bound to
+// any topology onto that topology's name. Tunnels have exclusive topology
+// ownership, so a new tunnel must never reuse one of these ports.
+func topologyBoundTunnelPorts() map[int]string {
+	out := map[int]string{}
+	topologyMu.Lock()
+	all, err := loadTopologies()
+	topologyMu.Unlock()
+	if err != nil {
+		return out
+	}
+	bound := map[string]string{}
+	for _, t := range all {
+		for _, id := range t.TunnelIDs {
+			bound[id] = t.Name
+		}
+	}
+	if len(bound) == 0 {
+		return out
+	}
+	inventory := topologyConfiguredInventory([]topologyTunnel{})
+	for _, tunnel := range inventory {
+		name, ok := bound[tunnel.ID]
+		if !ok {
+			continue
+		}
+		for _, p := range tunnel.Ports {
+			out[p] = name
+		}
+	}
+	return out
+}
+
 func topologyRole(role string) string {
 	switch {
 	case strings.HasPrefix(role, "iran"), role == "hub", role == "client":
@@ -681,22 +716,29 @@ func topologyConfiguredInventory(out []topologyTunnel) []topologyTunnel {
 				RemoteIP: topologyIP(p.RemotePub), Ports: append([]int{}, p.Ports...), role: "iran", localIP: topologyIP(p.LocalPub)})
 		}
 	}
-	var mx matrixState
-	matrixMu.Lock()
-	err := read(matrixStatePath(), &mx)
-	matrixMu.Unlock()
-	if err != nil {
-		return nil
-	}
-	if mx.Enabled || mx.Role != "" {
-		add(topologyTunnel{ID: "matrix", Name: "Matrix", Engine: "matrix", Family: mx.Family,
-			RemoteIP: topologyIP(mx.Addr), Ports: append([]int{}, mx.Ports...), role: topologyRole(mx.Role)})
+	// Every Matrix instance is a distinct inventory tunnel: "matrix" (legacy)
+	// plus matrix2, matrix3, ... State files are read directly (no matrixMu:
+	// saves rename atomically, so readers never see partial writes) so this
+	// helper is safe to call while matrixMu is held elsewhere.
+	for _, in := range matrixInstances() {
+		var mx matrixState
+		if err := read(matrixStatePathOf(in), &mx); err != nil {
+			return nil
+		}
+		if mx.Enabled || mx.Role != "" {
+			name := "Matrix"
+			if in.suffix() != "" {
+				name += " " + in.suffix()
+			}
+			add(topologyTunnel{ID: in.ID, Name: name, Engine: "matrix", Family: mx.Family,
+				RemoteIP: topologyIP(mx.Addr), Ports: append([]int{}, mx.Ports...), role: topologyRole(mx.Role)})
+		}
 	}
 	var bagher SSHFwdConfig
 	sshFwdMu.Lock()
-	err = read(sshFwdConfigFile(), &bagher)
+	bagherErr := read(sshFwdConfigFile(), &bagher)
 	sshFwdMu.Unlock()
-	if err != nil {
+	if bagherErr != nil {
 		return nil
 	}
 	if bagher.Enabled || strings.TrimSpace(bagher.RemoteHost) != "" || len(bagher.Ports) > 0 {
@@ -717,9 +759,9 @@ func topologyConfiguredInventory(out []topologyTunnel) []topologyTunnel {
 	// or decode failure to zero links. Disabled links are deliberately retained.
 	var xray xrayState
 	xrayMu.Lock()
-	err = read(xrayStatePath(), &xray)
+	xrayErr := read(xrayStatePath(), &xray)
 	xrayMu.Unlock()
-	if err != nil {
+	if xrayErr != nil {
 		return nil
 	}
 	for _, link := range xray.Links {

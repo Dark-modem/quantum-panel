@@ -25,11 +25,12 @@ func matrixEditLab(t *testing.T) matrixState {
 		return "", nil
 	}
 	t.Cleanup(func() { configDir, matrixUnitDir, matrixTincPath, matrixExec = oldDir, oldUnit, oldTinc, oldExec })
+	inst := matrixLegacyInstance()
 	st := matrixState{Enabled: true, Network: matrixNetname, Role: "hub", Family: "ipv4", Addr: "185.226.119.74", Port: 21097, Name: "main", IP: matrixHubIP, Token: strings.Repeat("a", 64), Ports: []int{18080}, Peers: []matrixPeer{{Name: "node", IP: matrixFirstPeer}}, ForwardBefore: "1"}
-	if e := matrixWriteConfig(st, ""); e != nil {
+	if e := matrixWriteConfig(inst, st, ""); e != nil {
 		t.Fatal(e)
 	}
-	if e := saveMatrix(st); e != nil {
+	if e := saveMatrixInstance(inst, st); e != nil {
 		t.Fatal(e)
 	}
 	return st
