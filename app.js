@@ -447,7 +447,7 @@ const I18N = {
     topology_attach: "Attach an existing tunnel",
     topology_attach_btn: "Attach tunnel",
     topology_return: "Back to topology and attach the new tunnel",
-    topology_cables: "Each cable represents one tunnel. Green: connected; amber: unverified; red: stopped.",
+    topology_cables: "Each cable represents one tunnel between the two servers.",
     nav_tunnel: "Topology",
     nav_cluster: "Cluster",
     nav_setup: "Setup",
@@ -1292,9 +1292,9 @@ async function removePeer(peerId, name) {
   btns.forEach(b => { b.disabled = true; b.innerHTML = '<span class="ent-spinner"></span> Removing…'; });
   try {
     await api('/api/action', {action: 'remove-tunnel', peer_id: peerId});
-    toastOk(`tunnel '${name}' removed`);
+    toastOk(tr('', 'Tunnel removed'), name);
     refresh();
-  } catch(e) { toastErr('remove failed', e.message); refresh(); }
+  } catch(e) { toastErr(tr('', 'Tunnel removal failed'), e.message); refresh(); }
 }
 async function showPeerToken(peerId, name) {
   try {
@@ -1761,7 +1761,7 @@ function matrixRestartClick() {
 }
 function matrixRemoveClick() {
   entConfirm(tr('', 'Remove Matrix tunnel?'), tr('', 'The tinc mesh, its service and the forwarding rules are removed on this server. The other side keeps its own copy until removed there. The panel stays.'), tr('', 'Remove Matrix'))
-    .then(ok => { if (ok) api('/api/matrix/remove', {}).then(() => { toastOk(tr('', 'Matrix removed')); if (_tunnelDetail === 'matrix') closeTunnelDetail(); loadMatrix(); }).catch(e => toastErr('matrix remove failed', e.message)); });
+    .then(ok => { if (ok) api('/api/matrix/remove', {}).then(() => { toastOk(tr('', 'Matrix removed')); if (_tunnelDetail === 'matrix') closeTunnelDetail(); loadMatrix(); }).catch(e => toastErr(tr('', 'Matrix removal failed'), e.message)); });
 }
 
 function renderMatrixDetail() {
@@ -4249,7 +4249,7 @@ $('removeTunnelBtn').onclick = async () => {
     showActOut(tr('', 'Remove Tunnel'), r.output || 'tunnel removed');
     toastOk(tr('', 'Tunnel removed'));
     refresh();
-  } catch(e) { toastErr('tunnel remove failed', e.message); }
+  } catch(e) { toastErr(tr('', 'Tunnel removal failed'), e.message); }
   b.disabled = false;
 };
 $('optimizeBtn').onclick = () => runNetOptimize($('optimizeBtn'));

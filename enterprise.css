@@ -574,6 +574,7 @@ html[data-dens="compact"] .quantum-table th, html[data-dens="compact"] .quantum-
 .cl-legend i { display: inline-block; width: 22px; border-top: 3px solid var(--mu); vertical-align: middle; margin-inline-end: 6px; }
 .cl-legend i.ok { border-top-color: var(--ok); } .cl-legend i.err { border-top: 3px dotted var(--er); }
 .cl-legend i.idle { border-top-color: var(--mu); } .cl-legend i.standby { border-top: 3px dashed var(--info); } .cl-legend i.off { border-top: 3px dotted var(--mu); }
+.cl-legend i.warn { border-top: 3px dashed var(--wr); }
 .cl-ins { border: 1px solid var(--ln); border-radius: var(--r-md); background: var(--s1); padding: 14px; display: grid; gap: 12px; min-width: 0; }
 .cl-ins-h b { font-size: var(--fs-h4); color: var(--tx); }
 .cl-ins dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; margin: 0; font-size: var(--fs-small); }
@@ -1189,9 +1190,18 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 .topo-list-wrap { min-width:0; max-width:100%; border:1px solid var(--ln); border-radius:var(--r-md); overflow:hidden; background:var(--s1); }
 .topo-list-table { display:block; width:100%; border-collapse:collapse; font-size:var(--fs-small); text-align:start; }
 .topo-list-table thead, .topo-list-table tbody { display:block; }
-.topo-list-head, .topo-list-row { display:grid; grid-template-columns:minmax(90px,1.1fr) minmax(150px,1.2fr) minmax(150px,1.2fr) 56px 168px; gap:14px; align-items:center; padding:14px 18px; }
+/* Header and rows share one grid so every column lines up exactly. The first
+   three tracks are pure fr (minmax(0,…) strips content-based minimums, the
+   usual source of header/body drift); Tunnels and Actions are fixed so the
+   header can never drift against a row. */
+.topo-list-head, .topo-list-row { display:grid; grid-template-columns:minmax(0,1.05fr) minmax(0,1.2fr) minmax(0,1.2fr) 72px 176px; gap:14px; align-items:center; padding:14px 18px; }
 .topo-list-head { background:var(--s2); border-bottom:1px solid var(--ln); }
 .topo-list-head th { min-width:0; padding:0; color:var(--mu); font-size:var(--fs-caption); font-weight:650; text-align:start; text-transform:uppercase; letter-spacing:.07em; }
+/* Tunnels count sits centred under its header; Actions hugs the end edge in
+   both header and rows so LTR and RTL align the same way. */
+.topo-list-head th:nth-child(4) { text-align:center; white-space:nowrap; }
+.topo-list-row .topo-cell-tunnels { text-align:center; }
+.topo-list-head th:nth-child(5) { text-align:end; }
 .topo-list-row { min-height:76px; border-bottom:1px solid var(--ln); transition:background .15s; cursor:pointer; }
 .topo-list-row:last-child { border-bottom:0; }
 .topo-list-row:hover { background:var(--sunk); }
@@ -1202,7 +1212,10 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 .topo-name:hover { color:var(--ac); }
 .topo-name:focus-visible, .topo-actions button:focus-visible { outline:2px solid var(--ent-focus); outline-offset:3px; border-radius:4px; }
 .topo-server { display:flex; align-items:center; gap:8px; min-width:0; font-size:var(--fs-caption); }
-.topo-flag { flex:none; font-size:1.1em; line-height:1; }
+.topo-flag { flex:none; display:inline-flex; line-height:1; }
+/* Embedded SVG country flags: fixed 20x14 footprint, rounded corners and a
+   subtle in-SVG frame, aligned with the mono IP in both LTR and RTL. */
+.topo-flag-svg { display:block; width:20px; height:14px; flex:none; border-radius:3px; clip-path:inset(0 round 3px); }
 .topo-server bdi { min-width:0; overflow-wrap:anywhere; }
 .topo-count { color:var(--ac); font-weight:700; font-variant-numeric:tabular-nums; }
 .topo-actions { display:flex; align-items:center; justify-content:flex-end; gap:8px; }
@@ -1214,8 +1227,9 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 .topo-list-empty { display:block; }
 .topo-list-empty td { display:block; padding:0; }
 .topo-list-empty .ent-empty { border:0; border-radius:0; }
-/* skeleton rows while the first /api/topologies load is in flight (skel()) */
-.topo-list-skel td { padding:6px 12px; }
+/* skeleton rows while the first /api/topologies load is in flight (skel())
+   — same 18px side padding as real rows so the bars line up with the cells */
+.topo-list-skel td { padding:8px 18px; }
 .topo-list-skel .u-grid { display:grid; gap:8px; width:100%; }
 .topo-list-skel .ent-skel { width:100%; height:14px; min-height:14px; }
 .topo-list-tools { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:14px; }
@@ -1232,22 +1246,37 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 .topo-list-table.topo-grid .topo-list-row:hover { border-color:var(--ac); }
 .topo-list-table.topo-grid .topo-list-row td { display:block; }
 .topo-list-table.topo-grid .topo-list-row td::before { display:none; }
+/* card mode stacks the cells, so the count reads start-aligned like its peers */
+.topo-list-table.topo-grid .topo-cell-tunnels { text-align:start; }
 .topo-list-table.topo-grid .topo-actions { justify-content:flex-start; }
 .topo-settings { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin:16px 0; }
 .topo-attach { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
 .topo-attach select { min-width:180px; max-width:360px; }
 .topo-binding { display:flex; flex-wrap:wrap; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--ln); }
 .topo-binding b { flex:1; }
-.topo-graph { width:100%; height:auto; max-height:680px; min-height:220px; display:block; overflow:visible; }
-.topo-graph text { fill:var(--tx); stroke:none; font-size:14px; font-family:inherit; }
-.topo-graph .topo-ip { font-size:12px; fill:var(--tx2); }
-.topo-node rect { fill:var(--s2); stroke:var(--ac); stroke-width:2; }
-.topo-cable path { fill:none; stroke-width:3; }
-.topo-cable rect { fill:var(--s1); stroke:var(--ln); }
-.topo-cable.topo-ok path { stroke:var(--ok); }
-.topo-cable.topo-warn path { stroke:var(--wr); stroke-dasharray:6 4; }
-.topo-cable.topo-err path { stroke:var(--er); stroke-dasharray:3 5; }
-.topo-empty { fill:var(--tx2)!important; }
+/* topology map — the cluster map's visual language: node cards on a sunken
+   well, health-colored cables, halo'd labels, legend row below */
+.topo-map { display:grid; gap:8px; }
+.topo-map-scroll { overflow-x:auto; border:1px solid var(--ln); border-radius:var(--r-md); background:var(--sunk); direction:ltr; }
+.topo-graph { display:block; width:100%; min-width:640px; height:auto; user-select:none; overflow:visible; font-family:inherit; }
+.topo-node { outline:none; }
+.topo-n-bg { fill:var(--s1); stroke:var(--ln2); stroke-width:1.5; transition:stroke var(--dur-fast) ease; }
+.topo-node:hover > .topo-n-bg, .topo-node:focus-visible > .topo-n-bg { stroke:var(--ac); }
+.topo-cap { fill:var(--mu); font-size:12px; }
+.topo-t1 { fill:var(--tx); font-size:15px; font-weight:600; }
+.topo-ip { fill:var(--mu); font-size:13px; font-variant-numeric:tabular-nums; }
+.topo-dot.ok { fill:var(--ok); } .topo-dot.warn { fill:var(--wr); }
+.topo-dot.err { fill:var(--er); } .topo-dot.off { fill:var(--mu); }
+.topo-e-hit { fill:none; stroke:transparent; stroke-width:16; }
+.topo-cable .topo-e-line { fill:none; stroke-linecap:round; stroke-width:3; transition:stroke var(--dur-fast) ease; }
+.topo-cable.topo-ok .topo-e-line { stroke:var(--ok); }
+.topo-cable.topo-warn .topo-e-line { stroke:var(--wr); stroke-dasharray:8 6; }
+.topo-cable.topo-err .topo-e-line { stroke:var(--er); stroke-dasharray:3 7; }
+.topo-cable:hover .topo-e-line, .topo-cable:focus-visible .topo-e-line { stroke:var(--ac); }
+.topo-e-flow { fill:none; stroke:var(--tx); stroke-opacity:.45; stroke-width:2; stroke-dasharray:3 13; animation:cl-flow 1s linear infinite; pointer-events:none; }
+@media (prefers-reduced-motion: reduce) { .topo-e-flow { display:none; } }
+.topo-e-tag { fill:var(--tx); font-size:12px; font-weight:600; text-anchor:middle; paint-order:stroke; stroke:var(--sunk); stroke-width:4px; pointer-events:none; }
+.topo-empty { fill:var(--mu)!important; font-size:14px; }
 @media(max-width:799px) {
   .topo-list-table thead { display:none; }
   .topo-list-row { grid-template-columns:minmax(0,1fr); gap:12px; padding:16px; }
@@ -1263,7 +1292,7 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
   .topo-list-table.topo-grid .topo-list-row td { display:grid; grid-template-columns:86px minmax(0,1fr); }
   .topo-list-table.topo-grid .topo-list-row td::before { display:block; content:attr(data-label); }
 }
-@media(max-width:800px) { .topo-settings{grid-template-columns:1fr;} .topo-graph{min-height:150px;} }
+@media(max-width:800px) { .topo-settings{grid-template-columns:1fr;} }
 
 /* ---------- New-tunnel wizard modal (topology view) ---------- */
 .topo-wiz-modal { width: min(94vw, 620px); }

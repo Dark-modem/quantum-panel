@@ -34,14 +34,130 @@ const TOPO_COUNTRIES = [
   ['ae', 'UAE'], ['am', 'Armenia'], ['ge', 'Georgia'], ['az', 'Azerbaijan'],
   ['in', 'India'], ['cn', 'China'], ['', 'Other']
 ];
-function topologyFlagIcon(country) {
+// Flags are embedded SVG, not emoji: Windows and older browsers render emoji
+// regional-indicator pairs as bare letters ("IR") or boxes. Every flag draws
+// inside a 20x14 viewBox with simple, recognizable geometry (bands, crosses,
+// crescents, cantons) and stays under ~15 shapes. Elements carry explicit
+// fill/stroke because the global `svg { fill:none; stroke:currentColor }`
+// rule would otherwise strip them or inherit the text colour.
+const TOPO_FLAG_DRAW = {
+  ir: '<rect x="0" y="0" width="20" height="4.67" fill="#239f40" stroke="none"/>' +
+      '<rect x="0" y="4.67" width="20" height="4.66" fill="#ffffff" stroke="none"/>' +
+      '<rect x="0" y="9.33" width="20" height="4.67" fill="#da0000" stroke="none"/>' +
+      '<path d="M10 4.8c-1.3 1.4-1.3 3.4 0 4.8 1.3-1.4 1.3-3.4 0-4.8z" fill="#da0000" stroke="none"/>' +
+      '<path d="M8.3 5.5c-.7 1.4-.3 3 1 3.8M11.7 5.5c.7 1.4.3 3-1 3.8" fill="none" stroke="#da0000" stroke-width=".6"/>',
+  de: '<rect x="0" y="0" width="20" height="4.67" fill="#000000" stroke="none"/>' +
+      '<rect x="0" y="4.67" width="20" height="4.66" fill="#dd0000" stroke="none"/>' +
+      '<rect x="0" y="9.33" width="20" height="4.67" fill="#ffce00" stroke="none"/>',
+  fi: '<rect x="0" y="0" width="20" height="14" fill="#ffffff" stroke="none"/>' +
+      '<rect x="5.5" y="0" width="3.4" height="14" fill="#003580" stroke="none"/>' +
+      '<rect x="0" y="5.3" width="20" height="3.4" fill="#003580" stroke="none"/>',
+  nl: '<rect x="0" y="0" width="20" height="4.67" fill="#ae1c28" stroke="none"/>' +
+      '<rect x="0" y="4.67" width="20" height="4.66" fill="#ffffff" stroke="none"/>' +
+      '<rect x="0" y="9.33" width="20" height="4.67" fill="#21468b" stroke="none"/>',
+  fr: '<rect x="0" y="0" width="6.67" height="14" fill="#0055a4" stroke="none"/>' +
+      '<rect x="6.67" y="0" width="6.66" height="14" fill="#ffffff" stroke="none"/>' +
+      '<rect x="13.33" y="0" width="6.67" height="14" fill="#ef4135" stroke="none"/>',
+  gb: '<rect x="0" y="0" width="20" height="14" fill="#012169" stroke="none"/>' +
+      '<path d="M0 0l20 14M20 0L0 14" fill="none" stroke="#ffffff" stroke-width="3"/>' +
+      '<path d="M0 0l20 14M20 0L0 14" fill="none" stroke="#c8102e" stroke-width="1.2"/>' +
+      '<path d="M10 0v14M0 7h20" fill="none" stroke="#ffffff" stroke-width="5"/>' +
+      '<path d="M10 0v14M0 7h20" fill="none" stroke="#c8102e" stroke-width="3"/>',
+  us: '<rect x="0" y="0" width="20" height="14" fill="#ffffff" stroke="none"/>' +
+      '<rect x="0" y="0" width="20" height="2" fill="#b22234" stroke="none"/>' +
+      '<rect x="0" y="4" width="20" height="2" fill="#b22234" stroke="none"/>' +
+      '<rect x="0" y="8" width="20" height="2" fill="#b22234" stroke="none"/>' +
+      '<rect x="0" y="12" width="20" height="2" fill="#b22234" stroke="none"/>' +
+      '<rect x="0" y="0" width="9" height="8" fill="#3c3b6e" stroke="none"/>' +
+      '<circle cx="2.2" cy="2" r=".7" fill="#ffffff" stroke="none"/>' +
+      '<circle cx="6.2" cy="2" r=".7" fill="#ffffff" stroke="none"/>' +
+      '<circle cx="4.2" cy="4.4" r=".7" fill="#ffffff" stroke="none"/>' +
+      '<circle cx="2.2" cy="6.4" r=".7" fill="#ffffff" stroke="none"/>' +
+      '<circle cx="6.2" cy="6.4" r=".7" fill="#ffffff" stroke="none"/>',
+  tr: '<rect x="0" y="0" width="20" height="14" fill="#e30a17" stroke="none"/>' +
+      '<circle cx="8" cy="7" r="3.5" fill="#ffffff" stroke="none"/>' +
+      '<circle cx="8.9" cy="7" r="2.8" fill="#e30a17" stroke="none"/>' +
+      '<polygon points="13,5.6 13.33,6.55 14.33,6.57 13.53,7.17 13.82,8.13 13,7.56 12.18,8.13 12.47,7.17 11.67,6.57 12.67,6.55" fill="#ffffff" stroke="none"/>',
+  ru: '<rect x="0" y="0" width="20" height="4.67" fill="#ffffff" stroke="none"/>' +
+      '<rect x="0" y="4.67" width="20" height="4.66" fill="#0039a6" stroke="none"/>' +
+      '<rect x="0" y="9.33" width="20" height="4.67" fill="#d52b1e" stroke="none"/>',
+  ua: '<rect x="0" y="0" width="20" height="7" fill="#005bbb" stroke="none"/>' +
+      '<rect x="0" y="7" width="20" height="7" fill="#ffd500" stroke="none"/>',
+  pl: '<rect x="0" y="0" width="20" height="7" fill="#ffffff" stroke="none"/>' +
+      '<rect x="0" y="7" width="20" height="7" fill="#dc143c" stroke="none"/>',
+  se: '<rect x="0" y="0" width="20" height="14" fill="#006aa7" stroke="none"/>' +
+      '<rect x="5.5" y="0" width="3" height="14" fill="#fecc00" stroke="none"/>' +
+      '<rect x="0" y="5.5" width="20" height="3" fill="#fecc00" stroke="none"/>',
+  ch: '<rect x="0" y="0" width="20" height="14" fill="#da291c" stroke="none"/>' +
+      '<rect x="8.75" y="3.5" width="2.5" height="7" fill="#ffffff" stroke="none"/>' +
+      '<rect x="6.5" y="5.75" width="7" height="2.5" fill="#ffffff" stroke="none"/>',
+  at: '<rect x="0" y="0" width="20" height="4.67" fill="#ed2939" stroke="none"/>' +
+      '<rect x="0" y="4.67" width="20" height="4.66" fill="#ffffff" stroke="none"/>' +
+      '<rect x="0" y="9.33" width="20" height="4.67" fill="#ed2939" stroke="none"/>',
+  ca: '<rect x="0" y="0" width="20" height="14" fill="#ffffff" stroke="none"/>' +
+      '<rect x="0" y="0" width="5" height="14" fill="#d52b1e" stroke="none"/>' +
+      '<rect x="15" y="0" width="5" height="14" fill="#d52b1e" stroke="none"/>' +
+      '<path d="M10 3.8l.9 1.9 1.7-.5-.5 1.8 1.6 1.2-1.7.7.3 1.9-2.3-.9-2.3.9.3-1.9-1.7-.7 1.6-1.2-.5-1.8 1.7.5z" fill="#d52b1e" stroke="none"/>',
+  jp: '<rect x="0" y="0" width="20" height="14" fill="#ffffff" stroke="none"/>' +
+      '<circle cx="10" cy="7" r="3" fill="#bc002d" stroke="none"/>',
+  sg: '<rect x="0" y="0" width="20" height="14" fill="#ffffff" stroke="none"/>' +
+      '<rect x="0" y="0" width="20" height="7" fill="#ed2939" stroke="none"/>' +
+      '<circle cx="5" cy="3.5" r="2.6" fill="#ffffff" stroke="none"/>' +
+      '<circle cx="5.9" cy="3.5" r="2.2" fill="#ed2939" stroke="none"/>' +
+      '<circle cx="9" cy="2.3" r=".55" fill="#ffffff" stroke="none"/>' +
+      '<circle cx="10.4" cy="3.5" r=".55" fill="#ffffff" stroke="none"/>' +
+      '<circle cx="9" cy="4.7" r=".55" fill="#ffffff" stroke="none"/>',
+  ae: '<rect x="0" y="0" width="20" height="14" fill="#ffffff" stroke="none"/>' +
+      '<rect x="0" y="0" width="20" height="4.67" fill="#00732f" stroke="none"/>' +
+      '<rect x="0" y="9.33" width="20" height="4.67" fill="#000000" stroke="none"/>' +
+      '<rect x="0" y="0" width="5" height="14" fill="#ff0000" stroke="none"/>',
+  am: '<rect x="0" y="0" width="20" height="4.67" fill="#d90012" stroke="none"/>' +
+      '<rect x="0" y="4.67" width="20" height="4.66" fill="#0033a0" stroke="none"/>' +
+      '<rect x="0" y="9.33" width="20" height="4.67" fill="#f2a800" stroke="none"/>',
+  ge: '<rect x="0" y="0" width="20" height="14" fill="#ffffff" stroke="none"/>' +
+      '<rect x="8.75" y="0" width="2.5" height="14" fill="#ff0000" stroke="none"/>' +
+      '<rect x="0" y="5.75" width="20" height="2.5" fill="#ff0000" stroke="none"/>' +
+      '<path d="M4.5 2v3M3 3.5h3M15.5 2v3M14 3.5h3M4.5 9v3M3 10.5h3M15.5 9v3M14 10.5h3" fill="none" stroke="#ff0000" stroke-width=".9"/>',
+  az: '<rect x="0" y="0" width="20" height="4.67" fill="#00b5e2" stroke="none"/>' +
+      '<rect x="0" y="4.67" width="20" height="4.66" fill="#ed2939" stroke="none"/>' +
+      '<rect x="0" y="9.33" width="20" height="4.67" fill="#3f9c35" stroke="none"/>' +
+      '<circle cx="10" cy="7" r="1.9" fill="#ffffff" stroke="none"/>' +
+      '<circle cx="10.55" cy="7" r="1.55" fill="#ed2939" stroke="none"/>' +
+      '<circle cx="12.2" cy="7" r=".6" fill="#ffffff" stroke="none"/>',
+  in: '<rect x="0" y="0" width="20" height="4.67" fill="#ff9933" stroke="none"/>' +
+      '<rect x="0" y="4.67" width="20" height="4.66" fill="#ffffff" stroke="none"/>' +
+      '<rect x="0" y="9.33" width="20" height="4.67" fill="#138808" stroke="none"/>' +
+      '<circle cx="10" cy="7" r="1.6" fill="none" stroke="#000080" stroke-width=".5"/>' +
+      '<circle cx="10" cy="7" r=".35" fill="#000080" stroke="none"/>',
+  cn: '<rect x="0" y="0" width="20" height="14" fill="#de2910" stroke="none"/>' +
+      '<polygon points="5,2.8 5.52,4.48 7.09,4.32 5.84,5.84 6.29,6.78 5,5.88 3.71,6.78 4.16,5.84 2.91,4.32 4.48,4.48" fill="#ffde00" stroke="none"/>' +
+      '<circle cx="9.2" cy="2.6" r=".55" fill="#ffde00" stroke="none"/>' +
+      '<circle cx="10.6" cy="4.4" r=".55" fill="#ffde00" stroke="none"/>' +
+      '<circle cx="10.6" cy="6.6" r=".55" fill="#ffde00" stroke="none"/>' +
+      '<circle cx="9.2" cy="8.4" r=".55" fill="#ffde00" stroke="none"/>'
+};
+// Generic fallback for an empty/unknown country: a stroked globe in the same
+// 20x14 footprint so list rows stay visually aligned.
+const TOPO_FLAG_GLOBE =
+  '<g class="topo-flag-globe">' +
+  '<circle cx="10" cy="7" r="5.5" fill="none" stroke="currentColor" stroke-width="1.2"/>' +
+  '<path d="M4.5 7h11M10 1.5v11" fill="none" stroke="currentColor" stroke-width="1.2"/>' +
+  '<ellipse cx="10" cy="7" rx="2.8" ry="5.5" fill="none" stroke="currentColor" stroke-width="1.2"/>' +
+  '</g>';
+// Render a country as a small inline SVG flag. `attrs` places the flag inside
+// a parent SVG (the topology graph nodes); the frame rect adds the subtle
+// rounded border on top of the colours.
+function topologyFlagSvg(country, attrs) {
   const cc = String(country || '').toLowerCase();
-  if (!/^[a-z]{2}$/.test(cc)) return '🌐';
-  return String.fromCodePoint(...[...cc.toUpperCase()].map(c => 0x1f1e6 + c.charCodeAt(0) - 65));
+  const innards = (/^[a-z]{2}$/.test(cc) && TOPO_FLAG_DRAW[cc]) || TOPO_FLAG_GLOBE;
+  return `<svg class="topo-flag-svg" viewBox="0 0 20 14" width="20" height="14"${attrs ? ' ' + attrs : ''} aria-hidden="true" focusable="false">` +
+    innards +
+    '<rect x="0.5" y="0.5" width="19" height="13" rx="2.5" fill="none" stroke="currentColor" stroke-opacity=".3" stroke-width="1"/>' +
+    '</svg>';
 }
 function topologyCountryOptions(current) {
   return TOPO_COUNTRIES.map(([cc, label]) =>
-    `<option value="${esc(cc)}"${cc === (current || '') ? ' selected' : ''}>${topologyFlagIcon(cc)} ${esc(tr('', label))}</option>`
+    `<option value="${esc(cc)}"${cc === (current || '') ? ' selected' : ''}>${esc(tr('', label))}</option>`
   ).join('');
 }
 function topologyDeleteNotice(count) {
@@ -63,26 +179,56 @@ function topologyGraph(topo, tunnels) {
   const text = value => esc(String(value || '—'));
   const iran = topo.role === 'foreign' ? topo.remote_ip : topo.local_ip;
   const foreign = topo.role === 'foreign' ? topo.local_ip : topo.remote_ip;
-  const height = Math.max(230, 90 + tunnels.length * 42);
-  const cy = height / 2;
-  const paths = tunnels.map((t, i) => {
-    const healthy = ['healthy', 'ok', 'up', 'connected'].includes(t.state);
-    const down = ['down', 'err', 'stopped'].includes(t.state);
-    const state = healthy ? 'ok' : down ? 'err' : 'warn';
-    const y = 65 + i * 42;
-    return `<g data-topology-cable="${text(t.id)}" class="topo-cable topo-${state}">
-      <path d="M 180 ${cy} C 300 ${y}, 500 ${y}, 620 ${cy}" />
-      <rect x="290" y="${y - 14}" width="220" height="28" rx="12" />
-      <text x="400" y="${y + 5}" text-anchor="middle">${text(t.name)} · ${text(t.engine)}</text>
-      <title>${text(t.name)} · ${text(t.state)}</title>
-    </g>`;
+  // Same drawing language as the cluster map: rounded node cards on a sunken
+  // well, cubic cables whose color and dash carry the tunnel health, and a
+  // halo'd label on every cable so it stays readable where lines cross.
+  const W = 800, NW = 240, NH = 96, ix = 30, fx = W - 30 - NW, GAP = 90;
+  const n = tunnels.length;
+  const H = n ? Math.max(260, 150 + n * 54) : 240;
+  const cy = H / 2;
+  const stateOf = t => {
+    const s = String(t.state || '');
+    return ['healthy', 'ok', 'up', 'connected'].includes(s) ? 'ok'
+      : ['down', 'err', 'stopped'].includes(s) ? 'err' : 'warn';
+  };
+  const kinds = tunnels.map(stateOf);
+  const nodeKind = !n ? 'off' : kinds.every(k => k === 'ok') ? 'ok' : kinds.every(k => k === 'err') ? 'err' : 'warn';
+  const cables = tunnels.map((t, i) => {
+    const y = cy + (i - (n - 1) / 2) * 54;
+    const d = `M ${ix + NW} ${cy} C ${ix + NW + GAP} ${y}, ${fx - GAP} ${y}, ${fx} ${cy}`;
+    const midY = (0.25 * cy + 0.75 * y - 10).toFixed(1);
+    const st = stateOf(t);
+    return `<g data-topology-cable="${text(t.id)}" class="topo-cable topo-${st}">` +
+      `<path class="topo-e-hit" d="${d}"/><path class="topo-e-line" d="${d}"/>` +
+      (st === 'ok' ? `<path class="topo-e-flow" d="${d}"/>` : '') +
+      `<text class="topo-e-tag" x="${W / 2}" y="${midY}">${text(t.name)} · ${text(t.engine)}</text>` +
+      `<title>${text(t.name)} · ${text(t.state)}</title>` +
+    `</g>`;
   }).join('');
-  return `<svg class="topo-graph" viewBox="0 0 800 ${height}" role="img" aria-label="${text(tr('', 'Topology connections'))}" dir="ltr">
-    ${paths}
-    <g class="topo-node"><rect x="20" y="${cy - 48}" width="160" height="96" rx="18"/><text x="100" y="${cy - 12}" text-anchor="middle">${text(tr('', 'Iran server'))}</text><text class="topo-ip" x="100" y="${cy + 17}" text-anchor="middle">${text(iran)}</text></g>
-    <g class="topo-node"><rect x="620" y="${cy - 48}" width="160" height="96" rx="18"/><text x="700" y="${cy - 12}" text-anchor="middle">${text(tr('', 'Foreign server'))}</text><text class="topo-ip" x="700" y="${cy + 17}" text-anchor="middle">${text(foreign)}</text></g>
-    ${tunnels.length ? '' : `<text x="400" y="${cy}" text-anchor="middle" class="topo-empty">${text(tr('', 'No tunnel attached yet'))}</text>`}
-  </svg>`;
+  const cc = String(topo.country || '').toLowerCase();
+  const countryLabel = (TOPO_COUNTRIES.find(c => c[0] === cc) || ['', 'Other'])[1];
+  const top = cy - NH / 2;
+  const node = (x, caption, title, ip, flag) =>
+    `<g class="topo-node"><title>${text(title)} · ${text(ip)}</title>` +
+    `<rect class="topo-n-bg" x="${x}" y="${top}" width="${NW}" height="${NH}" rx="12"/>` +
+    `<circle class="topo-dot ${nodeKind}" cx="${x + 18}" cy="${top + 24}" r="5"/>` +
+    topologyFlagSvg(flag, `x="${x + 28}" y="${top + 17}"`) +
+    `<text class="topo-cap" x="${x + 54}" y="${top + 28}">${caption}</text>` +
+    `<text class="topo-t1" x="${x + 16}" y="${top + 52}">${text(title)}</text>` +
+    `<text class="topo-ip" x="${x + 16}" y="${top + 74}">${text(ip)}</text>` +
+    `</g>`;
+  return `<div class="topo-map"><div class="topo-map-scroll">` +
+    `<svg class="topo-graph" viewBox="0 0 ${W} ${H}" role="img" aria-label="${text(tr('', 'Topology connections'))}" dir="ltr">` +
+    cables +
+    node(ix, esc(tr('', 'Iran')), tr('', 'Iran server'), iran, 'ir') +
+    node(fx, esc(tr('', countryLabel)), tr('', 'Foreign server'), foreign, topo.country) +
+    (n ? '' : `<text class="topo-empty" x="${W / 2}" y="${cy + 4}" text-anchor="middle">${text(tr('', 'No tunnel attached yet'))}</text>`) +
+    `</svg></div>` +
+    `<div class="cl-legend">` +
+    `<span><i class="ok"></i>${esc(tr('', 'Connected'))}</span>` +
+    `<span><i class="warn"></i>${esc(tr('', 'Unverified'))}</span>` +
+    `<span><i class="err"></i>${esc(tr('', 'Stopped'))}</span>` +
+    `</div></div>`;
 }
 
 async function topologyReload() {
@@ -142,7 +288,7 @@ function topologyRender() {
         const endpoints = topologyEndpointPair(t);
         const countLabel = tr('', '{n} existing tunnel(s)').replace('{n}', String(remaining));
         const deleteTitle = remaining ? topologyDeleteNotice(remaining) : tr('', 'Delete topology');
-        const serverCell = (flag, ip) => `<span class="topo-server"><span class="topo-flag" aria-hidden="true">${topologyFlagIcon(flag)}</span><bdi class="u-mono" dir="ltr">${esc(ip || '—')}</bdi></span>`;
+        const serverCell = (flag, ip) => `<span class="topo-server"><span class="topo-flag" aria-hidden="true">${topologyFlagSvg(flag)}</span><bdi class="u-mono" dir="ltr">${esc(ip || '—')}</bdi></span>`;
         return `<tr class="topo-list-row" role="row" tabindex="0" data-topo-id="${esc(t.id)}" aria-label="${esc(t.name)}">
         <td role="cell" class="topo-cell-name" data-label="${esc(tr('', 'Name'))}"><button type="button" class="topo-name" data-topo-open="${esc(t.id)}"><bdi>${esc(t.name)}</bdi></button></td>
         <td role="cell" class="topo-cell-iran" data-label="${esc(tr('', 'Iran'))}">${serverCell('ir', endpoints.iran)}</td>
@@ -244,8 +390,12 @@ async function topologyDelete(id) {
     return;
   }
   if (!await entConfirm(tr('', 'Delete topology?'), tr('', 'This empty topology will be removed.'), tr('', 'Delete topology'))) return;
-  try { await api('/api/topologies/' + encodeURIComponent(id), {}, 'DELETE'); await topologyReload(); }
-  catch(e) { toastErr(tr('', 'Topology save failed'), e.message); }
+  try {
+    await api('/api/topologies/' + encodeURIComponent(id), {}, 'DELETE');
+    await topologyReload();
+    toastOk(tr('', 'Topology deleted'), topo ? topo.name : '');
+  }
+  catch(e) { toastErr(tr('', 'Topology delete failed'), e.message); }
 }
 // ---- New-tunnel wizard: a 3-step modal (type -> settings -> review) that
 // replaces the old "jump to the Setup tab" behaviour. It reuses the same

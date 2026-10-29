@@ -48,16 +48,16 @@ func TestTopologyListSemanticTable(t *testing.T) {
 	}
 	js := topologyListTestSource(t, "topology.js")
 	for _, want := range []string{
-		`country: $('topologyCountry').value`,       // PATCH persists the country
-		`topologyFlagIcon(flag)`,                    // flag icon per server column
-		`tabindex="0"`,                              // rows are keyboard reachable
-		`$('topologiesList').addEventListener`,      // whole-row click opens the topology
+		`country: $('topologyCountry').value`,  // PATCH persists the country
+		`topologyFlagSvg(flag)`,                // embedded SVG flag per server column
+		`tabindex="0"`,                         // rows are keyboard reachable
+		`$('topologiesList').addEventListener`, // whole-row click opens the topology
 		`toastWarn(tr('', 'Delete topology'), topologyDeleteNotice(remaining))`, // delete explains blocked state
-		`quantum-btn-danger topo-delete`,             // delete is a danger button, never disabled
-		`let topologyLoadedOnce = false`,            // first-load gate: skeleton instead of empty-state flash
-		`if (!topologyLoadedOnce) topologyRender()`, // first load paints the skeleton immediately
-		`topologyLoading && !topologyLoadedOnce`,    // skeleton branch replaces the "No topology yet" row
-		`${skel(2)}`,                                // skeleton rows reuse the shared skel() helper
+		`quantum-btn-danger topo-delete`,                                        // delete is a danger button, never disabled
+		`let topologyLoadedOnce = false`,                                        // first-load gate: skeleton instead of empty-state flash
+		`if (!topologyLoadedOnce) topologyRender()`,                             // first load paints the skeleton immediately
+		`topologyLoading && !topologyLoadedOnce`,                                // skeleton branch replaces the "No topology yet" row
+		`${skel(2)}`,                                                            // skeleton rows reuse the shared skel() helper
 	} {
 		if !strings.Contains(js, want) {
 			t.Errorf("topology.js lacks %q", want)
