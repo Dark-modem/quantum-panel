@@ -281,7 +281,7 @@ function goTab(name) {
     loadClusterStatus();
   }
   if (name === 'perf') loadPerf();
-  if (name === 'tunnel') { loadCarrier(); loadFleet(); loadTunnelHealth(); loadLimits(); loadXray(true); }
+  if (name === 'tunnel') { loadCarrier(); loadFleet(); loadTunnelHealth(); loadLimits(); loadMatrix(); loadXray(true); }
   if (name === 'dashboard') loadUsage();
   if (name === 'watchdog') loadWatchdog();
   if (name === 'doctor') loadDoctor();
@@ -887,6 +887,35 @@ const I18N = {
     ghtok_set: "saved",
     ghtok_unset: "not set",
     ver_check_failed: "Version check failed: ",
+    mx_title: "Matrix tunnel",
+    mx_hint: "An encrypted tinc mesh between this server and its peer, independent of the main tunnel. The hub runs on the Iran side; the foreign side registers with the bundle. IPv4 rides the server's IPv4, IPv6 rides its global IPv6.",
+    mx_family: "Family",
+    mx_port: "Tinc port",
+    mx_v6: "This server's IPv6 (IPv6 family)",
+    mx_ports: "Forwarded ports (comma list)",
+    mx_apply: "Apply Matrix Setup",
+    mx_bridge: "Foreign server? Paste the Matrix bundle from the Iran panel here and register it.",
+    mx_register: "Register",
+    mx_hub_started: "Matrix hub started — copy the bundle to the foreign panel",
+    mx_bundle_hint: "Matrix bundle — paste it on the foreign panel to register that server:",
+    mx_node_registered: "Matrix node registered",
+    mx_service: "Service",
+    mx_role: "Role",
+    mx_role_hub: "Hub (Iran)",
+    mx_role_node: "Node (foreign)",
+    mx_tinc_port: "Tinc port",
+    mx_mesh_nodes: "Mesh nodes",
+    mx_fwd_ports: "Forwarded ports",
+    mx_hub: "Hub",
+    mx_mesh_ip: "Mesh IP",
+    mx_remove_title: "Remove Matrix tunnel?",
+    mx_remove_body: "The tinc mesh, its service and the forwarding rules are removed on this server. The other side keeps its own copy until removed there. The panel stays.",
+    mx_remove_btn: "Remove Matrix",
+    mx_mesh_up: "mesh up",
+    mx_mesh_down: "mesh down",
+    mx_no_node: "No node registered yet — paste the bundle on the foreign panel.",
+    mx_restart_ok: "Matrix service restarted",
+    mx_remove_ok: "Matrix removed",
     tunnels_title: "Tunnels",
     tunnels_hint: "One row per tunnel: its live status, its full settings and its remove button.",
     tunnels_col_name: "Name",
@@ -1426,11 +1455,126 @@ function renderPeers(peers) {
 // ---- Tunnels list: one horizontal row per tunnel (status · view · delete) ----
 let _tunnelDetail = null;   // null | 'main' | 'bagher' | peer id (number)
 
+// ---- Matrix tunnel (tinc mesh): setup card on Setup, row + detail on Tunnel ----
+async function loadMatrix() {
+  try {
+    window._matrixState = await api('/api/matrix/status');
+  } catch (e) { window._matrixState = null; }
+  renderMatrixSetup();
+  renderTunnelsList();
+  if (_tunnelDetail === 'matrix') renderMatrixDetail();
+}
+
+function renderMatrixSetup() {
+  const st = window._matrixState, box = $('mxState'), badge = $('mxRoleBadge');
+  if (!box || !st) { if (badge) badge.textContent = '—'; return; }
+  badge.textContent = st.enabled ? (st.role === 'hub' ? tr('', 'Hub') : tr('', 'Node')) : tr('', 'off');
+  badge.className = 'badge ' + (st.enabled ? 'ok' : 'dim');
+  if (!st.enabled) {
+    box.innerHTML = `
+      <div class="u-flex-center-wrap10">
+        <div class="fg"><label for="mxFamily">${esc(tr('', 'Family'))}</label>
+          <select class="hashem-input" id="mxFamily"><option value="ipv4">IPv4</option><option value="ipv6">IPv6</option></select></div>
+        <div class="fg"><label for="mxPort">${esc(tr('', 'Tinc port'))}</label><input class="hashem-input u-w-120" id="mxPort" value="2097" inputmode="numeric" dir="ltr"></div>
+        <div class="fg"><label for="mxV6">${esc(tr('', "This server's IPv6 (IPv6 family)"))}</label><input class="hashem-input u-mono" id="mxV6" placeholder="auto" dir="ltr"></div>
+        <div class="fg u-flex-1"><label for="mxPorts">${esc(tr('', 'Forwarded ports (comma list)'))}</label><input class="hashem-input u-mono" id="mxPorts" placeholder="443, 8080" dir="ltr"></div>
+      </div>
+      <button type="button" class="hashem-btn hashem-btn-primary u-mt-8" id="mxApplyBtn">${esc(tr('', 'Apply Matrix Setup'))}</button>
+      <div class="u-mt-12">
+        <p class="qs-hint">${esc(tr('', 'Foreign server? Paste the Matrix bundle from the Iran panel here and register it.'))}</p>
+        <div class="u-flex-center-wrap10 u-mt-4">
+          <input class="hashem-input u-flex-1 u-mono" id="mxBundle" placeholder="hmx1_…" dir="ltr" autocomplete="off" spellcheck="false">
+          <button type="button" class="hashem-btn hashem-btn-secondary" id="mxRegisterBtn">${esc(tr('', 'Register'))}</button>
+        </div>
+      </div>`;
+    $('mxApplyBtn').onclick = mxApplyClick;
+    $('mxRegisterBtn').onclick = mxRegisterClick;
+    return;
+  }
+  renderMatrixBody('mxState');
+  if (st.role === 'hub') $('mxBridge') && ($('mxBridge').hidden = true);
+}
+
+function renderMatrixBody(targetId) {
+  const st = window._matrixState;
+  const box = $(targetId);
+  if (!box || !st || !st.enabled) return;
+  const peersHtml = (st.peers || []).map(p =>
+    `<div class="det-row"><span class="det-k">${esc(p.name)} · ${esc(p.addr)}</span><span class="det-v"><span class="badge ${p.ping_ok ? 'ok' : 'err'}"><span class="dot"></span>${esc(tr('', p.ping_ok ? 'mesh up' : 'mesh down'))}</span> <span class="mono" data-no-i18n>${esc(p.ip)}</span></span></div>`).join('')
+    || `<div class="det-row"><span class="det-k">${esc(tr('', 'No node registered yet — paste the bundle on the foreign panel.'))}</span></div>`;
+  const hubPing = st.role === 'node'
+    ? `<div class="det-row"><span class="det-k">${esc(tr('', 'Hub mesh ping'))}</span><span class="det-v"><span class="badge ${st.hub_ping_ok ? 'ok' : 'err'}"><span class="dot"></span>${esc(tr('', st.hub_ping_ok ? 'mesh up' : 'mesh down'))}</span></span></div>` : '';
+  box.innerHTML = `
+    <div class="det-grid">
+      <div class="det-card">
+        <div class="det-card-head">${ICO_SRV} <span>${esc(tr('', 'Service'))}</span></div>
+        <div class="det-row"><span class="det-k">${esc(tr('', 'Role'))}</span><span class="det-v">${esc(tr('', st.role === 'hub' ? 'Hub (Iran)' : 'Node (foreign)'))}</span></div>
+        <div class="det-row"><span class="det-k">${esc(tr('', 'Family'))}</span><span class="det-v mono" data-no-i18n>${esc(st.family)}</span></div>
+        <div class="det-row"><span class="det-k">${esc(tr('', 'Tinc port'))}</span><span class="det-v mono" data-no-i18n>${esc(String(st.port))}</span></div>
+        <div class="det-row"><span class="det-k">${esc(tr('', 'Service'))}</span><span class="det-v"><span class="badge ${st.service ? 'ok' : 'err'}"><span class="dot"></span>${esc(tr('', st.service ? 'Running' : 'Stopped'))}</span></span></div>
+        ${hubPing}
+      </div>
+      <div class="det-card">
+        <div class="det-card-head">${ICO_SRV} <span>${esc(tr('', 'Mesh nodes'))}</span></div>
+        ${st.role === 'hub' ? peersHtml : `<div class="det-row"><span class="det-k">${esc(tr('', 'Hub'))}</span><span class="det-v mono" data-no-i18n>${esc(st.addr)}</span></div><div class="det-row"><span class="det-k">${esc(tr('', 'Mesh IP'))}</span><span class="det-v mono" data-no-i18n>${esc(st.ip || '')}</span></div>`}
+      </div>
+      <div class="det-card">
+        <div class="det-card-head">${ICO_SRV} <span>${esc(tr('', 'Forwarded ports'))}</span></div>
+        <div class="det-row"><span class="det-v mono" data-no-i18n>${esc((st.ports || []).join(', ') || '—')}</span></div>
+      </div>
+    </div>
+    ${st.role === 'hub' && st.bundle ? `<div class="u-mt-8">
+      <p class="qs-hint">${esc(tr('', 'Matrix bundle — paste it on the foreign panel to register that server:'))}</p>
+      <textarea class="hashem-input u-mono u-w-full" rows="3" readonly dir="ltr" onclick="this.select()">${esc(st.bundle)}</textarea>
+    </div>` : ''}
+    <div class="tc-acts u-flex u-wrap u-gap-8 u-mt-4">
+      <button type="button" class="hashem-btn hashem-btn-secondary u-btn-30" onclick="matrixRestartClick()">${esc(tr('', 'Restart'))}</button>
+      <button type="button" class="hashem-btn hashem-btn-danger u-btn-30" onclick="matrixRemoveClick()">${esc(tr('', 'Remove Matrix'))}</button>
+    </div>`;
+}
+
+async function mxApplyClick() {
+  const ports = ($('mxPorts').value || '').split(/[ ,]+/).filter(Boolean).map(Number).filter(n => n > 0);
+  const body = { family: $('mxFamily').value, port: Number($('mxPort').value) || 2097, ports, addr: ($('mxFamily').value === 'ipv6' && $('mxV6') ? $('mxV6').value.trim() : '') };
+  try {
+    const r = await api('/api/matrix/setup', body);
+    toastOk(tr('', 'Matrix hub started — copy the bundle to the foreign panel'));
+    window._matrixState = Object.assign({}, window._matrixState || {}, { enabled: true, role: 'hub', family: body.family, port: body.port, bundle: r.bundle });
+    renderMatrixSetup();
+    renderTunnelsList();
+  } catch (e) { toastErr('matrix setup failed', e.message); }
+}
+async function mxRegisterClick() {
+  try {
+    const r = await api('/api/matrix/foreign-setup', { bundle: ($('mxBundle').value || '').trim() });
+    toastOk(r.detail || tr('', 'Matrix node registered'));
+    loadMatrix();
+  } catch (e) { toastErr('matrix registration failed', e.message); }
+}
+function matrixRestartClick() {
+  return api('/api/matrix/restart', {}).then(() => { toastOk(tr('', 'Matrix service restarted')); loadMatrix(); })
+    .catch(e => toastErr('matrix restart failed', e.message));
+}
+function matrixRemoveClick() {
+  entConfirm(tr('', 'Remove Matrix tunnel?'), tr('', 'The tinc mesh, its service and the forwarding rules are removed on this server. The other side keeps its own copy until removed there. The panel stays.'), tr('', 'Remove Matrix'))
+    .then(ok => { if (ok) api('/api/matrix/remove', {}).then(() => { toastOk(tr('', 'Matrix removed')); if (_tunnelDetail === 'matrix') closeTunnelDetail(); loadMatrix(); }).catch(e => toastErr('matrix remove failed', e.message)); });
+}
+
+function renderMatrixDetail() {
+  const st = window._matrixState, body = $('matrixDetailBody');
+  if (!body) return;
+  if (!st || !st.enabled) { _tunnelDetail = null; applyTunnelDetail(false); return; }
+  $('mxDot').className = 'status-indicator ' + (st.service ? 'active' : 'offline');
+  $('mxDotTxt').textContent = st.service ? tr('', 'Running') : tr('', 'Stopped');
+  renderMatrixBody('matrixDetailBody');
+}
+
 function renderTunnelsList() {
   const card = $('tunnelsListCard'), box = $('tunnelsList');
   if (!card || !box) return;
   const L = window._lastLocal || {};
   const peers = tunPeerCache || [];
+  const mx = window._matrixState;
   const b = (_sshfwdData || (window._lastDash && window._lastDash.bagher) || window._lastBagher || {});
   const bagherHasCfg = !!(b.is_active || b.has_config || (b.remote_host && b.remote_host.length) || (Array.isArray(b.ports) && b.ports.length));
   const hasMain = !!(L.frp_up || L.frp_svc || (L.gre && L.gre.exists) || (L.proxies || []).length);
@@ -1463,6 +1607,19 @@ function renderTunnelsList() {
       ports: Array.isArray(b.ports) ? b.ports.length : null,
     });
   }
+  if (mx && mx.enabled) {
+    const meshOk = mx.role === 'hub'
+      ? (mx.peers || []).some(p => p.ping_ok)
+      : !!mx.hub_ping_ok;
+    rows.push({
+      kind: 'matrix',
+      name: 'Matrix tunnel',
+      ip: mx.role === 'hub' ? (mx.addr || '') : (mx.addr || ''),
+      state: (mx.service && meshOk) ? 'ok' : (mx.service ? 'warn' : 'down'),
+      engine: 'matrix-' + (mx.family || 'ipv4'),
+      ports: (mx.ports || []).length || null,
+    });
+  }
   // the markup ships with the hidden ATTRIBUTE — clear it, not just the class
   card.hidden = !rows.length;
   const badge = $('tunnelsCountBadge');
@@ -1470,7 +1627,7 @@ function renderTunnelsList() {
   if (!rows.length) { box.innerHTML = ''; return; }
   const ICO_TRASH = '<svg class="i" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H8a2 2 0 01-2-2V6"/></svg>';
   box.innerHTML = rows.map(r => {
-    const eng = { frp: 'GRE + FRP', backhaul: 'Backhaul', 'gre-backhaul': 'Backhaul + GRE', bagher: 'Bagher' }[r.engine] || '—';
+    const eng = { frp: 'GRE + FRP', backhaul: 'Backhaul', 'gre-backhaul': 'Backhaul + GRE', bagher: 'Bagher' }[r.engine] || (r.engine && r.engine.startsWith('matrix-') ? 'Matrix · ' + r.engine.slice(7).toUpperCase() : '—');
     // string args must be esc()aped like jsArg: raw JSON quotes break the attribute
     const arg = typeof r.kind === 'number' ? String(r.kind) : esc(JSON.stringify(r.kind));
     const stTxt = r.state === 'ok' ? 'active' : r.state === 'warn' ? 'degraded' : 'down';
@@ -1481,6 +1638,8 @@ function renderTunnelsList() {
       acts.push(b.is_active
         ? `<button type="button" class="hashem-btn hashem-btn-secondary u-btn-30" onclick="bagherStopTunnelClick()">${esc(tr('', 'Stop'))}</button>`
         : `<button type="button" class="hashem-btn hashem-btn-primary u-btn-30" onclick="bagherStartClick()">${esc(tr('', 'Start'))}</button>`);
+    } else if (r.kind === 'matrix') {
+      acts.push(`<button type="button" class="hashem-btn hashem-btn-secondary u-btn-30" onclick="matrixRestartClick()">${esc(tr('', 'Restart'))}</button>`);
     } else {
       if (r.engine !== 'backhaul') acts.push(`<button type="button" class="hashem-btn hashem-btn-secondary u-btn-30" data-peer-act="ping-${r.kind}" onclick="peerAct('ping', ${r.kind})">${esc(tr('', 'Ping'))}</button>`);
       acts.push(`<button type="button" class="hashem-btn hashem-btn-secondary u-btn-30" data-peer-act="restart-frps-${r.kind}" onclick="peerAct('restart-frps', ${r.kind})">${esc(tr('', 'Restart'))}</button>`);
@@ -1541,11 +1700,13 @@ function applyTunnelDetail(scroll) {
   // list mode hides every tunnel-specific card — the table is the overview.
   // All of them open with View on the main tunnel: status, rescue, fleet
   // health, tunnel health, carriers and the GRE wrap.
-  const hide = !m ? ['tunnelStatusCard', 'rescueCard', 'fleetCard', 'tunnelHealthCard', 'carriersCard', 'carrierCard', 'limitsCard'] : (m === 'main'
-    ? ['tunnelsListCard', 'dialCard']
-    : ['tunnelsListCard', 'fleetCard', 'limitsCard', 'tunnelHealthCard', 'carriersCard', 'carrierCard', 'dialCard', 'rescueCard']);
+  const hide = !m ? ['tunnelStatusCard', 'rescueCard', 'fleetCard', 'tunnelHealthCard', 'carriersCard', 'carrierCard', 'limitsCard', 'matrixDetailCard'] : (m === 'main'
+    ? ['tunnelsListCard', 'dialCard', 'matrixDetailCard']
+    : (m === 'matrix'
+      ? ['tunnelsListCard', 'tunnelStatusCard', 'rescueCard', 'fleetCard', 'tunnelHealthCard', 'carriersCard', 'carrierCard', 'limitsCard', 'dialCard', 'tunnelsEmpty']
+      : ['tunnelsListCard', 'fleetCard', 'limitsCard', 'tunnelHealthCard', 'carriersCard', 'carrierCard', 'dialCard', 'rescueCard', 'matrixDetailCard']));
   hide.forEach(id => { const c = $(id); if (c) c.classList.add('td-hide'); });
-  ['tunnelsListCard', 'tunnelStatusCard', 'rescueCard', 'fleetCard', 'limitsCard', 'tunnelHealthCard', 'carriersCard', 'carrierCard', 'dialCard']
+  ['tunnelsListCard', 'tunnelStatusCard', 'rescueCard', 'fleetCard', 'limitsCard', 'tunnelHealthCard', 'carriersCard', 'carrierCard', 'dialCard', 'matrixDetailCard']
     .filter(id => !hide.includes(id)).forEach(id => { const c = $(id); if (c) c.classList.remove('td-hide'); });
   // the active peer card is marked on every rebuild (renderPeers rebuilds the DOM)
   document.querySelectorAll('#peerCards > .peer-card.td-keep').forEach(c => c.classList.remove('td-keep'));

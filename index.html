@@ -1606,6 +1606,11 @@
         </div>
         <!-- empty / hint slot for the tunnels table (no tunnel status card in list mode) -->
         <div id="tunnelsEmpty"></div>
+        <!-- Matrix tunnel detail (View on the Matrix row): content rendered from /api/matrix/status -->
+        <div class="tunnel-card" id="matrixDetailCard" hidden>
+          <div class="tc-header"><p class="tc-title">Matrix tunnel</p><span class="status-indicator" id="mxDot"><span class="dot"></span><span id="mxDotTxt">—</span></span></div>
+          <div id="matrixDetailBody"></div>
+        </div>
         <!-- action output lives at tab level so table-row actions can show it too -->
         <div class="tun-out hidden" id="actOutWrap">
           <div class="tun-out-head"><span id="actOutTitle">Output</span><button type="button" class="hashem-btn hashem-btn-ghost u-btn-xs" id="actOutClose">Close</button></div>
@@ -2175,6 +2180,13 @@
               </div>
             </div>
           </div></div>
+        </div>
+
+        <!-- Matrix tunnel (tinc mesh, hub on the Iran side) -->
+        <div class="tunnel-card" id="matrixCard">
+          <div class="tc-header"><p class="tc-title" data-i18n="mx_title">Matrix tunnel</p><span class="badge dim" id="mxRoleBadge">—</span></div>
+          <p class="qs-hint" data-i18n="mx_hint">An encrypted tinc mesh between this server and its peer, independent of the main tunnel. The hub runs on the Iran side; the foreign side registers with the bundle. IPv4 rides the server's IPv4, IPv6 rides its global IPv6.</p>
+          <div id="mxState"><div class="ent-skel u-h-14"></div></div>
         </div>
       </section>
       <section id="tab-logs" role="tabpanel" hidden>
