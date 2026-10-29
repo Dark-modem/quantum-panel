@@ -1739,7 +1739,7 @@ async function mxApplyClick() {
     mxSetSetupBusy(false);
     renderMatrixSetup();
     renderTunnelsList();
-  } catch (e) { toastErr('matrix setup failed', e.message); }
+  } catch (e) { toastErr(tr('', 'Matrix setup failed'), e.message); }
   finally { mxSetSetupBusy(false); }
 }
 async function mxRegisterClick() {
@@ -1751,13 +1751,13 @@ async function mxRegisterClick() {
     toastOk(r.detail || tr('', 'Matrix node registered'));
     mxSetSetupBusy(false);
     await loadMatrix();
-  } catch (e) { toastErr('matrix registration failed', e.message); }
+  } catch (e) { toastErr(tr('', 'Matrix registration failed'), e.message); }
   finally { mxSetSetupBusy(false); }
 }
 function matrixEditOpen() { return window.matrixEditPanelOpen(); }
 function matrixRestartClick() {
   return api('/api/matrix/restart', {}).then(() => { toastOk(tr('', 'Matrix service restarted')); loadMatrix(); })
-    .catch(e => toastErr('matrix restart failed', e.message));
+    .catch(e => toastErr(tr('', 'Matrix restart failed'), e.message));
 }
 function matrixRemoveClick() {
   entConfirm(tr('', 'Remove Matrix tunnel?'), tr('', 'The tinc mesh, its service and the forwarding rules are removed on this server. The other side keeps its own copy until removed there. The panel stays.'), tr('', 'Remove Matrix'))

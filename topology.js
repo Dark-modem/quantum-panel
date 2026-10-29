@@ -352,8 +352,9 @@ async function topologyCreate() {
     const r = await api('/api/topologies', {name: nameBase + ' ' + number, role: /foreign/.test(local.role || '') ? 'foreign' : 'iran', local_ip: local.local_pub || '', remote_ip: '', tunnel_ids: []});
     topologySelected = r.topology.id;
     await topologyReload();
+    toastOk(tr('', 'Topology created'), r.topology.name || '');
     $('topologyName').focus();
-  } catch(e) { toastErr(tr('', 'Topology save failed'), e.message); }
+  } catch(e) { toastErr(tr('', 'Topology create failed'), e.message); }
   finally { topologyBusy = false; }
 }
 async function topologySave() {
