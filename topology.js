@@ -172,7 +172,9 @@ function topologyKind(id) {
 }
 function topologyFilterRows(rows) {
   const topo = topologyCurrent();
-  if (!topo) return [];
+  // No topology selected: the table lists every established tunnel. With one
+  // open, only the tunnels assigned to it belong to this server pair.
+  if (!topo) return rows;
   return rows.filter(row => (topo.tunnel_ids || []).includes(topologyTunnelKey(row.kind)));
 }
 function topologyGraph(topo, tunnels) {
@@ -275,7 +277,6 @@ function topologyRender() {
   $('tunnelsAddBtn').disabled = !topo || !topo.local_ip || !topo.remote_ip;
   $('topologyAddTunnelBtn').disabled = !topo || !topo.local_ip || !topo.remote_ip;
   $('tunnelsEmpty').hidden = !topo || inTunnel;
-  if (!topo) $('tunnelsListCard').hidden = true;
   $('topologyCount').textContent = String(topologyData.topologies.length);
   const listTable = $('topologyListTable');
   if (listTable && listTable.classList) listTable.classList.toggle('topo-grid', topologyViewMode === 'grid');
