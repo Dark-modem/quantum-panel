@@ -1006,6 +1006,11 @@ func localStatusFrom(v *hostView) tunnelStatus {
 	st.TunnelEngine = st.Engine
 	st.TunnelType = st.Engine
 	st.LocalPub = st.Gre.Local
+	if st.LocalPub == "" {
+		// engines without a GRE device (Backhaul alone, Matrix) would leave the
+		// topbar identity empty; the setup-recorded address identifies the host
+		st.LocalPub = stablePublicIP()
+	}
 	if st.RemotePub == "" {
 		st.RemotePub = st.Gre.PeerIP
 	}

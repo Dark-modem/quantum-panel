@@ -374,6 +374,17 @@ func savedPublicIP() string {
 	return ""
 }
 
+// stablePublicIP is the address that identifies this server in the UI (the
+// topbar and dashboard hero). It prefers the address recorded at setup and
+// never re-resolves while that exists, so a routing change — traffic leaving
+// through the tunnel — cannot make the shown IP jump to the peer's address.
+func stablePublicIP() string {
+	if v := savedPublicIP(); v != "" {
+		return v
+	}
+	return detectPublicIPCached()
+}
+
 var (
 	extIPMu   sync.Mutex
 	extIPVal  string

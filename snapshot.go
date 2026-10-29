@@ -547,7 +547,7 @@ func buildSnapshot() *HubSnapshot {
 		s.CarrierRx, s.CarrierTx, s.CarrierOK, s.CarrierTags = v.carrierRx, v.carrierTx, v.carrierOK, v.carrierTags
 		s.LocalRx, s.LocalTx = localTraffic(local, v)
 	})
-	s.PublicIP = detectPublicIPCached()
+	s.PublicIP = stablePublicIP()
 	s.FrpSince = frpSinceCached(local.FrpSvc)
 
 	snapIcmp.setTargets(icmpTargets(s))
