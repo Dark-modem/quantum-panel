@@ -84,6 +84,21 @@ func handleMatrixForeignSetup(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, r, "E-MATRIX-07", err.Error())
 		return
 	}
+	// the node must know its own Subnet, or tincd answers net-unreachable
+	// for packets addressed to its mesh address
+	selfPath := matrixConfDir + "/hosts/" + name
+	selfData, err := os.ReadFile(selfPath)
+	if err != nil {
+		writeAPIError(w, r, "E-MATRIX-07", err.Error())
+		return
+	}
+	if !strings.Contains(string(selfData), "Subnet = ") {
+		pre := "Subnet = " + b.FIP + "/32\n" + fmt.Sprintf("Port = %d\n", b.Port)
+		if err := os.WriteFile(selfPath, []byte(pre+string(selfData)), 0644); err != nil {
+			writeAPIError(w, r, "E-MATRIX-07", err.Error())
+			return
+		}
+	}
 	// the node's own host file now carries its public key
 	self, err := os.ReadFile(matrixConfDir + "/hosts/" + name)
 	if err != nil {
