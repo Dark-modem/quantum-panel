@@ -1115,6 +1115,16 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 .lm-chips button:hover, .lm-chips button:focus-visible { border-color: var(--ac); color: var(--tx); }
 @media (prefers-reduced-motion: reduce) { .lm-meter i { transition: none; } }
 
+/* Server dashboard order follows DOM order on every screen size. */
+#dashGrid > .dash-system { grid-column: 1 / -1; grid-row: 1; min-width: 0; }
+
+/* Selected-tunnel slots are controlled by applyTunnelDetail, never topology mode. */
+#tab-tunnel > .tunnel-overview { min-width: 0; margin-top: 14px; }
+#tab-tunnel > .tunnel-overview[hidden],
+#tab-tunnel:not(.td-mode) > .tunnel-overview { display: none !important; }
+/* Deprecated render targets remain in the DOM, without layout or hit-testing. */
+#tunnelOverviewLegacy { display: none !important; }
+
 /* ---- Tunnels list (one horizontal row per tunnel) + detail (drill-in) mode ---- */
 .tnl-acts { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
 @media (max-width: 900px) { .tnl-acts { flex-direction: column; align-items: stretch; } }

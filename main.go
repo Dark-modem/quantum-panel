@@ -29,7 +29,7 @@ import (
 	"time"
 )
 
-//go:embed index.html app.js i18n-fa.js matrix_edit.js topology.js fonts.css tokens.css base.css enterprise.css favicon.png favicon.svg apple-touch-icon.png xterm.js xterm-fit.js xterm-search.js xterm.css fonts/vazirmatn.woff2
+//go:embed index.html app.js i18n-fa.js matrix_edit.js topology.js tunnel_overview.js fonts.css tokens.css base.css enterprise.css favicon.png favicon.svg apple-touch-icon.png xterm.js xterm-fit.js xterm-search.js xterm.css fonts/vazirmatn.woff2
 var panelFS embed.FS
 
 var configDir = "/etc/gre-panel"
@@ -90,8 +90,8 @@ func effectiveTLSPort() int {
 var (
 	cfg panelConfig
 	// panelVersion is set at release build time:
-	// go build -ldflags "-X main.panelVersion=v1.15.0"
-	panelVersion = "v1.15.0"
+	// go build -ldflags "-X main.panelVersion=v1.16.0"
+	panelVersion = "v1.16.0"
 	// panelMux is shared between the HTTP listener and the HTTPS listener.
 	panelMux *http.ServeMux
 )
@@ -591,6 +591,7 @@ func main() {
 	mux := http.NewServeMux()
 	panelMux = mux
 	mux.HandleFunc("GET "+base+"/", serveIndex)
+	mux.HandleFunc("GET "+base+"/tunnel_overview.js", serveAsset("tunnel_overview.js", "text/javascript; charset=utf-8"))
 	mux.HandleFunc("GET "+base+"/topology.js", serveAsset("topology.js", "text/javascript; charset=utf-8"))
 	mux.HandleFunc("GET "+base+"/matrix_edit.js", serveAsset("matrix_edit.js", "text/javascript; charset=utf-8"))
 	mux.HandleFunc("GET "+base+"/app.js", serveAsset("app.js", "text/javascript; charset=utf-8"))
@@ -912,6 +913,7 @@ func serveIndex(w http.ResponseWriter, r *http.Request) {
 	for _, f := range []string{"tokens.css", "base.css", "enterprise.css"} {
 		page = strings.ReplaceAll(page, `href="`+f+`"`, `href="`+f+`?v=`+assetTag()+`"`)
 	}
+	page = strings.ReplaceAll(page, `src="tunnel_overview.js"`, `src="tunnel_overview.js?v=`+assetTag()+`"`)
 	page = strings.ReplaceAll(page, `src="topology.js"`, `src="topology.js?v=`+assetTag()+`"`)
 	page = strings.ReplaceAll(page, `src="matrix_edit.js"`, `src="matrix_edit.js?v=`+assetTag()+`"`)
 	page = strings.ReplaceAll(page, `src="app.js"`, `src="app.js?v=`+assetTag()+`"`)

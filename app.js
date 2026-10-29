@@ -497,6 +497,29 @@ const I18N = {
     loading: "Loading…",
     save_settings: "Save Settings",
 
+    // Server dashboard labels (tunnel identity lives in the selected tunnel view).
+    dash_server_live: "Server Live Traffic",
+    dash_server_connections: "Server Connections",
+    dash_server_active: "Server Active Connections",
+    dash_server_active_hint: "Established TCP and UDP connections on this server",
+    dash_server_traffic: "Server Traffic Throughput",
+    dash_server_usage: "Server Traffic Usage",
+    dash_server_usage_hint: "Server-wide traffic history saved every minute and retained for seven days.",
+    dash_server_system: "Server System",
+    dash_server_traffic_down: "Traffic collection is paused. The history below shows previously recorded server traffic.",
+    dash_this_server: "This server",
+    dash_unknown: "Unknown",
+    usage_total: "Server total",
+    usage_range: "Selected range",
+    usage_in: "Received",
+    usage_out: "Sent",
+    usage_topology: "Topology",
+    usage_sum: "Total",
+    usage_since: "Since reliable collection started",
+    usage_grouping_hint: "Topology traffic uses current tunnel assignments and may differ from physical server traffic.",
+    usage_unavailable: "Server traffic is unavailable.",
+    usage_topologies_unavailable: "Topology traffic is unavailable.",
+
     // Dashboard Details & Cards
     card_server_title: "Server & Role",
     card_gre_title: "GRE Kernel Tunnel",
@@ -1714,6 +1737,7 @@ function renderMatrixDetail() {
   $('mxDot').className = 'status-indicator ' + (st.service ? 'active' : 'offline');
   $('mxDotTxt').textContent = st.service ? tr('', 'Running') : tr('', 'Stopped');
   renderMatrixBody('matrixDetailBody');
+  if (typeof renderTunnelOverview === 'function') renderTunnelOverview(_tunnelDetail);
 }
 
 function renderTunnelsList() {
@@ -1872,6 +1896,7 @@ function applyTunnelDetail(scroll) {
   }
   if (typeof topologyDisplayMode === 'function') topologyDisplayMode();
   if (m && scroll && bar && bar.scrollIntoView) bar.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if (typeof renderTunnelOverview === 'function') renderTunnelOverview(m);
 }
 // Two-step remove (inline confirm, no modal): 1st click arms 5s + Undo,
 // 2nd click while armed deletes. Same from Tunnel tab or Dashboard summary.
@@ -1880,32 +1905,17 @@ function peerRemoveClick(peerId, name) {
   if (armed) removePeer(peerId, name);
   else armRemovePeer(peerId, name);
 }
-// Signature: the topbar names the link itself: this server ⇄ the other side · engine ·
-// latency, with one live dot. Values sit in <bdi> so they keep their order in Persian.
+// The global topbar identifies the host, never the selected tunnel or engine.
+// Values sit in <bdi> so addresses keep their order in Persian.
 const LS_ENGINE = { frp: 'GRE + FRP', backhaul: 'Backhaul (no GRE)', 'gre-backhaul': 'Backhaul (with GRE)', bagher: 'Bagher' };
 function linkStrip(s) {
   const el = $('roleLine');
   if (!el || !s) return;
-  const L = s.local || {}, peers = s.peers || [];
-  if (window._hashemEmpty === true) {
-    el.innerHTML = '<span class="ls-dot" aria-hidden="true"></span>' + esc(tr('x_notcfg', 'Not configured'));
-    el.title = '';
-    return;
-  }
-  const iran = /iran/i.test(L.role || '') || L.frp_svc === 'frps' || peers.length > 0;
-  const here = iran ? tr('x002', 'Iran') : tr('x003', 'Foreign');
-  const there = peers.length > 1 ? peers.length + ' ' + tr('ls_servers', 'servers')
-    : (peers[0] && (peers[0].name || peers[0].remote_pub)) || L.remote_pub || L.gre_peer || (iran ? tr('x003', 'Foreign') : tr('x002', 'Iran'));
-  const eng = LS_ENGINE[L.engine || L.tunnel_engine] || '';
-  const up = !!(L.frp_up || (L.gre && L.gre.exists) || peers.some(p => p.frp_up || p.gre_up));
-  const pinged = L.ping_ok || peers.some(p => p.ping_ok);
-  const ms = L.ping_ok && parseFloat(L.ping_ms) > 0 ? Math.round(parseFloat(L.ping_ms)) + ' ms' : '';
-  const state = up ? (pinged ? 'ok' : 'warn') : 'err';
-  const sep = ' <span class="ls-sep" aria-hidden="true">·</span> ';
-  el.innerHTML = '<span class="ls-dot ' + state + '" aria-hidden="true"></span><bdi>' + esc(here) + '</bdi>' +
-    '<span class="ls-arrow" aria-hidden="true">⇄</span><bdi>' + esc(there) + '</bdi>' +
-    (eng ? sep + '<bdi>' + esc(eng) + '</bdi>' : '') + (ms ? sep + '<bdi>' + esc(ms) + '</bdi>' : '');
-  el.title = up ? tr('ls_up', 'Tunnel up') : tr('ls_down', 'Tunnel down');
+  const L = s.local || s;
+  const ip = L.local_pub || '';
+  el.innerHTML = '<span class="ls-dot" aria-hidden="true"></span><bdi>' + esc(tr('dash_this_server', 'This server')) + '</bdi>' +
+    ' <span class="ls-sep" aria-hidden="true">·</span> <bdi data-no-i18n>' + esc(ip || tr('dash_unknown', 'Unknown')) + '</bdi>';
+  el.title = tr('lbl_public_ip', 'Public IP');
 }
 // Engine of the base tunnel: recorded, else derived from the running unit.
 function tunEngine(st) {
@@ -2080,6 +2090,7 @@ async function refresh() {
     updatePeerHints(s);
     if (typeof uiObserve === 'function') uiObserve(s);
     linkStrip(s);
+    if (typeof renderTunnelOverview === 'function') renderTunnelOverview(_tunnelDetail);
     if (s.local) {
       const isForeign = /foreign/i.test(s.local.role || '') || (s.local.frp_svc === 'frpc');
       const ap = $('setupAddPeerStep');
@@ -2223,10 +2234,11 @@ document.querySelectorAll('[data-range]').forEach(b => b.onclick = () => {
 
 function hydrateCachedTraffic() {
   try {
-    const raw = localStorage.getItem('hashem_traffic_cache');
+    const raw = localStorage.getItem('hashem_server_traffic_cache');
     if (!raw) return;
     const cache = JSON.parse(raw);
-    if (!cache || !cache.traffic) return;
+    // Never hydrate pre-migration tunnel counters as server totals.
+    if (!cache || cache.scope !== 'server' || !cache.traffic) return;
     const t = cache.traffic;
     setTraffic(t, null, null);
     if (cache.history && cache.history.length >= 2) {
@@ -2268,8 +2280,9 @@ function drawChart(hist, isDown) {
   cv._padL = padL;
   cv._iw = iw;
 
-  const pts = (hist || []).filter(p => p && p.t != null);
+  const pts = (hist || []).filter(p => p && p.t != null && p.down != null && p.up != null && p.known !== false);
   if (pts.length < 2) {
+    cv._series = [];
     if (cv._animId) { cancelAnimationFrame(cv._animId); cv._animId = null; }
     cv._peak = null; cv._peakRange = null;
     cv._ymax = null; cv._viewNow = null;
@@ -2740,6 +2753,7 @@ async function refreshDash() {
     const d = await api('/api/dashboard?range=' + dashRange);
     if (!d || typeof d !== 'object') return;
     window._lastDash = d;
+    if (typeof linkStrip === 'function') linkStrip(d);
     const model = dashboardModel(d, window._hashemEmpty);
     const { matrix: mx, legacy: legacyConfigured, unset, state, role, on } = model;
     const peers = d.peers || [];
@@ -2838,47 +2852,51 @@ async function refreshDash() {
     set('kpiPing', hasMs ? Math.round(ms) + ' ms' : '—');
     setHTML('kpiPingSub', hasMs ? latBadge(ms) + (d.icmp_filtered ? icmpChip() : '') : esc(tr('', unset ? 'No tunnel yet' : 'No answer')));
 
-    // Live traffic
-    const t = d.traffic || {};
-    let rtUp = null, rtDown = null;
-    if (t.speed_up != null && t.speed_down != null) {
-      rtUp = t.speed_up; rtDown = t.speed_down;
-    } else if (d.history && d.history.length >= 2) {
-      const b = d.history[d.history.length - 1], a = d.history[d.history.length - 2];
-      const dt = (b.t - a.t) || 1;
-      if (b.up != null && a.up != null && b.up >= a.up) rtUp = (b.up - a.up) / dt;
-      if (b.down != null && a.down != null && b.down >= a.down) rtDown = (b.down - a.down) / dt;
-    }
+    // Host metrics have their own scope. Tunnel setup/health never pauses them,
+    // and legacy traffic/history/conns are never a fallback for server readings.
+    const st = d.server_traffic || {};
+    const number = v => typeof v === 'number' && Number.isFinite(v) && v >= 0;
+    const trafficKnown = st.known === true;
+    const rx = trafficKnown && number(st.rx) ? st.rx : null;
+    const tx = trafficKnown && number(st.tx) ? st.tx : null;
+    const t = { down: rx, up: tx, total: rx != null && tx != null ? rx + tx : null };
+    const rtDown = trafficKnown && number(st.rx_rate) ? st.rx_rate : null;
+    const rtUp = trafficKnown && number(st.tx_rate) ? st.tx_rate : null;
+    const serverHistory = Array.isArray(d.server_history) ? d.server_history : [];
     setTraffic(t, rtDown, rtUp);
+    ['kpiDown', 'kpiUpRate', 'kpiTraffic'].forEach((id, i) => {
+      if ([rtDown, rtUp, t.total][i] == null) set(id, tr('dash_unknown', 'Unknown'));
+    });
 
-    // Connections: now, and the peak over the chart range
+    // Established connections across this host, including non-tunnel services.
+    const connections = d.server_connections || {};
+    const hasConns = connections.known === true && number(connections.active);
     let peak = null;
-    (d.history || []).forEach(p => { if (p && p.conns != null && (peak == null || p.conns > peak)) peak = p.conns; });
-    const hasConns = d.conns != null;
-    set('kpiConns', hasConns ? String(d.conns) : '—');
-    set('kpiConnsSub', peak != null ? tr('', 'Peak') + ' ' + peak + ' · ' + dashRange.toUpperCase() : tr('', 'Established TCP and UDP'));
-    { const ic = $('icoConns'); if (ic) ic.dataset.lvl = d.conns > 0 ? 'ok' : 'dim'; }
-    set('actNow', hasConns ? d.conns + ' ' + tr('', 'now') : '—');
+    serverHistory.forEach(p => { if (p && number(p.conns) && (peak == null || p.conns > peak)) peak = p.conns; });
+    set('kpiConns', hasConns ? String(connections.active) : tr('dash_unknown', 'Unknown'));
+    set('kpiConnsSub', peak != null ? tr('', 'Peak') + ' ' + peak + ' · ' + dashRange.toUpperCase() : tr('dash_server_active_hint', 'Established TCP and UDP connections on this server'));
+    { const ic = $('icoConns'); if (ic) ic.dataset.lvl = hasConns && connections.active > 0 ? 'ok' : 'dim'; }
+    set('actNow', hasConns ? connections.active + ' ' + tr('', 'now') : tr('dash_unknown', 'Unknown'));
     { const ab = $('actLiveBadge'); if (ab) { ab.hidden = !hasConns; ab.classList.add('is-ok'); } }
 
-    drawChart(d.history, !on);
-    drawActivityChart(d.history, !on);
+    drawChart(serverHistory, !trafficKnown);
+    drawActivityChart(serverHistory, !hasConns);
     try {
-      if (d.traffic && (d.traffic.total > 0 || (d.history && d.history.length > 0))) {
-        localStorage.setItem('hashem_traffic_cache', JSON.stringify({
-          traffic: d.traffic,
-          history: d.history,
-          saved_at: Date.now()
+      if (trafficKnown) {
+        localStorage.setItem('hashem_server_traffic_cache', JSON.stringify({
+          scope: 'server', traffic: t, history: serverHistory, saved_at: Date.now()
         }));
+      } else {
+        localStorage.removeItem('hashem_server_traffic_cache');
       }
     } catch (e) {}
     const cd = $('chartDown'), cc = $('chartCard');
-    if (cd) cd.classList.toggle('hidden', on || unset);
-    if (cc) cc.classList.toggle('is-down', !on);
+    if (cd) cd.classList.toggle('hidden', trafficKnown);
+    if (cc) cc.classList.toggle('is-down', !trafficKnown);
     const badge = $('chartLiveBadge');
     if (badge) {
-      badge.hidden = unset;
-      const paused = !on || document.hidden;
+      badge.hidden = !trafficKnown;
+      const paused = !trafficKnown || document.hidden;
       badge.classList.toggle('is-paused', paused);
       const txt = badge.querySelector('.live-txt');
       if (txt) txt.textContent = tr('', paused ? 'Paused' : 'Live');
@@ -3030,7 +3048,7 @@ async function refreshDash() {
       });
       acv.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
     }
-    if (cv && d.history) cv._hist = d.history;
+    if (cv) cv._hist = serverHistory;
     // System: ring gauges colored by load
     const s = d.system || {};
     const gauge = (gid, vid, pct) => {
@@ -3108,6 +3126,7 @@ async function refreshDash() {
     { const dp = $('detPulse'); if (dp) dp.classList.toggle('off', !on); }
     const ck = d.checked ? new Date(d.checked) : null;
     set('dashChecked', ck && !isNaN(ck) ? tr('', 'Checked') + ' ' + ck.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—');
+    if (typeof renderTunnelOverview === 'function') renderTunnelOverview(_tunnelDetail);
   } catch(e) { reportErr('dashboard', e); /* keep old values; N/A already default */ return false; }
   return true;
 }
@@ -7703,15 +7722,25 @@ async function runTunnelHealthClick() {
 })();
 
 
-// ---- Traffic usage: per-peer bytes kept on disk for 7 days ----
+// ---- Server usage and named topology attribution, retained for 7 days ----
 let usageTimer = null;
 // Usage columns: one per day for the 7-day range, else the minute points
 // folded into at most 36 columns. Each column stacks received over sent.
 function usageCols(d, tot) {
   if ((d.range || '7d') === '7d') {
-    return (tot.days || []).map(x => ({ rx: x.rx, tx: x.tx, label: x.day.slice(5), title: x.day }));
+    if (Array.isArray(tot.days) && tot.days.length) {
+      return tot.days.map(x => ({ rx: x.rx, tx: x.tx, label: x.day.slice(5), title: x.day }));
+    }
+    const days = new Map();
+    (tot.points || []).forEach(p => {
+      if (!p || p.rx == null || p.tx == null || !Number.isFinite(p.t)) return;
+      const day = new Date(p.t * 1000).toISOString().slice(0, 10);
+      const row = days.get(day) || { rx: 0, tx: 0, label: day.slice(5), title: day };
+      row.rx += p.rx; row.tx += p.tx; days.set(day, row);
+    });
+    return [...days.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(x => x[1]);
   }
-  const pts = tot.points || [];
+  const pts = (tot.points || []).filter(p => p && p.rx != null && p.tx != null && Number.isFinite(p.t));
   if (!pts.length) return [];
   const n = Math.min(36, pts.length), per = Math.ceil(pts.length / n), out = [];
   for (let i = 0; i < pts.length; i += per) {
@@ -7739,34 +7768,43 @@ function usageChart(cols) {
 function renderUsage(d) {
   const box = $('usageBody');
   if (!box) return;
-  const links = (d && d.links) || [];
-  if (!links.length || links.every(l => !l.rx && !l.tx && !(l.days || []).length)) {
-    box.innerHTML = '<p class="qs-hint">' + esc(tr('usage_empty', 'No traffic recorded yet. It appears here after the first minute of traffic.')) + '</p>';
-    return;
-  }
-  const tot = links[0], sum = tot.rx + tot.tx;
-  const pct = v => sum ? Math.round((v / sum) * 100) + '%' : '—';
-  const rows = links.slice(1);
-  const top = Math.max(1, ...rows.map(l => l.rx + l.tx));
+  d = d || {};
+  // Physical server totals are independent of topology/tunnel interface sums.
+  const tot = d.server_total || {}, win = d.server_window || {};
+  const valid = v => typeof v === 'number' && Number.isFinite(v) && v >= 0;
+  const value = (row, key) => row.known === true && valid(row[key]) ? row[key] : null;
+  const sumOf = row => {
+    const total = value(row, 'total'), rx = value(row, 'rx'), tx = value(row, 'tx');
+    return total != null ? total : rx != null && tx != null ? rx + tx : null;
+  };
+  const bytes = v => v == null ? tr('dash_unknown', 'Unknown') : fmtBytes(v);
+  const sum = sumOf(tot), windowSum = sumOf(win);
+  const rows = Array.isArray(d.topologies) ? d.topologies.slice() : [];
+  if (d.unassigned) rows.push({ ...d.unassigned, name: tr('', 'Unassigned tunnels') });
+  const top = Math.max(1, ...rows.map(l => sumOf(l) || 0));
   const list = rows.map(l => {
-    const s = l.rx + l.tx, host = l.key === 'host';
-    const w = Math.round((s / top) * 100), r = s ? Math.round((l.rx / s) * 100) : 0;
-    return '<div class="ug-row' + (host ? ' host' : '') + (s ? '' : ' zero') + '">' +
-      '<div class="ug-name"><b>' + esc(host ? tr('', 'All tunnel interfaces') : (l.name || l.key)) + '</b><small>' +
-      esc(host ? tr('', 'This server, every tunnel together') : (s ? pct(s) + ' ' + tr('', 'of the total') : tr('', 'No traffic counted'))) + '</small></div>' +
+    const s = sumOf(l), rx = value(l, 'rx'), tx = value(l, 'tx');
+    const w = s != null ? Math.round(s / top * 100) : 0, r = s > 0 && rx != null ? Math.round(rx / s * 100) : 0;
+    const count = valid(l.tunnel_count) ? l.tunnel_count + ' ' + tr('', 'tunnels') : '';
+    return '<div class="ug-row' + (s === 0 ? ' zero' : '') + '">' +
+      '<div class="ug-name"><b data-no-i18n>' + esc(l.name || l.id || tr('usage_topology', 'Topology')) + '</b><small>' +
+      esc([count, s == null ? tr('dash_unknown', 'Unknown') : ''].filter(Boolean).join(' · ')) + '</small></div>' +
       '<div class="ug-bar" aria-hidden="true"><span style="--w:' + w + '%;--r:' + r + '%"><i class="r"></i><i class="t"></i></span></div>' +
-      '<span class="ug-n ug-in">↓ ' + esc(fmtBytes(l.rx)) + '</span><span class="ug-n ug-out">↑ ' + esc(fmtBytes(l.tx)) + '</span>' +
-      '<span class="ug-n sum">' + esc(fmtBytes(s)) + '</span></div>';
+      '<span class="ug-n ug-in">↓ ' + esc(bytes(rx)) + '</span><span class="ug-n ug-out">↑ ' + esc(bytes(tx)) + '</span>' +
+      '<span class="ug-n sum">' + esc(bytes(s)) + '</span></div>';
   }).join('');
   box.innerHTML =
     '<div class="ug-stats">' +
-      '<div class="ug-stat"><span>' + esc(tr('usage_total', 'Hub total')) + '</span><b>' + esc(fmtBytes(sum)) + '</b></div>' +
-      '<div class="ug-stat ug-in"><span>↓ ' + esc(tr('usage_in', 'Received')) + '</span><b>' + esc(fmtBytes(tot.rx)) + '</b><small>' + esc(pct(tot.rx)) + '</small></div>' +
-      '<div class="ug-stat ug-out"><span>↑ ' + esc(tr('usage_out', 'Sent')) + '</span><b>' + esc(fmtBytes(tot.tx)) + '</b><small>' + esc(pct(tot.tx)) + '</small></div>' +
+      '<div class="ug-stat"><span>' + esc(tr('usage_total', 'Server total')) + '</span><b>' + esc(bytes(sum)) + '</b><small>' + esc(tr('usage_since', 'Since reliable collection started')) + '</small></div>' +
+      '<div class="ug-stat ug-in"><span>↓ ' + esc(tr('usage_in', 'Received')) + '</span><b>' + esc(bytes(value(tot, 'rx'))) + '</b></div>' +
+      '<div class="ug-stat ug-out"><span>↑ ' + esc(tr('usage_out', 'Sent')) + '</span><b>' + esc(bytes(value(tot, 'tx'))) + '</b></div>' +
     '</div>' +
-    usageChart(usageCols(d, tot)) +
+    '<p class="qs-hint">' + esc(tr('usage_range', 'Selected range')) + ' · ' + esc(bytes(windowSum)) + '</p>' +
+    (win.known === true ? usageChart(usageCols(d, win)) : '<p class="qs-hint">' + esc(tr('usage_unavailable', 'Server traffic is unavailable.')) + '</p>') +
     '<div class="ug-legend"><span class="r">' + esc(tr('usage_in', 'Received')) + '</span><span class="t">' + esc(tr('usage_out', 'Sent')) + '</span></div>' +
-    '<div class="ug-list"><div class="ug-head"><span>' + esc(tr('usage_server', 'Server')) + '</span><span></span><span>↓ ' + esc(tr('usage_in', 'Received')) +
+    '<p class="qs-hint">' + esc(tr('usage_grouping_hint', 'Topology traffic uses current tunnel assignments and may differ from physical server traffic.')) + '</p>' +
+    (d.topology_error ? '<p class="qs-hint">' + esc(tr('usage_topologies_unavailable', 'Topology traffic is unavailable.')) + '</p>' : '') +
+    '<div class="ug-list"><div class="ug-head"><span>' + esc(tr('usage_topology', 'Topology')) + '</span><span></span><span>↓ ' + esc(tr('usage_in', 'Received')) +
     '</span><span>↑ ' + esc(tr('usage_out', 'Sent')) + '</span><span>' + esc(tr('usage_sum', 'Total')) + '</span></div>' + list + '</div>';
 }
 async function loadUsage() {

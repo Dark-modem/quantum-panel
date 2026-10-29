@@ -36,11 +36,12 @@ const (
 	usageStep      = time.Minute        // one point per link per minute
 	usageKeep      = 7 * 24 * time.Hour // retention
 	usageSaveEvery = 60 * time.Second   // periodic flush
-	usageMaxLinks  = 64                 // sanity cap, far above GRE_MAX_PEERS
+	usageMaxLinks  = 1104               // bounded canonical inventory plus aggregate series
 	usageFileVer   = 1
-	usageTotalKey  = "total" // the whole hub
-	usageMainKey   = "main"  // the base tunnel
-	usageHostKey   = "host"  // all tunnel interfaces on this machine
+	usageTotalKey  = "total"  // the whole hub
+	usageMainKey   = "main"   // the base tunnel
+	usageHostKey   = "host"   // all tunnel interfaces on this machine (not physical server usage)
+	usageServerKey = "server" // independent physical-interface ledger
 	usageDayLayout = "2006-01-02"
 )
 
@@ -55,8 +56,9 @@ type usagePoint struct {
 
 // usageLink is the persisted state of one link.
 type usageLink struct {
-	Name   string       `json:"name"`
-	Points []usagePoint `json:"points"`
+	Name    string       `json:"name"`
+	AliasOf string       `json:"alias_of,omitempty"` // a legacy peer can refer to main's same counter
+	Points  []usagePoint `json:"points"`
 	// Days maps "YYYY-MM-DD" (UTC) to {rx, tx}. Totals since the first sample.
 	Days map[string]usageDay `json:"days"`
 	// LastRx/LastTx are the last raw kernel counters seen; Have says they are
@@ -69,6 +71,14 @@ type usageLink struct {
 	// (the "host" series), each delta taken on its own.
 	LastIf map[string][2]uint64 `json:"last_if,omitempty"`
 	Seen   int64                `json:"seen"` // last unix time this link produced a sample
+	// Optional fields keep v1 ledgers readable. Known reports the latest reading,
+	// Measured distinguishes an idle measured interval from a first baseline.
+	Known        *bool  `json:"known,omitempty"`
+	Measured     bool   `json:"measured,omitempty"`
+	ObservedAt   int64  `json:"observed_at,omitempty"` // nanoseconds; reject stale raw readings
+	StartedAt    int64  `json:"started_at,omitempty"`
+	CumulativeRx uint64 `json:"cumulative_rx,omitempty"`
+	CumulativeTx uint64 `json:"cumulative_tx,omitempty"`
 }
 
 type usageDay struct {
@@ -130,11 +140,23 @@ func (s *usageStore) observe(key, name string, now time.Time, rx, tx *uint64) {
 		l = &usageLink{Days: map[string]usageDay{}}
 		s.links[key] = l
 	}
+	if now.UnixNano() < l.ObservedAt {
+		return
+	}
+	l.ObservedAt = now.UnixNano()
 	if name != "" {
 		l.Name = name
 	}
-	if rx == nil || tx == nil {
+	known := rx != nil && tx != nil
+	l.Known = &known
+	s.dirty = true // names, idle baselines and availability must survive restart too
+	if !known {
 		return
+	}
+	if l.Have {
+		l.Measured = true
+	} else if l.StartedAt == 0 {
+		l.StartedAt = now.Unix()
 	}
 	dRx := usageDelta(l.LastRx, *rx, l.Have)
 	dTx := usageDelta(l.LastTx, *tx, l.Have)
@@ -148,6 +170,10 @@ func (s *usageStore) observe(key, name string, now time.Time, rx, tx *uint64) {
 // every other interface's whole counter was counted again, and a new
 // interface's existing counter was counted as traffic.
 func (s *usageStore) observeIfs(key, name string, now time.Time, cur map[string][2]uint64) {
+	s.observeIfsKnown(key, name, now, cur, len(cur) > 0)
+}
+
+func (s *usageStore) observeIfsKnown(key, name string, now time.Time, cur map[string][2]uint64, known bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	l := s.links[key]
@@ -158,12 +184,24 @@ func (s *usageStore) observeIfs(key, name string, now time.Time, cur map[string]
 		l = &usageLink{Days: map[string]usageDay{}}
 		s.links[key] = l
 	}
+	if now.UnixNano() < l.ObservedAt {
+		return
+	}
+	l.ObservedAt = now.UnixNano()
 	if name != "" {
 		l.Name = name
 	}
-	if len(cur) == 0 {
-		return // nothing readable now: keep the baselines for when it comes back
+	l.Known = &known
+	s.dirty = true
+	if !known {
+		return // keep all baselines through an unreadable snapshot
 	}
+	if l.Have {
+		l.Measured = true
+	} else if l.StartedAt == 0 {
+		l.StartedAt = now.Unix()
+	}
+	l.Have = true
 	var dRx, dTx uint64
 	for ifname, c := range cur {
 		if prev, ok := l.LastIf[ifname]; ok {
@@ -181,6 +219,11 @@ func (s *usageStore) observeIfs(key, name string, now time.Time, cur map[string]
 // addLocked books dRx/dTx in the link's minute and day.
 func (s *usageStore) addLocked(l *usageLink, now time.Time, dRx, dTx uint64) {
 	l.Seen = now.Unix()
+	l.CumulativeRx += dRx
+	l.CumulativeTx += dTx
+	if l.Days == nil {
+		l.Days = map[string]usageDay{}
+	}
 	if dRx == 0 && dTx == 0 {
 		// still advance "seen" and make sure a minute bucket exists lazily
 		// only when traffic flows; idle minutes need no point.
@@ -222,7 +265,7 @@ func (s *usageStore) prune(now time.Time) {
 				s.dirty = true
 			}
 		}
-		if len(l.Points) == 0 && len(l.Days) == 0 && l.Seen < cut {
+		if k != usageServerKey && len(l.Points) == 0 && len(l.Days) == 0 && l.Seen < cut {
 			delete(s.links, k) // nothing left and not seen for the whole window
 			s.dirty = true
 		}
@@ -387,7 +430,9 @@ func (s *usageStore) all(now time.Time, window time.Duration, step int64) []usag
 	defer s.mu.Unlock()
 	keys := make([]string, 0, len(s.links))
 	for k := range s.links {
-		keys = append(keys, k)
+		if k != usageServerKey && k != usageTotalKey {
+			keys = append(keys, k)
+		}
 	}
 	sort.Slice(keys, func(i, j int) bool {
 		// host, then main, then peers by numeric id
@@ -427,7 +472,7 @@ func (s *usageStore) all(now time.Time, window time.Duration, step int64) []usag
 			continue
 		}
 		out = append(out, sr)
-		if k == usageHostKey && haveLinks {
+		if k == usageHostKey && haveLinks || s.links[k].AliasOf != "" {
 			continue
 		}
 		tot.Rx += sr.Rx
@@ -490,10 +535,35 @@ func (s *usageStore) all(now time.Time, window time.Duration, step int64) []usag
 //     spoke (which has one tunnel and no peer list), and on a hub it is the
 //     overall total that also covers interfaces the peer list does not name.
 func usageOnSnapshot(s *HubSnapshot) {
-	now := time.Now()
-	for _, l := range s.All() {
-		trafficUsage.observe(usageKey(l), linkName(l), now, l.Rx, l.Tx)
+	if s == nil {
+		return
 	}
+	now := s.CountersAt
+	if now.IsZero() {
+		now = s.At
+	}
+	if now.IsZero() {
+		now = time.Now()
+	}
+	aliases := usageSnapshotAliases(s)
+	seen := map[string]bool{}
+	for _, l := range s.All() {
+		key := usageKey(l)
+		if aliases["peer:"+strconv.Itoa(l.ID)] == "main" {
+			key = usageMainKey
+		}
+		if l.Engine == "matrix" || seen[key] {
+			continue
+		}
+		seen[key] = true
+		trafficUsage.observe(key, linkName(l), now, l.Rx, l.Tx)
+	}
+	// Foreign spokes have no synthetic Main record. Their local counters are
+	// still attributable to main, never to the entire physical server.
+	if !seen[usageMainKey] && s.Local.Engine != "matrix" && s.Local.Engine != "bagher" && (s.Local.Gre.Exists || s.Local.FrpSvc != "") {
+		trafficUsage.observe(usageMainKey, "Main tunnel", now, s.LocalRx, s.LocalTx)
+	}
+	usageObserveSpecialTunnels(s, now)
 	// every tunnel interface, plus the Backhaul/Bagher port counters, each
 	// on its own (the chains count only what no interface does)
 	cur := trafficTunnelIfs(s.DevData)
@@ -563,11 +633,5 @@ func startUsagePersistence(stop <-chan struct{}) {
 // GET /api/traffic/usage?range=1h|6h|24h|7d  — admin only (requireAuth).
 func handleUsageGet(w http.ResponseWriter, r *http.Request) {
 	win, step := usageRange(r.URL.Query().Get("range"))
-	writeJSON(w, map[string]any{
-		"range":     r.URL.Query().Get("range"),
-		"keep_days": int(usageKeep / (24 * time.Hour)),
-		"step_sec":  step,
-		"now":       time.Now().Unix(),
-		"links":     trafficUsage.all(time.Now(), win, step),
-	})
+	writeJSON(w, usageResponse(time.Now(), win, step, r.URL.Query().Get("range")))
 }

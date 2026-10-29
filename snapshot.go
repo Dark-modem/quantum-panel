@@ -70,14 +70,17 @@ type devCounters struct{ rx, tx uint64 }
 // hostView is everything the pure builders (localStatusFrom, livePeersFrom,
 // mainTunnelFrom) need from the host, collected once.
 type hostView struct {
-	sessions   []ssSession
-	tunnelShow string
-	tunnelOK   bool
-	inner      map[string]string // ifname -> first inet CIDR
-	active     map[string]bool   // unit -> active
-	devData    string            // raw /proc/net/dev
-	devAt      time.Time         // when devData and the carrier counters were read
-	dev        map[string]devCounters
+	sessions       []ssSession
+	tunnelShow     string
+	tunnelOK       bool
+	inner          map[string]string // ifname -> first inet CIDR
+	active         map[string]bool   // unit -> active
+	devData        string            // raw /proc/net/dev
+	devAt          time.Time         // when devData and the carrier counters were read
+	dev            map[string]devCounters
+	serverCounters map[string][2]uint64 // physical host NICs only: received, transmitted
+	serverKnown    bool
+	bootID         string
 	// Backhaul/Bagher port counters, read right after devData (carrier_traffic.go)
 	carrierRx, carrierTx uint64
 	carrierOK            bool
@@ -240,6 +243,10 @@ func collectHost(recs []peerRecord, prev map[string]devCounters) *hostView {
 			v.devData = string(b)
 			v.dev = parseNetDev(v.devData)
 		}
+		v.serverCounters, v.serverKnown = serverIfSelector.counters(v.dev, v.devAt, procRoot, serverSysRoot, serverNetProbe)
+		if b, err := serverNetProbe.readFile(filepath.Join(procRoot, "sys/kernel/random/boot_id")); err == nil {
+			v.bootID = strings.TrimSpace(string(b))
+		}
 		v.carrierRx, v.carrierTx, v.carrierOK = carrierCounters()
 		if v.carrierOK {
 			v.carrierTags = carrierTagCounters()
@@ -336,13 +343,14 @@ func mainTunnelFrom(st tunnelStatus, v *hostView) *peerLive {
 // ---- snapshot ----
 
 type HubSnapshot struct {
-	At      time.Time
-	Seq     uint64
-	BuildMs float64
-	Local   tunnelStatus
-	Main    *peerLive
-	Peers   []peerLive
-	Traffic map[string]any
+	At            time.Time
+	Seq           uint64
+	BuildMs       float64
+	Local         tunnelStatus
+	Main          *peerLive
+	Peers         []peerLive
+	Traffic       map[string]any
+	ServerTraffic serverTrafficMetrics
 	// DevData is the raw /proc/net/dev this snapshot was built from (the
 	// traffic ledger sums tunnel interfaces from it).
 	DevData string
@@ -534,6 +542,8 @@ func buildSnapshot() *HubSnapshot {
 		s.Traffic = trafficSample(v.devData, v.carrierRx, v.carrierTx, v.carrierOK, v.devAt)
 		s.DevData, s.CountersAt = v.devData, v.devAt
 		s.ActiveConns = activeConns()
+		s.ServerTraffic = serverMetrics.sample(serverMetricsFile(), v.serverCounters, v.serverKnown, v.bootID, v.devAt, s.ActiveConns)
+		observeServerInterfaceUsage(v.devAt, v.serverCounters, v.serverKnown)
 		s.CarrierRx, s.CarrierTx, s.CarrierOK, s.CarrierTags = v.carrierRx, v.carrierTx, v.carrierOK, v.carrierTags
 		s.LocalRx, s.LocalTx = localTraffic(local, v)
 	})

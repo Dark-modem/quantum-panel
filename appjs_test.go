@@ -23,7 +23,10 @@ func TestAppJSExtracted(t *testing.T) {
 	if !strings.Contains(string(html), `<script src="topology.js"></script>`) {
 		t.Error("index.html must load the topology module")
 	}
-	if strings.Count(string(html), "<script") != 4 { // theme, app, Matrix edit and topology
+	if !strings.Contains(string(html), `<script src="tunnel_overview.js"></script>`) {
+		t.Error("page must load selected tunnel overview module")
+	}
+	if strings.Count(string(html), "<script") != 5 { // theme, app, Matrix edit, topology and selected tunnel overview
 		t.Errorf("unexpected number of <script> tags: %d", strings.Count(string(html), "<script"))
 	}
 	if strings.Contains(string(html), "async function api(") {
@@ -48,6 +51,9 @@ func TestIndexCacheBustsAppJS(t *testing.T) {
 	cfg.BasePath = "x"
 	rr := httptest.NewRecorder()
 	serveIndex(rr, httptest.NewRequest("GET", "/x/", nil))
+	if !strings.Contains(rr.Body.String(), `src="tunnel_overview.js?v=`) {
+		t.Error("selected tunnel overview must be cache-busted")
+	}
 	if !strings.Contains(rr.Body.String(), `src="topology.js?v=`) {
 		t.Error("topology module must be cache-busted per build")
 	}

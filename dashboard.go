@@ -194,8 +194,11 @@ func handleDashboard(w http.ResponseWriter, r *http.Request) {
 			"proxies":     st.Proxies,
 			"proxy_ports": st.ProxyPorts,
 		},
-		"traffic": traffic,
-		"history": trafficHistory(r.URL.Query().Get("range")),
+		"traffic":            traffic,
+		"history":            trafficHistory(r.URL.Query().Get("range")),
+		"server_traffic":     dashboardServerTraffic(snap.ServerTraffic),
+		"server_connections": serverConnections(snap.ActiveConns),
+		"server_history":     serverTrafficHistory(r.URL.Query().Get("range")),
 		// when the counters (traffic, peers' rx/tx) were read: speeds in the
 		// browser are bytes over the difference of two of these
 		"counters_at": countersAtMs(snap),
@@ -747,7 +750,7 @@ func countEstablished(path string) (int, bool) {
 			n++
 		}
 	}
-	return n, true
+	return n, sc.Err() == nil
 }
 
 // ---- traffic history: cumulative rx/tx sampled into a ring on disk ----
@@ -868,6 +871,7 @@ func saveHistoryLocked() {
 }
 
 func flushHistoryIfDirty() {
+	serverMetrics.flush()
 	histMu.Lock()
 	defer histMu.Unlock()
 	if histDirty {
