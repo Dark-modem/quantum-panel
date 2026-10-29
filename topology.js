@@ -73,7 +73,6 @@ function topologyRender() {
   const inTunnel = typeof _tunnelDetail !== 'undefined' && _tunnelDetail !== null;
   $('topologyListCard').hidden = !!topo || inTunnel;
   $('topologyDetailCard').hidden = !topo || inTunnel;
-  $('topologyUnassignedCard').hidden = !!topo || inTunnel;
   $('topologySetupBack').hidden = !topo;
   $('rscBanner').classList.toggle('td-hide', !inTunnel);
   $('dialCard').classList.toggle('td-hide', !inTunnel);
@@ -97,9 +96,6 @@ function topologyRender() {
       }).join('')
     : `<div class="ent-empty"><b>${esc(tr('', 'No topology yet'))}</b><span>${esc(tr('', 'Create a topology, set the server roles, then add tunnels between them.'))}</span></div>`;
   const assigned = new Set(topologyData.topologies.flatMap(t => t.tunnel_ids || []));
-  const unassigned = topologyData.tunnels.filter(t => !assigned.has(t.id));
-  $('topologyUnassigned').innerHTML = unassigned.map(t => `<div class="topo-list-row"><b>${esc(t.name)}</b><span>${esc(t.engine)}</span><span class="u-mono" dir="ltr">${esc(t.remote_ip || '—')}</span><button type="button" class="hashem-btn hashem-btn-secondary" data-topo-view-tunnel="${esc(t.id)}">${esc(tr('', 'View'))}</button></div>`).join('')
-    || `<p class="qs-hint">${esc(tr('', 'All known tunnels are assigned or no tunnel exists.'))}</p>`;
   if (!topo) return;
   const cables = (topo.tunnel_ids || []).map(id => topologyData.tunnels.find(t => t.id === id) || {id, name: id, engine: '—', state: 'down'});
   $('topologyGraph').innerHTML = topologyGraph(topo, cables);
