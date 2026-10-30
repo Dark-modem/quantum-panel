@@ -843,7 +843,10 @@ func main() {
 		}
 	}
 	srv := &http.Server{
-		Handler:           panelChain(mux),
+		// errorPagesMiddleware renders the branded Persian error page for
+		// browser navigations only; API JSON and WebSocket upgrades pass
+		// through untouched (innermost, inside the security headers).
+		Handler:           panelChain(errorPagesMiddleware(mux)),
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       120 * time.Second,
 	}
