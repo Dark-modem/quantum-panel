@@ -402,6 +402,7 @@ func matrixDetectV6() string {
 	}
 	return ""
 }
+
 // matrixPortBusyError marks a port another program already holds on this
 // server. It maps to its own API code (E-MATRIX-10) so the UI can tell
 // "pick another port" apart from a genuine setup failure (E-MATRIX-07).
@@ -1008,46 +1009,71 @@ func handleMatrixRegister(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "registration denied", 403)
 		return
 	}
-	if !matrixNameRe.MatchString(q.Name) || q.Name == "main" {
-		http.Error(w, "invalid node name", 400)
-		return
-	}
-	if st.Revision != q.Revision {
-		http.Error(w, "bundle revision changed; copy the current hub bundle", http.StatusConflict)
-		return
-	}
-	key, e := matrixPublicKey(q.HostFile)
+	main, e := matrixRegisterHub(in, st, q.Name, ClientIP(r), q.HostFile, q.Revision)
 	if e != nil {
-		http.Error(w, "invalid public key", 400)
+		var ue *matrixOpError
+		if errors.As(e, &ue) {
+			http.Error(w, ue.Msg, ue.Status)
+			return
+		}
+		writeAPIError(w, r, "E-MATRIX-07", e.Error())
 		return
+	}
+	writeJSON(w, map[string]string{"status": "ok", "main_host": main})
+}
+
+// matrixOpError is a user-fixable failure with a stable error code and
+// HTTP status, shared by the HTTP handlers and the controller-driven
+// agent path so both report identical causes.
+type matrixOpError struct {
+	Code   string // E-MATRIX-xx
+	Status int    // HTTP status for the legacy handler
+	Msg    string
+}
+
+func (e *matrixOpError) Error() string { return e.Msg }
+
+// matrixRegisterHub finishes hub-side pairing for in: validates the node
+// name, revision and host-file key, writes hosts/<name>, activates the
+// forwarding rules and restarts the unit. The caller must hold matrixMu
+// and must already have resolved in/st by pairing token; addr is the
+// node's public address for the dashboard (ClientIP on the HTTP path,
+// the agent registry's last-seen address on the agent path). Returns the
+// hub's hosts/main content. Plain (non-*matrixOpError) errors are
+// internal (disk/exec) failures.
+func matrixRegisterHub(in matrixInstance, st matrixState, name, addr, hostFile, revision string) (string, error) {
+	if !matrixNameRe.MatchString(name) || name == "main" {
+		return "", &matrixOpError{Code: "E-MATRIX-02", Status: 400, Msg: "invalid node name"}
+	}
+	if st.Revision != revision {
+		return "", &matrixOpError{Code: "E-MATRIX-02", Status: http.StatusConflict, Msg: "bundle revision changed; copy the current hub bundle"}
+	}
+	key, e := matrixPublicKey(hostFile)
+	if e != nil {
+		return "", &matrixOpError{Code: "E-MATRIX-02", Status: 400, Msg: "invalid public key"}
 	}
 	hash := sha256.Sum256([]byte(key))
 	fingerprint := hex.EncodeToString(hash[:])
-	if len(st.Peers) > 0 && (st.Peers[0].Name != q.Name || st.Peers[0].KeyHash != fingerprint) {
-		http.Error(w, "hub already paired; remove and recreate to pair another node", 409)
-		return
+	if len(st.Peers) > 0 && (st.Peers[0].Name != name || st.Peers[0].KeyHash != fingerprint) {
+		return "", &matrixOpError{Code: "E-MATRIX-02", Status: 409, Msg: "hub already paired; remove and recreate to pair another node"}
 	}
 	hf := "Subnet = " + in.firstPeer() + "/32\nPort = " + strconv.Itoa(st.Port) + "\nCipher = aes-256-cbc\nDigest = sha256\n" + key
-	if e = os.WriteFile(filepath.Join(matrixDirOf(in), "hosts", q.Name), []byte(hf), 0600); e != nil {
-		writeAPIError(w, r, "E-MATRIX-07", e.Error())
-		return
+	if e = os.WriteFile(filepath.Join(matrixDirOf(in), "hosts", name), []byte(hf), 0600); e != nil {
+		return "", e
 	}
-	st.Peers = []matrixPeer{{Name: q.Name, Addr: ClientIP(r), IP: in.firstPeer(), KeyHash: fingerprint}}
+	st.Peers = []matrixPeer{{Name: name, Addr: addr, IP: in.firstPeer(), KeyHash: fingerprint}}
 	if e = matrixActivateForward(in, &st); e != nil {
-		writeAPIError(w, r, "E-MATRIX-07", e.Error())
-		return
+		return "", e
 	}
 	st.PeerSyncRequired = false
 	if e = saveMatrixInstance(in, st); e != nil {
-		writeAPIError(w, r, "E-MATRIX-07", e.Error())
-		return
+		return "", e
 	}
 	if _, e = matrixExec("systemctl", "restart", in.unit()); e != nil {
-		writeAPIError(w, r, "E-MATRIX-07", e.Error())
-		return
+		return "", e
 	}
 	host, _ := os.ReadFile(filepath.Join(matrixDirOf(in), "hosts/main"))
-	writeJSON(w, map[string]string{"status": "ok", "main_host": string(host)})
+	return string(host), nil
 }
 func handleMatrixForeignSetup(w http.ResponseWriter, r *http.Request) {
 	var q struct {
@@ -1057,27 +1083,79 @@ func handleMatrixForeignSetup(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, r, "E-MATRIX-02", "invalid JSON")
 		return
 	}
-	b, in, e := parseMatrixBundleFor(q.Bundle)
+	res, e := matrixProvisionNodeBundle(q.Bundle)
 	if e != nil {
-		writeAPIError(w, r, "E-MATRIX-02", e.Error())
+		var ue *matrixOpError
+		if errors.As(e, &ue) {
+			writeAPIError(w, r, ue.Code, ue.Msg)
+			return
+		}
+		writeMatrixSetupError(w, r, e)
 		return
+	}
+	// Register with the hub over HTTP, exactly like the manual bundle flow.
+	payload, _ := json.Marshal(map[string]string{"token": res.Token, "name": res.Name, "host_file": res.HostFile, "revision": res.Revision})
+	client := &http.Client{Timeout: 25 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	resp, e := client.Post(res.Panel+"/api/matrix/register", "application/json", strings.NewReader(string(payload)))
+	if e != nil {
+		_ = matrixRemove(res.Instance, res.State)
+		writeAPIError(w, r, "E-MATRIX-08", "hub registration unavailable")
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		_ = matrixRemove(res.Instance, res.State)
+		writeAPIError(w, r, "E-MATRIX-08", fmt.Sprintf("hub registration returned HTTP %d", resp.StatusCode))
+		return
+	}
+	LogSecurityAudit("matrix_node_setup", cfg.Username, ClientIP(r), "instance="+res.Instance.ID+" family="+res.State.Family)
+	out := map[string]any{"status": "ok", "detail": "matrix node registered with the hub and started"}
+	// A shifted local mesh port is the one thing the node chose for itself;
+	// surfacing it spares the user a round-trip to the Matrix card.
+	if res.State.Port != res.BundlePort {
+		out["port"] = res.State.Port
+	}
+	writeJSON(w, out)
+}
+
+// matrixNodeApplyResult carries everything the caller needs to register
+// the freshly configured node with its hub.
+type matrixNodeApplyResult struct {
+	Instance   matrixInstance
+	State      matrixState
+	BundlePort int    // mesh port as embedded in the bundle (before a local shift)
+	Panel      string // hub panel URL from the bundle
+	Token      string
+	Name       string
+	HostFile   string // this node's hosts/<name> content
+	Revision   string
+}
+
+// matrixProvisionNodeBundle provisions this server as a Matrix node from an
+// hmx1_ pairing bundle. It is the shared core of handleMatrixForeignSetup
+// (the manual HTTP flow) and the controller-driven agent path: parse and
+// validate the bundle, refuse double setup, check port ownership, shift
+// the local mesh port when busy, and run matrixSetup. It stops right
+// before hub registration so each caller registers its own way.
+// Caller need not hold matrixMu; the function takes it internally.
+func matrixProvisionNodeBundle(bundle string) (matrixNodeApplyResult, error) {
+	b, in, e := parseMatrixBundleFor(bundle)
+	if e != nil {
+		return matrixNodeApplyResult{}, &matrixOpError{Code: "E-MATRIX-02", Status: 400, Msg: e.Error()}
 	}
 	matrixMu.Lock()
 	defer matrixMu.Unlock()
 	if old := loadMatrixInstance(in); old.Enabled {
-		writeAPIError(w, r, "E-MATRIX-01", "")
-		return
+		return matrixNodeApplyResult{}, &matrixOpError{Code: "E-MATRIX-01", Status: 400, Msg: ""}
 	}
 	// Forwarded user ports genuinely must be free on the node: the hub DNATs
 	// exactly these port numbers into this server, where the real service
 	// listens. A collision there is a hard, user-fixable conflict.
 	if owner, port := matrixFirstInstancePortBusy(in, b.Ports); owner != "" {
-		writeAPIError(w, r, "E-MATRIX-02", fmt.Sprintf("forwarded port %d is already used on this server by Matrix instance %s — free that port or remove that tunnel first", port, owner))
-		return
+		return matrixNodeApplyResult{}, &matrixOpError{Code: "E-MATRIX-02", Status: 400, Msg: fmt.Sprintf("forwarded port %d is already used on this server by Matrix instance %s — free that port or remove that tunnel first", port, owner)}
 	}
 	if owner, port := matrixFirstTopologyPortOwner(b.Ports); owner != "" {
-		writeAPIError(w, r, "E-MATRIX-02", fmt.Sprintf("forwarded port %d is already owned by another topology's tunnel (%s)", port, owner))
-		return
+		return matrixNodeApplyResult{}, &matrixOpError{Code: "E-MATRIX-02", Status: 400, Msg: fmt.Sprintf("forwarded port %d is already owned by another topology's tunnel (%s)", port, owner)}
 	}
 	st := matrixState{Enabled: true, Network: in.network(), Role: "node", Family: b.Family, Port: b.Port, Addr: b.Addr, Ports: b.Ports, Name: "node" + randHex(8), IP: in.firstPeer(), Panel: b.Panel}
 	// The node's local mesh port does not have to equal the hub's: the node
@@ -1088,38 +1166,15 @@ func handleMatrixForeignSetup(w http.ResponseWriter, r *http.Request) {
 	if matrixInstancePortsBusy(in, []int{b.Port}) != "" || matrixTopologyPortOwner([]int{b.Port}) != "" || !matrixPortFree(b.Port) {
 		p, e := matrixAutoMeshPort(in, b.Ports)
 		if e != nil {
-			writeAPIError(w, r, "E-MATRIX-10", e.Error())
-			return
+			return matrixNodeApplyResult{}, &matrixOpError{Code: "E-MATRIX-10", Status: 400, Msg: e.Error()}
 		}
 		st.Port = p
 	}
 	if e = matrixSetup(in, st, b.MainHost); e != nil {
-		writeMatrixSetupError(w, r, e)
-		return
+		return matrixNodeApplyResult{}, e
 	}
 	self, _ := os.ReadFile(filepath.Join(matrixDirOf(in), "hosts", st.Name))
-	payload, _ := json.Marshal(map[string]string{"token": b.Token, "name": st.Name, "host_file": string(self), "revision": b.Revision})
-	client := &http.Client{Timeout: 25 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	resp, e := client.Post(b.Panel+"/api/matrix/register", "application/json", strings.NewReader(string(payload)))
-	if e != nil {
-		_ = matrixRemove(in, st)
-		writeAPIError(w, r, "E-MATRIX-08", "hub registration unavailable")
-		return
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		_ = matrixRemove(in, st)
-		writeAPIError(w, r, "E-MATRIX-08", fmt.Sprintf("hub registration returned HTTP %d", resp.StatusCode))
-		return
-	}
-	LogSecurityAudit("matrix_node_setup", cfg.Username, ClientIP(r), "instance="+in.ID+" family="+st.Family)
-	out := map[string]any{"status": "ok", "detail": "matrix node registered with the hub and started"}
-	// A shifted local mesh port is the one thing the node chose for itself;
-	// surfacing it spares the user a round-trip to the Matrix card.
-	if st.Port != b.Port {
-		out["port"] = st.Port
-	}
-	writeJSON(w, out)
+	return matrixNodeApplyResult{Instance: in, State: st, BundlePort: b.Port, Panel: b.Panel, Token: b.Token, Name: st.Name, HostFile: string(self), Revision: b.Revision}, nil
 }
 func matrixPublicState(in matrixInstance, st matrixState) map[string]any {
 	peers := []map[string]any{}
