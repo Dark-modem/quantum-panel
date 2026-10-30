@@ -915,3 +915,21 @@ func captureStdout(t *testing.T, fn func()) string {
 	os.Stdout = old
 	return <-done
 }
+
+func TestAgentWSURLBasePathNotDoubled(t *testing.T) {
+	cases := []struct {
+		server, basePath, want string
+	}{
+		{"https://ctrl.example:7443/panel", "panel", "wss://ctrl.example:7443/panel/api/agent/ws"},
+		{"https://ctrl.example:7443", "panel", "wss://ctrl.example:7443/panel/api/agent/ws"},
+		{"https://ctrl.example:7443/", "panel", "wss://ctrl.example:7443/panel/api/agent/ws"},
+		{"https://ctrl.example:7443", "", "wss://ctrl.example:7443/api/agent/ws"},
+		{"http://127.0.0.1:17778/4UCf3vAbDv5I", "4UCf3vAbDv5I", "ws://127.0.0.1:17778/4UCf3vAbDv5I/api/agent/ws"},
+	}
+	for _, tc := range cases {
+		got := agentWSURL(agentIdentity{Server: tc.server, BasePath: tc.basePath})
+		if got != tc.want {
+			t.Fatalf("agentWSURL(%q, base %q) = %q, want %q", tc.server, tc.basePath, got, tc.want)
+		}
+	}
+}

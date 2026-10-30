@@ -75,13 +75,19 @@ var agentDialer = func(ident agentIdentity) (agentWS, error) {
 
 // agentWSURL builds the outbound WebSocket URL from the enrollment record:
 // server "https://host:7443" + base_path "panel" → wss://host:7443/panel/api/agent/ws
+// The installer contract passes --server WITH the base path already included
+// ("https://host:7443[/base]"), so the controller-returned base_path is only
+// appended when the server URL does not already end with it — appending it
+// twice produced host/base/base/api/agent/ws and the WS 404'd.
 func agentWSURL(ident agentIdentity) string {
 	base := strings.TrimRight(strings.TrimSpace(ident.Server), "/")
 	if !strings.Contains(base, "://") {
 		base = "ws://" + base
 	}
 	if bp := strings.Trim(ident.BasePath, "/"); bp != "" {
-		base += "/" + bp
+		if !strings.HasSuffix(strings.ToLower(base), "/"+strings.ToLower(bp)) {
+			base += "/" + bp
+		}
 	}
 	u := base + agentWSPath
 	u = strings.Replace(u, "https://", "wss://", 1)
