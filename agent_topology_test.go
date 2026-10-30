@@ -1,0 +1,354 @@
+package main
+
+import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+)
+
+// agentTunnelLab redirects the tunnel store at a temp dir and installs
+// fake hub/registry seams. Returns a harness the tests drive.
+type agentTunnelLab struct {
+	t            *testing.T
+	mu           sync.Mutex
+	delivered    map[string][]agentDesired // agentID -> desired list
+	commands     []agentCommandCall
+	records      map[string]agentTunnelAgentInfo
+	online       map[string]bool
+	prevConfigMu sync.Mutex
+}
+
+type agentCommandCall struct {
+	ID     string
+	Op     string
+	Params map[string]string
+}
+
+func newAgentTunnelLab(t *testing.T) *agentTunnelLab {
+	t.Helper()
+	dir := t.TempDir()
+	oldDir, oldPath := configDir, agentTunnelsPath
+	configDir = dir
+	agentTunnelsPath = filepath.Join(dir, "agent_tunnels.json")
+	t.Cleanup(func() {
+		configDir = oldDir
+		agentTunnelsPath = oldPath
+	})
+	lab := &agentTunnelLab{
+		t:         t,
+		delivered: map[string][]agentDesired{},
+		records:   map[string]agentTunnelAgentInfo{},
+		online:    map[string]bool{},
+	}
+	oldDeliver, oldCmd, oldOnline, oldLookup := agentHubDeliverDesiredFn, agentHubCommandFn, agentHubOnlineFn, agentRegistryLookupFn
+	agentHubDeliverDesiredFn = func(id string, d agentDesired) error {
+		lab.mu.Lock()
+		lab.delivered[id] = append(lab.delivered[id], d)
+		lab.mu.Unlock()
+		return nil
+	}
+	agentHubCommandFn = func(id, op string, params map[string]string, timeout time.Duration) (agentCommandResult, error) {
+		lab.mu.Lock()
+		lab.commands = append(lab.commands, agentCommandCall{ID: id, Op: op, Params: params})
+		lab.mu.Unlock()
+		return agentCommandResult{OK: true}, nil
+	}
+	agentHubOnlineFn = func(id string) bool {
+		lab.mu.Lock()
+		defer lab.mu.Unlock()
+		return lab.online[id]
+	}
+	agentRegistryLookupFn = func(id string) (agentTunnelAgentInfo, bool) {
+		lab.mu.Lock()
+		defer lab.mu.Unlock()
+		rec, ok := lab.records[id]
+		return rec, ok
+	}
+	t.Cleanup(func() {
+		agentHubDeliverDesiredFn, agentHubCommandFn, agentHubOnlineFn, agentRegistryLookupFn = oldDeliver, oldCmd, oldOnline, oldLookup
+	})
+	return lab
+}
+
+func (l *agentTunnelLab) addAgent(id, name, role, ip string, caps []string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.records[id] = agentTunnelAgentInfo{ID: id, Name: name, Role: role, Status: "offline", PublicIP: ip, Caps: caps}
+}
+
+func (l *agentTunnelLab) setLastState(agentID string, st *agentStateReport) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	rec := l.records[agentID]
+	rec.LastState = st
+	l.records[agentID] = rec
+}
+
+func (l *agentTunnelLab) desiresFor(agentID string) []agentDesired {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return append([]agentDesired(nil), l.delivered[agentID]...)
+}
+
+func (l *agentTunnelLab) commandCalls() []agentCommandCall {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return append([]agentCommandCall(nil), l.commands...)
+}
+
+func agentTestRSAPem(t *testing.T) string {
+	t.Helper()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(pem.EncodeToMemory(&pem.Block{Type: "RSA PUBLIC KEY", Bytes: x509.MarshalPKCS1PublicKey(&key.PublicKey)}))
+}
+
+func TestAgentTunnelNextInstance(t *testing.T) {
+	tunnels := []agentTunnel{{ID: "at_1", HubAgentID: "h1", Instance: "matrix"}}
+	if got := agentTunnelNextInstance(tunnels, "h1"); got != "matrix2" {
+		t.Fatalf("expected matrix2, got %q", got)
+	}
+	if got := agentTunnelNextInstance(tunnels, "h2"); got != "matrix" {
+		t.Fatalf("expected matrix for other hub, got %q", got)
+	}
+}
+
+func TestAgentTunnelNodeBundle(t *testing.T) {
+	tun := agentTunnel{Instance: "matrix", Family: "ipv4", Ports: []int{8080}, Token: strings.Repeat("a", 32), HubMainHost: "Subnet = 10.254.231.1/32\n" + agentTestRSAPem(t)}
+	b, err := agentTunnelNodeBundle(&tun, "185.10.10.10", 2097, "rev1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(b, matrixBundlePfx) {
+		t.Fatalf("bundle must carry the %s prefix", matrixBundlePfx)
+	}
+	payload, in, err := parseMatrixBundleFor(b)
+	if err != nil {
+		t.Fatalf("controller-built bundle must parse: %v", err)
+	}
+	if payload.FIP != in.firstPeer() || payload.Token != tun.Token || payload.Port != 2097 || payload.Network != in.network() {
+		t.Fatalf("bundle payload mismatch: %+v", payload)
+	}
+}
+
+func TestAgentTunnelNodeBundleMissingHost(t *testing.T) {
+	tun := agentTunnel{Instance: "matrix", Family: "ipv4", Token: strings.Repeat("a", 32)}
+	if _, err := agentTunnelNodeBundle(&tun, "1.2.3.4", 2097, "r"); err == nil {
+		t.Fatal("expected error without hub host file")
+	}
+}
+
+func TestAgentTunnelProvisionEndToEnd(t *testing.T) {
+	lab := newAgentTunnelLab(t)
+	lab.addAgent("hub1", "iran", "iran", "185.1.1.1", []string{agentCapMatrix})
+	lab.addAgent("node1", "foreign", "foreign", "5.6.7.8", []string{agentCapMatrix})
+	lab.online["hub1"] = true
+	lab.online["node1"] = true
+
+	// Store a tunnel directly, then run the provisioning job.
+	s := loadAgentTunnels()
+	tun := agentTunnel{ID: "at_x", Name: "first", Instance: "matrix", HubAgentID: "hub1", NodeAgentID: "node1",
+		Family: "ipv4", MeshPort: 2097, Ports: []int{8080}, Token: strings.Repeat("t", 32), Active: true,
+		State: agentTunnelStateProvisioning, CreatedAt: time.Now().Unix()}
+	s.Tunnels = append(s.Tunnels, tun)
+	if err := saveAgentTunnels(s); err != nil {
+		t.Fatal(err)
+	}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		// Ack each side independently as soon as its desired lands: the
+		// node desired is only delivered after the hub ack arrives.
+		var hubAcked, nodeAcked bool
+		for !(hubAcked && nodeAcked) {
+			lab.mu.Lock()
+			hubWant := len(lab.delivered["hub1"])
+			nodeWant := len(lab.delivered["node1"])
+			lab.mu.Unlock()
+			if !hubAcked && hubWant >= 1 {
+				hubAcked = true
+				hubDesired := lab.desiresFor("hub1")[0]
+				agentTunnelAckObserved("hub1", agentAck{Revision: hubDesired.Revision, OK: true,
+					Detail: map[string]string{"main_host": "Subnet = 10.254.231.1/32\n" + agentTestRSAPem(t)}})
+				continue
+			}
+			if !nodeAcked && nodeWant >= 1 {
+				nodeAcked = true
+				nodeDesired := lab.desiresFor("node1")[0]
+				agentTunnelAckObserved("node1", agentAck{Revision: nodeDesired.Revision, OK: true})
+				continue
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+	}()
+	agentTunnelProvision("at_x")
+	<-done
+
+	s = loadAgentTunnels()
+	if len(s.Tunnels) != 1 || s.Tunnels[0].State != agentTunnelStateActive {
+		t.Fatalf("tunnel should end active, got %+v", s.Tunnels)
+	}
+	if !strings.Contains(s.Tunnels[0].HubMainHost, "RSA PUBLIC KEY") {
+		t.Fatal("hub main host file must be stored from the ack detail")
+	}
+	if s.Tunnels[0].MeshPort != 2097 {
+		t.Fatalf("mesh port must persist, got %d", s.Tunnels[0].MeshPort)
+	}
+	hubDesired := lab.desiresFor("hub1")[0]
+	if hubDesired.Matrix == nil || hubDesired.Matrix.Hub == nil || hubDesired.Matrix.Hub.Addr != "185.1.1.1" || hubDesired.Matrix.Hub.Token != tun.Token {
+		t.Fatalf("hub desired payload wrong: %+v", hubDesired.Matrix)
+	}
+	nodeDesired := lab.desiresFor("node1")[0]
+	if nodeDesired.Matrix == nil || nodeDesired.Matrix.Bundle == "" {
+		t.Fatal("node desired must carry the hmx1 bundle")
+	}
+	if _, _, err := parseMatrixBundleFor(nodeDesired.Matrix.Bundle); err != nil {
+		t.Fatalf("node bundle must parse: %v", err)
+	}
+}
+
+func TestAgentTunnelProvisionHubAckFail(t *testing.T) {
+	lab := newAgentTunnelLab(t)
+	lab.addAgent("hub1", "iran", "iran", "185.1.1.1", []string{agentCapMatrix})
+	lab.addAgent("node1", "foreign", "foreign", "5.6.7.8", []string{agentCapMatrix})
+
+	s := loadAgentTunnels()
+	s.Tunnels = append(s.Tunnels, agentTunnel{ID: "at_y", Instance: "matrix", HubAgentID: "hub1", NodeAgentID: "node1",
+		Family: "ipv4", MeshPort: 2097, Token: strings.Repeat("t", 32), State: agentTunnelStateProvisioning})
+	_ = saveAgentTunnels(s)
+
+	go func() {
+		for {
+			lab.mu.Lock()
+			got := len(lab.delivered["hub1"])
+			lab.mu.Unlock()
+			if got >= 1 {
+				break
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+		hubDesired := lab.desiresFor("hub1")[0]
+		agentTunnelAckObserved("hub1", agentAck{Revision: hubDesired.Revision, OK: false, Error: "port busy"})
+	}()
+	agentTunnelProvision("at_y")
+
+	s = loadAgentTunnels()
+	if s.Tunnels[0].State != agentTunnelStateError || !strings.Contains(s.Tunnels[0].Error, "port busy") {
+		t.Fatalf("expected error state, got %+v", s.Tunnels[0])
+	}
+	if len(lab.desiresFor("node1")) != 0 {
+		t.Fatal("node must not receive desired state after hub failure")
+	}
+}
+
+func TestAgentTunnelRegisterRelay(t *testing.T) {
+	lab := newAgentTunnelLab(t)
+	lab.addAgent("hub1", "iran", "iran", "185.1.1.1", []string{agentCapMatrix})
+	lab.addAgent("node1", "foreign", "foreign", "5.6.7.8", []string{agentCapMatrix})
+	s := loadAgentTunnels()
+	s.Tunnels = append(s.Tunnels, agentTunnel{ID: "at_z", Instance: "matrix", HubAgentID: "hub1", NodeAgentID: "node1",
+		Token: strings.Repeat("k", 32), State: agentTunnelStateRegistering})
+	_ = saveAgentTunnels(s)
+
+	res := agentTunnelRegisterRelay(agentRegisterMsg{Token: strings.Repeat("k", 32), Name: "nodeabcd12", HostFile: "hostfile", Revision: "rev"}, "node1")
+	if !res.OK {
+		t.Fatalf("relay should succeed: %+v", res)
+	}
+	calls := lab.commandCalls()
+	if len(calls) != 1 || calls[0].Op != agentCmdMatrixRegister || calls[0].ID != "hub1" {
+		t.Fatalf("expected one matrix.register command to the hub, got %+v", calls)
+	}
+	if calls[0].Params["host_file"] != "hostfile" || calls[0].Params["instance"] != "matrix" {
+		t.Fatalf("relay params wrong: %+v", calls[0].Params)
+	}
+
+	// Wrong agent must be refused.
+	res = agentTunnelRegisterRelay(agentRegisterMsg{Token: strings.Repeat("k", 32), Name: "x", HostFile: "h", Revision: "r"}, "hub1")
+	if res.OK {
+		t.Fatal("registration from the hub agent itself must be refused")
+	}
+	// Unknown token must be refused.
+	res = agentTunnelRegisterRelay(agentRegisterMsg{Token: strings.Repeat("z", 32), Name: "x", HostFile: "h", Revision: "r"}, "node1")
+	if res.OK {
+		t.Fatal("unknown token must be refused")
+	}
+}
+
+func TestAgentTunnelsPostValidation(t *testing.T) {
+	lab := newAgentTunnelLab(t)
+	lab.addAgent("hub1", "iran", "iran", "185.1.1.1", []string{agentCapMatrix})
+	lab.addAgent("node1", "foreign", "foreign", "5.6.7.8", []string{agentCapMatrix})
+	lab.addAgent("nocap", "no-cap", "iran", "1.1.1.1", []string{agentCapTraffic})
+
+	post := func(body string) *httptest.ResponseRecorder {
+		rr := httptest.NewRecorder()
+		req := httptest.NewRequest("POST", "/api/agent-tunnels", strings.NewReader(body))
+		handleAgentTunnelsPost(rr, req)
+		return rr
+	}
+	if rr := post(`{"name":"t","hub_agent_id":"hub1","node_agent_id":"hub1","family":"ipv4"}`); rr.Code != 400 {
+		t.Fatalf("same agents must be rejected, got %d", rr.Code)
+	}
+	if rr := post(`{"name":"t","hub_agent_id":"hub1","node_agent_id":"node1","family":"gre"}`); rr.Code != 400 {
+		t.Fatalf("bad family must be rejected, got %d", rr.Code)
+	}
+	if rr := post(`{"name":"t","hub_agent_id":"hub1","node_agent_id":"nocap","family":"ipv4"}`); rr.Code != 400 {
+		t.Fatalf("agent without matrix cap must be rejected, got %d", rr.Code)
+	}
+	if rr := post(`{"name":"t","hub_agent_id":"hub1","node_agent_id":"node1","family":"ipv4","ports":[22]}`); rr.Code != 400 {
+		t.Fatalf("port 22 must be rejected, got %d", rr.Code)
+	}
+	if rr := post(`{"name":"t","hub_agent_id":"hub1","node_agent_id":"node1","family":"ipv4","ports":[]}`); rr.Code != 400 {
+		t.Fatalf("empty ports must be rejected (Matrix DNATs user ports), got %d", rr.Code)
+	}
+	rr := post(`{"name":"t","hub_agent_id":"hub1","node_agent_id":"node1","family":"ipv4","port":2097,"ports":[8080]}`)
+	if rr.Code != 200 {
+		t.Fatalf("valid create must pass, got %d: %s", rr.Code, rr.Body.String())
+	}
+	s := loadAgentTunnels()
+	if len(s.Tunnels) != 1 || s.Tunnels[0].Instance != "matrix" || len(s.Tunnels[0].Token) < 32 {
+		t.Fatalf("tunnel not stored correctly: %+v", s.Tunnels)
+	}
+}
+
+func TestAgentTunnelHealthViewFromHubState(t *testing.T) {
+	lab := newAgentTunnelLab(t)
+	lab.addAgent("hub1", "iran", "iran", "185.1.1.1", []string{agentCapMatrix})
+	lab.setLastState("hub1", &agentStateReport{Health: []agentTunnelHealth{{Instance: "matrix", LatencyMs: 42, LossPct: 0, Quality: "good"}}})
+	tun := agentTunnel{Instance: "matrix", HubAgentID: "hub1"}
+	h := agentTunnelHealthView(tun)
+	if h == nil || h.LatencyMs != 42 || h.Quality != "good" {
+		t.Fatalf("health view wrong: %+v", h)
+	}
+}
+
+func TestAgentTunnelsFileRoundTrip(t *testing.T) {
+	newAgentTunnelLab(t)
+	s := agentTunnelStore{Version: 1, Tunnels: []agentTunnel{{ID: "at_1", Token: "sekrit"}}}
+	if err := saveAgentTunnels(s); err != nil {
+		t.Fatal(err)
+	}
+	fi, err := os.Stat(agentTunnelsFile())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if runtime.GOOS != "windows" && fi.Mode().Perm() != 0600 {
+		t.Fatalf("agent_tunnels.json must be 0600, got %v", fi.Mode().Perm())
+	}
+	back := loadAgentTunnels()
+	if len(back.Tunnels) != 1 || back.Tunnels[0].Token != "sekrit" {
+		t.Fatalf("round trip failed: %+v", back)
+	}
+}
