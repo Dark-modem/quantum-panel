@@ -117,7 +117,7 @@ func agentReadEnv(c *websocket.Conn) (string, json.RawMessage, error) {
 // (allowlisted)→result, and a heartbeat carrying the state report.
 func TestAgentWSRoundTrip(t *testing.T) {
 	agentLab(t)
-	port, userPort := freeUDPPort(t), freeUDPPort(t)
+	port, userPort := freeMeshPort(t), freeMeshPort(t)
 	ident := agentIdentity{ID: "agt_rt", Key: "krt", Server: "http://127.0.0.1:1", BasePath: "panel", Name: "lab"}
 	if err := agentSaveIdentity(ident); err != nil {
 		t.Fatal(err)
@@ -394,7 +394,7 @@ func TestAgentWelcomeRefusalExitsOne(t *testing.T) {
 func TestAgentOfflineReconcile(t *testing.T) {
 	agentLab(t)
 	// Hub desired pending on disk (crash before ack).
-	port, userPort := freeUDPPort(t), freeUDPPort(t)
+	port, userPort := freeMeshPort(t), freeMeshPort(t)
 	hubDesired := agentHubDesired("900", port, []int{userPort})
 	if err := agentMutateState(func(st *agentPersistedState) {
 		d := *hubDesired
@@ -416,7 +416,7 @@ func TestAgentOfflineReconcile(t *testing.T) {
 	in2 := matrixInstance{ID: "matrix2"}
 	nodeDesired := &agentDesired{Revision: "901", Matrix: &agentDesiredMatrix{
 		Instance: in2.ID, Action: "apply",
-		Bundle: agentTestBundle(t, in2, freeUDPPort(t), freeUDPPort(t), "901"),
+		Bundle: agentTestBundle(t, in2, freeMeshPort(t), freeMeshPort(t), "901"),
 	}}
 	if err := agentMutateState(func(st *agentPersistedState) {
 		d := *nodeDesired

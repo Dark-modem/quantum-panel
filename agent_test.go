@@ -18,11 +18,13 @@ import (
 	"errors"
 	"io"
 	"math/big"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -146,11 +148,36 @@ func agentTestBundle(t *testing.T, in matrixInstance, meshPort, userPort int, re
 // TestAgentDesiredRevisionRules covers the required revision semantics:
 // newer → applied, equal → idempotent ok ack with zero work, older →
 // "stale revision rejected" with no state change.
+// freeMeshPort returns an ephemeral port that is free on BOTH TCP and UDP —
+// Matrix's setup preflight probes both transports. Picking UDP-only (the
+// shared freeUDPPort helper) raced with the OS handing the same port's TCP
+// side to another process on loaded machines and flaked setup 1-in-6.
+func freeMeshPort(t *testing.T) int {
+	t.Helper()
+	for attempt := 0; attempt < 20; attempt++ {
+		u, err := net.ListenPacket("udp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		port := u.LocalAddr().(*net.UDPAddr).Port
+		ln, err := net.Listen("tcp", "127.0.0.1:"+strconv.Itoa(port))
+		if err != nil {
+			u.Close()
+			continue // TCP side taken: pick another ephemeral port
+		}
+		u.Close()
+		ln.Close()
+		return port
+	}
+	t.Fatal("no dual-transport-free port found after 20 attempts")
+	return 0
+}
+
 func TestAgentDesiredRevisionRules(t *testing.T) {
 	agentLab(t)
 	var rec agentExecRecorder
 	rec.wrap(t, nil)
-	port, userPort := freeUDPPort(t), freeUDPPort(t)
+	port, userPort := freeMeshPort(t), freeMeshPort(t)
 
 	// newer → applied
 	ack := agentApplyDesired(nil, agentHubDesired("100", port, []int{userPort}))
@@ -209,7 +236,7 @@ func TestAgentDesiredRevisionRules(t *testing.T) {
 // carries the hub's hosts/main content for the controller's node bundle.
 func TestAgentHubApply(t *testing.T) {
 	agentLab(t)
-	port, userPort := freeUDPPort(t), freeUDPPort(t)
+	port, userPort := freeMeshPort(t), freeMeshPort(t)
 	ack := agentApplyDesired(nil, agentHubDesired("10", port, []int{userPort}))
 	if !ack.OK {
 		t.Fatalf("hub apply failed: %+v", ack)
@@ -235,7 +262,7 @@ func TestAgentHubApply(t *testing.T) {
 // repaired by remove + fresh setup, not silently ignored.
 func TestAgentHubApplyDriftRebuild(t *testing.T) {
 	agentLab(t)
-	port1, port2, userPort := freeUDPPort(t), freeUDPPort(t), freeUDPPort(t)
+	port1, port2, userPort := freeMeshPort(t), freeMeshPort(t), freeMeshPort(t)
 	if ack := agentApplyDesired(nil, agentHubDesired("10", port1, []int{userPort})); !ack.OK {
 		t.Fatalf("first apply: %+v", ack)
 	}
@@ -258,7 +285,7 @@ func TestAgentHubApplyDriftRebuild(t *testing.T) {
 func TestAgentNodeApply(t *testing.T) {
 	agentLab(t)
 	in := matrixInstance{ID: "matrix2"}
-	bundle := agentTestBundle(t, in, freeUDPPort(t), freeUDPPort(t), "77")
+	bundle := agentTestBundle(t, in, freeMeshPort(t), freeMeshPort(t), "77")
 	link := &fakeAgentLink{results: map[string]json.RawMessage{
 		agentMsgRegisterResult: []byte(`{"ok":true,"main_host":"HUBMAIN"}`),
 	}}
@@ -300,7 +327,7 @@ func TestAgentNodeApplyRegisterFailureRollback(t *testing.T) {
 		"timeout": {},
 	} {
 		t.Run(name, func(t *testing.T) {
-			bundle := agentTestBundle(t, in, freeUDPPort(t), freeUDPPort(t), "80")
+			bundle := agentTestBundle(t, in, freeMeshPort(t), freeMeshPort(t), "80")
 			ack := agentApplyDesired(link, &agentDesired{Revision: "80", Matrix: &agentDesiredMatrix{
 				Instance: in.ID, Action: "apply", Bundle: bundle,
 			}})
@@ -375,7 +402,7 @@ func TestAgentCommandsAllowlistAndInjection(t *testing.T) {
 // matrix.register relay with replayed command IDs.
 func TestAgentCommandPowerAndRegister(t *testing.T) {
 	agentLab(t)
-	port, userPort := freeUDPPort(t), freeUDPPort(t)
+	port, userPort := freeMeshPort(t), freeMeshPort(t)
 	if ack := agentApplyDesired(nil, agentHubDesired("1", port, []int{userPort})); !ack.OK {
 		t.Fatalf("hub setup: %+v", ack)
 	}
