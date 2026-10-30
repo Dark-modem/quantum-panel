@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"net/http/httptest"
 	"os"
@@ -12,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/gorilla/websocket"
 	"time"
 )
 
@@ -353,5 +356,153 @@ func TestAgentTunnelsFileRoundTrip(t *testing.T) {
 	back := loadAgentTunnels()
 	if len(back.Tunnels) != 1 || back.Tunnels[0].Token != "sekrit" {
 		t.Fatalf("round trip failed: %+v", back)
+	}
+}
+
+// ---- full controller-loop E2E: real hub server, real WebSocket clients,
+// real orchestration and relay. Only the agents' matrix exec is absent
+// (agent-side apply is covered by the agent package tests). ----
+
+type agentE2EConn struct {
+	t  *testing.T
+	ws *websocket.Conn
+	mu sync.Mutex
+}
+
+func (c *agentE2EConn) send(typ string, payload any) error {
+	b, err := agentEncode(typ, payload)
+	if err != nil {
+		return err
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.ws.WriteMessage(websocket.TextMessage, b)
+}
+
+func (c *agentE2EConn) read() (string, json.RawMessage, error) {
+	var env agentEnvelope
+	if err := c.ws.ReadJSON(&env); err != nil {
+		return "", nil, err
+	}
+	return env.Type, env.Data, nil
+}
+
+func TestAgentTunnelControllerLoopRealHub(t *testing.T) {
+	dir := t.TempDir()
+	oldDir, oldPath := configDir, agentTunnelsPath
+	oldAck, oldPort, oldCmd := agentTunnelAckWait, agentTunnelPortWait, agentTunnelCmdTimeout
+	configDir, agentTunnelsPath = dir, filepath.Join(dir, "agent_tunnels.json")
+	agentTunnelAckWait, agentTunnelPortWait, agentTunnelCmdTimeout = 15*time.Second, 3*time.Second, 10*time.Second
+	t.Cleanup(func() {
+		configDir, agentTunnelsPath = oldDir, oldPath
+		agentTunnelAckWait, agentTunnelPortWait, agentTunnelCmdTimeout = oldAck, oldPort, oldCmd
+	})
+
+	// Wire the REAL hub functions (the production wiring).
+	oldDeliver, oldCmdFn, oldOnline, oldLookup := agentHubDeliverDesiredFn, agentHubCommandFn, agentHubOnlineFn, agentRegistryLookupFn
+	wireAgentSubsystem()
+	t.Cleanup(func() {
+		agentHubDeliverDesiredFn, agentHubCommandFn, agentHubOnlineFn, agentRegistryLookupFn = oldDeliver, oldCmdFn, oldOnline, oldLookup
+	})
+
+	srv := agentHubTestServer(t)
+	hubID, hubKey := agentHubEnrollAgent(t, srv, []string{agentCapMatrix})
+	nodeID, nodeKey := agentHubEnrollAgent(t, srv, []string{agentCapMatrix})
+	hubWS := agentHubHandshakeCaps(t, srv.URL, hubID, hubKey, []string{agentCapMatrix})
+	defer hubWS.Close()
+	nodeWS := agentHubHandshakeCaps(t, srv.URL, nodeID, nodeKey, []string{agentCapMatrix})
+	defer nodeWS.Close()
+	hub, node := &agentE2EConn{t: t, ws: hubWS}, &agentE2EConn{t: t, ws: nodeWS}
+
+	pem := agentTestRSAPem(t)
+	hubSaw := make(chan agentCommand, 4)
+	// Hub brain: ack hub desired with the host file; answer register relay.
+	go func() {
+		for {
+			typ, data, err := hub.read()
+			if err != nil {
+				return
+			}
+			switch typ {
+			case agentMsgDesired:
+				var d agentDesired
+				if json.Unmarshal(data, &d) != nil {
+					continue
+				}
+				_ = hub.send(agentMsgAck, agentAck{Revision: d.Revision, OK: true,
+					Detail: map[string]string{"main_host": "Subnet = 10.254.231.1/32\n" + pem}})
+			case agentMsgCommand:
+				var cmd agentCommand
+				if json.Unmarshal(data, &cmd) != nil {
+					continue
+				}
+				hubSaw <- cmd
+				_ = hub.send(agentMsgResult, agentCommandResult{ID: cmd.ID, OK: true, Output: "paired"})
+			}
+		}
+	}()
+	// Node brain: ack node desired and send the pairing register.
+	nodeGotRegisterResult := make(chan agentRegisterResult, 1)
+	go func() {
+		for {
+			typ, data, err := node.read()
+			if err != nil {
+				return
+			}
+			switch typ {
+			case agentMsgDesired:
+				var d agentDesired
+				if json.Unmarshal(data, &d) != nil {
+					continue
+				}
+				_ = node.send(agentMsgAck, agentAck{Revision: d.Revision, OK: true})
+				_ = node.send(agentMsgRegister, agentRegisterMsg{Instance: "matrix",
+					Token: strings.Repeat("e", 32), Name: "nodee2e1234", HostFile: "hostfile", Revision: "rev1"})
+			case agentMsgRegisterResult:
+				var r agentRegisterResult
+				_ = json.Unmarshal(data, &r)
+				nodeGotRegisterResult <- r
+			}
+		}
+	}()
+
+	s := loadAgentTunnels()
+	s.Tunnels = append(s.Tunnels, agentTunnel{ID: "at_e2e", Name: "e2e", Instance: "matrix",
+		HubAgentID: hubID, NodeAgentID: nodeID, Family: "ipv4", MeshPort: 2097,
+		Ports: []int{8080}, Token: strings.Repeat("e", 32), Active: true,
+		State: agentTunnelStateProvisioning, CreatedAt: time.Now().Unix()})
+	if err := saveAgentTunnels(s); err != nil {
+		t.Fatal(err)
+	}
+
+	agentTunnelProvision("at_e2e")
+
+	s = loadAgentTunnels()
+	if len(s.Tunnels) != 1 {
+		t.Fatalf("tunnel record lost")
+	}
+	got := s.Tunnels[0]
+	if got.State != agentTunnelStateActive {
+		t.Fatalf("tunnel must end active over the real hub, got state=%q error=%q hubAck=%v nodeAck=%v", got.State, got.Error, got.HubAckOK, got.NodeAckOK)
+	}
+	if !strings.Contains(got.HubMainHost, "RSA PUBLIC KEY") {
+		t.Fatalf("hub host file missing from the ack detail: %q", got.HubMainHost)
+	}
+
+	select {
+	case cmd := <-hubSaw:
+		if cmd.Op != agentCmdMatrixRegister || cmd.Params["host_file"] != "hostfile" || cmd.Params["instance"] != "matrix" {
+			t.Fatalf("register relay envelope wrong: %+v", cmd)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("hub never received the matrix.register relay")
+	}
+	select {
+	case r := <-nodeGotRegisterResult:
+		if !r.OK {
+			t.Fatalf("node register_result not ok: %+v", r)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("node never received the register_result")
 	}
 }
