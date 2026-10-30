@@ -50,7 +50,7 @@ const (
 	agentServiceUnit = "gre-agent.service"
 
 	agentDialTimeout     = 15 * time.Second
-	agentHelloTimeout    = 10 * time.Second
+	agentWelcomeTimeout  = 10 * time.Second // waiting for the controller welcome after hello
 	agentBackoffCeiling  = 120 * time.Second
 	agentHeartbeatPeriod = 30 * time.Second
 )
@@ -361,7 +361,7 @@ func (s *agentSession) serve(ctx context.Context) error {
 		s.fail(err)
 		return s.err()
 	}
-	raw, err := s.waitFor(agentMsgWelcome, agentHelloTimeout)
+	raw, err := s.waitFor(agentMsgWelcome, agentWelcomeTimeout)
 	if err != nil {
 		s.fail(err)
 		return s.err()
