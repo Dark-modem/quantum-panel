@@ -246,7 +246,9 @@ func agentTunnelAckObserved(agentID string, ack agentAck) {
 
 // ---- provisioning orchestration ----
 
-const (
+// Wait budgets are vars so tests can shrink them (and so an in-flight
+// provisioning goroutine left over from a finished test never lingers).
+var (
 	agentTunnelAckWait    = 180 * time.Second // apt + tinc setup can be slow
 	agentTunnelPortWait   = 20 * time.Second
 	agentTunnelCmdTimeout = 20 * time.Second
@@ -314,6 +316,13 @@ func agentTunnelWaitPort(agentID, instance string, timeout time.Duration) int {
 // agentTunnelProvision drives both sides. Runs in its own goroutine; all
 // failures land in the tunnel record (state=error), never in a panic.
 func agentTunnelProvision(tunnelID string) {
+	// Snapshot the hub seams once: the wiring must not change under an
+	// in-flight provisioning run (tests restore fakes mid-flight).
+	deliverFn, cmdFn := agentHubDeliverDesiredFn, agentHubCommandFn
+	if deliverFn == nil || cmdFn == nil || !agentTunnelHubWired() {
+		log.Printf("agent tunnel %s: agent hub not wired; provisioning aborted", tunnelID)
+		return
+	}
 	agentTunnelsMu.Lock()
 	s := loadAgentTunnels()
 	var t *agentTunnel
@@ -358,7 +367,7 @@ func agentTunnelProvision(tunnelID string) {
 	hubRev := agentNewRevision()
 	hubCh := agentTunnelArmWait(job.HubAgentID, hubRev)
 	defer agentTunnelDisarmWait(job.HubAgentID, hubRev)
-	if err := agentHubDeliverDesiredFn(job.HubAgentID, agentTunnelHubDesired(&job, hubAddr, hubRev)); err != nil {
+	if err := deliverFn(job.HubAgentID, agentTunnelHubDesired(&job, hubAddr, hubRev)); err != nil {
 		fail("hub", err.Error())
 		return
 	}
@@ -414,7 +423,7 @@ func agentTunnelProvision(tunnelID string) {
 	nodeCh := agentTunnelArmWait(job.NodeAgentID, nodeRev)
 	defer agentTunnelDisarmWait(job.NodeAgentID, nodeRev)
 	nodeDesired := agentDesired{Revision: nodeRev, Matrix: &agentDesiredMatrix{Instance: job.Instance, Action: "apply", Bundle: bundle}}
-	if err := agentHubDeliverDesiredFn(job.NodeAgentID, nodeDesired); err != nil {
+	if err := deliverFn(job.NodeAgentID, nodeDesired); err != nil {
 		fail("node", err.Error())
 		return
 	}

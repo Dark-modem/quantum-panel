@@ -569,6 +569,7 @@ func main() {
 	}
 	validateConfigDirs()
 	loadOrInit()
+	wireAgentSubsystem()
 	ensureFreeHTTPPort()
 	if n, err := upgradeBagherKeyLocks(); err != nil {
 		log.Printf("bagher: upgrading key restrictions in %s: %v", authorizedKeysPath, err)
@@ -683,6 +684,25 @@ func main() {
 	mux.HandleFunc("POST "+base+"/api/topologies/{id}/active", requireAuth(requireCSRF(handleTopologyPowerPost)))
 	mux.HandleFunc("POST "+base+"/api/matrix/edit", requireAuth(requireCSRF(handleMatrixEdit)))
 	mux.HandleFunc("POST "+base+"/api/matrix/register", handleMatrixRegister)
+
+	// Agents: central controller <-> lightweight endpoint agents. The
+	// enroll + WS routes authenticate with agent credentials, not sessions.
+	mux.HandleFunc("POST "+base+"/api/agent/enroll", handleAgentEnroll)
+	mux.HandleFunc("GET "+base+"/api/agent/ws", handleAgentWS)
+	mux.HandleFunc("GET "+base+"/api/agents", requireAuth(handleAgentsGet))
+	mux.HandleFunc("POST "+base+"/api/agents/tokens", requireAuth(requireCSRF(handleAgentTokenPost)))
+	mux.HandleFunc("GET "+base+"/api/agents/tokens", requireAuth(handleAgentTokensGet))
+	mux.HandleFunc("POST "+base+"/api/agents/tokens/{id}/revoke", requireAuth(requireCSRF(handleAgentTokenRevoke)))
+	mux.HandleFunc("GET "+base+"/api/agents/{id}", requireAuth(handleAgentGet))
+	mux.HandleFunc("POST "+base+"/api/agents/{id}/revoke", requireAuth(requireCSRF(handleAgentRevoke)))
+	mux.HandleFunc("POST "+base+"/api/agents/{id}/command", requireAuth(requireCSRF(handleAgentCommandPost)))
+	mux.HandleFunc("POST "+base+"/api/agents/{id}/desired", requireAuth(requireCSRF(handleAgentDesiredPost)))
+	mux.HandleFunc("GET "+base+"/api/agent-tunnels", requireAuth(handleAgentTunnelsGet))
+	mux.HandleFunc("POST "+base+"/api/agent-tunnels", requireAuth(requireCSRF(handleAgentTunnelsPost)))
+	mux.HandleFunc("POST "+base+"/api/agent-tunnels/{id}/power", requireAuth(requireCSRF(handleAgentTunnelPower)))
+	mux.HandleFunc("POST "+base+"/api/agent-tunnels/{id}/restart", requireAuth(requireCSRF(handleAgentTunnelRestart)))
+	mux.HandleFunc("DELETE "+base+"/api/agent-tunnels/{id}", requireAuth(requireCSRF(handleAgentTunnelDelete)))
+
 	mux.HandleFunc("GET "+base+"/api/update/peer", requireAuth(handleUpdatePeer))
 	mux.HandleFunc("POST "+base+"/api/setup", requireAuth(requireCSRF(handleSetupPost)))
 	mux.HandleFunc("GET "+base+"/api/peers", requireAuth(handlePeersGet))

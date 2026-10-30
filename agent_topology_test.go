@@ -50,6 +50,8 @@ func newAgentTunnelLab(t *testing.T) *agentTunnelLab {
 		online:    map[string]bool{},
 	}
 	oldDeliver, oldCmd, oldOnline, oldLookup := agentHubDeliverDesiredFn, agentHubCommandFn, agentHubOnlineFn, agentRegistryLookupFn
+	oldAckWait, oldPortWait, oldCmdTimeout := agentTunnelAckWait, agentTunnelPortWait, agentTunnelCmdTimeout
+	agentTunnelAckWait, agentTunnelPortWait, agentTunnelCmdTimeout = 2*time.Second, 200*time.Millisecond, 2*time.Second
 	agentHubDeliverDesiredFn = func(id string, d agentDesired) error {
 		lab.mu.Lock()
 		lab.delivered[id] = append(lab.delivered[id], d)
@@ -75,6 +77,7 @@ func newAgentTunnelLab(t *testing.T) *agentTunnelLab {
 	}
 	t.Cleanup(func() {
 		agentHubDeliverDesiredFn, agentHubCommandFn, agentHubOnlineFn, agentRegistryLookupFn = oldDeliver, oldCmd, oldOnline, oldLookup
+		agentTunnelAckWait, agentTunnelPortWait, agentTunnelCmdTimeout = oldAckWait, oldPortWait, oldCmdTimeout
 	})
 	return lab
 }
