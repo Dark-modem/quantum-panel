@@ -210,5 +210,37 @@ assert.ok(/\.topo-flag-svg\s*\{[^}]*width\s*:\s*20px[^}]*height\s*:\s*14px/.test
  assert.equal(calls[0].method,'PATCH');
  assert.equal(calls[0].body.country,'fi','save persists the chosen country');
  assert.ok(sandbox.topoCountryOptionsHtml('topologyCountryDD', sandbox.topoCountryIndex('fi'), sandbox.topoCountryIndex('fi')).includes('aria-selected="true" data-dd-value="fi"'),'saved country is preselected in the dropdown');
+ // ---- Activate/Deactivate: the real power flow (header button + row menu) ----
+ vm.runInContext("topologyData={topologies:[topo],tunnels:one};topologySelected='t'",sandbox);
+ // activate=true → POST /active, success toast, and the reload that flips the label
+ let toasts=[];sandbox.toastOk=(t,d)=>toasts.push(['ok',t,d]);sandbox.toastErr=(t,d)=>toasts.push(['err',t,d]);sandbox.toastWarn=(t,d)=>toasts.push(['warn',t,d]);
+ calls=[];await sandbox.topologyPower('t',true);
+ let power=calls.find(c=>c.path==='/api/topologies/t/active');
+ assert.ok(power,'the power action POSTs the topology active endpoint');
+ assert.equal(power.method,'POST');assert.equal(power.body.active,true);
+ assert.ok(toasts.some(t=>t[0]==='ok'&&t[1]==='Tunnels connected'),'success toast names the connected state');
+ assert.ok(calls.some(c=>c.path==='/api/topologies'&&!c.body),'the power action reloads the topology state');
+ // a tunnel that fails to change state surfaces the per-tunnel error
+ toasts=[];calls=[];
+ sandbox.api=async(p,b,m)=>{calls.push({path:p,body:b,method:m});if(p==='/api/topologies'&&!b)return {topologies:[topo],tunnels:one};if(p.endsWith('/active'))return {results:[{id:'matrix',ok:false,error:'unit offline'}]};return {};};
+ await sandbox.topologyPower('t',false);
+ assert.ok(toasts.some(t=>t[0]==='err'&&t[1]==='Some tunnels did not change state'&&String(t[2]).includes('matrix: unit offline')),'partial failures report the offending tunnel');
+ // API failure keeps the generic title
+ toasts=[];calls=[];
+ sandbox.api=async(p,b,m)=>{calls.push({path:p,body:b,method:m});if(p.endsWith('/active'))throw new Error('boom');return {topologies:[topo],tunnels:one};};
+ await sandbox.topologyPower('t',true);
+ assert.ok(toasts.some(t=>t[0]==='err'&&t[1]==='Topology action failed'),'an API failure keeps the action-failed toast');
+ // the header label mirrors the pair health, without wiping the power icon
+ sandbox.api=async(p,b,m)=>{calls.push({path:p,body:b,method:m});if(p==='/api/topologies'&&!b)return {topologies:[topo],tunnels:one};return {};};
+ vm.runInContext('topologySelected=null;topologyRender()',sandbox);
+ vm.runInContext("topologyData={topologies:[topo],tunnels:one};topologySelected='t';_tunnelDetail=null;topologyRender()",sandbox);
+ const actBtn=el('topologyActivateBtn');
+ // The icon lives in the static markup, the label is the only dynamic part.
+ const detailMarkup=fs.readFileSync(path.join(__dirname,'index.html'),'utf8');
+ const powerBtn=detailMarkup.slice(detailMarkup.indexOf('id="topologyActivateBtn"'),detailMarkup.indexOf('id="topologyEditBtn"'));
+ assert.ok(/<svg[^>]*topo-act-ic/.test(powerBtn)&&powerBtn.includes('id="topologyActivateLbl"'),'the power button pairs its icon with the label span');
+ assert.ok(el('topologyActivateLbl').textContent==='Deactivate','a healthy pair offers Deactivate');
+ vm.runInContext("topologyData={topologies:[topo],tunnels:[{id:'matrix',name:'Matrix',engine:'matrix',state:'down'}]};topologyRender()",sandbox);
+ assert.ok(el('topologyActivateLbl').textContent==='Activate','a down pair offers Activate');
  console.log('Topology UI: semantic table/actions, escaping, embedded SVG flag columns, country selector, aligned columns, plain counts, keyboard rows, view/back, first-load skeleton gate, absent overview card, attachment and safe deletion PASS');
 })().catch(e=>{console.error(e);process.exitCode=1;});

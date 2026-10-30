@@ -529,6 +529,10 @@ type topologyPowerResult struct {
 	Error string `json:"error,omitempty"`
 }
 
+// topologyLocalStatus is a test seam: the power handler reads the host's
+// tunnel view to decide whether the main GRE/FRP units exist.
+var topologyLocalStatus = localStatus
+
 // handleTopologyPowerPost connects ({"active": true}) or disconnects
 // ({"active": false}) every tunnel assigned to the topology, best effort per
 // tunnel; the results say what each tunnel did. The disabled flag is
@@ -585,7 +589,7 @@ func topologyPowerTunnel(id string, active bool) topologyPowerResult {
 	unitExists := func(unit string) bool { return fileExists(filepath.Join("/etc/systemd/system", unit)) }
 	switch {
 	case id == "main":
-		st := localStatus()
+		st := topologyLocalStatus()
 		if active {
 			started := false
 			if st.Gre.Exists {
