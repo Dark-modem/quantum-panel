@@ -933,3 +933,41 @@ func TestAgentWSURLBasePathNotDoubled(t *testing.T) {
 		}
 	}
 }
+
+// TestAgentInstallUnitMatchesInstaller guards the contract between the
+// runtime's `agent install` unit and Session 6's install-agent.sh heredoc:
+// the two must stay byte-identical for the same binary path.
+func TestAgentInstallUnitMatchesInstaller(t *testing.T) {
+	script, err := os.ReadFile(filepath.Join("..", "install-agent.sh"))
+	if err != nil {
+		t.Skip("install-agent.sh not found (shallow checkout)")
+	}
+	start := strings.Index(string(script), "write_atomic \"$UNIT_DIR/$UNIT\" <<EOF")
+	if start < 0 {
+		t.Fatal("write_unit heredoc not found in install-agent.sh")
+	}
+	rest := string(script)[start:]
+	begin := strings.Index(rest, "EOF\n") + 4
+	end := strings.Index(rest[begin:], "\nEOF")
+	if end < 0 {
+		t.Fatal("heredoc terminator not found")
+	}
+	// The heredoc carries bash's $BIN variable; expand it exactly as the
+	// installer does (BIN="/usr/local/bin/gre-panel") before comparing.
+	heredoc := strings.ReplaceAll(rest[begin:begin+end], "$BIN", "/usr/local/bin/gre-panel")
+	want := agentUnitContent("/usr/local/bin/gre-panel")
+	if heredoc != strings.TrimSuffix(want, "\n") {
+		t.Fatalf("installer unit drifted from agentUnitContent:\n--- installer ---\n%s\n--- runtime ---\n%s", heredoc, want)
+	}
+	// The uninstaller must never target Matrix units or the agent's own
+	// binary from a Matrix context: assert no destructive Matrix reference.
+	uninstall, err := os.ReadFile(filepath.Join("..", "uninstall-agent.sh"))
+	if err != nil {
+		t.Skip("uninstall-agent.sh not found")
+	}
+	for _, line := range strings.Split(string(uninstall), "\n") {
+		if strings.Contains(line, "quantum-matrix") && (strings.Contains(line, "systemctl stop") || strings.Contains(line, "systemctl disable") || strings.Contains(line, "systemctl reset-failed") || strings.Contains(line, "rm -f") || strings.Contains(line, "rm -rf")) {
+			t.Fatalf("uninstaller targets a Matrix unit: %q", line)
+		}
+	}
+}
