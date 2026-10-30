@@ -32,6 +32,15 @@ import (
 
 // ---- seams to the agent hub / registry (wired at integration) ----
 
+// agentTrafficRateView is one interface's recent byte rate as seen by
+// the controller (derived from consecutive agent heartbeats).
+type agentTrafficRateView struct {
+	Name  string
+	Kind  string // "physical" | "tunnel"
+	RxBps float64
+	TxBps float64
+}
+
 // agentTunnelAgentInfo is the narrow registry view the tunnel layer needs.
 type agentTunnelAgentInfo struct {
 	ID              string
@@ -44,6 +53,7 @@ type agentTunnelAgentInfo struct {
 	Caps            []string
 	AppliedRevision string
 	LastState       *agentStateReport
+	TrafficRate     map[string]agentTrafficRateView
 }
 
 var (
@@ -531,6 +541,34 @@ func agentTunnelHealthView(t agentTunnel) *agentTunnelHealth {
 	return nil
 }
 
+// agentTrafficSummary sums one agent's rates by interface kind and
+// derives the Iran billable amplification: physical NIC RX per payload
+// byte pushed into the tunnel. UNKNOWN whenever a component is missing
+// or zero — the controller never invents numbers.
+func agentTrafficSummary(info agentTunnelAgentInfo) map[string]any {
+	var nicRx, nicTx, tunRx, tunTx float64
+	for _, r := range info.TrafficRate {
+		switch r.Kind {
+		case "physical":
+			nicRx += r.RxBps
+			nicTx += r.TxBps
+		case "tunnel":
+			tunRx += r.RxBps
+			tunTx += r.TxBps
+		}
+	}
+	out := map[string]any{
+		"nic_rx_bps": nicRx, "nic_tx_bps": nicTx,
+		"tunnel_rx_bps": tunRx, "tunnel_tx_bps": tunTx,
+	}
+	if nicRx > 0 && tunTx > 0 {
+		out["billable_amplification"] = nicRx / tunTx
+	} else {
+		out["billable_amplification"] = nil
+	}
+	return out
+}
+
 func agentTunnelView(t agentTunnel) map[string]any {
 	view := map[string]any{
 		"id": t.ID, "name": t.Name, "engine": "matrix", "instance": t.Instance,
@@ -556,6 +594,11 @@ func agentTunnelView(t agentTunnel) map[string]any {
 	}
 	view["hub"] = endpoint(t.HubAgentID, t.HubAckOK, t.HubAckError)
 	view["node"] = endpoint(t.NodeAgentID, t.NodeAckOK, t.NodeAckError)
+	// Billable traffic lives on the hub (Iran) side: its physical NIC RX
+	// is what the provider charges, the tunnel interface is the payload.
+	if info, ok := agentTunnelAgent(t.HubAgentID); ok && len(info.TrafficRate) > 0 {
+		view["traffic"] = agentTrafficSummary(info)
+	}
 	if h := agentTunnelHealthView(t); h != nil {
 		view["health"] = h
 	}
