@@ -489,6 +489,7 @@ func agentTunnelRegisterRelay(reg agentRegisterMsg, fromAgentID string) agentReg
 	if fromAgentID != t.NodeAgentID {
 		return agentRegisterResult{OK: false, Error: "registration from the wrong agent"}
 	}
+	start := time.Now()
 	nodeAddr := ""
 	if info, ok := agentTunnelAgent(t.NodeAgentID); ok {
 		nodeAddr = info.PublicIP
@@ -502,6 +503,13 @@ func agentTunnelRegisterRelay(reg agentRegisterMsg, fromAgentID string) agentReg
 		"revision":  reg.Revision,
 	}
 	res, err := agentHubCommandFn(t.HubAgentID, agentCmdMatrixRegister, params, agentTunnelCmdTimeout)
+	// A hub agent that dropped its WS for a moment fails fast; the node
+	// only waits ~30s for this answer, so retry exactly once on a fast
+	// failure and never on a slow (timeout) one.
+	if err != nil && time.Since(start) < 5*time.Second {
+		time.Sleep(7 * time.Second)
+		res, err = agentHubCommandFn(t.HubAgentID, agentCmdMatrixRegister, params, agentTunnelCmdTimeout)
+	}
 	if err != nil {
 		return agentRegisterResult{OK: false, Error: err.Error()}
 	}
