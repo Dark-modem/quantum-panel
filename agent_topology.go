@@ -549,10 +549,17 @@ func agentTunnelHealthView(t agentTunnel) *agentTunnelHealth {
 	return nil
 }
 
-// agentTrafficSummary sums one agent's rates by interface kind and
-// derives the Iran billable amplification: physical NIC RX per payload
-// byte pushed into the tunnel. UNKNOWN whenever a component is missing
-// or zero — the controller never invents numbers.
+// agentTrafficSummary sums one agent's rates by interface kind.
+//
+// billable_amplification is a SERVER-BASIS ESTIMATE, not a validated
+// per-tunnel measurement: physical NIC RX is the billable direction and
+// qmx TX is the payload pushed into the tunnel (downloads only — uploads
+// ride qmx RX/NIC TX and are excluded by construction), but the physical
+// counter also carries SSH, panel and probe traffic, so the ratio is an
+// upper bound until Matrix-owned counters (the QMX_FWD iptables byte
+// counts, read-only) are wired into the agent. The controller therefore
+// labels the basis explicitly and reports nil (UNKNOWN) whenever a
+// component cannot be measured — it never invents a number.
 func agentTrafficSummary(info agentTunnelAgentInfo) map[string]any {
 	var nicRx, nicTx, tunRx, tunTx float64
 	for _, r := range info.TrafficRate {
@@ -568,11 +575,12 @@ func agentTrafficSummary(info agentTunnelAgentInfo) map[string]any {
 	out := map[string]any{
 		"nic_rx_bps": nicRx, "nic_tx_bps": nicTx,
 		"tunnel_rx_bps": tunRx, "tunnel_tx_bps": tunTx,
+		"basis": "server", // physical NIC covers more than Matrix
 	}
 	if nicRx > 0 && tunTx > 0 {
 		out["billable_amplification"] = nicRx / tunTx
 	} else {
-		out["billable_amplification"] = nil
+		out["billable_amplification"] = nil // UNKNOWN, not zero
 	}
 	return out
 }
