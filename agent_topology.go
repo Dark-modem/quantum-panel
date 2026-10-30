@@ -79,13 +79,17 @@ func agentTunnelAgent(id string) (agentTunnelAgentInfo, bool) {
 
 // Tunnel lifecycle states persisted in the record: "provisioning" (hub
 // desired in flight), "registering" (node desired in flight), "active",
-// "stopped" (powered off), "error".
+// "stopped" (powered off), "error", and "deleting" — a tombstone: the
+// delete was requested and the record stays until both agents acked their
+// teardown desired, keeping the matrix instance name reserved and the
+// remove revisions available for the ack observer.
 const (
 	agentTunnelStateProvisioning = "provisioning"
 	agentTunnelStateRegistering  = "registering"
 	agentTunnelStateActive       = "active"
 	agentTunnelStateStopped      = "stopped"
 	agentTunnelStateError        = "error"
+	agentTunnelStateDeleting     = "deleting"
 )
 
 type agentTunnel struct {
@@ -110,6 +114,12 @@ type agentTunnel struct {
 	HubAckError  string `json:"hub_ack_error,omitempty"`
 	NodeAckOK    bool   `json:"node_ack_ok,omitempty"`
 	NodeAckError string `json:"node_ack_error,omitempty"`
+
+	// Deleting-tombstone teardown acks (audit F2): each flips true when
+	// that agent acked its remove desired; both true ⇒ the tombstone is
+	// dropped and the instance name freed.
+	HubTeardownOK  bool `json:"hub_teardown_ok,omitempty"`
+	NodeTeardownOK bool `json:"node_teardown_ok,omitempty"`
 
 	CreatedAt int64 `json:"created_at"`
 }
@@ -223,21 +233,57 @@ func agentTunnelAckObserved(agentID string, ack agentAck) {
 		t := &s.Tunnels[i]
 		if t.HubAgentID == agentID && t.HubRevision == ack.Revision {
 			t.HubAckOK, t.HubAckError = ack.OK, ack.Error
+			if t.State == agentTunnelStateDeleting {
+				// Teardown ack (F2): a failed remove stays on the
+				// tombstone for the next reconcile retry; a good one
+				// completes this side.
+				t.HubTeardownOK = ack.OK
+				if ack.OK {
+					t.Error = ""
+				} else {
+					t.Error = "hub teardown: " + ack.Error
+				}
+			} else if ack.OK {
+				// Preserve ack artifacts across controller restarts (F3):
+				// the provisioning goroutine that normally records
+				// main_host may be gone by the time this ack arrives.
+				if mh := ack.Detail["main_host"]; mh != "" {
+					t.HubMainHost = mh
+				}
+			}
 			changed = true
 		}
 		if t.NodeAgentID == agentID && t.NodeRevision == ack.Revision {
 			t.NodeAckOK, t.NodeAckError = ack.OK, ack.Error
-			changed = true
-			if ack.OK && t.State == agentTunnelStateRegistering {
+			if t.State == agentTunnelStateDeleting {
+				t.NodeTeardownOK = ack.OK
+				if ack.OK {
+					t.Error = ""
+				} else {
+					t.Error = "node teardown: " + ack.Error
+				}
+			} else if ack.OK && t.State == agentTunnelStateRegistering {
 				t.State = agentTunnelStateActive
 				t.Error = ""
-			} else if !ack.OK {
+			} else if !ack.OK && t.State == agentTunnelStateRegistering {
 				t.State = agentTunnelStateError
 				t.Error = "node: " + ack.Error
 			}
+			changed = true
 		}
 	}
 	if changed {
+		// A tombstone whose both endpoints acked the teardown is fully
+		// cleaned up: drop it (freeing the instance name) in this pass.
+		kept := s.Tunnels[:0]
+		for _, x := range s.Tunnels {
+			if x.State == agentTunnelStateDeleting && x.HubTeardownOK && x.NodeTeardownOK {
+				log.Printf("agent tunnel %s: both endpoints acked teardown; record removed", x.ID)
+				continue
+			}
+			kept = append(kept, x)
+		}
+		s.Tunnels = kept
 		if err := saveAgentTunnels(s); err != nil {
 			log.Printf("agent tunnel: save after ack: %v", err)
 		}
@@ -332,7 +378,11 @@ func agentTunnelProvision(tunnelID string) {
 			break
 		}
 	}
-	if t == nil {
+	// Only a tunnel that still wants provisioning may run the pipeline:
+	// reconcile re-runs it for incomplete records, never for active,
+	// stopped or deleting ones (a deleting tombstone is owned by the
+	// delete flow).
+	if t == nil || t.State != agentTunnelStateProvisioning {
 		agentTunnelsMu.Unlock()
 		return
 	}
@@ -349,6 +399,9 @@ func agentTunnelProvision(tunnelID string) {
 		s := loadAgentTunnels()
 		for i := range s.Tunnels {
 			if s.Tunnels[i].ID == tunnelID {
+				if s.Tunnels[i].State == agentTunnelStateDeleting {
+					continue // the delete flow owns this record now
+				}
 				s.Tunnels[i].State = agentTunnelStateError
 				s.Tunnels[i].Error = stage + ": " + msg
 			}
@@ -363,34 +416,60 @@ func agentTunnelProvision(tunnelID string) {
 		return
 	}
 
-	// 1. Hub desired.
-	hubRev := agentNewRevision()
-	hubCh := agentTunnelArmWait(job.HubAgentID, hubRev)
-	defer agentTunnelDisarmWait(job.HubAgentID, hubRev)
-	if err := deliverFn(job.HubAgentID, agentTunnelHubDesired(&job, hubAddr, hubRev)); err != nil {
-		fail("hub", err.Error())
-		return
-	}
-	markState(tunnelID, agentTunnelStateProvisioning, hubRev, "")
-	select {
-	case ack := <-hubCh:
-		if !ack.OK {
-			fail("hub", ack.Error)
+	// 1. Hub desired — skipped when resuming a record whose hub stage
+	// already completed before a controller restart (F3): re-applying to
+	// the hub would restart a healthy tinc instance for nothing. The
+	// agent may still re-ack the old revision; the ack observer keeps the
+	// ack fields fresh and preserves main_host in that case.
+	hubStageDone := job.HubAckOK && job.HubMainHost != ""
+	if hubStageDone {
+		log.Printf("agent tunnel %s: resuming after hub stage (instance %s)", tunnelID, job.Instance)
+	} else {
+		hubRev := agentNewRevision()
+		hubCh := agentTunnelArmWait(job.HubAgentID, hubRev)
+		defer agentTunnelDisarmWait(job.HubAgentID, hubRev)
+		if err := deliverFn(job.HubAgentID, agentTunnelHubDesired(&job, hubAddr, hubRev)); err != nil {
+			fail("hub", err.Error())
 			return
 		}
-		agentTunnelsMu.Lock()
-		s := loadAgentTunnels()
-		for i := range s.Tunnels {
-			if s.Tunnels[i].ID == tunnelID {
-				s.Tunnels[i].HubMainHost = ack.Detail["main_host"]
+		markState(tunnelID, agentTunnelStateProvisioning, hubRev, "")
+		select {
+		case ack := <-hubCh:
+			if !ack.OK {
+				fail("hub", ack.Error)
+				return
 			}
+			agentTunnelsMu.Lock()
+			s := loadAgentTunnels()
+			for i := range s.Tunnels {
+				if s.Tunnels[i].ID == tunnelID {
+					s.Tunnels[i].HubMainHost = ack.Detail["main_host"]
+				}
+			}
+			_ = saveAgentTunnels(s)
+			agentTunnelsMu.Unlock()
+		case <-time.After(agentTunnelAckWait):
+			fail("hub", "hub agent did not acknowledge in time")
+			return
 		}
-		_ = saveAgentTunnels(s)
-		agentTunnelsMu.Unlock()
-	case <-time.After(agentTunnelAckWait):
-		fail("hub", "hub agent did not acknowledge in time")
+	}
+
+	// Orphan guard (F1): the tunnel may have been deleted or powered off
+	// while the hub ack was in flight. A deleting tombstone is owned by
+	// the delete flow (its removes are already in flight); a vanished
+	// record gets a best-effort teardown so no instance is left running.
+	gate, gateOK := agentTunnelStageGate(tunnelID, agentTunnelStateProvisioning)
+	if !gateOK {
+		if gate.ID == "" {
+			log.Printf("agent tunnel %s: record vanished mid-provision; best-effort teardown", tunnelID)
+			agentTunnelBestEffortRemove(job.HubAgentID, job.Instance)
+			agentTunnelBestEffortRemove(job.NodeAgentID, job.Instance)
+		} else {
+			log.Printf("agent tunnel %s: provisioning aborted (%s owns the record now)", tunnelID, gate.State)
+		}
 		return
 	}
+	job = gate
 
 	// 2. Resolve the actual mesh port (auto case) and node bundle.
 	meshPort := job.MeshPort
@@ -418,8 +497,16 @@ func agentTunnelProvision(tunnelID string) {
 		return
 	}
 
-	// 3. Node desired.
+	// 3. Node desired — gated atomically (F1): between the hub ack and
+	// here the tunnel may have been deleted or powered off; the atomic
+	// transition refuses to hand the registering state to a record that
+	// no longer wants it, so no node bundle is ever delivered for a
+	// tunnel the controller has stopped tracking.
 	nodeRev := agentNewRevision()
+	if !agentTunnelBeginRegistering(tunnelID, nodeRev) {
+		log.Printf("agent tunnel %s: aborted before node stage (delete/power owns the record)", tunnelID)
+		return
+	}
 	nodeCh := agentTunnelArmWait(job.NodeAgentID, nodeRev)
 	defer agentTunnelDisarmWait(job.NodeAgentID, nodeRev)
 	nodeDesired := agentDesired{Revision: nodeRev, Matrix: &agentDesiredMatrix{Instance: job.Instance, Action: "apply", Bundle: bundle}}
@@ -427,7 +514,6 @@ func agentTunnelProvision(tunnelID string) {
 		fail("node", err.Error())
 		return
 	}
-	markState(tunnelID, agentTunnelStateRegistering, "", nodeRev)
 	select {
 	case ack := <-nodeCh:
 		if !ack.OK {
@@ -458,6 +544,9 @@ func markState(tunnelID, state, hubRev, nodeRev string) {
 	s := loadAgentTunnels()
 	for i := range s.Tunnels {
 		if s.Tunnels[i].ID == tunnelID {
+			if s.Tunnels[i].State == agentTunnelStateDeleting {
+				continue // never resurrect a tombstone
+			}
 			if state != "" {
 				s.Tunnels[i].State = state
 			}
@@ -470,6 +559,150 @@ func markState(tunnelID, state, hubRev, nodeRev string) {
 		}
 	}
 	_ = saveAgentTunnels(s)
+}
+
+// agentTunnelStageGate atomically re-checks a tunnel between provisioning
+// stages (audit F1). gateOK is false when the record vanished, was deleted
+// (state deleting — the delete flow owns teardown), lost desired power, or
+// left the expected state. A vanished record is reported with an empty ID
+// so the caller can send a best-effort teardown.
+func agentTunnelStageGate(tunnelID, want string) (agentTunnel, bool) {
+	agentTunnelsMu.Lock()
+	defer agentTunnelsMu.Unlock()
+	s := loadAgentTunnels()
+	for i := range s.Tunnels {
+		if s.Tunnels[i].ID != tunnelID {
+			continue
+		}
+		t := s.Tunnels[i]
+		if t.State != want || t.State == agentTunnelStateDeleting || !t.Active {
+			return t, false
+		}
+		return t, true
+	}
+	return agentTunnel{}, false
+}
+
+// agentTunnelBeginRegistering atomically moves a provisioning tunnel to
+// registering and arms its node revision. It refuses (and the caller must
+// abort the node stage) when the record vanished, is a deleting tombstone,
+// lost desired power, or left the provisioning state.
+func agentTunnelBeginRegistering(tunnelID, nodeRev string) bool {
+	agentTunnelsMu.Lock()
+	defer agentTunnelsMu.Unlock()
+	s := loadAgentTunnels()
+	for i := range s.Tunnels {
+		if s.Tunnels[i].ID != tunnelID {
+			continue
+		}
+		if s.Tunnels[i].State != agentTunnelStateProvisioning || !s.Tunnels[i].Active {
+			return false
+		}
+		s.Tunnels[i].State = agentTunnelStateRegistering
+		s.Tunnels[i].NodeRevision = nodeRev
+		_ = saveAgentTunnels(s)
+		return true
+	}
+	return false
+}
+
+// agentTunnelBestEffortRemove delivers one remove desired without error
+// handling; used by the orphan guard when a record vanished entirely.
+func agentTunnelBestEffortRemove(agentID, instance string) {
+	if agentHubDeliverDesiredFn == nil {
+		return
+	}
+	d := agentDesired{Revision: agentNewRevision(), Matrix: &agentDesiredMatrix{Instance: instance, Action: "remove"}}
+	_ = agentHubDeliverDesiredFn(agentID, d)
+}
+
+// ---- startup reconciliation (audit F3) ----
+
+// agentTunnelTombstoneTTL bounds how long a deleting tombstone may reserve
+// its instance name while waiting for teardown acks from agents that may
+// never reconnect. reconcileAgentTunnels drops older tombstones.
+const agentTunnelTombstoneTTL = 24 * time.Hour
+
+// reconcileAgentTunnels scans the persisted tunnel store when the
+// controller starts and returns the work the previous process left
+// unfinished. provisioning/registering records (and powered-on error
+// records) are re-run through the resume-aware pipeline with FRESH
+// revisions: agents refuse stale revisions and treat equal ones as
+// no-ops, and every stage re-applies the same instance, so a reconcile can
+// never duplicate a service, a port or a firewall rule. deleting
+// tombstones get their teardown re-delivered once; tombstones older than
+// the TTL are dropped, freeing the instance name. The returned lists are
+// meant to be driven exactly once — there is no retry timer anywhere.
+func reconcileAgentTunnels() (provision, teardown []string) {
+	if !agentTunnelHubWired() {
+		return nil, nil
+	}
+	agentTunnelsMu.Lock()
+	s := loadAgentTunnels()
+	changed := false
+	// First pass: drop tombstones past their TTL (frees the instance name).
+	kept := s.Tunnels[:0]
+	for _, x := range s.Tunnels {
+		if x.State == agentTunnelStateDeleting && time.Since(time.Unix(x.CreatedAt, 0)) > agentTunnelTombstoneTTL {
+			log.Printf("agent tunnel %s: tombstone older than %s; dropping (instance %s freed)", x.ID, agentTunnelTombstoneTTL, x.Instance)
+			changed = true
+			continue
+		}
+		kept = append(kept, x)
+	}
+	s.Tunnels = kept
+	// Second pass: collect the unfinished work.
+	for i := range s.Tunnels {
+		t := &s.Tunnels[i]
+		switch t.State {
+		case agentTunnelStateProvisioning, agentTunnelStateRegistering:
+			// Resume: the pipeline skips the hub stage when the hub ack
+			// and host file survived on the record.
+			t.State = agentTunnelStateProvisioning
+			provision = append(provision, t.ID)
+			changed = true
+		case agentTunnelStateError:
+			if t.Active {
+				t.State = agentTunnelStateProvisioning
+				t.Error = ""
+				provision = append(provision, t.ID)
+				changed = true
+			}
+		case agentTunnelStateDeleting:
+			t.HubRevision, t.NodeRevision = agentNewRevision(), agentNewRevision()
+			t.HubTeardownOK, t.NodeTeardownOK = false, false
+			teardown = append(teardown, t.ID)
+			changed = true
+		}
+	}
+	if changed {
+		if err := saveAgentTunnels(s); err != nil {
+			log.Printf("agent tunnel: reconcile save: %v", err)
+		}
+	}
+	agentTunnelsMu.Unlock()
+	return provision, teardown
+}
+
+// agentTunnelRedeliverTeardown re-delivers the remove desired for a
+// deleting tombstone with the revisions reconcileAgentTunnels armed.
+func agentTunnelRedeliverTeardown(tunnelID string) {
+	deliverFn := agentHubDeliverDesiredFn
+	if deliverFn == nil {
+		return
+	}
+	agentTunnelsMu.Lock()
+	t, _, ok := findAgentTunnel(tunnelID)
+	agentTunnelsMu.Unlock()
+	if !ok || t.State != agentTunnelStateDeleting {
+		return
+	}
+	for _, side := range []struct{ agentID, rev string }{{t.HubAgentID, t.HubRevision}, {t.NodeAgentID, t.NodeRevision}} {
+		d := agentDesired{Revision: side.rev, Matrix: &agentDesiredMatrix{Instance: t.Instance, Action: "remove"}}
+		if err := deliverFn(side.agentID, d); err != nil {
+			log.Printf("agent tunnel %s: teardown redelivery to %s: %v", tunnelID, side.agentID, err)
+		}
+	}
 }
 
 // ---- register relay (node -> controller -> hub command) ----
@@ -715,6 +948,15 @@ func handleAgentTunnelsPost(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, r, "E-AGENT-05", "both agents must advertise the matrix capability")
 		return
 	}
+	// Refuse a doomed create (audit F2): while an endpoint still holds an
+	// unacked teardown desired, the delivery guard would refuse the new
+	// work anyway — say so now instead of parking a tunnel in error.
+	for _, agentID := range []string{q.HubAgentID, q.NodeAgentID} {
+		if pd := agentPendingDesired(agentID); pd != nil && pd.Matrix != nil && pd.Matrix.Action == "remove" {
+			writeAPIError(w, r, "E-AGENT-06", "agent "+agentID+" still has a pending teardown; create again once it completes")
+			return
+		}
+	}
 
 	agentTunnelsMu.Lock()
 	s := loadAgentTunnels()
@@ -791,7 +1033,12 @@ func agentTunnelPowerRestart(w http.ResponseWriter, r *http.Request, restart boo
 		writeAPIError(w, r, "E-AGENT-03", "tunnel not found")
 		return
 	}
+	deleting := t.State == agentTunnelStateDeleting
 	agentTunnelsMu.Unlock()
+	if deleting {
+		writeAPIError(w, r, "E-AGENT-05", "tunnel is being deleted")
+		return
+	}
 
 	active := true
 	if !restart && q.Active != nil {
@@ -868,29 +1115,44 @@ func handleAgentTunnelDelete(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, r, "E-AGENT-03", "tunnel not found")
 		return
 	}
+	// Tombstone instead of removal (audit F2): the record survives with
+	// state=deleting until both agents acked their remove desired. It
+	// keeps reserving the matrix instance name (no reuse collision while
+	// the old instance may still run) and carries the teardown revisions
+	// so the ack observer can recognize the removes. reconcileAgentTunnels
+	// re-delivers teardowns for tombstones at startup and drops them after
+	// the TTL if an endpoint never returns.
+	hubRev, nodeRev := agentNewRevision(), agentNewRevision()
 	s := loadAgentTunnels()
-	kept := s.Tunnels[:0]
-	for _, x := range s.Tunnels {
-		if x.ID != id {
-			kept = append(kept, x)
+	for i := range s.Tunnels {
+		if s.Tunnels[i].ID != id {
+			continue
 		}
+		s.Tunnels[i].State = agentTunnelStateDeleting
+		s.Tunnels[i].HubRevision, s.Tunnels[i].NodeRevision = hubRev, nodeRev
+		s.Tunnels[i].HubTeardownOK, s.Tunnels[i].NodeTeardownOK = false, false
+		s.Tunnels[i].Error = ""
 	}
-	s.Tunnels = kept
 	err := saveAgentTunnels(s)
 	agentTunnelsMu.Unlock()
 	if err != nil {
 		writeAPIError(w, r, "E-AGENT-05", err.Error())
 		return
 	}
-	// Best-effort teardown on both agents: each removes its local instance.
-	removeDesired := func(agentID string) {
-		d := agentDesired{Revision: agentNewRevision(), Matrix: &agentDesiredMatrix{Instance: t.Instance, Action: "remove"}}
-		_ = agentHubDeliverDesiredFn(agentID, d)
+	// Teardown desired to both agents: each removes its local instance.
+	// An offline agent is not an error — the hub keeps the desired queued
+	// and delivers it on the next connect; the delivery guard keeps that
+	// queued teardown from being clobbered by later work.
+	removeDesired := func(agentID, rev string) {
+		d := agentDesired{Revision: rev, Matrix: &agentDesiredMatrix{Instance: t.Instance, Action: "remove"}}
+		if err := agentHubDeliverDesiredFn(agentID, d); err != nil {
+			log.Printf("agent tunnel %s: teardown desired to %s: %v", id, agentID, err)
+		}
 	}
-	go removeDesired(t.HubAgentID)
-	go removeDesired(t.NodeAgentID)
+	go removeDesired(t.HubAgentID, hubRev)
+	go removeDesired(t.NodeAgentID, nodeRev)
 	LogSecurityAudit("agent_tunnel_delete", cfg.Username, ClientIP(r), "id="+id)
-	writeJSON(w, map[string]string{"status": "ok", "detail": "tunnel removed; both endpoints are tearing down their local Matrix instances"})
+	writeJSON(w, map[string]string{"status": "ok", "detail": "tunnel tombstoned; both endpoints are tearing down their local Matrix instances"})
 }
 
 func capsInclude(caps []string, want string) bool {

@@ -52,4 +52,16 @@ func wireAgentSubsystem() {
 	agentRegistryLookupFn = agentTunnelRegistryLookup
 	agentAckObserver = agentTunnelAckObserved
 	agentRegisterRelay = agentTunnelRegisterRelay
+	// Audit F3: finish what a previous controller process left behind.
+	// Runs once: a synchronous store scan, then one-shot goroutines for
+	// the returned work — there is no retry timer anywhere, and the
+	// resume-aware pipeline re-applies the same instance with fresh
+	// revisions, so it can never duplicate services or firewall rules.
+	provision, teardown := reconcileAgentTunnels()
+	for _, id := range provision {
+		go agentTunnelProvision(id)
+	}
+	for _, id := range teardown {
+		go agentTunnelRedeliverTeardown(id)
+	}
 }

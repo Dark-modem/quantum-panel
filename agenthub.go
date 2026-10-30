@@ -542,6 +542,13 @@ func agentPendingDesired(id string) *agentDesired {
 	return nil
 }
 
+// agentErrPendingTeardown is returned when a delivery would silently
+// overwrite a pending, unacked teardown desired (audit F2): the old Matrix
+// instance would then never be torn down. Callers should surface the error
+// and retry once the teardown acks; reconcileAgentTunnels re-drives such
+// work on the next controller start.
+var agentErrPendingTeardown = errors.New("agent has a pending teardown desired; retry after it is acked")
+
 // agentHubDeliverDesired persists the desired state (overwriting any pending
 // one) and pushes it to a live session immediately. An offline agent is not
 // an error: it delivers on next connect.
@@ -555,6 +562,19 @@ func agentHubDeliverDesired(id string, d agentDesired) error {
 	found := false
 	for i := range agents {
 		if agents[i].ID == id {
+			// Teardown guard (audit F2): a pending, unacked remove must
+			// not be silently replaced by new work. Applies may supersede
+			// applies (last write wins), a remove supersedes an apply
+			// (delete during a mid-flight provisioning), and a
+			// same-instance remove refreshes a pending remove; anything
+			// else waits for the teardown to ack.
+			if pd := agents[i].Desired; pd != nil && pd.Matrix != nil && d.Matrix != nil {
+				if pd.Matrix.Action == "remove" &&
+					(d.Matrix.Action != "remove" || pd.Matrix.Instance != d.Matrix.Instance) {
+					agentRegMu.Unlock()
+					return agentErrPendingTeardown
+				}
+			}
 			agents[i].Desired = &d
 			found = true
 			break
