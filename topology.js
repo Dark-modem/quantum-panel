@@ -479,7 +479,11 @@ function topologyRender() {
   // The header's power toggle mirrors the row menu: a pair whose tunnels are
   // not up offers Activate, a live pair offers Deactivate.
   const act = $('topologyActivateBtn');
-  if (act) act.textContent = tr('', topologyHealthOf(topo, cables) !== 'ok' ? 'Activate' : 'Deactivate');
+  if (act) {
+    // The button carries an icon + label span; only the label may change.
+    const lbl = $('topologyActivateLbl') || act;
+    lbl.textContent = tr('', topologyHealthOf(topo, cables) !== 'ok' ? 'Activate' : 'Deactivate');
+  }
   // Do not overwrite a form the user is currently editing.
   if (!$('topologySettings').contains(document.activeElement)) {
     $('topologyName').value = topo.name;
