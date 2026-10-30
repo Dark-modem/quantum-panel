@@ -70,18 +70,20 @@ const (
 // Allowlisted remote commands. Anything else the controller sends is
 // rejected with an error result — the agent never runs shell commands.
 const (
-	agentCmdMatrixRestart = "matrix.restart"
-	agentCmdMatrixStart   = "matrix.start"
-	agentCmdMatrixStop    = "matrix.stop"
-	agentCmdDiagPing      = "diag.ping"
+	agentCmdMatrixRestart  = "matrix.restart"
+	agentCmdMatrixStart    = "matrix.start"
+	agentCmdMatrixStop     = "matrix.stop"
+	agentCmdMatrixRegister = "matrix.register" // hub side: pair a node host file
+	agentCmdDiagPing       = "diag.ping"
 )
 
 // agentValidCommands is the complete remote-operation allowlist.
 var agentValidCommands = map[string]bool{
-	agentCmdMatrixRestart: true,
-	agentCmdMatrixStart:   true,
-	agentCmdMatrixStop:    true,
-	agentCmdDiagPing:      true,
+	agentCmdMatrixRestart:  true,
+	agentCmdMatrixStart:    true,
+	agentCmdMatrixStop:     true,
+	agentCmdMatrixRegister: true,
+	agentCmdDiagPing:       true,
 }
 
 // agentEnvelope wraps every message in both directions.
