@@ -1490,3 +1490,69 @@ html[dir="rtl"] .topo-back .topo-back-ic { transform:scaleX(-1); }
 .topo-dd-opt.on { color: var(--ac); font-weight: 600; }
 .topo-dd-opt.on::after { content: "\2713"; margin-inline-start: auto; font-weight: 800; }
 .topo-dd-txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---------- Agents tab (endpoint agents + agent Matrix tunnels) ---------- */
+.ag-token-form {
+  display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px;
+  margin: 12px 0 16px;
+}
+.ag-token-form .fg { display: flex; flex-direction: column; gap: 6px; min-width: 160px; flex: 1; }
+.ag-token-form .fg:first-child { flex: 0 0 auto; }
+.ag-token-form .quantum-btn { flex: 0 0 auto; }
+.ag-token-out { resize: none; word-break: break-all; white-space: pre-wrap; }
+.ag-warn {
+  padding: 8px 12px; border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--wr) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--wr) 35%, transparent);
+  color: var(--wr); font-size: var(--fs-body);
+}
+.ag-warn-err {
+  background: color-mix(in srgb, var(--er) 10%, transparent);
+  border-color: color-mix(in srgb, var(--er) 35%, transparent);
+  color: var(--er);
+}
+/* status dots: online green, offline gray, revoked red */
+.ag-dot {
+  width: 9px; height: 9px; border-radius: 50%; flex: none;
+  display: inline-block; background: var(--mu);
+}
+.ag-dot-online { background: var(--ok); box-shadow: 0 0 6px color-mix(in srgb, var(--ok) 70%, transparent); }
+.ag-dot-offline { background: var(--mu); }
+.ag-dot-revoked { background: var(--er); }
+.ag-agents, .ag-tunnels { display: grid; gap: 10px; margin-top: 12px; }
+.ag-card, .ag-tunnel {
+  padding: 12px 14px; border: 1px solid var(--ln); border-radius: var(--r-lg);
+  background: var(--sunk); display: grid; gap: 8px;
+}
+.ag-card-revoked { opacity: 0.65; }
+.ag-card-head, .ag-card-foot { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.ag-card-name {
+  border: 0; background: transparent; color: var(--tx);
+  font: inherit; font-weight: 650; cursor: pointer; padding: 0;
+}
+.ag-card-name:hover, .ag-card-name:focus-visible { color: var(--ac); text-decoration: underline; outline: none; }
+.ag-card-meta { font-size: var(--fs-small); color: var(--mu); min-width: 0; overflow-wrap: anywhere; }
+.ag-card-foot { justify-content: flex-start; }
+.ag-inst {
+  padding: 10px 12px; margin: 6px 0; border: 1px solid var(--ln);
+  border-radius: var(--r-md); background: var(--sunk);
+}
+.ag-tunnel-name { font-weight: 650; color: var(--tx); }
+.ag-tunnel-eps { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.ag-tunnel-foot { gap: 12px; }
+.ag-tunnel-traffic { font-size: var(--fs-small); color: var(--mu); border-top: 1px solid var(--ln); padding-top: 8px; }
+.ag-amp-val { font-weight: 700; color: var(--tx); }
+.ag-amp-note { color: var(--dim); }
+.ag-port {
+  display: inline-block; padding: 1px 8px; border-radius: 999px;
+  background: color-mix(in srgb, var(--info) 12%, transparent);
+  color: var(--info); border: 1px solid color-mix(in srgb, var(--info) 30%, transparent);
+  font-size: var(--fs-caption);
+}
+.ag-detail-modal { max-width: 720px; }
+/* narrow screens: token form stacks, meta drops under the name */
+@media (max-width: 640px) {
+  .ag-token-form { flex-direction: column; align-items: stretch; }
+  .ag-token-form .fg, .ag-token-form .fg:first-child { flex: 1 1 auto; min-width: 0; }
+  .ag-card-meta { flex-basis: 100%; margin-inline-start: 17px; }
+}

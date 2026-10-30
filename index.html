@@ -1365,6 +1365,7 @@
       <button role="tab" aria-selected="true" aria-controls="tab-dashboard" tabindex="0" class="nav-item on" data-tab="dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span data-i18n="nav_dashboard">Dashboard</span></button>
       <div class="nav-sec" role="presentation" data-i18n="sec_tunnel">Tunnel</div>
       <button role="tab" aria-selected="false" aria-controls="tab-tunnel" tabindex="-1" class="nav-item" data-tab="tunnel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="5" cy="6" r="2.5"/><circle cx="19" cy="6" r="2.5"/><circle cx="12" cy="19" r="2.5"/><path d="M7.5 6h9M6.3 8l4.7 8.8M17.7 8l-4.7 8.8"/></svg><span data-i18n="nav_topology">Topology</span><span class="nav-badge hidden u-ml-auto" aria-hidden="false"></span></button>
+      <button role="tab" aria-selected="false" aria-controls="tab-agents" tabindex="-1" class="nav-item" data-tab="agents"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8M12 17v4"/><circle cx="8.5" cy="11" r="1.5"/><circle cx="15.5" cy="11" r="1.5"/><path d="M7 8h.01M17 8h.01"/></svg><span data-i18n="nav_agents">Agents</span></button>
       <button role="tab" aria-selected="false" aria-controls="tab-cluster" tabindex="-1" class="nav-item" data-tab="cluster" id="clusterNav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg><span data-i18n="nav_cluster">Cluster</span></button>
       <button role="tab" aria-selected="false" aria-controls="tab-logs" tabindex="-1" class="nav-item" data-tab="logs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span data-i18n="nav_logs">Logs</span></button>
       <div class="nav-sec" role="presentation" data-i18n="sec_system">System</div>
@@ -1829,6 +1830,69 @@
               </div>
               <button class="quantum-btn quantum-btn-secondary" id="carrierSaveWSSBtn">Save WSS Settings</button>
             </div>
+          </div>
+        </div>
+      </section>
+      <!-- ==================== AGENTS TAB (endpoint agents + agent Matrix tunnels) ==================== -->
+      <section id="tab-agents" role="tabpanel" hidden>
+        <div class="ent-grid u-gap-16">
+          <!-- Enrollment tokens -->
+          <div class="tunnel-card" id="agentsTokenCard">
+            <div class="tc-header">
+              <p class="tc-title" data-i18n="agents_tokens_title">Enrollment Tokens</p>
+            </div>
+            <div class="qs-hint" data-i18n="agents_tokens_hint">One token enrolls exactly one endpoint agent. The token is shown once — copy it and run the command on the endpoint server.</div>
+            <div class="ag-token-form">
+              <div class="fg">
+                <label class="qs-label" for="agTokenRole" data-i18n="agents_role">Agent role</label>
+                <select class="quantum-input" id="agTokenRole">
+                  <option value="iran" data-i18n="agents_role_iran">Iran (hub)</option>
+                  <option value="foreign" data-i18n="agents_role_foreign">Foreign (node)</option>
+                </select>
+              </div>
+              <div class="fg">
+                <label class="qs-label" for="agTokenLabel" data-i18n="agents_token_label">Label (optional)</label>
+                <input class="quantum-input" id="agTokenLabel" maxlength="120" autocomplete="off" data-i18n-ph="agents_token_label_ph" placeholder="e.g. Tehran office">
+              </div>
+              <div class="fg">
+                <label class="qs-label" for="agTokenDays" data-i18n="agents_token_expiry">Expiry (days)</label>
+                <input class="quantum-input u-mono" id="agTokenDays" type="number" min="1" max="365" value="7" inputmode="numeric">
+              </div>
+              <button type="button" class="quantum-btn quantum-btn-primary" id="agTokenCreateBtn" data-i18n="agents_token_create">Create Enrollment Token</button>
+            </div>
+            <div class="ent-tbl-wrap" id="agTokensWrap">
+              <table class="ent-tbl" id="agTokensTbl">
+                <thead><tr>
+                  <th data-i18n="agents_th_prefix">Token</th>
+                  <th data-i18n="agents_th_role">Role</th>
+                  <th data-i18n="agents_th_label">Label</th>
+                  <th data-i18n="agents_th_status">Status</th>
+                  <th data-i18n="agents_th_expires">Expires</th>
+                  <th data-i18n="agents_th_actions">Actions</th>
+                </tr></thead>
+                <tbody id="agTokensBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Agents list -->
+          <div class="tunnel-card" id="agentsListCard">
+            <div class="tc-header">
+              <p class="tc-title" data-i18n="agents_list_title">Agents</p>
+              <button type="button" class="quantum-btn quantum-btn-secondary" id="agRefreshBtn" aria-label="Refresh agents" data-i18n-aria="agents_refresh_aria" data-i18n="refresh">Refresh</button>
+            </div>
+            <div class="qs-hint" data-i18n="agents_list_hint">Endpoint servers enrolled with a token. Online agents take Matrix desired state and relay commands; revoked agents can never connect again.</div>
+            <div id="agAgentsList" class="ag-agents"></div>
+          </div>
+
+          <!-- Agent-based Matrix tunnels -->
+          <div class="tunnel-card" id="agentsTunnelsCard">
+            <div class="tc-header">
+              <p class="tc-title" data-i18n="agents_tunnels_title">Matrix Tunnels (Agents)</p>
+              <button type="button" class="quantum-btn quantum-btn-primary" id="agTunnelCreateBtn" data-i18n="agents_tunnel_create">Create New Tunnel</button>
+            </div>
+            <div class="qs-hint" data-i18n="agents_tunnels_hint">Each tunnel pairs one Iran hub agent with one foreign node agent. Both endpoints must advertise the Matrix capability and 1-20 forwarded ports are required.</div>
+            <div id="agTunnelsList" class="ag-tunnels"></div>
           </div>
         </div>
       </section>
@@ -3537,6 +3601,79 @@
       <div class="xr-err hidden" id="nameModalErr"></div>
     </div>
     <div class="ent-modal-f"><button class="quantum-btn quantum-btn-ghost" id="nameModalNo">Cancel</button><button class="quantum-btn quantum-btn-primary" id="nameModalYes">Save</button></div>
+  </div>
+</div>
+
+<!-- Agent enrollment: the one-time token, shown exactly once -->
+<div class="ent-modal-ov" id="agTokenModal" hidden>
+  <div class="ent-modal" role="dialog" aria-modal="true" aria-labelledby="agTokenTitle">
+    <div class="ent-modal-h"><b id="agTokenTitle">Enrollment Token</b><button class="ent-x" id="agTokenX" aria-label="Close" data-i18n-aria="aria_close">×</button></div>
+    <div class="ent-modal-b">
+      <div class="ag-warn" id="agTokenOnceWarn" data-i18n="agents_token_once">This token is shown only once. Copy it now — it cannot be viewed again.</div>
+      <label class="qs-label" for="agTokenValue" data-i18n="agents_token_value">Token</label>
+      <textarea class="quantum-input u-mono ag-token-out" id="agTokenValue" readonly rows="2"></textarea>
+      <button type="button" class="quantum-btn quantum-btn-secondary u-mt-8" id="agTokenCopy" aria-label="Copy token" data-i18n-aria="agents_copy_token_aria" data-i18n="agents_copy">Copy</button>
+      <label class="qs-label u-mt-16" for="agTokenCmd" data-i18n="agents_token_cmd">Command on the endpoint server</label>
+      <textarea class="quantum-input u-mono ag-token-out" id="agTokenCmd" readonly rows="2"></textarea>
+      <button type="button" class="quantum-btn quantum-btn-secondary u-mt-8" id="agTokenCmdCopy" aria-label="Copy enroll command" data-i18n-aria="agents_copy_cmd_aria" data-i18n="agents_copy">Copy</button>
+      <div class="qs-hint u-mt-8" data-i18n="agents_token_cmd_hint">Run this on the endpoint server as root. The agent connects to the panel and appears in the list below.</div>
+    </div>
+    <div class="ent-modal-f"><button type="button" class="quantum-btn quantum-btn-primary" id="agTokenDone" data-i18n="agents_done">Done</button></div>
+  </div>
+</div>
+
+<!-- Create an agent-based Matrix tunnel -->
+<div class="ent-modal-ov" id="agTunnelModal" hidden>
+  <div class="ent-modal" role="dialog" aria-modal="true" aria-labelledby="agTunnelTitle">
+    <div class="ent-modal-h"><b id="agTunnelTitle">Create New Tunnel</b><button class="ent-x" id="agTunnelX" aria-label="Close" data-i18n-aria="aria_close">×</button></div>
+    <div class="ent-modal-b">
+      <label class="qs-label" for="agTunnelName" data-i18n="agents_tunnel_name">Tunnel name</label>
+      <input class="quantum-input" id="agTunnelName" maxlength="80" autocomplete="off" data-i18n-ph="agents_tunnel_name_ph" placeholder="e.g. Tehran-Frankfurt">
+      <div class="ent-grid-2 u-mt-8">
+        <div class="fg">
+          <label class="qs-label" for="agTunnelHub" data-i18n="agents_tunnel_hub">Hub agent (Iran)</label>
+          <select class="quantum-input" id="agTunnelHub"></select>
+        </div>
+        <div class="fg">
+          <label class="qs-label" for="agTunnelNode" data-i18n="agents_tunnel_node">Node agent (foreign)</label>
+          <select class="quantum-input" id="agTunnelNode"></select>
+        </div>
+      </div>
+      <div class="ent-grid-2 u-mt-8">
+        <div class="fg">
+          <label class="qs-label" for="agTunnelFamily" data-i18n="agents_tunnel_family">Address family</label>
+          <select class="quantum-input" id="agTunnelFamily">
+            <option value="ipv4">IPv4</option>
+            <option value="ipv6">IPv6</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label class="qs-label" for="agTunnelMeshPort" data-i18n="agents_tunnel_meshport">Mesh port</label>
+          <input class="quantum-input u-mono" id="agTunnelMeshPort" type="number" min="0" max="65535" value="0" inputmode="numeric">
+          <div class="qs-hint" data-i18n="agents_tunnel_meshport_hint">0 = the hub agent picks a free port automatically.</div>
+        </div>
+      </div>
+      <label class="qs-label u-mt-8" for="agTunnelPorts" data-i18n="agents_tunnel_ports">Forwarded ports (comma separated, 1-20)</label>
+      <input class="quantum-input u-mono" id="agTunnelPorts" inputmode="numeric" autocomplete="off" placeholder="443, 8080, 990" dir="ltr">
+      <div class="qs-hint" data-i18n="agents_tunnel_ports_hint">Matrix forwards exactly these ports from the hub to the node. Port 22 is not allowed.</div>
+      <div class="xr-err hidden" id="agTunnelErr" role="alert"></div>
+    </div>
+    <div class="ent-modal-f"><button type="button" class="quantum-btn quantum-btn-ghost" id="agTunnelCancel" data-i18n="cancel">Cancel</button><button type="button" class="quantum-btn quantum-btn-primary" id="agTunnelSave" data-i18n="agents_tunnel_create">Create New Tunnel</button></div>
+  </div>
+</div>
+
+<!-- Agent detail drawer -->
+<div class="ent-modal-ov" id="agAgentModal" hidden>
+  <div class="ent-modal ag-detail-modal" role="dialog" aria-modal="true" aria-labelledby="agAgentTitle">
+    <div class="ent-modal-h"><b id="agAgentTitle">Agent</b><button class="ent-x" id="agAgentX" aria-label="Close" data-i18n-aria="aria_close">×</button></div>
+    <div class="ent-modal-b" id="agAgentBody"></div>
+    <div class="ent-modal-f" id="agAgentFoot">
+      <button type="button" class="quantum-btn quantum-btn-secondary" id="agAgentPing" aria-label="Diagnostics ping" data-i18n-aria="agents_diag_aria" data-i18n="agents_diag_ping">Diagnostics Ping</button>
+      <span class="u-flex u-gap-8">
+        <button type="button" class="quantum-btn quantum-btn-danger" id="agAgentRevoke" aria-label="Revoke agent" data-i18n-aria="agents_revoke_aria" data-i18n="agents_revoke">Revoke</button>
+        <button type="button" class="quantum-btn quantum-btn-ghost" id="agAgentClose" data-i18n="agents_close">Close</button>
+      </span>
+    </div>
   </div>
 </div>
 
