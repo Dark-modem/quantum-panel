@@ -554,12 +554,13 @@ func agentTunnelHealthView(t agentTunnel) *agentTunnelHealth {
 // billable_amplification is a SERVER-BASIS ESTIMATE, not a validated
 // per-tunnel measurement: physical NIC RX is the billable direction and
 // qmx TX is the payload pushed into the tunnel (downloads only — uploads
-// ride qmx RX/NIC TX and are excluded by construction), but the physical
-// counter also carries SSH, panel and probe traffic, so the ratio is an
-// upper bound until Matrix-owned counters (the QMX_FWD iptables byte
-// counts, read-only) are wired into the agent. The controller therefore
-// labels the basis explicitly and reports nil (UNKNOWN) whenever a
-// component cannot be measured — it never invents a number.
+// ride qmx RX/NIC TX and are excluded by construction). The physical
+// counter also carries SSH, panel and probe traffic, so this is a
+// SERVER-WIDE ESTIMATE, not a Matrix-specific measurement and not a
+// bound. It stays UNKNOWN (nil) whenever the counters are unavailable or
+// unreliable (reset, stale heartbeat, unknown iface); Matrix-owned
+// counters (the QMX_FWD iptables byte counts, read-only) would be needed
+// for a per-tunnel figure and are deliberately not claimed yet.
 func agentTrafficSummary(info agentTunnelAgentInfo) map[string]any {
 	var nicRx, nicTx, tunRx, tunTx float64
 	for _, r := range info.TrafficRate {
