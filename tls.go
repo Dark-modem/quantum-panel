@@ -566,7 +566,7 @@ func startHTTPSListener() {
 		port = next
 	}
 	httpsSrv = &http.Server{
-		Addr:              fmt.Sprintf(":%d", port),
+		Addr:              panelBindAddr(port),
 		Handler:           panelHandler(),
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       120 * time.Second,

@@ -59,6 +59,9 @@ type panelConfig struct {
 	TerminalAllowIPs []string `json:"terminal_allow_ips,omitempty"`
 	// TLSPort is the HTTPS listener port (default 7443). HTTP stays on Port.
 	TLSPort int `json:"tls_port,omitempty"`
+	// BindHost restricts both listeners to one address (e.g. "127.0.0.1"
+	// behind a reverse proxy). Empty binds all interfaces (default).
+	BindHost string `json:"bind_host,omitempty"`
 	// DebugEnabled mounts /debug/pprof behind auth (also QUANTUM_PPROF=1).
 	DebugEnabled bool `json:"debug_enabled,omitempty"`
 	// RevPathAuto enables automatic application of reverse-path fixes
@@ -192,14 +195,28 @@ func saveConfigAtomic(c panelConfig) error {
 
 // ---- auto port: never fail install when the HTTP/TLS port is taken ----
 
-// portFree reports whether TCP :port can be bound right now.
+// portFree reports whether TCP :port can be bound right now. It is
+// bind_host aware: with bind_host set (reverse-proxy mode) it probes the
+// configured host instead of all interfaces, so the panel never
+// auto-switches away from a port it holds on loopback.
 func portFree(port int) bool {
-	ln, err := net.Listen("tcp", ":"+strconv.Itoa(port))
+	ln, err := net.Listen("tcp", panelBindAddr(port))
 	if err != nil {
 		return false
 	}
 	_ = ln.Close()
 	return true
+}
+
+// panelBindAddr builds the listen address for the panel's listeners,
+// honoring panel.json bind_host (reverse-proxy mode: "127.0.0.1" keeps
+// the panel private behind nginx). Empty binds all interfaces.
+func panelBindAddr(port int) string {
+	host := strings.TrimSpace(cfg.BindHost)
+	if host == "" {
+		return fmt.Sprintf(":%d", port)
+	}
+	return net.JoinHostPort(host, strconv.Itoa(port))
 }
 
 // pickFreePort scans upward from start for the first bindable TCP port
@@ -765,7 +782,7 @@ func main() {
 	mux.HandleFunc("GET "+base+"/api/pathtest", requireAuth(handlePathTestGet))
 	mux.HandleFunc("POST "+base+"/api/pathtest", requireAuth(requireCSRF(handlePathTestPost)))
 
-	addr := fmt.Sprintf(":%d", cfg.Port)
+	addr := panelBindAddr(cfg.Port)
 	log.Printf("gre-panel listening on %s under /%s", addr, cfg.BasePath)
 	histStop := make(chan struct{})
 	startHistoryPersistence(histStop)
