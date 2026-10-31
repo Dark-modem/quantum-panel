@@ -128,12 +128,27 @@ var (
 
 // agentUpdateVerifyKey parses the pinned public key once per call site need;
 // small and stateless.
+// agentSelfExe is the seam for the running binary's path (tests point it at
+// throwaway copies; the swap and rollback never touch the test binary).
+var agentSelfExe = os.Executable
+
+// agentUpdateVerifyKey parses the pinned update public key. Two accepted
+// forms: PEM SubjectPublicKeyInfo, or single-line base64 of the DER
+// SubjectPublicKeyInfo (ldflags -X cannot carry newlines).
 func agentUpdateVerifyKey(pubPEM string) (ed25519.PublicKey, error) {
-	block, _ := pem.Decode([]byte(pubPEM))
-	if block == nil || block.Type != "PUBLIC KEY" {
-		return nil, errors.New("update public key PEM missing or malformed")
+	pubPEM = strings.TrimSpace(pubPEM)
+	if pubPEM == "" {
+		return nil, errors.New("no update public key pinned")
 	}
-	parsed, err := x509.ParsePKIXPublicKey(block.Bytes)
+	var der []byte
+	if block, _ := pem.Decode([]byte(pubPEM)); block != nil && block.Type == "PUBLIC KEY" {
+		der = block.Bytes
+	} else if b, err := base64.StdEncoding.DecodeString(pubPEM); err == nil {
+		der = b
+	} else {
+		return nil, errors.New("update public key is neither PEM nor base64 DER")
+	}
+	parsed, err := x509.ParsePKIXPublicKey(der)
 	if err != nil {
 		return nil, fmt.Errorf("update public key not parseable: %w", err)
 	}
@@ -237,7 +252,7 @@ var (
 	agentUpdateProgressSt *agentUpdateProgress
 )
 
-func agentUpdateSetProgress(phase, version, errMsg string) {
+var agentUpdateSetProgress = func(phase, version, errMsg string) {
 	agentUpdateProgressMu.Lock()
 	agentUpdateProgressSt = &agentUpdateProgress{Phase: phase, Version: version, Error: errMsg, At: time.Now().Unix()}
 	agentUpdateProgressMu.Unlock()
@@ -293,7 +308,7 @@ func agentUpdateCheckBootRollback() {
 	// Roll back.
 	prev, err := os.ReadFile(m.PrevPath)
 	if err == nil {
-		exe, e := os.Executable()
+		exe, e := agentSelfExe()
 		if e == nil {
 			tmp := exe + ".rollback"
 			if os.WriteFile(tmp, prev, 0755) == nil && os.Rename(tmp, exe) == nil {

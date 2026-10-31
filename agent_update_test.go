@@ -172,3 +172,53 @@ func TestAgentUpdateRequestWireFields(t *testing.T) {
 		t.Fatalf("wire fields drifted: %v", back)
 	}
 }
+
+// Boot-rollback: 3 crash-looped boots of the updated binary restore the
+// previous binary and report the failure; stable boots just count up.
+func TestAgentUpdateBootRollback(t *testing.T) {
+	withTempConfig(t)
+	lab := t.TempDir()
+	exe := filepath.Join(lab, "gre-panel")
+	newBin := []byte("NEW-BINARY")
+	prevBin := []byte("PREV-BINARY")
+	if err := os.WriteFile(exe, newBin, 0755); err != nil {
+		t.Fatal(err)
+	}
+	prev := filepath.Join(lab, "gre-panel.prev")
+	if err := os.WriteFile(prev, prevBin, 0755); err != nil {
+		t.Fatal(err)
+	}
+	oldSeam := agentSelfExe
+	agentSelfExe = func() (string, error) { return exe, nil }
+	t.Cleanup(func() { agentSelfExe = oldSeam })
+
+	save := agentUpdateSetProgress
+	defer func() { agentUpdateSetProgress = save }()
+
+	if err := agentUpdateMarkerSave(&agentUpdateMarker{Version: "v1.28.1", PrevPath: prev, BootCount: 0, StartedAt: 1}); err != nil {
+		t.Fatal(err)
+	}
+	agentUpdateCheckBootRollback()
+	if b, _ := os.ReadFile(exe); string(b) != "NEW-BINARY" {
+		t.Fatal("rollback must not trigger before 3 boots")
+	}
+	agentUpdateCheckBootRollback()
+	if b, _ := os.ReadFile(exe); string(b) != "NEW-BINARY" {
+		t.Fatal("rollback must not trigger on boot 2")
+	}
+	agentUpdateCheckBootRollback()
+	if b, _ := os.ReadFile(exe); string(b) != "PREV-BINARY" {
+		t.Fatalf("boot 3 must restore the previous binary, got %q", string(b))
+	}
+	if _, ok := agentUpdateMarkerLoad(); ok {
+		t.Fatal("marker must be cleared after rollback")
+	}
+	if p := agentUpdateProgressSnapshot(); p == nil || p.Phase != "failed" {
+		t.Fatalf("rollback must report failed progress: %+v", p)
+	}
+	// The marker is gone; the next boots are no-ops.
+	agentUpdateCheckBootRollback()
+	if b, _ := os.ReadFile(exe); string(b) != "PREV-BINARY" {
+		t.Fatal("rollback must run exactly once")
+	}
+}

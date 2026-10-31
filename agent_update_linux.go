@@ -58,7 +58,7 @@ func agentUpdateRun(req agentUpdateRequest, ident agentIdentity) {
 		return
 	}
 
-	exe, err := os.Executable()
+	exe, err := agentSelfExe()
 	if err != nil {
 		agentUpdateSetProgress("failed", req.Version, "cannot locate own binary: "+err.Error())
 		return
