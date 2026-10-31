@@ -409,7 +409,7 @@ func netPlanChanges(p netProfileName, rep *netHardwareReport, role netRole) []ne
 			out = append(out, pc)
 			continue
 		}
-		if pc.Kind == "sysctl" && pc.Current == pc.Proposed {
+		if pc.Kind == "sysctl" && netSameSysctlValue(pc.Current, pc.Proposed) {
 			pc.Apply, pc.SkipReason = false, "already at proposed value"
 			out = append(out, pc)
 			continue
@@ -424,6 +424,14 @@ func netPlanChanges(p netProfileName, rep *netHardwareReport, role netRole) []ne
 		return out[i].Key < out[j].Key
 	})
 	return out
+}
+
+// netSameSysctlValue compares two sysctl values ignoring whitespace layout:
+// the kernel prints vector values with tabs while profiles write spaces
+// (live-acceptance finding — tcp_rmem "4096	131072	…" vs "4096 131072 …"
+// is the same setting, not a change).
+func netSameSysctlValue(a, b string) bool {
+	return strings.Join(strings.Fields(a), " ") == strings.Join(strings.Fields(b), " ")
 }
 
 // netProfileSummary is the one-line plan digest for CLI output.

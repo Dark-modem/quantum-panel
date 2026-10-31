@@ -402,7 +402,10 @@ func netRestore(j *netJournal, base *netBaseline) []string {
 			continue
 		}
 		ctx, cancel := contextWithTimeout(5 * time.Second)
-		_, err := netDetectExec(ctx, "sysctl", "-w", s.Key+"=\""+s.Before+"\"")
+		// No shell is involved (exec seam): the value must go UNQUOTED —
+		// a literal `key="value"` is rejected by sysctl -w (live-acceptance
+		// finding, session 2 acceptance round).
+		_, err := netDetectExec(ctx, "sysctl", "-w", s.Key+"="+s.Before)
 		cancel()
 		if err != nil {
 			errs = append(errs, "restore "+s.Key+": "+err.Error())
