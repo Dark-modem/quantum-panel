@@ -220,7 +220,10 @@ func NetopStatus() (*NetopStatusResult, error) {
 		if s.Kind != "sysctl" {
 			continue
 		}
-		if live := rep.Sysctls[s.Key]; live != s.After {
+		// whitespace-normalized compare: the kernel prints vector values with
+		// tabs while the journal stores the profile's space-separated form —
+		// a formatting difference is not drift (live-acceptance finding).
+		if live := rep.Sysctls[s.Key]; !netSameSysctlValue(live, s.After) {
 			res.Drift = append(res.Drift, netDrifted{Key: s.Key, Live: live, Wanted: s.After})
 		}
 	}

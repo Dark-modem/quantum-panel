@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // netAgentOnlyFixture: an enrolled lightweight agent — agent.json present,
@@ -324,5 +325,47 @@ func TestNetopsDispatcherGuards(t *testing.T) {
 	if _, err := NetopDispatch(NetopRequest{Op: "apply", Profile: "performance"}); err == nil ||
 		!strings.Contains(err.Error(), "--justify") {
 		t.Fatalf("performance without justify must be refused, got %v", err)
+	}
+}
+
+// TestNetopsStatusNoFalseDriftFromFormatting pins the whitespace fix: a
+// vector sysctl the kernel reports with tabs must not read as drift against
+// the journal's space-separated form.
+func TestNetopsStatusNoFalseDriftFromFormatting(t *testing.T) {
+	files, dirs, exec := netAgentOnlyFixture(t)
+	// The kernel reports vector values with TABS; the journal (written by the
+	// profile) stores the space-separated form. Same values, same setting.
+	files["/proc/sys/net/ipv4/tcp_rmem"] = "4096\t131072\t16777216\n"
+	netTestEnv(t, files, dirs, exec)
+
+	j := &netJournal{
+		AppliedAt: time.Now().Unix(), Profile: "balanced", Role: "agent",
+		Applied: []netAppliedSetting{
+			{Key: "net.ipv4.tcp_rmem", Kind: "sysctl", Before: "4096 65536 4194304", After: "4096 131072 16777216"},
+		},
+		OwnedFiles: []string{"/etc/sysctl.d/99-quantum-netopt.conf"},
+	}
+	b, _ := json.MarshalIndent(j, "", "  ")
+	if err := os.MkdirAll(netOptDir(), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(netJournalPath(), b, 0600); err != nil {
+		t.Fatal(err)
+	}
+	res, err := NetopStatus()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Drift) != 0 {
+		t.Fatalf("formatting-only difference must not be drift: %+v", res.Drift)
+	}
+	// and a genuinely different live value IS drift
+	files["/proc/sys/net/ipv4/tcp_rmem"] = "4096 131072 4194304\n"
+	res, err = NetopStatus()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Drift) != 1 || res.Drift[0].Key != "net.ipv4.tcp_rmem" {
+		t.Fatalf("real drift not detected: %+v", res.Drift)
 	}
 }
