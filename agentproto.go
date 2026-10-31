@@ -123,12 +123,38 @@ type agentHeartbeat struct {
 // applied, what health it measured, and what traffic it counted. It is
 // also what the controller persists per agent for the dashboards.
 type agentStateReport struct {
-	AppliedRevision string              `json:"applied_revision,omitempty"`
-	Matrix          []agentMatrixStatus `json:"matrix,omitempty"`
-	Health          []agentTunnelHealth `json:"health,omitempty"`
-	Traffic         *agentTrafficReport `json:"traffic,omitempty"`
-	NodeDetect      *agentNodeDetect    `json:"node_detect,omitempty"`
-	Errors          []string            `json:"errors,omitempty"`
+	AppliedRevision string               `json:"applied_revision,omitempty"`
+	Matrix          []agentMatrixStatus  `json:"matrix,omitempty"`
+	Health          []agentTunnelHealth  `json:"health,omitempty"`
+	Traffic         *agentTrafficReport  `json:"traffic,omitempty"`
+	Resources       *agentResourceReport `json:"resources,omitempty"`
+	NodeDetect      *agentNodeDetect     `json:"node_detect,omitempty"`
+	Errors          []string             `json:"errors,omitempty"`
+}
+
+// agentResourceReport is the lightweight host snapshot for the controller
+// dashboards: CPU/RAM/disk/virt plus the listening-port inventory with
+// ownership hints. Measured values only — nothing is estimated here.
+type agentResourceReport struct {
+	CPUModel    string            `json:"cpu_model,omitempty"`
+	CPUCores    int               `json:"cpu_cores"`
+	CPUPercent  float64           `json:"cpu_percent"` // sampled over ~200ms
+	LoadAvg1    float64           `json:"load_avg_1"`
+	MemTotalMB  uint64            `json:"mem_total_mb"`
+	MemUsedMB   uint64            `json:"mem_used_mb"` // total - available
+	DiskTotalGB uint64            `json:"disk_total_gb"`
+	DiskUsedGB  uint64            `json:"disk_used_gb"` // root filesystem
+	UptimeS     uint64            `json:"uptime_s"`
+	Virt        string            `json:"virt,omitempty"` // systemd-detect-virt
+	Listening   []agentListenPort `json:"listening,omitempty"`
+}
+
+// agentListenPort is one listening socket with an ownership hint.
+type agentListenPort struct {
+	Proto string `json:"proto"` // "tcp" | "udp"
+	Port  int    `json:"port"`
+	Addr  string `json:"addr"`           // bind address as reported
+	Proc  string `json:"proc,omitempty"` // process name(s), comma-joined
 }
 
 // agentMatrixStatus is one local Matrix instance as seen by the agent.

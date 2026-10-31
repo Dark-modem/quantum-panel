@@ -518,6 +518,7 @@ func agentBuildStateReport() *agentStateReport {
 		Matrix:          agentMatrixStatuses(true),
 		Health:          agentHealthSnapshot(),
 		Traffic:         agentCollectTraffic(),
+		Resources:       agentCollectResources(),
 		NodeDetect:      agentDetectNode(),
 	}
 }

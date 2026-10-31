@@ -8152,6 +8152,33 @@ function agentDetailRender(d) {
     });
   }
 
+  // Host resources + listening-port inventory (measured by the agent, M1).
+  const res = st.resources;
+  if (res) {
+    html += '<p class="ent-sec-label u-mt-16">' + esc(tr('', 'Host resources')) + '</p>';
+    const cpu = [];
+    if (res.cpu_model) cpu.push('<bdi data-no-i18n>' + esc(res.cpu_model) + '</bdi>');
+    cpu.push((res.cpu_cores || 0) + ' ' + esc(tr('', 'cores')));
+    if (res.cpu_percent != null) cpu.push(Math.round(res.cpu_percent) + '%');
+    html += agentDetailRow(tr('', 'CPU'), cpu.join(' · '));
+    if (res.mem_total_mb) html += agentDetailRow(tr('', 'Memory'), '<bdi data-no-i18n>' + res.mem_used_mb + ' / ' + res.mem_total_mb + ' MB</bdi>');
+    if (res.disk_total_gb) html += agentDetailRow(tr('', 'Disk'), '<bdi data-no-i18n>' + res.disk_used_gb + ' / ' + res.disk_total_gb + ' GB</bdi>');
+    const sys = [];
+    if (res.load_avg_1 != null) sys.push(esc(tr('', 'Load')) + ' <bdi data-no-i18n>' + res.load_avg_1.toFixed(2) + '</bdi>');
+    if (res.uptime_s) sys.push(esc(tr('', 'Uptime')) + ' <bdi data-no-i18n>' + esc(agentAgo(Math.floor(Date.now() / 1000) - res.uptime_s)) + '</bdi>');
+    if (res.virt) sys.push('<span class="u-mono">' + esc(res.virt) + '</span>');
+    if (sys.length) html += agentDetailRow(tr('', 'System'), sys.join(' · '));
+    const listening = res.listening || [];
+    if (listening.length) {
+      const chips = listening.slice(0, 12).map(l =>
+        '<span class="badge ' + (l.addr === '0.0.0.0' || l.addr === '::' || l.addr === '*' ? 'warn' : 'dim') + '"><bdi data-no-i18n>' +
+        esc(l.proto + ':' + l.port) + (l.proc ? ' · ' + esc(l.proc) : '') + '</bdi></span>'
+      ).join(' ');
+      html += agentDetailRow(tr('', 'Listening ports'), chips +
+        (listening.length > 12 ? ' <span class="u-hint-12">+' + (listening.length - 12) + '</span>' : ''));
+    }
+  }
+
   // Node-detect info (read-only PasarGuard node signal).
   const nd = st.node_detect;
   if (nd && nd.detected) {
