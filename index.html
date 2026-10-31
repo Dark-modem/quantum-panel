@@ -1879,7 +1879,10 @@
           <div class="tunnel-card" id="agentsListCard">
             <div class="tc-header">
               <p class="tc-title" data-i18n="agents_list_title">Agents</p>
-              <button type="button" class="quantum-btn quantum-btn-secondary" id="agRefreshBtn" aria-label="Refresh agents" data-i18n-aria="agents_refresh_aria" data-i18n="refresh">Refresh</button>
+              <span class="u-flex u-gap-8">
+                <button type="button" class="quantum-btn quantum-btn-secondary" id="agAgentsUpdateBtn" hidden data-i18n="agents_update_selected">Update Selected</button>
+                <button type="button" class="quantum-btn quantum-btn-secondary" id="agRefreshBtn" aria-label="Refresh agents" data-i18n-aria="agents_refresh_aria" data-i18n="refresh">Refresh</button>
+              </span>
             </div>
             <div class="qs-hint" data-i18n="agents_list_hint">Endpoint servers enrolled with a token. Online agents take Matrix desired state and relay commands; revoked agents can never connect again.</div>
             <div id="agAgentsList" class="ag-agents"></div>
@@ -1896,6 +1899,28 @@
           </div>
         </div>
       </section>
+      <!-- ==================== AGENT UPDATE MODAL ==================== -->
+      <div class="modal-overlay" id="agUpdateModal" hidden>
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="agUpdateTitle">
+          <div class="modal-head">
+            <p class="modal-title" id="agUpdateTitle" data-i18n="agents_update_title">Update Agent</p>
+            <button type="button" class="modal-x" id="agUpdateX" aria-label="Close">&times;</button>
+          </div>
+          <p class="qs-hint" data-i18n="agents_update_hint">The controller downloads the artifact and verifies its ed25519 signature against the pinned update key before sending anything. The agent re-verifies, swaps the binary atomically and restarts itself; enrollment and tunnels survive.</p>
+          <p class="dr"><span class="k" data-i18n="agents_update_targets">Targets</span><span id="agUpdateTargets" class="u-mono"></span></p>
+          <label class="dr"><span class="k" data-i18n="agents_update_version">Target version</span>
+            <input type="text" id="agUpdateVersion" class="quantum-input" placeholder="v1.28.1" autocomplete="off" required>
+          </label>
+          <label class="dr"><span class="k" data-i18n="agents_update_url">Artifact URL (https)</span>
+            <input type="text" id="agUpdateUrl" class="quantum-input" placeholder="https://controller/base/api/agent/artifact/gre-panel-linux-amd64" autocomplete="off" required>
+          </label>
+          <div class="modal-foot">
+            <button type="button" class="quantum-btn quantum-btn-ghost" id="agUpdateCancel" data-i18n="agents_close">Close</button>
+            <button type="button" class="quantum-btn quantum-btn-primary" id="agUpdateStart" data-i18n="agents_update_start">Start Update</button>
+          </div>
+        </div>
+      </div>
+
       <!-- ==================== CLUSTER TAB ==================== -->
       <section id="tab-cluster" role="tabpanel" hidden>
         <div class="tunnel-card">
@@ -3669,6 +3694,7 @@
     <div class="ent-modal-b" id="agAgentBody"></div>
     <div class="ent-modal-f" id="agAgentFoot">
       <button type="button" class="quantum-btn quantum-btn-secondary" id="agAgentPing" aria-label="Diagnostics ping" data-i18n-aria="agents_diag_aria" data-i18n="agents_diag_ping">Diagnostics Ping</button>
+      <button type="button" class="quantum-btn quantum-btn-primary" id="agAgentUpdate" data-i18n="agents_update">Update Agent</button>
       <span class="u-flex u-gap-8">
         <button type="button" class="quantum-btn quantum-btn-danger" id="agAgentRevoke" aria-label="Revoke agent" data-i18n-aria="agents_revoke_aria" data-i18n="agents_revoke">Revoke</button>
         <button type="button" class="quantum-btn quantum-btn-ghost" id="agAgentClose" data-i18n="agents_close">Close</button>

@@ -8025,11 +8025,15 @@ function agentsRenderAgents() {
     box.innerHTML = agentsEmpty('No agents enrolled yet — create a token and run the command on the endpoint');
     return;
   }
+  const sel = agentSelGet();
+  const updBtn = $('agAgentsUpdateBtn');
+  if (updBtn) updBtn.hidden = sel.size === 0;
   box.innerHTML = _agAgents.map(a => {
     const caps = a.caps || [];
     const matrixCap = caps.includes('matrix');
     return '<div class="ag-card' + (a.status === 'revoked' ? ' ag-card-revoked' : '') + '" >' +
       '<div class="ag-card-head">' +
+        (a.status !== 'revoked' ? '<input type="checkbox" class="ag-sel" data-ag-sel="' + esc(a.id) + '" aria-label="' + esc(tr('', 'Select for update')) + '"' + (sel.has(a.id) ? ' checked' : '') + '>' : '') +
         '<span class="ag-dot ag-dot-' + esc(a.status || 'offline') + '" role="img" aria-label="' + esc(tr('', AG_STATUS_BADGE[a.status] ? AG_STATUS_BADGE[a.status][1] : 'Offline')) + '"></span>' +
         '<button type="button" class="ag-card-name" data-ag-open="' + esc(a.id) + '">' + esc(a.name || a.id) + '</button>' +
         agentBadge(AG_STATUS_BADGE, a.status) +
@@ -8081,6 +8085,46 @@ async function agentCommand(id, op, params, okTitle) {
   }
 }
 
+// ---- agent updates (M2) ----
+
+function agentSelGet() {
+  if (!window._agSel) window._agSel = new Set();
+  return window._agSel;
+}
+
+function agentUpdateOpen(ids) {
+  if (!ids.length) { toastWarn(tr('', 'Nothing selected'), ''); return; }
+  const names = ids.map(id => { const a = _agAgents.find(x => x.id === id); return (a && (a.name || a.id)) || id; });
+  $('agUpdateTargets').textContent = names.join(', ');
+  const vers = Array.from(new Set(_agAgents.filter(a => ids.includes(a.id)).map(a => a.version).filter(Boolean)));
+  $('agUpdateVersion').value = vers.length === 1 ? vers[0] : '';
+  $('agUpdateUrl').value = window._agLastUpdateUrl || '';
+  $('agUpdateStart').dataset.ids = JSON.stringify(ids);
+  modalShow($('agUpdateModal'), () => {});
+}
+
+async function agentUpdateStart() {
+  const ids = JSON.parse(($('agUpdateStart').dataset.ids) || '[]');
+  const version = $('agUpdateVersion').value.trim();
+  const url = $('agUpdateUrl').value.trim();
+  if (!ids.length || !version || !url) { toastErr(tr('', 'Update failed'), tr('', 'Version and artifact URL are required')); return; }
+  window._agLastUpdateUrl = url;
+  let okN = 0, fail = [];
+  for (const id of ids) {
+    try {
+      const res = await api('/api/agents/' + encodeURIComponent(id) + '/update', { version, url });
+      if (res && res.status === 'started') { okN++; continue; }
+      fail.push(((_agAgents.find(x => x.id === id) || {}).name || id) + ': ' + ((res && res.error) || tr('', 'refused')));
+    } catch (e) {
+      fail.push(((_agAgents.find(x => x.id === id) || {}).name || id) + ': ' + (e.message || e));
+    }
+  }
+  modalHide($('agUpdateModal'));
+  if (okN) toastOk(tr('', 'Update started'), okN + '/' + ids.length + ' — ' + tr('', 'progress appears in the agent detail'));
+  if (fail.length) toastErr(tr('', 'Some updates were refused'), fail.join(' | '));
+  agentsLoad();
+}
+
 // ---- agent detail drawer ----
 
 function agentHealthChip(h) {
@@ -8102,6 +8146,15 @@ function agentDetailRender(d) {
   const st = d.last_state || {};
   const rate = d.traffic_rate || {};
   let html = '';
+
+  // Live update progress (M2): phase badge + verdict.
+  const up = st.update_progress;
+  if (up) {
+    const phaseBadge = { requested: 'info', downloading: 'info', verifying: 'warn', swapped: 'warn', restarting: 'warn', completed: 'ok', failed: 'err' }[up.phase] || 'dim';
+    html += '<div class="ag-warn u-mt-8"><b>' + esc(tr('', 'Agent update')) + '</b>: <span class="badge ' + phaseBadge + '"><span class="dot"></span>' +
+      esc(tr('', up.phase)) + (up.version ? ' <bdi data-no-i18n>· ' + esc(up.version) + '</bdi>' : '') + '</span>' +
+      (up.error ? ' <span class="u-hint-12">' + esc(up.error) + '</span>' : '') + '</div>';
+  }
 
   // Matrix instances: role/service/iface/mesh IP/peer pings.
   html += '<p class="ent-sec-label">' + esc(tr('', 'Matrix instances')) + '</p>';
@@ -8204,6 +8257,10 @@ function agentDetailRender(d) {
   const revoked = d.revoked || d.status === 'revoked';
   $('agAgentRevoke').hidden = revoked;
   $('agAgentPing').hidden = false;
+  const agup = $('agAgentUpdate');
+  agup.hidden = revoked;
+  agup.dataset.agId = d.id;
+  agup.dataset.agName = d.name || d.id;
   $('agAgentPing').dataset.agId = d.id;
   $('agAgentRevoke').dataset.agId = d.id;
 }
@@ -8420,6 +8477,25 @@ async function agentTunnelDelete(id) {
   if (arevoke) arevoke.onclick = () => agentRevoke((arevoke.dataset || {}).agId);
   const aping = $('agAgentPing');
   if (aping) aping.onclick = agentDiagPing;
+  const aup = $('agAgentUpdate');
+  if (aup) aup.onclick = () => agentUpdateOpen([(aup.dataset || {}).agId].filter(Boolean));
+  const us = $('agUpdateStart');
+  if (us) us.onclick = agentUpdateStart;
+  const uc = $('agUpdateCancel');
+  if (uc) uc.onclick = () => modalHide($('agUpdateModal'));
+  const ux = $('agUpdateX');
+  if (ux) ux.onclick = () => modalHide($('agUpdateModal'));
+  const usel = $('agAgentsUpdateBtn');
+  if (usel) usel.onclick = () => agentUpdateOpen(Array.from(agentSelGet()));
+
+  document.addEventListener('change', e => {
+    const cb = e.target && e.target.matches && e.target.matches('.ag-sel');
+    if (!cb) return;
+    const sel = agentSelGet();
+    if (e.target.checked) sel.add(e.target.dataset.agSel); else sel.delete(e.target.dataset.agSel);
+    const updBtn = $('agAgentsUpdateBtn');
+    if (updBtn) updBtn.hidden = sel.size === 0;
+  });
 
   document.addEventListener('click', e => {
     const b = e.target.closest;
