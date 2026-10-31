@@ -77,6 +77,7 @@ var (
 type agentConn struct {
 	id        string
 	ws        *websocket.Conn
+	ip        string     // real client IP (X-Forwarded-For aware via ClientIP)
 	writeMu   sync.Mutex // one writer at a time (single-writer discipline)
 	closed    chan struct{}
 	closeOnce sync.Once
@@ -155,6 +156,7 @@ func handleAgentWS(w http.ResponseWriter, r *http.Request) {
 	conn := &agentConn{
 		id:      id,
 		ws:      ws,
+		ip:      ClientIP(r), // honors X-Forwarded-For from a trusted loopback proxy
 		closed:  make(chan struct{}),
 		pending: map[string]chan agentCommandResult{},
 	}
@@ -332,6 +334,9 @@ func (c *agentConn) applyHello(h *agentHello) {
 }
 
 func (c *agentConn) remoteIP() string {
+	if c.ip != "" {
+		return c.ip
+	}
 	addr := c.ws.RemoteAddr().String()
 	if host, _, err := net.SplitHostPort(addr); err == nil {
 		return host
