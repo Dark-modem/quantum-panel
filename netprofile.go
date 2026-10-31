@@ -454,6 +454,12 @@ func netRoleFor(r netRole) netRole {
 	if r != netRoleAuto {
 		return r
 	}
+	switch netInstallRoleOf() {
+	case netInstallAgent:
+		return netRoleAgent
+	case netInstallController:
+		return netRoleController
+	}
 	if _, err := netStat(agentStatePath()); err == nil {
 		return netRoleAgent
 	}

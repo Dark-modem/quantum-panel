@@ -157,6 +157,74 @@ func netIfaceFixtures() (map[string]string, map[string][]string, map[string]stri
 	return files, dirs, exec
 }
 
+// netApplyStubEnv installs the fixture env AND the apply machinery: owned
+// paths under the temp configDir, a sysctl -w/-p handler that mutates the
+// fixture map (so read-back verification is real), ring/rps handlers, and an
+// always-successful connectivity probe. Returns ringCur's pointer for the
+// ring assertions.
+func netApplyStubEnv(t *testing.T, files map[string]string, dirs map[string][]string, exec map[string]string) *string {
+	t.Helper()
+	oldSys, oldUnit := netOwnedSysctlFile, netOwnedUnitFile
+	netOwnedSysctlFile = filepath.Join(configDir, "sysctl.d", "99-quantum-netopt.conf")
+	netOwnedUnitFile = filepath.Join(configDir, "quantum-netopt-nic.service")
+	t.Cleanup(func() { netOwnedSysctlFile, netOwnedUnitFile = oldSys, oldUnit })
+	exec["systemctl daemon-reload"] = ""
+	exec["systemctl enable quantum-netopt-nic.service"] = ""
+	netTestEnv(t, files, dirs, exec)
+	ringCur := "512"
+	realExec := netDetectExec
+	netDetectExec = func(ctx context.Context, name string, args ...string) ([]byte, error) {
+		switch {
+		case name == "sysctl" && len(args) >= 2 && args[0] == "-w":
+			kv := strings.SplitN(args[1], "=", 2)
+			if len(kv) == 2 {
+				key := strings.TrimSpace(kv[0])
+				val := strings.Trim(kv[1], `"`)
+				files[netSysctlPath(key)] = val + "\n"
+				return []byte(""), nil
+			}
+		case name == "ethtool" && len(args) >= 4 && args[0] == "-G":
+			ringCur = args[3]
+			return []byte(""), nil
+		case name == "ethtool" && len(args) == 2 && args[0] == "-g":
+			return []byte("Pre-set maximums:\nRX: 8192\nTX: 8192\nCurrent hardware settings:\nRX: " + ringCur + "\nTX: " + ringCur + "\n"), nil
+		case name == "sysctl" && len(args) >= 2 && args[0] == "-p":
+			b, rerr := os.ReadFile(args[1])
+			if rerr != nil {
+				return nil, rerr
+			}
+			for _, line := range strings.Split(string(b), "\n") {
+				line = strings.TrimSpace(line)
+				if line == "" || strings.HasPrefix(line, "#") {
+					continue
+				}
+				kv := strings.SplitN(line, "=", 2)
+				if len(kv) == 2 {
+					files[netSysctlPath(strings.TrimSpace(kv[0]))] = strings.TrimSpace(kv[1]) + "\n"
+				}
+			}
+			return []byte(""), nil
+		case name == "bash" && len(args) == 2 && args[0] == "-c":
+			for _, part := range strings.Split(args[1], " && ") {
+				if val, path, err := parseEchoRedirect(part); err == nil {
+					files[path] = val + "\n"
+				}
+			}
+			return []byte(""), nil
+		}
+		return realExec(ctx, name, args...)
+	}
+	netProbeDial = func(network, addr string, timeout time.Duration) (net.Conn, error) {
+		return nil, nil
+	}
+	t.Cleanup(func() {
+		netProbeDial = func(network, addr string, timeout time.Duration) (net.Conn, error) {
+			return dialFn(network, addr, timeout)
+		}
+	})
+	return &ringCur
+}
+
 func TestNetDetectHardwareMeasuresWithoutGuessing(t *testing.T) {
 	files, dirs, exec := netIfaceFixtures()
 	netTestEnv(t, files, dirs, exec)
