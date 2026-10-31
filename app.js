@@ -8067,6 +8067,8 @@ function agentsRenderAgents() {
   const sel = agentSelGet();
   const updBtn = $('agAgentsUpdateBtn');
   if (updBtn) updBtn.hidden = sel.size === 0;
+  opsAgentOptions('fwAgentSel');
+  opsAgentOptions('noAgentSel');
   box.innerHTML = _agAgents.map(a => {
     const caps = a.caps || [];
     const matrixCap = caps.includes('matrix');
@@ -8339,7 +8341,83 @@ async function agentDiagPing() {
   if (res && res.output) showActOut(tr('', 'Diagnostics Ping'), res.output);
 }
 
+// ---- typed ops: firewall/port + netopt tabs (real agent results) ----
+
+function opsAgentOptions(sel) {
+  const el = $(sel); if (!el) return;
+  const prev = el.value;
+  el.innerHTML = _agAgents.filter(a => a.status !== 'revoked')
+    .map(a => '<option value="' + esc(a.id) + '"' + (a.id === prev ? ' selected' : '') + '>' + esc((a.name || a.id) + ' (' + (a.arch || '?') + ')') + '</option>').join('');
+}
+
+async function opsRun(selId, op, payload, confirm) {
+  const body = { op, payload: payload || {} };
+  if (confirm) body.confirm = true;
+  return api('/api/agents/' + encodeURIComponent(selId) + '/op', body);
+}
+
+function opsRenderJSON(elId, obj) {
+  const el = $(elId); if (!el) return;
+  if (obj == null) { el.textContent = '—'; return; }
+  try { el.textContent = JSON.stringify(obj, null, 1); } catch (e) { el.textContent = String(obj); }
+}
+
+async function fwDetect() {
+  const id = ($('fwAgentSel') || {}).value; if (!id) return;
+  const out = $('fwOut'); if (out) out.textContent = '…';
+  try { const r = await opsRun(id, agentCmdFwDetect); opsRenderJSON('fwOut', r.ok ? r.result : { error: r.error }); }
+  catch (e) { opsRenderJSON('fwOut', { error: e.message || String(e) }); }
+}
+async function fwPorts() {
+  const id = ($('fwAgentSel') || {}).value; if (!id) return;
+  const out = $('fwPorts'); if (out) out.textContent = '…';
+  try {
+    const r = await opsRun(id, agentCmdPortList);
+    const res = r.ok ? r.result : { error: r.error };
+    const rows = (res && res.listeners) || res && res.ports || res;
+    if (Array.isArray(rows)) {
+      opsRenderJSON('fwPorts', rows.map(l => (l.proto || '?').toUpperCase().padEnd(4) + String(l.port).padStart(5) + '  ' + (l.addr || '') + (l.proc ? '  ' + l.proc : '')).join(' | ') || '(none)');
+    } else opsRenderJSON('fwPorts', res);
+  } catch (e) { opsRenderJSON('fwPorts', { error: e.message || String(e) }); }
+}
+async function noDetect() {
+  const id = ($('noAgentSel') || {}).value; if (!id) return;
+  const out = $('noOut'); if (out) out.textContent = '…';
+  try { const r = await opsRun(id, agentCmdNetDetect); opsRenderJSON('noOut', r.ok ? r.result : { error: r.error }); }
+  catch (e) { opsRenderJSON('noOut', { error: e.message || String(e) }); }
+}
+async function noStatus() {
+  const id = ($('noAgentSel') || {}).value; if (!id) return;
+  const out = $('noStatus'); if (out) out.textContent = '…';
+  try { const r = await opsRun(id, agentCmdNetStatus); opsRenderJSON('noStatus', r.ok ? r.result : { error: r.error }); }
+  catch (e) { opsRenderJSON('noStatus', { error: e.message || String(e) }); }
+}
+
 // ---- agent Matrix tunnels ----
+
+// Signature detail (UnsloP direction): the Hub——Node route drawn as one
+// instrument line, colored by the tunnel's real health. Data comes from the
+// orchestrator's health view — latency, jitter, loss and state feed the
+// segment color and the label; nothing is animated for its own sake.
+function agentRouteHealth(t) {
+  const h = t.health || {};
+  const q = h.quality || 'down';
+  const color = { good: 'var(--ok)', fair: 'var(--wr)', poor: 'var(--er)', down: 'var(--er)' }[q] || 'var(--mu)';
+  const label = { good: 'Route healthy', fair: 'Route fair', poor: 'Route degraded', down: 'Route down' }[q] || q;
+  const bits = [];
+  if (h.latency_ms != null) bits.push(Math.round(h.latency_ms) + ' ms');
+  if (h.jitter_ms != null) bits.push('±' + h.jitter_ms.toFixed(1) + ' ms');
+  if (h.loss_pct != null) bits.push(h.loss_pct.toFixed(1) + '%');
+  const hubName = (t.hub && (t.hub.agent_name || t.hub.agent_id)) || 'HUB';
+  const nodeName = (t.node && (t.node.agent_name || t.node.agent_id)) || 'NODE';
+  return '<div class="route-viz" role="img" aria-label="' + esc(tr('', label) + ' — ' + hubName + ' to ' + nodeName + (bits.length ? ', ' + bits.join(', ') : '')) + '">' +
+    '<span class="rv-end"><bdi data-no-i18n>' + esc(hubName) + '</bdi><i class="rv-node" style="background:' + color + '"></i></span>' +
+    '<span class="rv-line"><i class="rv-pulse" style="background:' + color + '"></i></span>' +
+    '<span class="rv-end"><i class="rv-node" style="background:' + color + '"></i><bdi data-no-i18n>' + esc(nodeName) + '</bdi></span>' +
+    '<span class="rv-meta" dir="ltr">' + esc(bits.join(' · ')) + '</span>' +
+    '<span class="badge ' + (q === 'good' ? 'ok' : q === 'down' ? 'err' : 'warn') + '"><span class="dot"></span>' + esc(tr('', label)) + '</span>' +
+  '</div>';
+}
 
 function agentsRenderTunnels() {
   const box = $('agTunnelsList');
@@ -8364,6 +8442,7 @@ function agentsRenderTunnels() {
         '<span class="badge ' + badge.cls + '"' + err + '><span class="dot"></span>' + esc(badge.label) + '</span>' +
         '<span class="badge dim u-mono" data-no-i18n>' + esc(t.instance || '') + '</span>' +
         '<span class="u-ml-auto ag-tunnel-eps"><span class="u-hint-12">HUB</span> ' + endpointDot(t.hub) + ' · <span class="u-hint-12">NODE</span> ' + endpointDot(t.node) + '</span>' +
+        agentRouteHealth(t) +
       '</div>' +
       '<div class="ag-card-foot ag-tunnel-foot">' +
         '<span>' + health + '</span>' +
@@ -8526,6 +8605,8 @@ async function agentTunnelDelete(id) {
   if (ux) ux.onclick = () => modalHide($('agUpdateModal'));
   const usel = $('agAgentsUpdateBtn');
   if (usel) usel.onclick = () => agentUpdateOpen(Array.from(agentSelGet()));
+  const fwb = $('fwDetectBtn'); if (fwb) fwb.onclick = () => { fwDetect(); fwPorts(); };
+  const nob = $('noDetectBtn'); if (nob) nob.onclick = () => { noDetect(); noStatus(); };
 
   document.addEventListener('change', e => {
     const cb = e.target && e.target.matches && e.target.matches('.ag-sel');
@@ -9007,6 +9088,7 @@ async function refreshRightSidebarLogs() {
     const lines = (s.lines || (s.logs ? s.logs.trim().split('\n') : [])).filter(l => l && !/^-- /.test(l));
     const up = $('rsUpdated');
     if (up) { const d = new Date(); up.textContent = tr('rs_updated', 'Updated') + ' ' + [d.getHours(), d.getMinutes(), d.getSeconds()].map(n => String(n).padStart(2, '0')).join(':'); }
+    const retryEl = document.getElementById('rsRetry'); if (retryEl) retryEl.remove();
     const sig = lines.join('\n');
     if (sig === rsState.sig && rs.querySelector('.rs-ev, .ent-empty')) return true;
     rsState.sig = sig;
@@ -9014,8 +9096,20 @@ async function refreshRightSidebarLogs() {
     rsDraw();
     return true;
   } catch(e) {
-    reportErr('rslogs', e);
-    if (rs && !rs.querySelector('.rs-ev')) rs.innerHTML = stateError(e.message, 'rslogs', true);
+    // Soft error: keep last-good events and show a quiet retry line; a hard
+    // error card only replaces an empty stream. Transient 401s after a
+    // controller restart must not wipe the panel.
+    if (rs && rsState.events.length) {
+      if (!document.getElementById('rsRetry')) {
+        const d = document.createElement('div');
+        d.id = 'rsRetry'; d.className = 'u-hint-12'; d.dir = 'auto';
+        d.textContent = tr('rs_retrying', 'Connection interrupted — retrying…');
+        rs.prepend(d);
+      }
+    } else {
+      reportErr('rslogs', e);
+      if (rs && !rs.querySelector('.rs-ev')) rs.innerHTML = stateError(e.message, 'rslogs', true);
+    }
     return false;
   }
 }
@@ -9059,10 +9153,10 @@ const ACCENTS = [
   ['blue', 'hsl(217 91% 60%)'], ['indigo', 'hsl(243 75% 62%)'], ['violet', 'hsl(265 83% 60%)'], ['rose', 'hsl(341 75% 50%)'],
   ['emerald', 'hsl(160 84% 36%)'], ['teal', 'hsl(178 80% 34%)'], ['orange', 'hsl(22 90% 46%)'],
 ];
-function accCurrent() { return document.documentElement.dataset.acc || 'blue'; }
+function accCurrent() { return document.documentElement.dataset.acc || 'teal'; }
 function accSet(name) {
   if (name === 'blue') delete document.documentElement.dataset.acc; else document.documentElement.dataset.acc = name;
-  try { if (name === 'blue') localStorage.removeItem('quantum_accent'); else localStorage.setItem('quantum_accent', name); } catch (e) { /* storage blocked: choice lasts this session */ }
+  try { if (name === 'teal') localStorage.removeItem('quantum_accent'); else localStorage.setItem('quantum_accent', name); } catch (e) { /* storage blocked: choice lasts this session */ }
   accRender();
   try { if (typeof refreshDash === 'function') refreshDash(); } catch (e) { /* dashboard repaints on its next poll */ }
 }

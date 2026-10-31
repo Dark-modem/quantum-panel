@@ -1286,7 +1286,7 @@
 </style>
 
 </head>
-<body data-t="dark">
+<body data-t="dark" data-acc="teal">
 <svg width="0" height="0" class="u-abs" aria-hidden="true">
   <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></symbol>
   <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
@@ -3341,22 +3341,28 @@
         <div class="tunnel-card">
           <div class="tc-header"><p class="tc-title" data-i18n="fw_title">Firewall &amp; Ports</p><span class="badge warn"><span class="dot"></span><span data-i18n="planned_badge">Planned — engine integrated, UI pending</span></span></div>
           <p class="qs-hint" data-i18n="fw_hint">The Session 1 engine is integrated in this build: multi-backend detection (active UFW, owned-chain iptables, native nftables refused), snapshot → plan → apply with revert, and the controller port-ownership registry. The graphical port manager and the typed Agent firewall operations are the next milestone — until then this section intentionally shows no simulated data.</p>
-          <div class="sys-grid">
-            <div class="sys-item"><div class="sys-k" data-i18n="fw_engine">Engine</div><div class="kpi-sub">panel/firewall.go + portregistry.go (integrated, tested)</div></div>
-            <div class="sys-item"><div class="sys-k" data-i18n="fw_cli">Inspect today (CLI, on a server)</div><div class="kpi-sub u-mono">ss -tulnp · iptables-save | grep quantum</div></div>
-            <div class="sys-item"><div class="sys-k" data-i18n="fw_docs">Design</div><div class="kpi-sub">docs/FIREWALL-PORTS.md</div></div>
+          <div class="dr"><span class="k" data-i18n="ops_agent">Agent</span>
+            <select id="fwAgentSel" class="quantum-input" aria-label="Agent"></select>
+            <button type="button" class="quantum-btn quantum-btn-secondary" id="fwDetectBtn" data-i18n="ops_detect">Detect backend</button>
           </div>
+          <div id="fwOut" class="ops-out u-mono" dir="ltr" aria-live="polite"></div>
+          <div class="dr"><span class="k" data-i18n="ops_ports">Listening ports (from the agent)</span></div>
+          <div id="fwPorts" class="ops-out u-mono" dir="ltr" aria-live="polite"></div>
+          <p class="qs-hint" data-i18n="fw_apply_hint">Plan and apply are available for Quantum-owned changes; the agent refuses mutations without an explicit confirmation step and records every operation in the audit log.</p>
         </div>
       </section>
       <section id="tab-netopt" role="tabpanel" hidden>
         <div class="tunnel-card">
           <div class="tc-header"><p class="tc-title" data-i18n="netopt_title">Network Optimization</p><span class="badge warn"><span class="dot"></span><span data-i18n="planned_badge">Planned — engine integrated, UI pending</span></span></div>
           <p class="qs-hint" data-i18n="netopt_hint">The Session 2 engine is integrated: hardware detection that refuses aggressive profiles over unreadable facts, conservative/balanced/performance plans, owned sysctl files, an apply journal with rollback, and the real-pair measurement harness in tests/netopt. The HTTP API and per-Agent desired-state operations are the next milestone — until then no values are invented here.</p>
-          <div class="sys-grid">
-            <div class="sys-item"><div class="sys-k" data-i18n="netopt_cli">Available today (CLI, on a server)</div><div class="kpi-sub u-mono">gre-panel netopt detect · plan · apply · status · rollback</div></div>
-            <div class="sys-item"><div class="sys-k" data-i18n="netopt_profiles">Profiles</div><div class="kpi-sub" data-i18n="netopt_profiles_v">conservative · balanced · performance (per-node, support-checked)</div></div>
-            <div class="sys-item"><div class="sys-k" data-i18n="netopt_docs">Design + acceptance</div><div class="kpi-sub">docs/NETOPT-INVENTORY.md · docs/NETOPT-ACCEPTANCE-FA.md</div></div>
+          <div class="dr"><span class="k" data-i18n="ops_agent">Agent</span>
+            <select id="noAgentSel" class="quantum-input" aria-label="Agent"></select>
+            <button type="button" class="quantum-btn quantum-btn-secondary" id="noDetectBtn" data-i18n="ops_detect">Detect hardware</button>
           </div>
+          <div id="noOut" class="ops-out u-mono" dir="ltr" aria-live="polite"></div>
+          <div class="dr"><span class="k" data-i18n="netopt_status">Tuning status on the agent</span></div>
+          <div id="noStatus" class="ops-out u-mono" dir="ltr" aria-live="polite"></div>
+          <p class="qs-hint" data-i18n="netopt_apply_hint">Apply/rollback run only with an explicit confirmation step and a justify string; profiles are chosen per node after hardware detection. No values on this page are simulated.</p>
         </div>
       </section>
       <section id="tab-settings" role="tabpanel" hidden>
