@@ -140,15 +140,13 @@ func agentUpdatePrepareFor(agentID, version, url string) (agentCommandResult, er
 	if err != nil {
 		return agentCommandResult{}, errors.New("signature fetch failed: " + err.Error())
 	}
-	req := agentUpdateRequest{Version: version, URL: url, Signature: sig}
+	// The digest is computed from the downloaded artifact: the signature IS
+	// the approval gate here, and the digest gives the agent an independent
+	// transport-integrity check on its own download.
+	req := agentUpdateRequest{Version: version, URL: url, Signature: sig, SHA256Hex: sha256HexBytes(artifact)}
 	if err := agentUpdateVerifyArtifact(artifact, req); err != nil {
-		// sha256 comes from the artifact itself after signature verification:
-		// the signature IS the approval; the digest is computed here so the
-		// agent can re-check transport integrity independently.
 		return agentCommandResult{}, err
 	}
-	sum := sha256HexBytes(artifact)
-	req.SHA256Hex = sum
 
 	res, err := agentHubCommand(agentID, agentCmdAgentUpdate, map[string]string{
 		"version":   req.Version,
