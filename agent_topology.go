@@ -491,7 +491,15 @@ func agentTunnelProvision(tunnelID string) {
 	agentTunnelsMu.Unlock()
 
 	job.HubMainHost = hubMainHost
-	bundle, err := agentTunnelNodeBundle(&job, hubAddr, meshPort, agentNewRevision())
+	if job.HubRevision == "" {
+		fail("node", "hub revision missing from the tunnel record; cannot build the node bundle")
+		return
+	}
+	// The bundle's Revision must equal what the hub stored in its matrix
+	// state (the hub-desired revision, persisted on the record so a resumed
+	// pipeline rebuilds the identical bundle): matrixRegisterHub refuses a
+	// node whose revision differs — a fresh revision here guaranteed a 409.
+	bundle, err := agentTunnelNodeBundle(&job, hubAddr, meshPort, job.HubRevision)
 	if err != nil {
 		fail("node", err.Error())
 		return
