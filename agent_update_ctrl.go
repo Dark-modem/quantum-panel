@@ -8,6 +8,7 @@ package main
 // No shell execution anywhere in this flow.
 
 import (
+	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
@@ -43,8 +44,13 @@ func agentUpdateSignature(url string) (string, error) {
 		return "", err
 	}
 	sig := strings.TrimSpace(string(b))
+	// Accept both the documented base64 form and a raw 64-byte ed25519
+	// signature (what openssl pkeyutl writes by default).
+	if len(b) == ed25519.SignatureSize {
+		return base64.StdEncoding.EncodeToString(b), nil
+	}
 	if _, err := base64.StdEncoding.DecodeString(sig); err != nil {
-		return "", errors.New("signature file is not base64")
+		return "", errors.New("signature file is neither raw 64 bytes nor base64")
 	}
 	return sig, nil
 }
