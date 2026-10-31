@@ -711,6 +711,7 @@ func main() {
 	mux.HandleFunc("POST "+base+"/api/agents/{id}/command", requireAuth(requireCSRF(handleAgentCommandPost)))
 	mux.HandleFunc("POST "+base+"/api/agents/{id}/desired", requireAuth(requireCSRF(handleAgentDesiredPost)))
 	mux.HandleFunc("POST "+base+"/api/agents/{id}/update", requireAuth(requireCSRF(handleAgentUpdatePost)))
+	mux.HandleFunc("POST "+base+"/api/agents/{id}/op", requireAuth(requireCSRF(handleAgentOpPost)))
 	// Agent artifact delivery: integrity is enforced by the mandatory
 	// ed25519 signature + digest on both controller and agent, not by
 	// transport auth (release binaries are public artifacts).

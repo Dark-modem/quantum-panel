@@ -365,6 +365,27 @@ func agentRunCommand(cmd agentCommand) agentCommandResult {
 	if p == nil {
 		p = map[string]string{}
 	}
+	// Typed firewall/port (Session 1) and netopt (Session 2) operations:
+	// dispatched to their delivered handlers with a confirm gate for
+	// mutations and an audit entry on both sides.
+	if strings.HasPrefix(cmd.Op, "firewall.") || strings.HasPrefix(cmd.Op, "port.") || strings.HasPrefix(cmd.Op, "netopt.") {
+		out, err := agentRunTypedOp(cmd.Op, p)
+		if err != nil {
+			res.Error = err.Error()
+			return res
+		}
+		b, err := json.Marshal(out)
+		if err != nil {
+			res.Error = "result encode: " + err.Error()
+			return res
+		}
+		if agentMutatingOps[cmd.Op] {
+			LogSecurityAudit("agent_typed_op", "agent", "local", "op="+cmd.Op+" confirm=yes")
+		}
+		res.OK = true
+		res.Output = string(b)
+		return res
+	}
 	switch cmd.Op {
 	case agentCmdMatrixRestart, agentCmdMatrixStart, agentCmdMatrixStop:
 		return agentRunMatrixPower(cmd.Op, p, res)

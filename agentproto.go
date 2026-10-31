@@ -76,6 +76,24 @@ const (
 	agentCmdMatrixRegister = "matrix.register" // hub side: pair a node host file
 	agentCmdDiagPing       = "diag.ping"
 	agentCmdAgentUpdate    = "agent.update" // self-update from a signed artifact
+
+	// Typed firewall/port operations (Session 1 handlers) and network
+	// optimization operations (Session 2 handlers). Params carry one JSON
+	// "payload" field per op; results return as JSON in Output. Mutating
+	// ops additionally require payload.confirm == "yes".
+	agentCmdFwDetect   = "firewall.detect"
+	agentCmdFwSnapshot = "firewall.snapshot"
+	agentCmdFwPlan     = "firewall.plan"
+	agentCmdFwApply    = "firewall.apply"
+	agentCmdFwTeardown = "firewall.teardown"
+	agentCmdPortCheck  = "port.check"
+	agentCmdPortList   = "port.list"
+	agentCmdNetDetect  = "netopt.detect"
+	agentCmdNetPlan    = "netopt.plan"
+	agentCmdNetApply   = "netopt.apply"
+	agentCmdNetStatus  = "netopt.status"
+	agentCmdNetRB      = "netopt.rollback"
+	agentCmdNetRevert  = "netopt.revert"
 )
 
 // agentValidCommands is the complete remote-operation allowlist.
@@ -86,6 +104,29 @@ var agentValidCommands = map[string]bool{
 	agentCmdMatrixRegister: true,
 	agentCmdDiagPing:       true,
 	agentCmdAgentUpdate:    true,
+	agentCmdFwDetect:       true,
+	agentCmdFwSnapshot:     true,
+	agentCmdFwPlan:         true,
+	agentCmdFwApply:        true,
+	agentCmdFwTeardown:     true,
+	agentCmdPortCheck:      true,
+	agentCmdPortList:       true,
+	agentCmdNetDetect:      true,
+	agentCmdNetPlan:        true,
+	agentCmdNetApply:       true,
+	agentCmdNetStatus:      true,
+	agentCmdNetRB:          true,
+	agentCmdNetRevert:      true,
+}
+
+// agentMutatingOps require payload.confirm == "yes" on the agent and are
+// audit-logged on both sides.
+var agentMutatingOps = map[string]bool{
+	agentCmdFwApply:    true,
+	agentCmdFwTeardown: true,
+	agentCmdNetApply:   true,
+	agentCmdNetRB:      true,
+	agentCmdNetRevert:  true,
 }
 
 // agentEnvelope wraps every message in both directions.

@@ -222,3 +222,59 @@ func TestAgentUpdateBootRollback(t *testing.T) {
 		t.Fatal("rollback must run exactly once")
 	}
 }
+
+// Typed ops (firewall/port/netopt): allowlist + confirm gate at the
+// controller proxy, using the real handlers with stubbed exec.
+func TestAgentTypedOpDispatch(t *testing.T) {
+	agentLab(t)
+	// fw.detect through the dispatcher.
+	res := agentRunCommand(agentCommand{ID: "t1", Op: agentCmdFwDetect})
+	if !res.OK || !strings.Contains(res.Output, "backend") {
+		t.Fatalf("fw.detect: %+v (%s)", res, res.Output)
+	}
+	// port.list through the dispatcher.
+	res = agentRunCommand(agentCommand{ID: "t2", Op: agentCmdPortList})
+	if !res.OK || res.Output == "" {
+		t.Fatalf("port.list: %+v", res)
+	}
+	// Mutating op without confirm must be refused before any exec.
+	var rec agentExecRecorder
+	rec.wrap(t, nil)
+	res = agentRunCommand(agentCommand{ID: "t3", Op: agentCmdFwApply, Params: map[string]string{"payload": `{"owner":"tunnel:x","add":[{"proto":"tcp","port":8443,"name":"test"}]}`}})
+	if res.OK || !strings.Contains(res.Error, "confirm=yes") {
+		t.Fatalf("apply without confirm must be refused: %+v", res)
+	}
+	if rec.count() != 0 {
+		t.Fatalf("refused mutation reached exec: %v", rec.all())
+	}
+	// Unknown typed op refused.
+	res = agentRunCommand(agentCommand{ID: "t4", Op: "firewall.nuke", Params: map[string]string{"payload": "{}"}})
+	if res.OK || !strings.Contains(res.Error, "not allowed") {
+		t.Fatalf("unknown typed op: %+v", res)
+	}
+}
+
+func TestAgentOpPostConfirmGate(t *testing.T) {
+	withTempConfig(t)
+	srv := agentHubTestServer(t)
+	id, key := agentHubEnrollAgent(t, srv, []string{agentCapMatrix})
+	_ = agentHubHandshakeCaps(t, srv.URL, id, key, []string{agentCapMatrix})
+
+	post := func(body string) (int, string) {
+		rr := httptest.NewRecorder()
+		req := httptest.NewRequest("POST", "/api/agents/"+id+"/op", strings.NewReader(body))
+		// The handler expects the path value; wrap through the same mux shape.
+		handleAgentOpPost(rr, req)
+		return rr.Code, rr.Body.String()
+	}
+	// Mutating without confirm → 428 precondition.
+	code, body := post(`{"op":"` + agentCmdFwApply + `","payload":{"owner":"tunnel:test","add":[{"proto":"tcp","port":8080,"name":"t"}]}}`)
+	if code != http.StatusPreconditionRequired {
+		t.Fatalf("mutation without confirm must 428, got %d: %s", code, body)
+	}
+	// Unknown op → 400.
+	code, _ = post(`{"op":"firewall.nuke"}`)
+	if code != http.StatusBadRequest {
+		t.Fatalf("unknown op must 400, got %d", code)
+	}
+}
