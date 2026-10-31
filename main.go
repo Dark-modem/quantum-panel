@@ -557,6 +557,11 @@ func main() {
 			// Headless endpoint agent: own runtime, never touches the
 			// panel's listeners, registry or background workers.
 			os.Exit(agentCmd(os.Args[2:]))
+		case "netopt":
+			// Network Optimization subsystem (Session 2): measure, plan,
+			// apply/rollback owned tuning. See docs/NETOPT-INVENTORY.md.
+			// Never touches SSH, firewall or ports (Sessions 1/6 own them).
+			os.Exit(cliNetOpt(os.Args[2:]))
 		}
 	}
 	if v := os.Getenv("GRE_PANEL_DIR"); v != "" {
