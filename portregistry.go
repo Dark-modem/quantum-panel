@@ -311,12 +311,14 @@ func portReleaseOwner(ownerKind, ownerID string) (int, error) {
 	return n, portRegistrySave(s)
 }
 
-// portEntries returns all reservations sorted by port then proto.
+// portEntries returns all reservations sorted by port then proto. The
+// result is never nil (empty registries serialize as [] for the UI).
 func portEntries() []portEntry {
 	portRegMu.Lock()
 	defer portRegMu.Unlock()
 	s := portRegistryLoad()
-	out := append([]portEntry(nil), s.Entries...)
+	out := make([]portEntry, 0, len(s.Entries))
+	out = append(out, s.Entries...)
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Port != out[j].Port {
 			return out[i].Port < out[j].Port
@@ -407,7 +409,7 @@ func portReport(port int) map[string]any {
 // own daemons (panel, xray, frp, backhaul, tinc) legitimately listen on
 // their reserved ports and are not conflicts.
 func portConflicts() []map[string]any {
-	var out []map[string]any
+	out := []map[string]any{}
 	listeners, err := portListeners()
 	if err != nil {
 		return out

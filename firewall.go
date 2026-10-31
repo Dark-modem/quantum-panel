@@ -39,6 +39,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -96,8 +97,11 @@ func (r fwPortRule) validate() error {
 	if r.Family != "ipv4" && r.Family != "ipv6" && r.Family != "both" {
 		return fmt.Errorf("family must be ipv4, ipv6 or both, got %q", r.Family)
 	}
-	if strings.TrimSpace(r.Owner) == "" || strings.Contains(r.Owner, "\"") || strings.Contains(r.Owner, "'") {
-		return fmt.Errorf("owner must be a non-empty string without quotes")
+	if strings.TrimSpace(r.Owner) == "" || strings.ContainsAny(r.Owner, "\"' \t") {
+		// Whitespace is forbidden too: the owner becomes an iptables
+		// comment token, and the normalized -S line is re-tokenized for
+		// exact deletes.
+		return fmt.Errorf("owner must be a non-empty string without quotes or whitespace")
 	}
 	return nil
 }
@@ -263,8 +267,12 @@ func fwUfwCmds(op fwOp) ([][]string, [][]string) {
 		[][]string{{"ufw", "allow", spec, "comment", comment}}
 }
 
-// fwIptablesSpec is the exact rule spec (without the -A/-D and chain) —
-// the same text `iptables -S` prints, so deletes match precisely.
+// fwIptablesSpec is the rule spec the engine appends (without the -A/-D
+// and chain). NOTE: `iptables -S` normalizes rules (adds implicit `-m
+// tcp`, quotes the comment) and — on the nft compatibility layer — a
+// missing chain makes `-S <chain>` exit 0 with EMPTY output. Therefore
+// presence checks match on tokens (fwIptablesMatchLines), never on exact
+// text, and removes delete the REAL normalized line from -S.
 func fwIptablesSpec(r fwPortRule) string {
 	return fmt.Sprintf("-p %s --dport %d -m comment --comment %s -j ACCEPT", r.Proto, r.Port, fwRuleComment(r))
 }
@@ -281,31 +289,51 @@ func fwIptablesFamilies(r fwPortRule) []string {
 	}
 }
 
-// fwIptablesPresent checks whether the exact rule already exists.
-func fwIptablesPresent(tool, spec string) bool {
+// fwIptablesMatchLines returns the live `-S fwChain` lines (normalized
+// form) that belong to one rule: same proto, same dport, same owner
+// comment. Quote characters are stripped on both sides because iptables
+// quotes comments in -S output.
+func fwIptablesMatchLines(tool string, r fwPortRule) ([]string, error) {
 	out, err := fwRun(tool, "-S", fwChain)
 	if err != nil {
-		return false
+		// A missing chain also lands here on legacy iptables; treat as
+		// "no rules yet".
+		return nil, nil
 	}
-	want := "-A " + fwChain + " " + spec
+	var lines []string
 	for _, line := range strings.Split(out, "\n") {
-		if strings.TrimSpace(line) == want {
-			return true
+		line = strings.TrimSpace(strings.ReplaceAll(line, "\"", ""))
+		if !strings.HasPrefix(line, "-A "+fwChain+" ") {
+			continue
+		}
+		if strings.Contains(line, "-p "+r.Proto+" ") &&
+			strings.Contains(line, fmt.Sprintf("--dport %d ", r.Port)) &&
+			strings.Contains(line, "--comment "+fwRuleComment(r)+" ") {
+			lines = append(lines, line)
 		}
 	}
-	return false
+	return lines, nil
+}
+
+// fwIptablesPresent checks whether the rule already exists (token match —
+// see fwIptablesMatchLines for why exact text cannot work).
+func fwIptablesPresent(tool string, r fwPortRule) bool {
+	lines, _ := fwIptablesMatchLines(tool, r)
+	return len(lines) > 0
 }
 
 // fwEnsureIptablesChain creates the Quantum chain and its INPUT jump once.
 // Both steps are idempotent and neither is part of plan rollback (the
 // chain is reusable infrastructure, not a per-rule change).
 func fwEnsureIptablesChain(tool string) error {
-	if _, err := fwRun(tool, "-S", fwChain); err != nil {
-		if _, err := fwRun(tool, "-N", fwChain); err != nil {
-			return fmt.Errorf("cannot create chain %s: %v", fwChain, err)
-		}
+	// `-S <chain>` cannot be trusted for existence (nft-compat exits 0 on
+	// a missing chain): create the chain unconditionally and tolerate the
+	// "already exists" answer.
+	out, err := fwRun(tool, "-N", fwChain)
+	if err != nil && !strings.Contains(strings.ToLower(out), "already exist") {
+		return fmt.Errorf("cannot create chain %s: %v", fwChain, err)
 	}
-	out, err := fwRun(tool, "-S", "INPUT")
+	out, err = fwRun(tool, "-S", "INPUT")
 	if err != nil {
 		return fmt.Errorf("cannot read INPUT rules: %v", err)
 	}
@@ -318,27 +346,49 @@ func fwEnsureIptablesChain(tool string) error {
 	return nil
 }
 
+// fwIptablesRuleArgv builds one iptables command as PROPER argv elements
+// (a whole rule must never travel as a single argument — iptables would
+// read "-p tcp --dport …" as one option value). action is "-A" or "-D".
+func fwIptablesRuleArgv(tool, action string, r fwPortRule) []string {
+	return []string{
+		tool, action, fwChain,
+		"-p", r.Proto, "--dport", strconv.Itoa(r.Port),
+		"-m", "comment", "--comment", fwRuleComment(r),
+		"-j", "ACCEPT",
+	}
+}
+
 // fwIptablesCmds builds the argv list for one op (one per family), plus
-// the inverse commands for rollback.
-func fwIptablesCmds(op fwOp) ([][]string, [][]string, error) {
+// the inverse commands for rollback. Removes target the REAL normalized
+// -S lines (tokenized), so a delete can never touch a different rule. In
+// dry-run the chain-creation step is skipped entirely: a plan must never
+// touch the host.
+func fwIptablesCmds(op fwOp, dry bool) ([][]string, [][]string, error) {
 	var cmds, undo [][]string
 	for _, tool := range fwIptablesFamilies(op.Rule) {
-		spec := fwIptablesSpec(op.Rule)
 		if op.Kind == "add" {
-			if fwIptablesPresent(tool, spec) {
+			if fwIptablesPresent(tool, op.Rule) {
 				continue // idempotent no-op
 			}
-			if err := fwEnsureIptablesChain(tool); err != nil {
+			if !dry {
+				if err := fwEnsureIptablesChain(tool); err != nil {
+					return nil, nil, err
+				}
+			}
+			cmds = append(cmds, fwIptablesRuleArgv(tool, "-A", op.Rule))
+			undo = append(undo, fwIptablesRuleArgv(tool, "-D", op.Rule))
+		} else {
+			lines, err := fwIptablesMatchLines(tool, op.Rule)
+			if err != nil {
 				return nil, nil, err
 			}
-			cmds = append(cmds, []string{tool, "-A", fwChain, spec})
-			undo = append(undo, []string{tool, "-D", fwChain, spec})
-		} else {
-			if !fwIptablesPresent(tool, spec) {
+			if len(lines) == 0 {
 				continue // idempotent no-op
 			}
-			cmds = append(cmds, []string{tool, "-D", fwChain, spec})
-			undo = append(undo, []string{tool, "-A", fwChain, spec})
+			for _, line := range lines {
+				cmds = append(cmds, append([]string{tool, "-D", fwChain}, strings.Fields(strings.TrimPrefix(line, "-A "+fwChain+" "))...))
+				undo = append(undo, fwIptablesRuleArgv(tool, "-A", op.Rule))
+			}
 		}
 	}
 	return cmds, undo, nil
@@ -505,7 +555,7 @@ func fwApply(plan fwPlan) (fwApplyResult, error) {
 			}
 		case fwBackendIptables:
 			var err error
-			cmds, undo, err = fwIptablesCmds(op)
+			cmds, undo, err = fwIptablesCmds(op, plan.DryRun)
 			if err != nil {
 				rollback(err)
 				fwAuditAppend(res.auditEntry(before, nil))
