@@ -2848,7 +2848,6 @@ async function refreshControllerFleet() {
     const vers = {};
     agents.forEach(x => { if (x.version) vers[x.version] = (vers[x.version] || 0) + 1; });
     setSub('fleetAgentsSub', esc(agents.length ? (Object.keys(vers).map(v => v + ' ×' + vers[v]).join(' · ') + (revoked ? ' · ' + revoked + ' ' + tr('', 'revoked') : '')) : tr('', 'No agents enrolled yet')));
-    gauge('gAgents', 'fleetAgentsSub', agents.length ? Math.round(100 * online / agents.length) : null);
   } catch (e) { set('fleetAgents', '—'); }
   try {
     const t = await api('/api/agent-tunnels');
@@ -2857,7 +2856,6 @@ async function refreshControllerFleet() {
     const err = tunnels.filter(x => x.state === 'error').length;
     set('fleetTunnels', tunnels.length ? (active + '/' + tunnels.length) : '0');
     setSub('fleetTunnelsSub', esc(tunnels.length ? (err ? err + ' ' + tr('', 'in error') : tr('', 'all healthy')) : tr('', 'No agent tunnels yet')));
-    gauge('gTunnels', 'fleetTunnelsSub', tunnels.length ? Math.round(100 * active / tunnels.length) : null);
   } catch (e) { set('fleetTunnels', '—'); }
   try {
     const agents = ((await api('/api/agents')).agents) || [];
