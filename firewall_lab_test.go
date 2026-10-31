@@ -20,6 +20,16 @@ func fwLabEnabled() bool {
 	return os.Getenv("QUANTUM_FW_LAB") == "1" && os.Geteuid() == 0
 }
 
+// fwLabHostCommands opts into real host commands: the package TestMain
+// stubs the runner for hermetic unit tests, and a lab test must restore
+// the real executor exactly like cluster_lab_test.go does.
+func fwLabHostCommands(t *testing.T) {
+	t.Helper()
+	old := runner
+	runner = execRunner
+	t.Cleanup(func() { runner = old })
+}
+
 func fwLabHave(bin string) bool {
 	_, err := exec.LookPath(bin)
 	return err == nil
@@ -29,6 +39,7 @@ func TestFirewallLabIptablesLifecycle(t *testing.T) {
 	if !fwLabEnabled() {
 		t.Skip("lab only: run via tests/test_firewall_lab.sh")
 	}
+	fwLabHostCommands(t)
 	if fwLabHave("ufw") {
 		if out, err := fwRun("ufw", "status"); err == nil && strings.Contains(out, "Status: active") {
 			t.Skip("ufw is active in this namespace; the iptables lifecycle test would fight it")
@@ -120,6 +131,7 @@ func TestFirewallLabListenerConflicts(t *testing.T) {
 	if !fwLabEnabled() {
 		t.Skip("lab only: run via tests/test_firewall_lab.sh")
 	}
+	fwLabHostCommands(t)
 	dir := t.TempDir()
 	oldDir := configDir
 	configDir = dir
@@ -172,6 +184,7 @@ func TestFirewallLabNftReads(t *testing.T) {
 	if !fwLabEnabled() {
 		t.Skip("lab only: run via tests/test_firewall_lab.sh")
 	}
+	fwLabHostCommands(t)
 	if !fwLabHave("nft") {
 		t.Skip("nft missing")
 	}
@@ -197,6 +210,7 @@ func TestFirewallLabUfwDetection(t *testing.T) {
 	if !fwLabEnabled() {
 		t.Skip("lab only: run via tests/test_firewall_lab.sh")
 	}
+	fwLabHostCommands(t)
 	if !fwLabHave("ufw") {
 		t.Skip("ufw missing")
 	}
