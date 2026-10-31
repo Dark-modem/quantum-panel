@@ -531,7 +531,7 @@ func main() {
 			fmt.Println(panelVersion)
 			return
 		case "--help", "-h", "help":
-			fmt.Println("Usage: gre-panel [password <new-password> | info | version | tls [status|issue|renew|remove|ip|custom] | settings [show|2fa off|terminal on|off|idle N] | doctor [check|fix] | tls-proxy | pathtest | cluster [status|pool|member|join-code|add-hub|events|rules|reset]]")
+			fmt.Println("Usage: gre-panel [password <new-password> | info | version | tls [status|issue|renew|remove|ip|custom] | settings [show|2fa off|terminal on|off|idle N] | doctor [check|fix] | tls-proxy | pathtest | cluster [status|pool|member|join-code|add-hub|events|rules|reset] | firewall [detect|snapshot|plan|apply|teardown] | ports [list|check]]")
 			return
 		case "tls-proxy":
 			os.Exit(tlsProxyCmd(os.Args[2:]))
@@ -557,6 +557,10 @@ func main() {
 			// Headless endpoint agent: own runtime, never touches the
 			// panel's listeners, registry or background workers.
 			os.Exit(agentCmd(os.Args[2:]))
+		case "firewall", "ports":
+			// Firewall & port engine CLI (Session 1): plan is dry-run,
+			// apply/teardown are --yes-gated; all output is JSON.
+			os.Exit(firewallCLI(os.Args[1], os.Args[2:]))
 		}
 	}
 	if v := os.Getenv("GRE_PANEL_DIR"); v != "" {
