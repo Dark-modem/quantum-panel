@@ -61,12 +61,21 @@ func agentIfaceUp(name string) bool {
 		return false
 	}
 	var rows []struct {
-		OperState string `json:"operstate"`
+		OperState string   `json:"operstate"`
+		Flags     []string `json:"flags"`
 	}
 	if json.Unmarshal([]byte(out), &rows) == nil {
 		for _, r := range rows {
 			if strings.EqualFold(strings.TrimSpace(r.OperState), "UP") {
 				return true
+			}
+			// tun/tap devices (tinc's qmx) keep operstate UNKNOWN while the
+			// interface is up: the kernel never sets carrier state for them
+			// and the UP flag is the authoritative signal. DOWN still wins.
+			for _, f := range r.Flags {
+				if strings.EqualFold(f, "UP") && !strings.EqualFold(strings.TrimSpace(r.OperState), "DOWN") {
+					return true
+				}
 			}
 		}
 	}

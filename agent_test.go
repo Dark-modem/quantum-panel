@@ -998,3 +998,20 @@ func TestAgentInstallUnitMatchesInstaller(t *testing.T) {
 		}
 	}
 }
+
+func TestAgentIfaceUpTunOperstateUnknown(t *testing.T) {
+	// Real fixture from the P0 lab: tinc's qmx0 reports operstate UNKNOWN
+	// with UP in flags — the interface IS up.
+	fixture := `[{"ifindex":55,"ifname":"qmx0","flags":["POINTOPOINT","MULTICAST","NOARP","UP","LOWER_UP"],"mtu":1380,"operstate":"UNKNOWN"}]`
+	old := agentIPLinkShow
+	agentIPLinkShow = func(string) (string, error) { return fixture, nil }
+	t.Cleanup(func() { agentIPLinkShow = old })
+	if !agentIfaceUp("qmx0") {
+		t.Fatal("tun interface with UP flag and UNKNOWN operstate must report up")
+	}
+	down := `[{"ifname":"qmx0","flags":["POINTOPOINT","NOARP"],"operstate":"DOWN"}]`
+	agentIPLinkShow = func(string) (string, error) { return down, nil }
+	if agentIfaceUp("qmx0") {
+		t.Fatal("explicitly DOWN interface must report down")
+	}
+}
