@@ -2833,7 +2833,48 @@ function drawChart(hist, isDown) {
     startLoop();
   }
 }
+// Controller fleet (M-skeleton): real data from the agent registry, the
+// agent-tunnel orchestrator and the security audit log. Nothing simulated:
+// an unreachable source renders as —, never as a guess.
+async function refreshControllerFleet() {
+  const set = (id, v) => { const el = $(id); if (el) el.textContent = v; };
+  const setSub = (id, v) => { const el = $(id); if (el) el.innerHTML = v; };
+  try {
+    const a = await api('/api/agents');
+    const agents = (a && a.agents) || [];
+    const online = agents.filter(x => x.status === 'online').length;
+    const revoked = agents.filter(x => x.revoked).length;
+    set('fleetAgents', agents.length ? (online + '/' + agents.length) : '0');
+    const vers = {};
+    agents.forEach(x => { if (x.version) vers[x.version] = (vers[x.version] || 0) + 1; });
+    setSub('fleetAgentsSub', esc(agents.length ? (Object.keys(vers).map(v => v + ' ×' + vers[v]).join(' · ') + (revoked ? ' · ' + revoked + ' ' + tr('', 'revoked') : '')) : tr('', 'No agents enrolled yet')));
+    gauge('gAgents', 'fleetAgentsSub', agents.length ? Math.round(100 * online / agents.length) : null);
+  } catch (e) { set('fleetAgents', '—'); }
+  try {
+    const t = await api('/api/agent-tunnels');
+    const tunnels = (t && t.tunnels) || [];
+    const active = tunnels.filter(x => x.state === 'active').length;
+    const err = tunnels.filter(x => x.state === 'error').length;
+    set('fleetTunnels', tunnels.length ? (active + '/' + tunnels.length) : '0');
+    setSub('fleetTunnelsSub', esc(tunnels.length ? (err ? err + ' ' + tr('', 'in error') : tr('', 'all healthy')) : tr('', 'No agent tunnels yet')));
+    gauge('gTunnels', 'fleetTunnelsSub', tunnels.length ? Math.round(100 * active / tunnels.length) : null);
+  } catch (e) { set('fleetTunnels', '—'); }
+  try {
+    const agents = ((await api('/api/agents')).agents) || [];
+    const vers = Array.from(new Set(agents.map(x => x.version).filter(Boolean)));
+    set('fleetVersions', vers.join(' · ') || '—');
+  } catch (e) { /* second call failures stay silent; first call rendered */ }
+  try {
+    const ev = await api('/api/audit?n=4');
+    const entries = (ev && ev.entries) || [];
+    setSub('fleetEvents', esc(entries.length ? entries[0].slice(0, 140) : tr('', 'No recent events')));
+  } catch (e) { set('fleetEvents', '—'); }
+  const seen = $('fleetSeen');
+  if (seen) seen.textContent = tr('', 'live') + ' · ' + new Date().toLocaleTimeString();
+}
+
 async function refreshDash() {
+  refreshControllerFleet();
   const set = (id, v) => { const el = $(id); if (el) el.textContent = v; };
   const setHTML = (id, v) => { const el = $(id); if (el) el.innerHTML = v; };
   const chip = (txt, cls) => '<span class="badge ' + (cls || '') + '"><span class="dot"></span>' + esc(txt) + '</span>';
