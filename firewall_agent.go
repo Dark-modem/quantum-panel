@@ -28,20 +28,24 @@ import (
 	"strings"
 )
 
-// fwAgentSplitOwner validates and splits an "kind:id" owner tag.
+// fwAgentSplitOwner validates and splits an "kind:id" owner tag. The KIND
+// for firewall teardown is any single lowercase word — the installer tags
+// rules as e.g. "controller:ssh-alt" (installer-lib.sh fw_allow_port), and
+// the registry layer keeps its own stricter enum (tunnel|service|external)
+// for port reservations.
 func fwAgentSplitOwner(owner string) (kind, id string, err error) {
 	idx := strings.Index(owner, ":")
 	if idx <= 0 || idx == len(owner)-1 {
-		return "", "", fmt.Errorf("owner must be kind:id (tunnel|service|external), got %q", owner)
+		return "", "", fmt.Errorf("owner must be kind:id (e.g. tunnel:at_1a2b3c4d), got %q", owner)
 	}
 	kind, id = owner[:idx], owner[idx+1:]
-	switch kind {
-	case portOwnerTunnel, portOwnerService, portOwnerExternal:
-	default:
-		return "", "", fmt.Errorf("owner kind must be tunnel, service or external, got %q", kind)
+	for _, r := range kind {
+		if !(r >= 'a' && r <= 'z') {
+			return "", "", fmt.Errorf("owner kind must be a lowercase word, got %q", kind)
+		}
 	}
-	if strings.ContainsAny(id, "\"'`$ \t") {
-		return "", "", fmt.Errorf("owner id must not contain quotes, whitespace or shell metacharacters")
+	if strings.ContainsAny(id, "\"'`$ \t:") {
+		return "", "", fmt.Errorf("owner id must not contain quotes, whitespace, colons or shell metacharacters")
 	}
 	return kind, id, nil
 }
