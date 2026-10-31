@@ -372,6 +372,27 @@ func agentRunCommand(cmd agentCommand) agentCommandResult {
 		return agentRunMatrixRegister(p, res)
 	case agentCmdDiagPing:
 		return agentRunDiagPing(p, res)
+	case agentCmdAgentUpdate:
+		if !agentUpdateSupported() {
+			res.Error = "self-update is not supported on this build"
+			return res
+		}
+		req := agentUpdateRequest{
+			Version:   p["version"],
+			URL:       p["url"],
+			SHA256Hex: strings.ToLower(p["sha256"]),
+			Signature: p["signature"],
+		}
+		if err := agentUpdateValidateRequest(req, false); err != nil {
+			res.Error = err.Error()
+			return res
+		}
+		// Long download: answer now, run in the background; progress rides
+		// the heartbeat state and the new version shows up in the hello.
+		go agentUpdateRun(req, agentCurrentIdentity)
+		res.OK = true
+		res.Output = "update started; progress is reported via heartbeats"
+		return res
 	}
 	res.Error = "operation not allowed"
 	return res
@@ -519,6 +540,7 @@ func agentBuildStateReport() *agentStateReport {
 		Health:          agentHealthSnapshot(),
 		Traffic:         agentCollectTraffic(),
 		Resources:       agentCollectResources(),
+		UpdateProgress:  agentUpdateProgressSnapshot(),
 		NodeDetect:      agentDetectNode(),
 	}
 }

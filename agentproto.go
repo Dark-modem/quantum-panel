@@ -75,6 +75,7 @@ const (
 	agentCmdMatrixStop     = "matrix.stop"
 	agentCmdMatrixRegister = "matrix.register" // hub side: pair a node host file
 	agentCmdDiagPing       = "diag.ping"
+	agentCmdAgentUpdate    = "agent.update" // self-update from a signed artifact
 )
 
 // agentValidCommands is the complete remote-operation allowlist.
@@ -84,6 +85,7 @@ var agentValidCommands = map[string]bool{
 	agentCmdMatrixStop:     true,
 	agentCmdMatrixRegister: true,
 	agentCmdDiagPing:       true,
+	agentCmdAgentUpdate:    true,
 }
 
 // agentEnvelope wraps every message in both directions.
@@ -128,6 +130,7 @@ type agentStateReport struct {
 	Health          []agentTunnelHealth  `json:"health,omitempty"`
 	Traffic         *agentTrafficReport  `json:"traffic,omitempty"`
 	Resources       *agentResourceReport `json:"resources,omitempty"`
+	UpdateProgress  *agentUpdateProgress `json:"update_progress,omitempty"`
 	NodeDetect      *agentNodeDetect     `json:"node_detect,omitempty"`
 	Errors          []string             `json:"errors,omitempty"`
 }
@@ -224,6 +227,27 @@ type agentNodeDetect struct {
 	Detected bool   `json:"detected"`
 	Kind     string `json:"kind,omitempty"` // e.g. "docker-container"
 	Detail   string `json:"detail,omitempty"`
+}
+
+// agentUpdateRequest is the payload of the agent.update command. Every
+// field is mandatory: the agent refuses partial requests. The artifact must
+// be HTTPS, carry the exact sha256 and an ed25519 signature made with the
+// update public key pinned in the binary; without a pinned key the agent
+// refuses all updates (fail closed).
+type agentUpdateRequest struct {
+	Version   string `json:"version"`   // target version marker, e.g. v1.28.1
+	URL       string `json:"url"`       // https:// artifact URL (agent-authenticated)
+	SHA256Hex string `json:"sha256"`    // sha256 of the artifact bytes
+	Signature string `json:"signature"` // base64 std ed25519 signature over the artifact bytes
+}
+
+// agentUpdateProgress rides the heartbeat state so the controller UI can
+// show live update phases and the final verdict.
+type agentUpdateProgress struct {
+	Phase   string `json:"phase"` // requested|downloading|verifying|swapped|restarting|completed|failed
+	Version string `json:"version,omitempty"`
+	Error   string `json:"error,omitempty"`
+	At      int64  `json:"at"`
 }
 
 // agentDesired is the full desired state the controller hands one agent.

@@ -521,11 +521,22 @@ func agentRun() int {
 		return 2
 	}
 	log.Printf("[agent] starting agent %s for %s (v%s)", ident.ID, agentWSURL(ident), panelVersion)
+	agentCurrentIdentity = ident
+	agentUpdateCheckBootRollback() // restore the previous binary after crash-loops
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, os.Interrupt)
 	defer stop()
 	rt := &agentRuntime{ident: ident, start: time.Now()}
 	agentReconcilePending(nil) // self-healing before any controller contact
 	go agentHealthLoop(ctx)
+	go func() { // clear the update rollback journal once the boot is stable
+		for ctx.Err() == nil {
+			agentUpdateClearMarkerIfStable(rt.start)
+			select {
+			case <-ctx.Done():
+			case <-time.After(time.Minute):
+			}
+		}
+	}()
 	code := rt.loop(ctx)
 	log.Printf("[agent] stopped (exit %d)", code)
 	return code
