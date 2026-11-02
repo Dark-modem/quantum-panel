@@ -34,12 +34,27 @@ func occupyTCP(t *testing.T, ports ...int) {
 
 func freeTCPPort(t *testing.T) int {
 	t.Helper()
-	l, e := net.Listen("tcp", "127.0.0.1:0")
-	if e != nil {
-		t.Fatal(e)
+	// The matrix preflight probes BOTH transports (matrixPortFree), so the
+	// port must be free on TCP and UDP; on loaded machines the OS can hand
+	// one side of an ephemeral port to another process in the check-to-use
+	// window. Loop until both sides are free, like the agent tests' helper.
+	for attempt := 0; attempt < 20; attempt++ {
+		l, e := net.Listen("tcp", "127.0.0.1:0")
+		if e != nil {
+			t.Fatal(e)
+		}
+		port := l.Addr().(*net.TCPAddr).Port
+		u, e := net.ListenPacket("udp", "127.0.0.1:"+strconv.Itoa(port))
+		if e != nil {
+			l.Close()
+			continue
+		}
+		l.Close()
+		u.Close()
+		return port
 	}
-	defer l.Close()
-	return l.Addr().(*net.TCPAddr).Port
+	t.Fatal("no dual-transport-free port found after 20 attempts")
+	return 0
 }
 
 func matrixSetupBody(port int, ports []int) *httptest.ResponseRecorder {

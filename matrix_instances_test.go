@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -40,12 +41,26 @@ func matrixInstanceLab(t *testing.T) {
 
 func freeUDPPort(t *testing.T) int {
 	t.Helper()
-	l, e := net.ListenPacket("udp", "127.0.0.1:0")
-	if e != nil {
-		t.Fatal(e)
+	// Verify BOTH transports are free: matrixSetup's preflight probes TCP as
+	// well, and on loaded machines the OS can hand the same ephemeral port's
+	// TCP side to another process between our check and tinc's bind.
+	for attempt := 0; attempt < 20; attempt++ {
+		l, e := net.ListenPacket("udp", "127.0.0.1:0")
+		if e != nil {
+			t.Fatal(e)
+		}
+		port := l.LocalAddr().(*net.UDPAddr).Port
+		ln, e := net.Listen("tcp", "127.0.0.1:"+strconv.Itoa(port))
+		if e != nil {
+			l.Close()
+			continue
+		}
+		l.Close()
+		ln.Close()
+		return port
 	}
-	defer l.Close()
-	return l.LocalAddr().(*net.UDPAddr).Port
+	t.Fatal("no dual-transport-free port found after 20 attempts")
+	return 0
 }
 
 func TestMatrixInstanceDerivationIsUniquePerInstance(t *testing.T) {
