@@ -118,4 +118,3 @@ func TestUpdateSignatureFailClosed(t *testing.T) {
 		})
 	}
 }
-

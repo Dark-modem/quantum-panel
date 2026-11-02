@@ -256,28 +256,28 @@ func ClientIP(r *http.Request) string {
 		remoteHost = strings.Trim(r.RemoteAddr, "[]")
 	}
 
-		// Only trust forwarding headers if the immediate peer is a verified reverse proxy
-		if IsTrustedProxy(remoteHost) {
-			if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-				// Session 4 gate: with nginx's $proxy_add_x_forwarded_for the
-				// TRUSTED proxy APPENDS the real client address as the LAST
-				// entry — every earlier entry was supplied by the client and
-				// is therefore spoofable. Take the last non-empty hop.
-				parts := strings.Split(xff, ",")
-				var candidate string
-				for i := len(parts) - 1; i >= 0; i-- {
-					if c := strings.TrimSpace(parts[i]); c != "" {
-						candidate = c
-						break
-					}
-				}
-				if candidate != "" {
-					if host, _, err := net.SplitHostPort(candidate); err == nil {
-						return host
-					}
-					return strings.Trim(candidate, "[]")
+	// Only trust forwarding headers if the immediate peer is a verified reverse proxy
+	if IsTrustedProxy(remoteHost) {
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			// Session 4 gate: with nginx's $proxy_add_x_forwarded_for the
+			// TRUSTED proxy APPENDS the real client address as the LAST
+			// entry — every earlier entry was supplied by the client and
+			// is therefore spoofable. Take the last non-empty hop.
+			parts := strings.Split(xff, ",")
+			var candidate string
+			for i := len(parts) - 1; i >= 0; i-- {
+				if c := strings.TrimSpace(parts[i]); c != "" {
+					candidate = c
+					break
 				}
 			}
+			if candidate != "" {
+				if host, _, err := net.SplitHostPort(candidate); err == nil {
+					return host
+				}
+				return strings.Trim(candidate, "[]")
+			}
+		}
 		if xri := r.Header.Get("X-Real-IP"); xri != "" {
 			cand := strings.TrimSpace(xri)
 			if host, _, err := net.SplitHostPort(cand); err == nil {
