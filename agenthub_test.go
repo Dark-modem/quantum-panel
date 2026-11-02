@@ -31,7 +31,10 @@ func agentHubTestServer(t *testing.T) *httptest.Server {
 	mux.HandleFunc("POST /api/agents/{id}/revoke", handleAgentRevoke)
 	mux.HandleFunc("GET /api/agent-ws", handleAgentWS)
 	srv := httptest.NewServer(mux)
-	t.Cleanup(srv.Close)
+	t.Cleanup(func() {
+		agentHubCloseAll()
+		srv.Close()
+	})
 	return srv
 }
 
@@ -596,7 +599,3 @@ func TestAgentHubRegisterRelay(t *testing.T) {
 		t.Fatalf("relay result wrong: %s (%v)", data, err)
 	}
 }
-
-// AgentObserverWait quiesces the async ack/relay goroutines so tests can
-// assert on their file/state effects without racing the observer path.
-func AgentObserverWait() { agentObserverWG.Wait() }

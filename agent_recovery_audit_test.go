@@ -93,7 +93,7 @@ func agentRecoveryDelete(t *testing.T, id string) {
 // controller start — exactly once, never on a timer).
 
 func TestAgentRecoveryS1PartialProvisioningNoRollback(t *testing.T) {
-	lab := newAgentTunnelLab(t)
+	lab := newAgentTunnelLabWithDrain(t)
 	lab.addAgent("hub1", "iran", "iran", "185.1.1.1", []string{agentCapMatrix})
 	lab.addAgent("node1", "foreign", "foreign", "5.6.7.8", []string{agentCapMatrix})
 	agentRecoveryTunnel(t, "at_s1", "matrix", "hub1", "node1", agentTunnelStateProvisioning, "", "")
@@ -148,7 +148,7 @@ func TestAgentRecoveryS1PartialProvisioningNoRollback(t *testing.T) {
 // remove refresh stays allowed.
 
 func TestAgentRecoveryS2OfflineDeleteRetainedThenGuarded(t *testing.T) {
-	lab := newAgentTunnelLab(t) // sets configDir to a temp dir
+	lab := newAgentTunnelLabWithDrain(t) // sets configDir to a temp dir
 	_ = lab
 	agentRecoverySeedRegistry(t, "node1")
 
@@ -186,7 +186,7 @@ func TestAgentRecoveryS2OfflineDeleteRetainedThenGuarded(t *testing.T) {
 // until the one-shot reconciler offers it for a resume.
 
 func TestAgentRecoveryS3RestartProvisioningPreservesHostAndResumes(t *testing.T) {
-	lab := newAgentTunnelLab(t)
+	lab := newAgentTunnelLabWithDrain(t)
 	lab.addAgent("hub1", "iran", "iran", "185.1.1.1", []string{agentCapMatrix})
 	lab.addAgent("node1", "foreign", "foreign", "5.6.7.8", []string{agentCapMatrix})
 	// Fresh "process": the record was persisted by the previous process
@@ -228,7 +228,7 @@ func TestAgentRecoveryS3RestartProvisioningPreservesHostAndResumes(t *testing.T)
 }
 
 func TestAgentRecoveryS3RestartRegisteringRecoversViaLateAck(t *testing.T) {
-	lab := newAgentTunnelLab(t)
+	lab := newAgentTunnelLabWithDrain(t)
 	lab.addAgent("hub1", "iran", "iran", "185.1.1.1", []string{agentCapMatrix})
 	lab.addAgent("node1", "foreign", "foreign", "5.6.7.8", []string{agentCapMatrix})
 	agentRecoveryTunnel(t, "at_s3b", "matrix", "hub1", "node1", agentTunnelStateRegistering, "r-hub-1", "r-node-77")
@@ -253,7 +253,7 @@ func TestAgentRecoveryS3RestartRegisteringRecoversViaLateAck(t *testing.T) {
 // teardown acks arrive.
 
 func TestAgentRecoveryS4DeleteDuringProvisioningNoOrphan(t *testing.T) {
-	lab := newAgentTunnelLab(t)
+	lab := newAgentTunnelLabWithDrain(t)
 	lab.addAgent("hub1", "iran", "iran", "185.1.1.1", []string{agentCapMatrix})
 	lab.addAgent("node1", "foreign", "foreign", "5.6.7.8", []string{agentCapMatrix})
 	agentRecoveryTunnel(t, "at_s4", "matrix", "hub1", "node1", agentTunnelStateProvisioning, "", "")
@@ -329,7 +329,7 @@ func TestAgentRecoveryS4DeleteDuringProvisioningNoOrphan(t *testing.T) {
 // tombstone waits for teardown acks, and is freed only afterwards.
 
 func TestAgentRecoveryS4InstanceReservedWhileTeardownPending(t *testing.T) {
-	lab := newAgentTunnelLab(t)
+	lab := newAgentTunnelLabWithDrain(t)
 	lab.addAgent("hub1", "iran", "iran", "185.1.1.1", []string{agentCapMatrix})
 	lab.addAgent("node1", "foreign", "foreign", "5.6.7.8", []string{agentCapMatrix})
 	agentRecoveryTunnel(t, "at_old", "matrix", "hub1", "node1", agentTunnelStateActive, "r1", "r2")
@@ -365,7 +365,7 @@ func TestAgentRecoveryS4InstanceReservedWhileTeardownPending(t *testing.T) {
 // --- S4c: duplicate acks for the same revision must not corrupt records.
 
 func TestAgentRecoveryS4DuplicateAckIdempotent(t *testing.T) {
-	lab := newAgentTunnelLab(t)
+	lab := newAgentTunnelLabWithDrain(t)
 	lab.addAgent("hub1", "iran", "iran", "185.1.1.1", []string{agentCapMatrix})
 	lab.addAgent("node1", "foreign", "foreign", "5.6.7.8", []string{agentCapMatrix})
 	agentRecoveryTunnel(t, "at_s4c", "matrix", "hub1", "node1", agentTunnelStateRegistering, "rh", "rn")
@@ -387,7 +387,7 @@ func TestAgentRecoveryS4DuplicateAckIdempotent(t *testing.T) {
 // last-write-wins for applies).
 
 func TestAgentRecoveryS5ReconnectLatestWins(t *testing.T) {
-	lab := newAgentTunnelLab(t)
+	lab := newAgentTunnelLabWithDrain(t)
 	_ = lab
 	agentRecoverySeedRegistry(t, "node1")
 
@@ -412,7 +412,7 @@ func TestAgentRecoveryS5ReconnectLatestWins(t *testing.T) {
 // --- FIX F2 regression: the full delivery-guard matrix.
 
 func TestAgentRecoveryFixF2DeliveryGuardMatrix(t *testing.T) {
-	lab := newAgentTunnelLab(t)
+	lab := newAgentTunnelLabWithDrain(t)
 	_ = lab
 	agentRecoverySeedRegistry(t, "a1")
 
@@ -451,7 +451,7 @@ func TestAgentRecoveryFixF2DeliveryGuardMatrix(t *testing.T) {
 // stage, and the tunnel completes.
 
 func TestAgentRecoveryFixF3ResumeSkipsHubStage(t *testing.T) {
-	lab := newAgentTunnelLab(t)
+	lab := newAgentTunnelLabWithDrain(t)
 	lab.addAgent("hub1", "iran", "iran", "185.1.1.1", []string{agentCapMatrix})
 	lab.addAgent("node1", "foreign", "foreign", "5.6.7.8", []string{agentCapMatrix})
 	// Post-restart shape: hub stage done, host file on the record.
@@ -503,7 +503,7 @@ func TestAgentRecoveryFixF3ResumeSkipsHubStage(t *testing.T) {
 // left alone; deleting tombstones get teardown re-delivery.
 
 func TestAgentRecoveryFixF3ReconcileRetriesOnce(t *testing.T) {
-	lab := newAgentTunnelLab(t)
+	lab := newAgentTunnelLabWithDrain(t)
 	_ = lab
 	AgentObserverWait()
 	s := loadAgentTunnels()
@@ -547,7 +547,7 @@ func TestAgentRecoveryFixF3ReconcileRetriesOnce(t *testing.T) {
 // pending teardown, instead of parking a doomed tunnel in error.
 
 func TestAgentRecoveryFixF2CreateRefusedWhileTeardownPending(t *testing.T) {
-	lab := newAgentTunnelLab(t)
+	lab := newAgentTunnelLabWithDrain(t)
 	lab.addAgent("hub1", "iran", "iran", "185.1.1.1", []string{agentCapMatrix})
 	lab.addAgent("node1", "foreign", "foreign", "5.6.7.8", []string{agentCapMatrix})
 	agentRecoverySeedRegistry(t, "hub1")
@@ -576,8 +576,18 @@ func TestAgentRecoveryFixF2CreateRefusedWhileTeardownPending(t *testing.T) {
 
 func quiesceObservers() { AgentObserverWait() }
 
-func TestAgentRecoveryFixPowerRejectedWhileDeleting(t *testing.T) {
+func newAgentTunnelLabWithDrain(t *testing.T) *agentTunnelLab {
 	lab := newAgentTunnelLab(t)
+	t.Cleanup(func() {
+		agentHubCloseAll()
+		agentTunnelWG.Wait()
+		AgentObserverWait()
+	})
+	return lab
+}
+
+func TestAgentRecoveryFixPowerRejectedWhileDeleting(t *testing.T) {
+	lab := newAgentTunnelLabWithDrain(t)
 	lab.addAgent("hub1", "iran", "iran", "185.1.1.1", []string{agentCapMatrix})
 	lab.addAgent("node1", "foreign", "foreign", "5.6.7.8", []string{agentCapMatrix})
 	agentRecoveryTunnel(t, "at_pd", "matrix", "hub1", "node1", agentTunnelStateActive, "r1", "r2")

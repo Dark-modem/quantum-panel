@@ -190,6 +190,9 @@ func agentTunnelNextInstance(tunnels []agentTunnel, hubAgentID string) string {
 	return ""
 }
 
+// agentTunnelWG tracks in-flight provisioning goroutines (test quiesce).
+var agentTunnelWG sync.WaitGroup
+
 // agentNewRevision is a monotonic desired-state revision (unix nanos).
 func agentNewRevision() string { return strconv.FormatInt(time.Now().UnixNano(), 10) }
 
@@ -994,7 +997,8 @@ func handleAgentTunnelsPost(w http.ResponseWriter, r *http.Request) {
 	}
 	agentTunnelsMu.Unlock()
 
-	go agentTunnelProvision(t.ID)
+	agentTunnelWG.Add(1)
+	go func() { defer agentTunnelWG.Done(); agentTunnelProvision(t.ID) }()
 	LogSecurityAudit("agent_tunnel_create", cfg.Username, ClientIP(r), "id="+t.ID+" hub="+q.HubAgentID+" node="+q.NodeAgentID)
 	writeJSON(w, map[string]any{"tunnel": agentTunnelView(t)})
 }

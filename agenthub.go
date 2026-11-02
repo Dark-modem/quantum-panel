@@ -72,6 +72,10 @@ var (
 // can quiesce before asserting (they race with the async ack path).
 var agentObserverWG sync.WaitGroup
 
+// AgentObserverWait quiesces the async ack/relay goroutines so tests can
+// assert on their file/state effects without racing the observer path.
+func AgentObserverWait() { agentObserverWG.Wait() }
+
 var (
 	agentHubMu    sync.Mutex
 	agentHubConns = map[string]*agentConn{} // agent ID -> current session
@@ -104,6 +108,22 @@ type agentSessionState struct {
 }
 
 // agentHubOnline reports whether the agent currently has a live session.
+// agentHubCloseAll closes every live agent session. Test-only drain: it
+// lets session goroutines finish their registry writes before a test
+// rotates the configDir seam (production sets configDir once at startup).
+func agentHubCloseAll() {
+	agentHubMu.Lock()
+	conns := make([]*agentConn, 0, len(agentHubConns))
+	for _, c := range agentHubConns {
+		conns = append(conns, c)
+	}
+	agentHubMu.Unlock()
+	for _, c := range conns {
+		c.shutdown("test drain")
+	}
+	AgentObserverWait()
+}
+
 func agentHubOnline(id string) bool {
 	agentHubMu.Lock()
 	defer agentHubMu.Unlock()
