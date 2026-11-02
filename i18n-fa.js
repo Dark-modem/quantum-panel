@@ -3217,6 +3217,7 @@ window.FA_TEXT = {
   "sec_servers": "سرورها / ایجنت‌ها",
   "sec_tunnels": "توپولوژی و تونل‌ها",
   "sec_firewall": "فایروال و پورت‌ها",
+  "badge_plan": "پلن",
   "sec_netopt": "بهینه‌سازی شبکه",
   "sec_updates": "به‌روزرسانی نرم‌افزار",
   "sec_monitoring": "پایش و ترافیک",

@@ -224,15 +224,27 @@ func TestAgentHubHappyPath(t *testing.T) {
 	}
 
 	// Counter reset (reboot): current < previous is treated as a zero base.
+	// hb3 lands the reset in the session's memory; hb4 (spaced >= the
+	// agentPersistEvery cadence this test installed) guarantees a persist
+	// actually carries the reset-derived rate into the registry the test
+	// polls — without it, the persist can be rate-limit-skipped and no later
+	// heartbeat ever flushes it (Linux CI flake, Session 4 gate).
 	hb3 := agentHeartbeat{TS: 1020, UptimeS: 30, State: &agentStateReport{
 		Traffic: &agentTrafficReport{TS: 1020, Ifaces: []agentIfaceCounters{
 			{Name: "eth0", Kind: "physical", Rx: 100, Tx: 500, Known: true},
 		}},
 	}}
+	hb4 := agentHeartbeat{TS: 1030, UptimeS: 40, State: &agentStateReport{
+		Traffic: &agentTrafficReport{TS: 1030, Ifaces: []agentIfaceCounters{
+			{Name: "eth0", Kind: "physical", Rx: 200, Tx: 1000, Known: true},
+		}},
+	}}
 	agentTestSendEnv(t, ws, agentMsgHeartbeat, hb3)
+	time.Sleep(60 * time.Millisecond)
+	agentTestSendEnv(t, ws, agentMsgHeartbeat, hb4)
 	agentTestWaitFor(t, "counter reset rate", func() bool {
 		r, ok := agentTestRawAgent(t, id).TrafficRate["eth0"]
-		return ok && r.RxBps >= 9 && r.RxBps <= 12 // reset: 100 B over 10 s ≈ 10 B/s
+		return ok && r.RxBps >= 9 && r.RxBps <= 12 // reset window: 100 B over 10 s ≈ 10 B/s
 	})
 	if r := agentTestRawAgent(t, id).TrafficRate["eth0"]; r.TxBps < 49 || r.TxBps > 51 {
 		t.Fatalf("tx rate after reset: got %+v want tx=50", r)
