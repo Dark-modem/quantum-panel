@@ -400,7 +400,7 @@ func (s *agentSession) serve(ctx context.Context) error {
 	case <-ctx.Done():
 		s.fail(nil) // graceful: SIGTERM/SIGINT
 	}
-	return s.sessErr
+	return s.err() // mutex-read: fail/failFatal write sessErr from other goroutines
 }
 
 // readLoop reads and routes every incoming message. Desired and command work

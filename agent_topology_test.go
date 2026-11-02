@@ -188,6 +188,7 @@ func TestAgentTunnelProvisionEndToEnd(t *testing.T) {
 				hubDesired := lab.desiresFor("hub1")[0]
 				agentTunnelAckObserved("hub1", agentAck{Revision: hubDesired.Revision, OK: true,
 					Detail: map[string]string{"main_host": "Subnet = 10.254.231.1/32\n" + agentTestRSAPem(t)}})
+				AgentObserverWait()
 				continue
 			}
 			if !nodeAcked && nodeWant >= 1 {
@@ -197,6 +198,7 @@ func TestAgentTunnelProvisionEndToEnd(t *testing.T) {
 				continue
 			}
 			time.Sleep(10 * time.Millisecond)
+			AgentObserverWait()
 		}
 	}()
 	agentTunnelProvision("at_x")
@@ -248,6 +250,7 @@ func TestAgentTunnelProvisionHubAckFail(t *testing.T) {
 		hubDesired := lab.desiresFor("hub1")[0]
 		agentTunnelAckObserved("hub1", agentAck{Revision: hubDesired.Revision, OK: false, Error: "port busy"})
 	}()
+	AgentObserverWait()
 	agentTunnelProvision("at_y")
 
 	s = loadAgentTunnels()

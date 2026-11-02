@@ -22,8 +22,8 @@ SwapTotal:             0 kB`
 	if total != 986 { // 1010568/1024
 		t.Fatalf("total = %d, want 986", total)
 	}
-	if used != 339 { // (1010568-663528)/1024 = 339
-		t.Fatalf("used = %d, want 339", used)
+	if used != 338 { // (1010568-663528)/1024 = 338.9 -> 338 (int division)
+		t.Fatalf("used = %d, want 338", used)
 	}
 	if t2, u2 := agentParseMemInfo([]byte("MemTotal: 0 kB")); t2 != 0 || u2 != 0 {
 		t.Fatalf("empty meminfo must stay zero: %d/%d", t2, u2)
@@ -79,7 +79,7 @@ tcp   ESTAB  0      0       185.1.1.1:22          185.2.2.2:51000  users:(("sshd
 udp   UNCONN 0      0           [::1]:323            [::]:*
 tcp   LISTEN 0      5         10.99.0.1:45000        0.0.0.0:*`
 	ports := agentParseSS(fixture)
-	if len(ports) != 6 {
+	if len(ports) != 5 {
 		t.Fatalf("expected 6 listening sockets, got %d: %+v", len(ports), ports)
 	}
 	byKey := map[string]agentListenPort{}

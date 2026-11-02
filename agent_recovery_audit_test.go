@@ -103,12 +103,14 @@ func TestAgentRecoveryS1PartialProvisioningNoRollback(t *testing.T) {
 		hubRev := lab.desiresFor("hub1")[0].Revision
 		agentTunnelAckObserved("hub1", agentAck{Revision: hubRev, OK: true,
 			Detail: map[string]string{"main_host": "Subnet = 10.254.231.1/32"}})
+		AgentObserverWait()
 		agentRecoveryWait(t, 3*time.Second, "node desired delivery", func() bool {
 			return len(lab.desiresFor("node1")) >= 1
 		})
 		nodeRev := lab.desiresFor("node1")[0].Revision
 		agentTunnelAckObserved("node1", agentAck{Revision: nodeRev, OK: false, Error: "apt install tinc failed"})
 	}()
+	AgentObserverWait()
 
 	agentTunnelProvision("at_s1")
 
@@ -192,6 +194,7 @@ func TestAgentRecoveryS3RestartProvisioningPreservesHostAndResumes(t *testing.T)
 	// registry, applies it, and acks — after the controller restarted.
 	agentTunnelAckObserved("hub1", agentAck{Revision: "r-hub-42", OK: true,
 		Detail: map[string]string{"main_host": "Subnet = 10.254.231.1/32"}})
+	AgentObserverWait()
 
 	s := loadAgentTunnels()
 	rec := s.Tunnels[0]
@@ -231,6 +234,7 @@ func TestAgentRecoveryS3RestartRegisteringRecoversViaLateAck(t *testing.T) {
 	agentTunnelAckObserved("node1", agentAck{Revision: "r-node-77", OK: true})
 
 	s := loadAgentTunnels()
+	AgentObserverWait()
 	if s.Tunnels[0].State != agentTunnelStateActive {
 		t.Fatalf("registering tunnel must complete via the late ack, got %+v", s.Tunnels[0])
 	}
@@ -272,6 +276,7 @@ func TestAgentRecoveryS4DeleteDuringProvisioningNoOrphan(t *testing.T) {
 	hubApplyRev := lab.desiresFor("hub1")[0].Revision
 	agentTunnelAckObserved("hub1", agentAck{Revision: hubApplyRev, OK: true,
 		Detail: map[string]string{"main_host": "Subnet = 10.254.231.1/32"}})
+	AgentObserverWait()
 	select {
 	case <-done:
 	case <-time.After(6 * time.Second):
@@ -303,6 +308,7 @@ func TestAgentRecoveryS4DeleteDuringProvisioningNoOrphan(t *testing.T) {
 	hubRemRev, nodeRemRev := s.Tunnels[0].HubRevision, s.Tunnels[0].NodeRevision
 	agentTunnelAckObserved("hub1", agentAck{Revision: hubRemRev, OK: true})
 	agentTunnelAckObserved("node1", agentAck{Revision: nodeRemRev, OK: true})
+	AgentObserverWait()
 	s = loadAgentTunnels()
 	if len(s.Tunnels) != 0 {
 		t.Fatalf("tombstone must be dropped after both teardown acks, got %+v", s.Tunnels)
@@ -338,6 +344,7 @@ func TestAgentRecoveryS4InstanceReservedWhileTeardownPending(t *testing.T) {
 	hubRemRev, nodeRemRev := s.Tunnels[0].HubRevision, s.Tunnels[0].NodeRevision
 	agentTunnelAckObserved("hub1", agentAck{Revision: hubRemRev, OK: true})
 	agentTunnelAckObserved("node1", agentAck{Revision: nodeRemRev, OK: true})
+	AgentObserverWait()
 	s = loadAgentTunnels()
 	if len(s.Tunnels) != 0 {
 		t.Fatalf("tombstone must be dropped after both acks, got %+v", s.Tunnels)
@@ -360,6 +367,7 @@ func TestAgentRecoveryS4DuplicateAckIdempotent(t *testing.T) {
 	agentTunnelAckObserved("node1", ack) // duplicate delivery over WS reconnect
 
 	s := loadAgentTunnels()
+	AgentObserverWait()
 	if len(s.Tunnels) != 1 || s.Tunnels[0].State != agentTunnelStateActive || !s.Tunnels[0].NodeAckOK {
 		t.Fatalf("duplicate ack must be a no-op, got %+v", s.Tunnels)
 	}
@@ -462,6 +470,7 @@ func TestAgentRecoveryFixF3ResumeSkipsHubStage(t *testing.T) {
 		nodeRev := lab.desiresFor("node1")[0].Revision
 		agentTunnelAckObserved("node1", agentAck{Revision: nodeRev, OK: true})
 	}()
+	AgentObserverWait()
 	agentTunnelProvision("at_fix3")
 
 	// The resume skipped the hub stage entirely.
@@ -549,6 +558,8 @@ func TestAgentRecoveryFixF2CreateRefusedWhileTeardownPending(t *testing.T) {
 }
 
 // --- FIX F2 regression: power/restart on a deleting tombstone is refused.
+
+func quiesceObservers() { AgentObserverWait() }
 
 func TestAgentRecoveryFixPowerRejectedWhileDeleting(t *testing.T) {
 	lab := newAgentTunnelLab(t)

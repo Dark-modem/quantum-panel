@@ -136,7 +136,7 @@ func agentParseSS(out string) []agentListenPort {
 			continue
 		}
 		port, err := strconv.Atoi(portStr)
-		if err != nil || port < 0 || port > 65535 {
+		if err != nil || port < 1 || port > 65535 {
 			continue
 		}
 		proc := agentSSProcesses(line)

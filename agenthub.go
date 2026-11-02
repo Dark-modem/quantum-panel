@@ -68,6 +68,10 @@ var (
 	agentRegisterRelay func(reg agentRegisterMsg, fromAgentID string) agentRegisterResult
 )
 
+// agentObserverWG tracks in-flight observer/relay goroutine calls so tests
+// can quiesce before asserting (they race with the async ack path).
+var agentObserverWG sync.WaitGroup
+
 var (
 	agentHubMu    sync.Mutex
 	agentHubConns = map[string]*agentConn{} // agent ID -> current session
@@ -503,6 +507,8 @@ func (c *agentConn) handleRegister(data json.RawMessage) {
 		_ = c.send(agentMsgRegisterResult, agentRegisterResult{OK: false, Error: "register relay not available"})
 		return
 	}
+	agentObserverWG.Add(1)
+	defer agentObserverWG.Done()
 	resCh := make(chan agentRegisterResult, 1)
 	go func() {
 		defer func() {

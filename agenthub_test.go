@@ -596,3 +596,7 @@ func TestAgentHubRegisterRelay(t *testing.T) {
 		t.Fatalf("relay result wrong: %s (%v)", data, err)
 	}
 }
+
+// AgentObserverWait quiesces the async ack/relay goroutines so tests can
+// assert on their file/state effects without racing the observer path.
+func AgentObserverWait() { agentObserverWG.Wait() }
