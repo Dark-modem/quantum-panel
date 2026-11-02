@@ -99,6 +99,12 @@ func portRegistrySave(s portRegistryFile) error {
 		return err
 	}
 	p := portRegistryFilepath()
+	// The config directory may not exist yet on a first-run agent; create it
+	// rather than failing the whole save (dir perms follow the file's 0600
+	// philosophy: private).
+	if err := os.MkdirAll(filepath.Dir(p), 0700); err != nil {
+		return err
+	}
 	tmp := p + ".tmp"
 	if err := os.WriteFile(tmp, data, 0600); err != nil {
 		return err
