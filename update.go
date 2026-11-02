@@ -269,12 +269,20 @@ func verifyAssetChecksum(tmpPath, tag, asset string) error {
 
 // verifyAssetSignature checks the release's detached ed25519 signature
 // (<asset>.sig, base64 over the artifact bytes) against the pinned update
-// key. Signature present but invalid, or a pinned-key mismatch, fails
-// closed. Releases that do not ship a signature yet are allowed through
-// with a recorded warning — the checksum manifest remains enforced above.
+// key. Session 4 gate (SU-1): verification is FAIL-CLOSED — a build with no
+// pinned key and a release without a signature are REFUSED. The only bypass
+// is the explicit emergency override QUANTUM_UPDATE_ALLOW_UNSIGNED=1, which
+// is audited on every use, must be set deliberately by the operator, and is
+// documented as an emergency measure to be removed once the signing workflow
+// is live. Invalid, malformed, or wrong-key signatures always fail.
 func verifyAssetSignature(tmpPath, dlURL, asset string) error {
+	override := os.Getenv("QUANTUM_UPDATE_ALLOW_UNSIGNED") == "1"
 	if agentUpdatePubKeyPEM == "" {
-		LogSecurityAudit("update_signature_skipped", "system", "local", "no update public key pinned in this build; asset="+asset)
+		if !override {
+			LogSecurityAudit("update_signature_refused", "system", "local", "no update public key pinned in this build; asset="+asset)
+			return errors.New("update refused: no update public key is pinned in this build (set QUANTUM_UPDATE_ALLOW_UNSIGNED=1 only as an audited emergency)")
+		}
+		LogSecurityAudit("update_signature_skipped_emergency", "system", "local", "no pinned key; QUANTUM_UPDATE_ALLOW_UNSIGNED=1 override in effect; asset="+asset)
 		return nil
 	}
 	sigResp, err := http.Get(dlURL + ".sig") //nolint — same release origin as the artifact
@@ -283,7 +291,11 @@ func verifyAssetSignature(tmpPath, dlURL, asset string) error {
 	}
 	defer sigResp.Body.Close()
 	if sigResp.StatusCode == http.StatusNotFound {
-		LogSecurityAudit("update_signature_absent", "system", "local", "asset="+asset+" (release is not signed yet)")
+		if !override {
+			LogSecurityAudit("update_signature_refused", "system", "local", "release ships no signature (.sig 404); asset="+asset)
+			return errors.New("update refused: the release does not ship a detached signature (.sig); QUANTUM_UPDATE_ALLOW_UNSIGNED=1 overrides this emergency-only")
+		}
+		LogSecurityAudit("update_signature_absent_emergency", "system", "local", "release unsigned; QUANTUM_UPDATE_ALLOW_UNSIGNED=1 override in effect; asset="+asset)
 		return nil
 	}
 	if sigResp.StatusCode != http.StatusOK {
