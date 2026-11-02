@@ -79,6 +79,7 @@ func newAgentTunnelLab(t *testing.T) *agentTunnelLab {
 		return rec, ok
 	}
 	t.Cleanup(func() {
+		AgentObserverWait() // observers still read the seams about to be restored
 		agentHubDeliverDesiredFn, agentHubCommandFn, agentHubOnlineFn, agentRegistryLookupFn = oldDeliver, oldCmd, oldOnline, oldLookup
 		agentTunnelAckWait, agentTunnelPortWait, agentTunnelCmdTimeout = oldAckWait, oldPortWait, oldCmdTimeout
 	})

@@ -24,6 +24,7 @@ import (
 
 // agentRecoveryWait polls cond until it holds or the timeout elapses.
 func agentRecoveryWait(t *testing.T, timeout time.Duration, what string, cond func() bool) {
+	defer AgentObserverWait() // ack/relay goroutines must finish before asserts
 	t.Helper()
 	deadline := time.Now().Add(timeout)
 	for !cond() {
@@ -38,6 +39,7 @@ func agentRecoveryWait(t *testing.T, timeout time.Duration, what string, cond fu
 // handler would (before the provisioning goroutine touches it).
 func agentRecoveryTunnel(t *testing.T, id, instance, hubID, nodeID, state, hubRev, nodeRev string) {
 	t.Helper()
+	AgentObserverWait()
 	s := loadAgentTunnels()
 	s.Tunnels = append(s.Tunnels, agentTunnel{
 		ID: id, Name: id, Instance: instance, HubAgentID: hubID, NodeAgentID: nodeID,
@@ -114,6 +116,7 @@ func TestAgentRecoveryS1PartialProvisioningNoRollback(t *testing.T) {
 
 	agentTunnelProvision("at_s1")
 
+	AgentObserverWait()
 	s := loadAgentTunnels()
 	if len(s.Tunnels) != 1 || s.Tunnels[0].State != agentTunnelStateError {
 		t.Fatalf("tunnel must end in error state, got %+v", s.Tunnels)
@@ -196,6 +199,7 @@ func TestAgentRecoveryS3RestartProvisioningPreservesHostAndResumes(t *testing.T)
 		Detail: map[string]string{"main_host": "Subnet = 10.254.231.1/32"}})
 	AgentObserverWait()
 
+	AgentObserverWait()
 	s := loadAgentTunnels()
 	rec := s.Tunnels[0]
 	if !rec.HubAckOK {
@@ -217,6 +221,7 @@ func TestAgentRecoveryS3RestartProvisioningPreservesHostAndResumes(t *testing.T)
 	if len(provision) != 1 || provision[0] != "at_s3a" || len(teardown) != 0 {
 		t.Fatalf("reconcile must resume the parked record, got provision=%v teardown=%v", provision, teardown)
 	}
+	AgentObserverWait()
 	if s := loadAgentTunnels(); s.Tunnels[0].State != agentTunnelStateProvisioning {
 		t.Fatalf("reconcile keeps the record in provisioning for the resume run, got %q", s.Tunnels[0].State)
 	}
@@ -233,6 +238,7 @@ func TestAgentRecoveryS3RestartRegisteringRecoversViaLateAck(t *testing.T) {
 	// matches by revision and completes the tunnel.
 	agentTunnelAckObserved("node1", agentAck{Revision: "r-node-77", OK: true})
 
+	AgentObserverWait()
 	s := loadAgentTunnels()
 	AgentObserverWait()
 	if s.Tunnels[0].State != agentTunnelStateActive {
@@ -300,6 +306,7 @@ func TestAgentRecoveryS4DeleteDuringProvisioningNoOrphan(t *testing.T) {
 		t.Fatalf("hub must receive the teardown remove, got %+v", lab.desiresFor("hub1"))
 	}
 	// The record is a tombstone, not gone.
+	AgentObserverWait()
 	s := loadAgentTunnels()
 	if len(s.Tunnels) != 1 || s.Tunnels[0].State != agentTunnelStateDeleting {
 		t.Fatalf("record must be tombstoned, got %+v", s.Tunnels)
@@ -332,6 +339,7 @@ func TestAgentRecoveryS4InstanceReservedWhileTeardownPending(t *testing.T) {
 		return len(lab.desiresFor("node1")) >= 1 && len(lab.desiresFor("hub1")) >= 1
 	})
 
+	AgentObserverWait()
 	s := loadAgentTunnels()
 	if len(s.Tunnels) != 1 || s.Tunnels[0].State != agentTunnelStateDeleting {
 		t.Fatalf("tombstone must exist, got %+v", s.Tunnels)
@@ -366,6 +374,7 @@ func TestAgentRecoveryS4DuplicateAckIdempotent(t *testing.T) {
 	agentTunnelAckObserved("node1", ack)
 	agentTunnelAckObserved("node1", ack) // duplicate delivery over WS reconnect
 
+	AgentObserverWait()
 	s := loadAgentTunnels()
 	AgentObserverWait()
 	if len(s.Tunnels) != 1 || s.Tunnels[0].State != agentTunnelStateActive || !s.Tunnels[0].NodeAckOK {
@@ -446,6 +455,7 @@ func TestAgentRecoveryFixF3ResumeSkipsHubStage(t *testing.T) {
 	lab.addAgent("hub1", "iran", "iran", "185.1.1.1", []string{agentCapMatrix})
 	lab.addAgent("node1", "foreign", "foreign", "5.6.7.8", []string{agentCapMatrix})
 	// Post-restart shape: hub stage done, host file on the record.
+	AgentObserverWait()
 	s := loadAgentTunnels()
 	s.Tunnels = append(s.Tunnels, agentTunnel{
 		ID: "at_fix3", Name: "resume", Instance: "matrix", HubAgentID: "hub1", NodeAgentID: "node1",
@@ -481,6 +491,8 @@ func TestAgentRecoveryFixF3ResumeSkipsHubStage(t *testing.T) {
 	if len(nodeDesires) != 1 || nodeDesires[0].Matrix == nil || nodeDesires[0].Matrix.Bundle == "" {
 		t.Fatalf("node must receive exactly one bundle, got %+v", nodeDesires)
 	}
+	AgentObserverWait()
+	AgentObserverWait()
 	if s := loadAgentTunnels(); len(s.Tunnels) != 1 || s.Tunnels[0].State != agentTunnelStateActive {
 		t.Fatalf("resumed tunnel must end active, got %+v", s.Tunnels)
 	}
@@ -493,6 +505,7 @@ func TestAgentRecoveryFixF3ResumeSkipsHubStage(t *testing.T) {
 func TestAgentRecoveryFixF3ReconcileRetriesOnce(t *testing.T) {
 	lab := newAgentTunnelLab(t)
 	_ = lab
+	AgentObserverWait()
 	s := loadAgentTunnels()
 	s.Tunnels = append(s.Tunnels,
 		agentTunnel{ID: "at_e1", Instance: "matrix", HubAgentID: "h", NodeAgentID: "n", State: agentTunnelStateError, Active: true, CreatedAt: time.Now().Unix()},
@@ -552,6 +565,8 @@ func TestAgentRecoveryFixF2CreateRefusedWhileTeardownPending(t *testing.T) {
 	if !strings.Contains(rr.Body.String(), "pending teardown") {
 		t.Fatalf("refusal must explain the pending teardown, got %s", rr.Body.String())
 	}
+	AgentObserverWait()
+	AgentObserverWait()
 	if s := loadAgentTunnels(); len(s.Tunnels) != 0 {
 		t.Fatalf("no tunnel record may be created, got %+v", s.Tunnels)
 	}
