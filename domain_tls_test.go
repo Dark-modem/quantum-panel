@@ -67,13 +67,17 @@ func TestTrustedProxyLoopback(t *testing.T) {
 		t.Errorf("did not expect 8.8.8.8 to be trusted proxy")
 	}
 
-	// When request comes from trusted proxy 127.0.0.1, X-Forwarded-For must be extracted
+	// When request comes from trusted proxy 127.0.0.1, X-Forwarded-For must be
+	// extracted. The repo's proxy configs use $proxy_add_x_forwarded_for, so
+	// the trusted proxy APPENDS the real client address: earlier entries were
+	// supplied by the client and are spoofable — the LAST hop is the trusted
+	// value (Session 4 gate fix).
 	req := httptest.NewRequest("GET", "/test", nil)
 	req.RemoteAddr = "127.0.0.1:54321"
 	req.Header.Set("X-Forwarded-For", "203.0.113.195, 10.0.0.1")
 	clientIP := ClientIP(req)
-	if clientIP != "203.0.113.195" {
-		t.Errorf("ClientIP() = %q; want %q", clientIP, "203.0.113.195")
+	if clientIP != "10.0.0.1" {
+		t.Errorf("ClientIP() = %q; want %q (last hop appended by the trusted proxy)", clientIP, "10.0.0.1")
 	}
 
 	// When request comes from untrusted remote IP, X-Forwarded-For must be ignored

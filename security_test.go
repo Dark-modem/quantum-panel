@@ -81,12 +81,23 @@ func TestTrustedProxyAndClientIP(t *testing.T) {
 		t.Fatalf("expected untrusted host 192.0.2.1, got %s", ip)
 	}
 
-	// Request from trusted proxy 127.0.0.1 with XFF
+	// Request from trusted proxy 127.0.0.1 with XFF. nginx's
+	// $proxy_add_x_forwarded_for APPENDS the real client address: earlier
+	// entries are client-supplied and spoofable, so the LAST non-empty hop
+	// wins (Session 4 gate fix).
 	reqTrusted := httptest.NewRequest("GET", "/test", nil)
 	reqTrusted.RemoteAddr = "127.0.0.1:40000"
-	reqTrusted.Header.Set("X-Forwarded-For", "198.51.100.1, 127.0.0.1")
+	reqTrusted.Header.Set("X-Forwarded-For", "203.0.113.99, 198.51.100.1")
 	if ip := ClientIP(reqTrusted); ip != "198.51.100.1" {
-		t.Fatalf("expected forwarded client IP 198.51.100.1, got %s", ip)
+		t.Fatalf("expected last-hop forwarded client IP 198.51.100.1, got %s", ip)
+	}
+
+	// A single-entry XFF from a trusted proxy is the proxy-appended value.
+	reqSpoof := httptest.NewRequest("GET", "/test", nil)
+	reqSpoof.RemoteAddr = "127.0.0.1:40001"
+	reqSpoof.Header.Set("X-Forwarded-For", "1.2.3.4")
+	if ip := ClientIP(reqSpoof); ip != "1.2.3.4" {
+		t.Fatalf("single-entry XFF is the proxy-appended value, got %s", ip)
 	}
 
 	// Request from trusted CIDR proxy 10.2.3.4 with X-Real-IP

@@ -38,7 +38,7 @@ func agentSelfUnit() string {
 // published via heartbeats. ident supplies the download credentials.
 func agentUpdateRun(req agentUpdateRequest, ident agentIdentity) {
 	agentUpdateSetProgress("downloading", req.Version, "")
-	artifact, err := agentUpdateDownload(req.URL, ident.ID, ident.Key)
+	artifact, err := agentUpdateDownload(req.URL, ident)
 	if err != nil {
 		agentUpdateSetProgress("failed", req.Version, "download: "+err.Error())
 		return

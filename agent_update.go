@@ -31,6 +31,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -215,16 +216,52 @@ func agentUpdateValidateRequest(req agentUpdateRequest, fromController bool) err
 	return nil
 }
 
-// agentUpdateDownload fetches the artifact with the agent's credentials and
-// a hard size cap. url must already be https (validated).
-func agentUpdateDownload(url string, id, key string) ([]byte, error) {
+// agentSameOrigin reports whether target uses the same scheme://host as the
+// enrolled controller origin (base). Empty base accepts nothing.
+func agentSameOrigin(base, target string) bool {
+	ob, err := url.Parse(strings.TrimRight(base, "/"))
+	if err != nil || ob.Host == "" {
+		return false
+	}
+	tb, err := url.Parse(target)
+	if err != nil || tb.Host == "" {
+		return false
+	}
+	return strings.EqualFold(ob.Scheme, tb.Scheme) && strings.EqualFold(ob.Host, tb.Host)
+}
+
+// agentUpdateDownload fetches the artifact with a hard size cap.
+//
+// Session 4 gate (SU-2): the agent's long-term enrollment key is a controller
+// credential, so it is attached ONLY when the artifact URL lives on the
+// enrolled controller's own origin; any other host gets an unauthenticated
+// download (artifact integrity comes from the mandatory signature, not the
+// transport). Redirects are refused when they change scheme or host, so a
+// controller-origin fetch cannot be bounced to a third party — and a
+// cross-origin artifact URL can never inherit the credential.
+func agentUpdateDownload(url string, ident agentIdentity) ([]byte, error) {
+	if !agentSameOrigin(ident.Server, url) {
+		return nil, fmt.Errorf("artifact URL %q is not on the controller origin (%s); refusing the download", url, ident.Server)
+	}
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set(agentIDHeader, id)
-	req.Header.Set(agentKeyHeader, key)
-	client := &http.Client{Timeout: 120 * time.Second}
+	req.Header.Set(agentIDHeader, ident.ID)
+	req.Header.Set(agentKeyHeader, ident.Key)
+	client := &http.Client{
+		Timeout: 120 * time.Second,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 4 {
+				return fmt.Errorf("too many redirects")
+			}
+			prev := via[len(via)-1]
+			if req.URL.Scheme != prev.URL.Scheme || !strings.EqualFold(req.URL.Host, prev.URL.Host) {
+				return fmt.Errorf("update download redirect changes origin (%s -> %s); refusing", prev.URL, req.URL)
+			}
+			return nil
+		},
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
