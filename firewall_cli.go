@@ -63,6 +63,13 @@ func fwCLIFirewall(args []string) (int, any) {
 		return fwCLIPlan(args, false)
 	case "teardown":
 		return fwCLITeardown(args)
+	case "--help", "-h", "help":
+		// Exit 0 on an explicit help request: installers probe engine
+		// presence with `firewall --help` (installer-lib.sh
+		// fw_engine_available), so help must succeed.
+		return 0, map[string]any{
+			"usage": "gre-panel firewall [detect | snapshot | plan | apply | teardown] — plan is dry-run; apply needs --yes",
+		}
 	}
 	return 2, fwCLIError("usage: gre-panel firewall [detect | snapshot | plan | apply | teardown] — plan is dry-run; apply needs --yes")
 }
@@ -77,6 +84,8 @@ func fwCLIPorts(args []string) (int, any) {
 		return fwCLIPortsList()
 	case "check":
 		return fwCLIPortsCheck(args)
+	case "--help", "-h", "help":
+		return 0, map[string]any{"usage": "gre-panel ports [list | check PORT[/tcp|/udp]]"}
 	}
 	return 2, fwCLIError("usage: gre-panel ports [list | check PORT[/tcp|/udp]]")
 }

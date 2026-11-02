@@ -15,7 +15,12 @@ func TestFirewallAgentSplitOwner(t *testing.T) {
 	if err != nil || kind != "tunnel" || id != "at_1a2b3c4d" {
 		t.Fatalf("valid owner parse failed: %q %q %v", kind, id, err)
 	}
-	for _, bad := range []string{"at_x", "tunnel:", ":at_x", "weird:at:x", "tunnel:at_\"x\"", "alien:at_x"} {
+	// Installer-style kinds (installer-lib.sh fw_allow_port tags rules as
+	// quantum:<role>:<name>) are valid firewall owners.
+	if k, id2, err := fwAgentSplitOwner("controller:ssh-alt"); err != nil || k != "controller" || id2 != "ssh-alt" {
+		t.Fatalf("installer-style owner must parse: %q %q %v", k, id2, err)
+	}
+	for _, bad := range []string{"at_x", "tunnel:", ":at_x", "weird:at:x", "tunnel:at_\"x\"", "Controller:at_x", "tunnel:at x", "UPPER:at_x"} {
 		if _, _, err := fwAgentSplitOwner(bad); err == nil {
 			t.Fatalf("owner %q must be rejected", bad)
 		}
