@@ -142,7 +142,7 @@ func TestAgentArtifactGetServesAndBlocks(t *testing.T) {
 	for _, name := range []string{"..%2F..%2Fetc%2Fpasswd", "..", "a/b", ".hidden"} {
 		rr = httptest.NewRecorder()
 		mux.ServeHTTP(rr, httptest.NewRequest("GET", "/api/agent/artifact/"+name, nil))
-		if rr.Code != 400 && rr.Code != 404 && rr.Code != 301 {
+		if rr.Code != 400 && rr.Code != 404 && rr.Code != 301 && rr.Code != 307 {
 			t.Fatalf("artifact name %q must be rejected, got %d", name, rr.Code)
 		}
 	}

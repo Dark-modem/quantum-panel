@@ -79,7 +79,7 @@ tcp   ESTAB  0      0       185.1.1.1:22          185.2.2.2:51000  users:(("sshd
 udp   UNCONN 0      0           [::1]:323            [::]:*
 tcp   LISTEN 0      5         10.99.0.1:45000        0.0.0.0:*`
 	ports := agentParseSS(fixture)
-	if len(ports) != 5 {
+	if len(ports) != 6 {
 		t.Fatalf("expected 6 listening sockets, got %d: %+v", len(ports), ports)
 	}
 	byKey := map[string]agentListenPort{}

@@ -415,9 +415,25 @@ func TestAgentTunnelControllerLoopRealHub(t *testing.T) {
 	hubID, hubKey := agentHubEnrollAgent(t, srv, []string{agentCapMatrix})
 	nodeID, nodeKey := agentHubEnrollAgent(t, srv, []string{agentCapMatrix})
 	hubWS := agentHubHandshakeCaps(t, srv.URL, hubID, hubKey, []string{agentCapMatrix})
-	defer hubWS.Close()
 	nodeWS := agentHubHandshakeCaps(t, srv.URL, nodeID, nodeKey, []string{agentCapMatrix})
-	defer nodeWS.Close()
+	t.Cleanup(func() {
+		hubWS.Close()
+		nodeWS.Close()
+		// The server-side session goroutines write the registry on their way
+		// down; wait for both agents to read offline before the seams rotate.
+		for i := 0; i < 40; i++ {
+			_, ok1 := agentTunnelRegistryLookup(hubID)
+			_, ok2 := agentTunnelRegistryLookup(nodeID)
+			h, _ := agentTunnelRegistryLookup(hubID)
+			n, _ := agentTunnelRegistryLookup(nodeID)
+			_ = ok1
+			_ = ok2
+			if h.Status == "offline" && n.Status == "offline" {
+				return
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+	})
 	hub, node := &agentE2EConn{t: t, ws: hubWS}, &agentE2EConn{t: t, ws: nodeWS}
 
 	pem := agentTestRSAPem(t)

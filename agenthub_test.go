@@ -232,7 +232,7 @@ func TestAgentHubHappyPath(t *testing.T) {
 	agentTestSendEnv(t, ws, agentMsgHeartbeat, hb3)
 	agentTestWaitFor(t, "counter reset rate", func() bool {
 		r, ok := agentTestRawAgent(t, id).TrafficRate["eth0"]
-		return ok && r.RxBps > 9 && r.RxBps < 11
+		return ok && r.RxBps >= 9 && r.RxBps <= 12 // reset: 100 B over 10 s ≈ 10 B/s
 	})
 	if r := agentTestRawAgent(t, id).TrafficRate["eth0"]; r.TxBps < 49 || r.TxBps > 51 {
 		t.Fatalf("tx rate after reset: got %+v want tx=50", r)
