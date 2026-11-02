@@ -9153,10 +9153,10 @@ const ACCENTS = [
   ['blue', 'hsl(217 91% 60%)'], ['indigo', 'hsl(243 75% 62%)'], ['violet', 'hsl(265 83% 60%)'], ['rose', 'hsl(341 75% 50%)'],
   ['emerald', 'hsl(160 84% 36%)'], ['teal', 'hsl(178 80% 34%)'], ['orange', 'hsl(22 90% 46%)'],
 ];
-function accCurrent() { return document.documentElement.dataset.acc || 'teal'; }
+function accCurrent() { return document.documentElement.dataset.acc || 'blue'; }
 function accSet(name) {
   if (name === 'blue') delete document.documentElement.dataset.acc; else document.documentElement.dataset.acc = name;
-  try { if (name === 'teal') localStorage.removeItem('quantum_accent'); else localStorage.setItem('quantum_accent', name); } catch (e) { /* storage blocked: choice lasts this session */ }
+  try { if (name === 'blue') localStorage.removeItem('quantum_accent'); else localStorage.setItem('quantum_accent', name); } catch (e) { /* storage blocked: choice lasts this session */ }
   accRender();
   try { if (typeof refreshDash === 'function') refreshDash(); } catch (e) { /* dashboard repaints on its next poll */ }
 }
