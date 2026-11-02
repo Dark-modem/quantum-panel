@@ -235,3 +235,52 @@ func netopJSON(v any) string {
 	}
 	return string(b)
 }
+
+// ---------------------------------------------------------------------------
+// Dispatcher — the single handler entry point for Session 3's Agent
+// protocol. One typed request, one function, the stable result types above.
+// ---------------------------------------------------------------------------
+
+// NetopRequest is the typed request for every netopt operation.
+type NetopRequest struct {
+	Op      string `json:"op"`                // detect|plan|apply|status|rollback|revert
+	Role    string `json:"role,omitempty"`    // controller|agent|auto ("" = auto)
+	Profile string `json:"profile,omitempty"` // conservative|balanced|performance|auto
+	Justify string `json:"justify,omitempty"` // required for profile=performance
+}
+
+// netopValidOps is the dispatcher's operation table.
+var netopValidOps = map[string]bool{
+	"detect": true, "plan": true, "apply": true,
+	"status": true, "rollback": true, "revert": true,
+}
+
+// NetopDispatch routes one typed request to its handler. The returned value
+// is one of the stable result types (marshal directly); the error is a Go
+// error for the transport to wrap. Mutating ops enforce the installation and
+// privilege rules internally.
+func NetopDispatch(req NetopRequest) (any, error) {
+	if !netopValidOps[req.Op] {
+		return nil, fmt.Errorf("netop: unknown op %q (valid: detect, plan, apply, status, rollback, revert)", req.Op)
+	}
+	role := netRole(req.Role)
+	forced := req.Profile
+	if forced == "auto" {
+		forced = ""
+	}
+	switch req.Op {
+	case "detect":
+		return NetopDetect()
+	case "plan":
+		return NetopPlan(role, forced)
+	case "apply":
+		return NetopApply(role, forced, req.Justify, nil)
+	case "status":
+		return NetopStatus()
+	case "rollback":
+		return NetopRollback()
+	case "revert":
+		return NetopRevert()
+	}
+	return nil, fmt.Errorf("netop: unreachable op %q", req.Op) // guarded by netopValidOps
+}

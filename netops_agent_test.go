@@ -233,3 +233,96 @@ func TestNetopsJournalUnderAgentConfigDir(t *testing.T) {
 		t.Fatalf("journal dir = %s", filepath.Dir(netJournalPath()))
 	}
 }
+
+// TestNetopsDispatcherAllOps runs every operation through the single
+// NetopDispatch entry point Session 3's agent dispatcher will call, on an
+// agent-only installation, and verifies the result types and the no-fake-
+// panel.json contract end to end.
+func TestNetopsDispatcherAllOps(t *testing.T) {
+	netAgentApplyFixture(t)
+
+	seq := []struct {
+		op    string
+		check func(any) error
+	}{
+		{op: "detect", check: func(v any) error {
+			r, ok := v.(*NetopDetectResult)
+			if !ok || r.Role != "agent" || r.Report == nil {
+				return errors.New("bad detect result")
+			}
+			return nil
+		}},
+		{op: "plan", check: func(v any) error {
+			r, ok := v.(*NetopPlanResult)
+			if !ok || r.Profile != string(netProfileConservative) || r.Role != "agent" {
+				return errors.New("bad plan result")
+			}
+			return nil
+		}},
+		{op: "apply", check: func(v any) error {
+			r, ok := v.(*NetopApplyResult)
+			if !ok || !r.Ok || r.Op != "apply" || r.Journal == nil || !r.Journal.Verified {
+				return errors.New("bad apply result")
+			}
+			return nil
+		}},
+		{op: "status", check: func(v any) error {
+			r, ok := v.(*NetopStatusResult)
+			if !ok || !r.HasJournal || r.Role != "agent" {
+				return errors.New("bad status result")
+			}
+			return nil
+		}},
+		{op: "rollback", check: func(v any) error {
+			r, ok := v.(*NetopApplyResult)
+			if !ok || !r.Ok || r.Op != "rollback" {
+				return errors.New("bad rollback result")
+			}
+			return nil
+		}},
+		{op: "revert", check: func(v any) error {
+			r, ok := v.(*NetopApplyResult)
+			if !ok || !r.Ok || r.Op != "revert" {
+				return errors.New("bad revert result")
+			}
+			return nil
+		}},
+	}
+	for _, step := range seq {
+		res, err := NetopDispatch(NetopRequest{Op: step.op, Role: "auto"})
+		if err != nil {
+			t.Fatalf("dispatch %s: %v", step.op, err)
+		}
+		if err := step.check(res); err != nil {
+			t.Fatalf("dispatch %s: %v", step.op, err)
+		}
+		// the transport contract: every result must marshal with its shape
+		if b, merr := json.Marshal(res); merr != nil || len(b) < 2 {
+			t.Fatalf("dispatch %s: result not marshalable (%v)", step.op, merr)
+		}
+	}
+	if _, err := os.Stat(cfgPath()); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("dispatcher must not create panel.json (err=%v)", err)
+	}
+}
+
+// TestNetopsDispatcherGuards pins the dispatcher's refusals: unknown op,
+// privilege, and performance-justify requirements.
+func TestNetopsDispatcherGuards(t *testing.T) {
+	netAgentApplyFixture(t)
+	if _, err := NetopDispatch(NetopRequest{Op: "tune"}); err == nil ||
+		!strings.Contains(err.Error(), "unknown op") {
+		t.Fatalf("unknown op must be rejected, got %v", err)
+	}
+	old := netPrivileged
+	netPrivileged = func() bool { return false }
+	t.Cleanup(func() { netPrivileged = old })
+	if _, err := NetopDispatch(NetopRequest{Op: "apply"}); !errors.Is(err, netErrPrivilege) {
+		t.Fatalf("dispatch apply without root must refuse, got %v", err)
+	}
+	netPrivileged = func() bool { return true }
+	if _, err := NetopDispatch(NetopRequest{Op: "apply", Profile: "performance"}); err == nil ||
+		!strings.Contains(err.Error(), "--justify") {
+		t.Fatalf("performance without justify must be refused, got %v", err)
+	}
+}
