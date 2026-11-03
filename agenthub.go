@@ -85,8 +85,9 @@ var (
 type agentConn struct {
 	id        string
 	ws        *websocket.Conn
-	ip        string     // real client IP (X-Forwarded-For aware via ClientIP)
-	writeMu   sync.Mutex // one writer at a time (single-writer discipline)
+	ip        string        // real client IP (X-Forwarded-For aware via ClientIP)
+	runDone   chan struct{} // closed when the session goroutine has fully exited
+	writeMu   sync.Mutex    // one writer at a time (single-writer discipline)
 	closed    chan struct{}
 	closeOnce sync.Once
 	cmdMu     sync.Mutex
@@ -120,6 +121,14 @@ func agentHubCloseAll() {
 	agentHubMu.Unlock()
 	for _, c := range conns {
 		c.shutdown("test drain")
+	}
+	// Wait for the session goroutines to fully exit: their cleanup path
+	// persists state and reads the configDir seam that tests rotate.
+	for _, c := range conns {
+		select {
+		case <-c.runDone:
+		case <-time.After(3 * time.Second):
+		}
 	}
 	AgentObserverWait()
 }
@@ -181,6 +190,7 @@ func handleAgentWS(w http.ResponseWriter, r *http.Request) {
 		id:      id,
 		ws:      ws,
 		ip:      ClientIP(r), // honors X-Forwarded-For from a trusted loopback proxy
+		runDone: make(chan struct{}),
 		closed:  make(chan struct{}),
 		pending: map[string]chan agentCommandResult{},
 	}
@@ -192,6 +202,7 @@ func handleAgentWS(w http.ResponseWriter, r *http.Request) {
 	agentHubMu.Unlock()
 
 	defer conn.cleanup()
+	defer close(conn.runDone)
 	conn.run()
 }
 
