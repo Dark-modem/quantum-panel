@@ -64,8 +64,8 @@ var agentHubUpgrader = websocket.Upgrader{
 // Both are nil in a stock panel; nil ack observer = no-op, nil relay =
 // agents get an explicit "not available" error.
 var (
-	agentAckObserver   func(agentID string, ack agentAck)
-	agentRegisterRelay func(reg agentRegisterMsg, fromAgentID string) agentRegisterResult
+	agentAckObserver   agentSeam[func(agentID string, ack agentAck)]
+	agentRegisterRelay agentSeam[func(reg agentRegisterMsg, fromAgentID string) agentRegisterResult]
 )
 
 // agentObserverWG tracks in-flight observer/relay goroutine calls so tests
@@ -491,8 +491,7 @@ func (c *agentConn) handleAck(data json.RawMessage) {
 		log.Printf("[agents] cannot record ack for %s: %v", c.id, err)
 		return
 	}
-	if matched && agentAckObserver != nil {
-		hook := agentAckObserver
+	if hook := agentAckObserver.get(); matched && hook != nil {
 		ack := ack
 		go hook(c.id, ack)
 	}
@@ -522,7 +521,7 @@ func (c *agentConn) handleRegister(data json.RawMessage) {
 		_ = c.send(agentMsgRegisterResult, agentRegisterResult{OK: false, Error: "invalid register message"})
 		return
 	}
-	hook := agentRegisterRelay
+	hook := agentRegisterRelay.get()
 	if hook == nil {
 		_ = c.send(agentMsgRegisterResult, agentRegisterResult{OK: false, Error: "register relay not available"})
 		return

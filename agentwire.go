@@ -46,12 +46,12 @@ func agentTunnelRegistryLookup(id string) (agentTunnelAgentInfo, bool) {
 // orchestration. Called once from main() on the controller path; the
 // headless agent path (gre-panel agent) never runs it.
 func wireAgentSubsystem() {
-	agentHubDeliverDesiredFn = agentHubDeliverDesired
-	agentHubCommandFn = agentHubCommand
-	agentHubOnlineFn = agentHubOnline
-	agentRegistryLookupFn = agentTunnelRegistryLookup
-	agentAckObserver = agentTunnelAckObserved
-	agentRegisterRelay = agentTunnelRegisterRelay
+	agentHubDeliverDesiredFn.set(agentHubDeliverDesired)
+	agentHubCommandFn.set(agentHubCommand)
+	agentHubOnlineFn.set(agentHubOnline)
+	agentRegistryLookupFn.set(agentTunnelRegistryLookup)
+	agentAckObserver.set(agentTunnelAckObserved)
+	agentRegisterRelay.set(agentTunnelRegisterRelay)
 	// Audit F3: finish what a previous controller process left behind.
 	// Runs once: a synchronous store scan, then one-shot goroutines for
 	// the returned work — there is no retry timer anywhere, and the

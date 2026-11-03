@@ -37,10 +37,13 @@ import (
 func agentLab(t *testing.T) {
 	t.Helper()
 	matrixInstanceLab(t)
-	oldPS, oldDirs := agentDockerPS, agentPasarguardDirs
-	agentDockerPS = func() (string, error) { return "", errors.New("agent lab: no docker") }
+	oldPS, oldDirs := agentDockerPS.get(), agentPasarguardDirs
+	agentDockerPS.set(func() (string, error) { return "", errors.New("agent lab: no docker") })
 	agentPasarguardDirs = []string{filepath.Join(t.TempDir(), "absent")}
-	t.Cleanup(func() { agentDockerPS, agentPasarguardDirs = oldPS, oldDirs })
+	t.Cleanup(func() {
+		agentDockerPS.set(oldPS)
+		agentPasarguardDirs = oldDirs
+	})
 }
 
 // agentExecRecorder wraps matrixExec, counting and recording every call so
@@ -775,8 +778,11 @@ func TestAgentTrafficClassification(t *testing.T) {
 func TestAgentNodeDetect(t *testing.T) {
 	agentLab(t)
 	dir := t.TempDir()
-	oldDirs, oldPS := agentPasarguardDirs, agentDockerPS
-	t.Cleanup(func() { agentPasarguardDirs, agentDockerPS = oldDirs, oldPS })
+	oldDirs, oldPS := agentPasarguardDirs, agentDockerPS.get()
+	t.Cleanup(func() {
+		agentPasarguardDirs = oldDirs
+		agentDockerPS.set(oldPS)
+	})
 
 	agentPasarguardDirs = []string{dir}
 	if d := agentDetectNode(); !d.Detected || d.Kind != "install-dir" || d.Detail != dir {
@@ -784,11 +790,11 @@ func TestAgentNodeDetect(t *testing.T) {
 	}
 
 	agentPasarguardDirs = oldDirs
-	agentDockerPS = func() (string, error) { return "pasarguard-node\nredis\n", nil }
+	agentDockerPS.set(func() (string, error) { return "pasarguard-node\nredis\n", nil })
 	if d := agentDetectNode(); !d.Detected || d.Kind != "docker-container" || d.Detail != "pasarguard-node" {
 		t.Fatalf("docker detect = %+v", d)
 	}
-	agentDockerPS = func() (string, error) { return "", errors.New("docker gone") }
+	agentDockerPS.set(func() (string, error) { return "", errors.New("docker gone") })
 	if d := agentDetectNode(); d.Detected {
 		t.Fatalf("errors must mean detected=false: %+v", d)
 	}

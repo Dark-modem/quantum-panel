@@ -280,15 +280,15 @@ func TestAgentHubHappyPath(t *testing.T) {
 
 	// The ack observer hook fires for a matched ack (coordinator seam).
 	observed := make(chan agentAck, 1)
-	agentAckObserver = func(agentID string, ack agentAck) {
+	agentAckObserver.set(func(agentID string, ack agentAck) {
 		if agentID == id {
 			select {
 			case observed <- ack:
 			default:
 			}
 		}
-	}
-	t.Cleanup(func() { agentAckObserver = nil })
+	})
+	t.Cleanup(func() { agentAckObserver.set(nil) })
 
 	// Ack(fail): desired is kept, last_error recorded.
 	status, body = agentHubPost(t, srv, "/api/agents/"+id+"/desired",
@@ -586,14 +586,14 @@ func TestAgentHubRegisterRelay(t *testing.T) {
 		from string
 	}
 	got := make(chan captured, 1)
-	agentRegisterRelay = func(reg agentRegisterMsg, fromAgentID string) agentRegisterResult {
+	agentRegisterRelay.set(func(reg agentRegisterMsg, fromAgentID string) agentRegisterResult {
 		select {
 		case got <- captured{reg, fromAgentID}:
 		default:
 		}
 		return agentRegisterResult{OK: true}
-	}
-	t.Cleanup(func() { agentRegisterRelay = nil })
+	})
+	t.Cleanup(func() { agentRegisterRelay.set(nil) })
 	agentTestSendEnv(t, ws, agentMsgRegister, agentRegisterMsg{Instance: "matrix", Token: "hmx1_T", Name: "node1", HostFile: "-----BEGIN", Revision: "1700"})
 	select {
 	case c := <-got:
