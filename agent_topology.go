@@ -19,6 +19,7 @@ package main
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -67,7 +68,7 @@ type agentSeam[F any] struct {
 	fn F
 }
 
-func (s *agentSeam[F]) get() F { s.mu.RLock(); defer s.mu.RUnlock(); return s.fn }
+func (s *agentSeam[F]) get() F  { s.mu.RLock(); defer s.mu.RUnlock(); return s.fn }
 func (s *agentSeam[F]) set(f F) { s.mu.Lock(); s.fn = f; s.mu.Unlock() }
 
 var (
@@ -145,7 +146,7 @@ type agentTunnelStore struct {
 }
 
 var (
-	agentTunnelsMu   sync.Mutex
+	agentTunnelsMu      sync.Mutex
 	agentTunnelsPathVal atomic.Value // string
 )
 
@@ -1182,7 +1183,7 @@ func handleAgentTunnelDelete(w http.ResponseWriter, r *http.Request) {
 	// queued teardown from being clobbered by later work.
 	removeDesired := func(agentID, rev string) {
 		d := agentDesired{Revision: rev, Matrix: &agentDesiredMatrix{Instance: t.Instance, Action: "remove"}}
-		if err := agentHubDeliverDesiredFn.get()(agentID, d); err != nil {
+		if err := agentDeliverTeardownDesired(agentID, d); err != nil {
 			log.Printf("agent tunnel %s: teardown desired to %s: %v", id, agentID, err)
 		}
 	}
@@ -1190,6 +1191,20 @@ func handleAgentTunnelDelete(w http.ResponseWriter, r *http.Request) {
 	go removeDesired(t.NodeAgentID, nodeRev)
 	LogSecurityAudit("agent_tunnel_delete", cfg.Username, ClientIP(r), "id="+id)
 	writeJSON(w, map[string]string{"status": "ok", "detail": "tunnel tombstoned; both endpoints are tearing down their local Matrix instances"})
+}
+
+// agentDeliverTeardownDesired delivers one teardown desired state. It is
+// nil-safe by design: the delete handler checks agentTunnelHubWired() once,
+// but these deliveries run in goroutines that may still be in flight when
+// another test (or a future rewiring) rotates the seam back to nil —
+// calling a nil func there would panic and kill the whole process
+// (Session 4 gate finding, snapshot wt-s4-158).
+func agentDeliverTeardownDesired(agentID string, d agentDesired) error {
+	deliver := agentHubDeliverDesiredFn.get()
+	if deliver == nil {
+		return errors.New("agent hub seam unwired; teardown desired skipped")
+	}
+	return deliver(agentID, d)
 }
 
 func capsInclude(caps []string, want string) bool {

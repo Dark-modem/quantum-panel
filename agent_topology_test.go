@@ -44,7 +44,7 @@ func newAgentTunnelLab(t *testing.T) *agentTunnelLab {
 	setAgentTunnelsPath(filepath.Join(dir, "agent_tunnels.json"))
 	t.Cleanup(func() {
 		configDir = oldDir
-		setAgentTunnelsPath("")   // back to the configDir default
+		setAgentTunnelsPath("") // back to the configDir default
 	})
 	lab := &agentTunnelLab{
 		t:         t,
@@ -400,7 +400,7 @@ func TestAgentTunnelControllerLoopRealHub(t *testing.T) {
 	dir := t.TempDir()
 	oldDir := configDir
 	oldAck, oldPort, oldCmd := agentTunnelAckWait, agentTunnelPortWait, agentTunnelCmdTimeout
-		configDir = dir
+	configDir = dir
 	setAgentTunnelsPath(filepath.Join(dir, "agent_tunnels.json"))
 	agentTunnelAckWait, agentTunnelPortWait, agentTunnelCmdTimeout = 15*time.Second, 3*time.Second, 10*time.Second
 	t.Cleanup(func() {
@@ -533,5 +533,33 @@ func TestAgentTunnelControllerLoopRealHub(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("node never received the register_result")
+	}
+}
+
+// Regression (Session 4 gate finding, snapshot wt-s4-158): the teardown
+// delivery runs in goroutines that may outlive the seam wiring — a nil
+// seam must produce an error, never a nil-func panic that kills the
+// process.
+func TestAgentTeardownDesiredDeliverNilSeamNoPanic(t *testing.T) {
+	old := agentHubDeliverDesiredFn.get()
+	t.Cleanup(func() { agentHubDeliverDesiredFn.set(old) })
+
+	agentHubDeliverDesiredFn.set(nil)
+	err := agentDeliverTeardownDesired("hub1", agentDesired{Revision: "r",
+		Matrix: &agentDesiredMatrix{Instance: "matrix", Action: "remove"}})
+	if err == nil {
+		t.Fatal("nil seam must return an error, not panic")
+	}
+
+	delivered := false
+	agentHubDeliverDesiredFn.set(func(id string, d agentDesired) error {
+		delivered = true
+		return nil
+	})
+	if err := agentDeliverTeardownDesired("hub1", agentDesired{Revision: "r"}); err != nil {
+		t.Fatal(err)
+	}
+	if !delivered {
+		t.Fatal("wired seam must deliver")
 	}
 }
