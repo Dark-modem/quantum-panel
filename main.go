@@ -776,19 +776,7 @@ func main() {
 	mux.HandleFunc("GET "+base+"/api/doctor", requireAuth(handleDoctorGet))
 	mux.HandleFunc("POST "+base+"/api/doctor", requireAuth(requireCSRF(handleDoctorPost)))
 
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		mu.Lock()
-		curBase := cfg.BasePath
-		mu.Unlock()
-		if curBase == "" {
-			curBase = "panel"
-		}
-		target := "/" + curBase + "/"
-		if r.URL.RawQuery != "" {
-			target += "?" + r.URL.RawQuery
-		}
-		http.Redirect(w, r, target, http.StatusFound)
-	})
+	mux.HandleFunc("/", handleRootEntry)
 
 	// Peer-to-peer synchronization & commands
 	mountPeerRoutes(mux, base)
@@ -1009,4 +997,28 @@ func writeJSON(w http.ResponseWriter, v any) {
 // is reachable without exposing any data.
 func handleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]string{"status": "ok", "version": panelVersion})
+}
+
+// handleRootEntry is the catch-all for paths no route claimed. Only the
+// exact root entry point redirects to the panel's secret base path — the
+// operator's bookmark UX — while every OTHER unmatched path gets a plain
+// 404. Redirecting arbitrary probed paths used to disclose that a panel
+// lives behind this port and handed out the secret base path to anything
+// that asked (audit finding F1); 404 keeps probing blind.
+func handleRootEntry(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
+	mu.Lock()
+	curBase := cfg.BasePath
+	mu.Unlock()
+	if curBase == "" {
+		curBase = "panel"
+	}
+	target := "/" + curBase + "/"
+	if r.URL.RawQuery != "" {
+		target += "?" + r.URL.RawQuery
+	}
+	http.Redirect(w, r, target, http.StatusFound)
 }
