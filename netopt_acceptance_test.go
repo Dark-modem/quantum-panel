@@ -160,3 +160,58 @@ func TestAcceptConservativeOnDetectionGaps(t *testing.T) {
 		t.Fatal("detection gaps must be recorded as warnings")
 	}
 }
+
+// netTwoCoreTwoGBFixture: 2 vCPU / 2048 MB RAM — the controller-compatible
+// low-resource shape (sits exactly on the ram>=2g and <2048 boundaries).
+func netTwoCoreTwoGBFixture() (map[string]string, map[string][]string, map[string]string) {
+	files, dirs, exec := netIfaceFixtures()
+	files["/proc/meminfo"] = "MemTotal:        2097152 kB\nMemAvailable:    1572864 kB\nSwapTotal:       512000 kB\nSwapFree:        512000 kB\n"
+	files["/proc/cpuinfo"] = "processor : 0\nmodel name : Common KVM processor\nprocessor : 1\nmodel name : Common KVM processor\n"
+	exec["systemd-detect-virt"] = "kvm\n"
+	files["/proc/sys/net/ipv4/tcp_available_congestion_control"] = "reno cubic bbr\n"
+	return files, dirs, exec
+}
+
+// TestAcceptTwoCoreTwoGBControllerCompatible pins the boundary behavior: a
+// 2-core / 2 GB host is NOT Conservative (2048 is not below 2048), selects
+// Balanced with the buffers exactly at the ram>=2g requirement, and
+// Performance stays out (2 cores < 4). This is the exact plan a
+// controller-compatible low-memory host receives.
+func TestAcceptTwoCoreTwoGBControllerCompatible(t *testing.T) {
+	files, dirs, exec := netTwoCoreTwoGBFixture()
+	netTestEnv(t, files, dirs, exec)
+	rep := netDetectHardware()
+	if rep.RAMTotalMB != 2048 || rep.CPUCores != 2 || rep.MemPressure {
+		t.Fatalf("fixture detection = %d MB / %d cores / pressure=%v", rep.RAMTotalMB, rep.CPUCores, rep.MemPressure)
+	}
+	profile, why := netSelectProfile(rep, netRoleController, "")
+	if profile != netProfileBalanced {
+		t.Fatalf("2-core/2GB profile = %s (%v)", profile, why)
+	}
+	changes := netPlanChanges(profile, rep, netRoleController)
+	applied := map[string]string{}
+	for _, c := range changes {
+		if c.Apply {
+			applied[c.Key] = c.Proposed
+		}
+	}
+	// the 2 GB gate: buffers ARE proposed (2048 satisfies ram>=2g)
+	for _, k := range []string{"net.core.rmem_max", "net.core.wmem_max", "net.ipv4.tcp_rmem", "net.ipv4.tcp_wmem"} {
+		if _, ok := applied[k]; !ok {
+			t.Fatalf("2GB host: buffer candidate %s must apply", k)
+		}
+	}
+	// conntrack scaled to the small RAM (2048*128 = 262144)
+	if applied["net.netfilter.nf_conntrack_max"] != "262144" {
+		t.Fatalf("conntrack = %q, want 262144", applied["net.netfilter.nf_conntrack_max"])
+	}
+	// Performance-only extras must be absent on 2 cores
+	for _, k := range []string{"net.ipv4.tcp_fastopen", "net.ipv4.tcp_notsent_lowat"} {
+		if _, ok := applied[k]; ok {
+			t.Fatalf("2-core host must not receive Performance candidate %s", k)
+		}
+	}
+	if applied["net.core.netdev_max_backlog"] != "16384" {
+		t.Fatalf("netdev backlog = %q, want the Balanced 16384", applied["net.core.netdev_max_backlog"])
+	}
+}
