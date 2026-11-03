@@ -27,6 +27,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -56,23 +57,37 @@ type agentTunnelAgentInfo struct {
 	TrafficRate     map[string]agentTrafficRateView
 }
 
+// agentSeam is a mutex-guarded function seam. Production wires these once at
+// startup (agentwire.go) and never touches them again; tests swap them and
+// restore them afterwards — while hub sessions, ack observers, provisioning
+// goroutines and delete teardowns may still be reading them, so plain func
+// vars are data races under `-race` (Session 4 Linux CI closure).
+type agentSeam[F any] struct {
+	mu sync.RWMutex
+	fn F
+}
+
+func (s *agentSeam[F]) get() F { s.mu.RLock(); defer s.mu.RUnlock(); return s.fn }
+func (s *agentSeam[F]) set(f F) { s.mu.Lock(); s.fn = f; s.mu.Unlock() }
+
 var (
-	agentHubDeliverDesiredFn func(id string, d agentDesired) error
-	agentHubCommandFn        func(id, op string, params map[string]string, timeout time.Duration) (agentCommandResult, error)
-	agentHubOnlineFn         func(id string) bool
-	agentRegistryLookupFn    func(id string) (agentTunnelAgentInfo, bool)
+	agentHubDeliverDesiredFn agentSeam[func(id string, d agentDesired) error]
+	agentHubCommandFn        agentSeam[func(id, op string, params map[string]string, timeout time.Duration) (agentCommandResult, error)]
+	agentHubOnlineFn         agentSeam[func(id string) bool]
+	agentRegistryLookupFn    agentSeam[func(id string) (agentTunnelAgentInfo, bool)]
 )
 
 func agentTunnelHubWired() bool {
-	return agentHubDeliverDesiredFn != nil && agentHubCommandFn != nil && agentHubOnlineFn != nil
+	return agentHubDeliverDesiredFn.get() != nil && agentHubCommandFn.get() != nil && agentHubOnlineFn.get() != nil
 }
 
 // agentTunnelAgent fetches registry info, tolerating an unwired registry.
 func agentTunnelAgent(id string) (agentTunnelAgentInfo, bool) {
-	if agentRegistryLookupFn == nil {
+	lookup := agentRegistryLookupFn.get()
+	if lookup == nil {
 		return agentTunnelAgentInfo{ID: id}, false
 	}
-	return agentRegistryLookupFn(id)
+	return lookup(id)
 }
 
 // ---- tunnel store: <configDir>/agent_tunnels.json (0600) ----
@@ -131,15 +146,22 @@ type agentTunnelStore struct {
 
 var (
 	agentTunnelsMu   sync.Mutex
-	agentTunnelsPath string
+	agentTunnelsPathVal atomic.Value // string
 )
 
 func agentTunnelsFile() string {
-	if agentTunnelsPath == "" {
-		agentTunnelsPath = filepath.Join(configDir, "agent_tunnels.json")
+	if v := agentTunnelsPathVal.Load(); v != nil {
+		return v.(string)
 	}
-	return agentTunnelsPath
+	p := filepath.Join(configDir, "agent_tunnels.json")
+	agentTunnelsPathVal.Store(p)
+	return p
 }
+
+// setAgentTunnelsPath is the test seam for redirecting the tunnel store
+// (atomic: the file path is read by hub sessions, ack observers and
+// provisioning goroutines that can outlive the test that rotates it).
+func setAgentTunnelsPath(p string) { agentTunnelsPathVal.Store(p) }
 
 func loadAgentTunnels() agentTunnelStore {
 	var s agentTunnelStore
@@ -367,7 +389,7 @@ func agentTunnelWaitPort(agentID, instance string, timeout time.Duration) int {
 func agentTunnelProvision(tunnelID string) {
 	// Snapshot the hub seams once: the wiring must not change under an
 	// in-flight provisioning run (tests restore fakes mid-flight).
-	deliverFn, cmdFn := agentHubDeliverDesiredFn, agentHubCommandFn
+	deliverFn, cmdFn := agentHubDeliverDesiredFn.get(), agentHubCommandFn.get()
 	if deliverFn == nil || cmdFn == nil || !agentTunnelHubWired() {
 		log.Printf("agent tunnel %s: agent hub not wired; provisioning aborted", tunnelID)
 		return
@@ -620,11 +642,12 @@ func agentTunnelBeginRegistering(tunnelID, nodeRev string) bool {
 // agentTunnelBestEffortRemove delivers one remove desired without error
 // handling; used by the orphan guard when a record vanished entirely.
 func agentTunnelBestEffortRemove(agentID, instance string) {
-	if agentHubDeliverDesiredFn == nil {
+	deliver := agentHubDeliverDesiredFn.get()
+	if deliver == nil {
 		return
 	}
 	d := agentDesired{Revision: agentNewRevision(), Matrix: &agentDesiredMatrix{Instance: instance, Action: "remove"}}
-	_ = agentHubDeliverDesiredFn(agentID, d)
+	_ = deliver(agentID, d)
 }
 
 // ---- startup reconciliation (audit F3) ----
@@ -698,7 +721,7 @@ func reconcileAgentTunnels() (provision, teardown []string) {
 // agentTunnelRedeliverTeardown re-delivers the remove desired for a
 // deleting tombstone with the revisions reconcileAgentTunnels armed.
 func agentTunnelRedeliverTeardown(tunnelID string) {
-	deliverFn := agentHubDeliverDesiredFn
+	deliverFn := agentHubDeliverDesiredFn.get()
 	if deliverFn == nil {
 		return
 	}
@@ -755,13 +778,13 @@ func agentTunnelRegisterRelay(reg agentRegisterMsg, fromAgentID string) agentReg
 		"addr":      nodeAddr,
 		"revision":  reg.Revision,
 	}
-	res, err := agentHubCommandFn(t.HubAgentID, agentCmdMatrixRegister, params, agentTunnelCmdTimeout)
+	res, err := agentHubCommandFn.get()(t.HubAgentID, agentCmdMatrixRegister, params, agentTunnelCmdTimeout)
 	// A hub agent that dropped its WS for a moment fails fast; the node
 	// only waits ~30s for this answer, so retry exactly once on a fast
 	// failure and never on a slow (timeout) one.
 	if err != nil && time.Since(start) < 5*time.Second {
 		time.Sleep(7 * time.Second)
-		res, err = agentHubCommandFn(t.HubAgentID, agentCmdMatrixRegister, params, agentTunnelCmdTimeout)
+		res, err = agentHubCommandFn.get()(t.HubAgentID, agentCmdMatrixRegister, params, agentTunnelCmdTimeout)
 	}
 	if err != nil {
 		return agentRegisterResult{OK: false, Error: err.Error()}
@@ -855,7 +878,9 @@ func agentTunnelView(t agentTunnel) map[string]any {
 		}
 		if info, ok := agentTunnelAgent(agentID); ok {
 			v["agent_name"] = info.Name
-			v["online"] = agentHubOnlineFn != nil && agentHubOnlineFn(agentID)
+			if online := agentHubOnlineFn.get(); online != nil {
+				v["online"] = online(agentID)
+			}
 			v["role"] = info.Role
 		} else {
 			v["online"] = false
@@ -1065,7 +1090,7 @@ func agentTunnelPowerRestart(w http.ResponseWriter, r *http.Request, restart boo
 	}
 	var failures []string
 	for _, agentID := range []string{t.HubAgentID, t.NodeAgentID} {
-		res, err := agentHubCommandFn(agentID, op, map[string]string{"instance": t.Instance}, agentTunnelCmdTimeout)
+		res, err := agentHubCommandFn.get()(agentID, op, map[string]string{"instance": t.Instance}, agentTunnelCmdTimeout)
 		if err != nil {
 			failures = append(failures, agentID+": "+err.Error())
 			continue
@@ -1157,7 +1182,7 @@ func handleAgentTunnelDelete(w http.ResponseWriter, r *http.Request) {
 	// queued teardown from being clobbered by later work.
 	removeDesired := func(agentID, rev string) {
 		d := agentDesired{Revision: rev, Matrix: &agentDesiredMatrix{Instance: t.Instance, Action: "remove"}}
-		if err := agentHubDeliverDesiredFn(agentID, d); err != nil {
+		if err := agentHubDeliverDesiredFn.get()(agentID, d); err != nil {
 			log.Printf("agent tunnel %s: teardown desired to %s: %v", id, agentID, err)
 		}
 	}

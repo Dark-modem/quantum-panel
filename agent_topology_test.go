@@ -39,12 +39,12 @@ type agentCommandCall struct {
 func newAgentTunnelLab(t *testing.T) *agentTunnelLab {
 	t.Helper()
 	dir := t.TempDir()
-	oldDir, oldPath := configDir, agentTunnelsPath
+	oldDir := configDir
 	configDir = dir
-	agentTunnelsPath = filepath.Join(dir, "agent_tunnels.json")
+	setAgentTunnelsPath(filepath.Join(dir, "agent_tunnels.json"))
 	t.Cleanup(func() {
 		configDir = oldDir
-		agentTunnelsPath = oldPath
+		setAgentTunnelsPath("")   // back to the configDir default
 	})
 	lab := &agentTunnelLab{
 		t:         t,
@@ -52,37 +52,40 @@ func newAgentTunnelLab(t *testing.T) *agentTunnelLab {
 		records:   map[string]agentTunnelAgentInfo{},
 		online:    map[string]bool{},
 	}
-	oldDeliver, oldCmd, oldOnline, oldLookup := agentHubDeliverDesiredFn, agentHubCommandFn, agentHubOnlineFn, agentRegistryLookupFn
+	oldDeliver, oldCmd, oldOnline, oldLookup := agentHubDeliverDesiredFn.get(), agentHubCommandFn.get(), agentHubOnlineFn.get(), agentRegistryLookupFn.get()
 	oldAckWait, oldPortWait, oldCmdTimeout := agentTunnelAckWait, agentTunnelPortWait, agentTunnelCmdTimeout
 	agentTunnelAckWait, agentTunnelPortWait, agentTunnelCmdTimeout = 2*time.Second, 200*time.Millisecond, 2*time.Second
-	agentHubDeliverDesiredFn = func(id string, d agentDesired) error {
+	agentHubDeliverDesiredFn.set(func(id string, d agentDesired) error {
 		lab.mu.Lock()
 		lab.delivered[id] = append(lab.delivered[id], d)
 		lab.mu.Unlock()
 		return nil
-	}
-	agentHubCommandFn = func(id, op string, params map[string]string, timeout time.Duration) (agentCommandResult, error) {
+	})
+	agentHubCommandFn.set(func(id, op string, params map[string]string, timeout time.Duration) (agentCommandResult, error) {
 		lab.mu.Lock()
 		lab.commands = append(lab.commands, agentCommandCall{ID: id, Op: op, Params: params})
 		lab.mu.Unlock()
 		return agentCommandResult{OK: true}, nil
-	}
-	agentHubOnlineFn = func(id string) bool {
+	})
+	agentHubOnlineFn.set(func(id string) bool {
 		lab.mu.Lock()
 		defer lab.mu.Unlock()
 		return lab.online[id]
-	}
-	agentRegistryLookupFn = func(id string) (agentTunnelAgentInfo, bool) {
+	})
+	agentRegistryLookupFn.set(func(id string) (agentTunnelAgentInfo, bool) {
 		lab.mu.Lock()
 		defer lab.mu.Unlock()
 		rec, ok := lab.records[id]
 		return rec, ok
-	}
+	})
 	t.Cleanup(func() {
 		agentHubDrainAll()
 		agentTunnelWG.Wait()
 		AgentObserverWait() // observers still read the seams about to be restored
-		agentHubDeliverDesiredFn, agentHubCommandFn, agentHubOnlineFn, agentRegistryLookupFn = oldDeliver, oldCmd, oldOnline, oldLookup
+		agentHubDeliverDesiredFn.set(oldDeliver)
+		agentHubCommandFn.set(oldCmd)
+		agentHubOnlineFn.set(oldOnline)
+		agentRegistryLookupFn.set(oldLookup)
 		agentTunnelAckWait, agentTunnelPortWait, agentTunnelCmdTimeout = oldAckWait, oldPortWait, oldCmdTimeout
 	})
 	return lab
@@ -395,20 +398,24 @@ func (c *agentE2EConn) read() (string, json.RawMessage, error) {
 
 func TestAgentTunnelControllerLoopRealHub(t *testing.T) {
 	dir := t.TempDir()
-	oldDir, oldPath := configDir, agentTunnelsPath
+	oldDir := configDir
 	oldAck, oldPort, oldCmd := agentTunnelAckWait, agentTunnelPortWait, agentTunnelCmdTimeout
-	configDir, agentTunnelsPath = dir, filepath.Join(dir, "agent_tunnels.json")
+		configDir = dir
+	setAgentTunnelsPath(filepath.Join(dir, "agent_tunnels.json"))
 	agentTunnelAckWait, agentTunnelPortWait, agentTunnelCmdTimeout = 15*time.Second, 3*time.Second, 10*time.Second
 	t.Cleanup(func() {
-		configDir, agentTunnelsPath = oldDir, oldPath
+		configDir = oldDir
 		agentTunnelAckWait, agentTunnelPortWait, agentTunnelCmdTimeout = oldAck, oldPort, oldCmd
 	})
 
 	// Wire the REAL hub functions (the production wiring).
-	oldDeliver, oldCmdFn, oldOnline, oldLookup := agentHubDeliverDesiredFn, agentHubCommandFn, agentHubOnlineFn, agentRegistryLookupFn
+	oldDeliver, oldCmdFn, oldOnline, oldLookup := agentHubDeliverDesiredFn.get(), agentHubCommandFn.get(), agentHubOnlineFn.get(), agentRegistryLookupFn.get()
 	wireAgentSubsystem()
 	t.Cleanup(func() {
-		agentHubDeliverDesiredFn, agentHubCommandFn, agentHubOnlineFn, agentRegistryLookupFn = oldDeliver, oldCmdFn, oldOnline, oldLookup
+		agentHubDeliverDesiredFn.set(oldDeliver)
+		agentHubCommandFn.set(oldCmdFn)
+		agentHubOnlineFn.set(oldOnline)
+		agentRegistryLookupFn.set(oldLookup)
 	})
 
 	srv := agentHubTestServer(t)

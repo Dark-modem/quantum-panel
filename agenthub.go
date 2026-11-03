@@ -64,8 +64,8 @@ var agentHubUpgrader = websocket.Upgrader{
 // Both are nil in a stock panel; nil ack observer = no-op, nil relay =
 // agents get an explicit "not available" error.
 var (
-	agentAckObserver   func(agentID string, ack agentAck)
-	agentRegisterRelay func(reg agentRegisterMsg, fromAgentID string) agentRegisterResult
+	agentAckObserver   agentSeam[func(agentID string, ack agentAck)]
+	agentRegisterRelay agentSeam[func(reg agentRegisterMsg, fromAgentID string) agentRegisterResult]
 )
 
 // agentObserverWG tracks in-flight observer/relay goroutine calls so tests
@@ -165,6 +165,16 @@ func agentHubCloseAll() {
 		c.shutdown("test drain")
 	}
 	AgentObserverWait()
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		agentHubMu.Lock()
+		n := len(agentHubConns)
+		agentHubMu.Unlock()
+		if n == 0 || time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
 }
 
 func agentHubOnline(id string) bool {
@@ -351,13 +361,19 @@ func (c *agentConn) cleanup() {
 	}
 	_ = c.ws.Close()
 
-	agentHubMu.Lock()
-	current := agentHubConns[c.id] == c
-	if current {
-		delete(agentHubConns, c.id)
-	}
-	agentHubMu.Unlock()
-	if current {
+	// Mark offline BEFORE dropping the hub-map entry: "the map is empty"
+	// must imply "every session's final registry write has happened", which
+	// is the invariant the test drain (agentHubCloseAll) relies on when a
+	// test rotates configDir. The brief window where a closed session is
+	// still in the map is harmless: consumers queue work for reconnects.
+	if current := func() bool {
+		agentHubMu.Lock()
+		defer agentHubMu.Unlock()
+		if agentHubConns[c.id] == c {
+			return true
+		}
+		return false
+	}(); current {
 		if err := agentRegistryUpdate(c.id, func(rec *agentRecord) {
 			if !rec.Revoked {
 				rec.Status = agentStatusOffline
@@ -366,6 +382,11 @@ func (c *agentConn) cleanup() {
 			log.Printf("[agents] cannot mark %s offline: %v", c.id, err)
 		}
 	}
+	agentHubMu.Lock()
+	if agentHubConns[c.id] == c {
+		delete(agentHubConns, c.id)
+	}
+	agentHubMu.Unlock()
 }
 
 // applyHello persists the hello-declared metadata and marks the agent online.
@@ -537,8 +558,7 @@ func (c *agentConn) handleAck(data json.RawMessage) {
 		log.Printf("[agents] cannot record ack for %s: %v", c.id, err)
 		return
 	}
-	if matched && agentAckObserver != nil {
-		hook := agentAckObserver
+	if hook := agentAckObserver.get(); matched && hook != nil {
 		ack := ack
 		go hook(c.id, ack)
 	}
@@ -568,7 +588,7 @@ func (c *agentConn) handleRegister(data json.RawMessage) {
 		_ = c.send(agentMsgRegisterResult, agentRegisterResult{OK: false, Error: "invalid register message"})
 		return
 	}
-	hook := agentRegisterRelay
+	hook := agentRegisterRelay.get()
 	if hook == nil {
 		_ = c.send(agentMsgRegisterResult, agentRegisterResult{OK: false, Error: "register relay not available"})
 		return

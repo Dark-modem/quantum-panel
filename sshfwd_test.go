@@ -188,6 +188,8 @@ func TestBagherFormatByteSize(t *testing.T) {
 }
 
 func TestBagherAPIEndpoints(t *testing.T) {
+	withTempConfig(t) // -count=N shares TestMain's configDir; isolate sshfwd.json
+
 	// Test get_bundle without remote_host (should fail with 400)
 	bodyNoHost := `{"action":"get_bundle"}`
 	reqNoHost := httptest.NewRequest("POST", "/api/sshfwd", strings.NewReader(bodyNoHost))
