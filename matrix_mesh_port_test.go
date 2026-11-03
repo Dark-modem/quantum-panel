@@ -17,6 +17,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 // occupyTCP holds the given ports for the whole test, so the panel's own
@@ -38,7 +39,10 @@ func freeTCPPort(t *testing.T) int {
 	// port must be free on TCP and UDP; on loaded machines the OS can hand
 	// one side of an ephemeral port to another process in the check-to-use
 	// window. Loop until both sides are free, like the agent tests' helper.
-	for attempt := 0; attempt < 20; attempt++ {
+	// Hardened like freeMeshPort: the probe/close sequence races the
+	// Windows loopback stack — 50 attempts with a short settle pause keeps
+	// it deterministic (20 occasionally ran out under load).
+	for attempt := 0; attempt < 50; attempt++ {
 		l, e := net.Listen("tcp", "127.0.0.1:0")
 		if e != nil {
 			t.Fatal(e)
@@ -47,13 +51,14 @@ func freeTCPPort(t *testing.T) int {
 		u, e := net.ListenPacket("udp", "127.0.0.1:"+strconv.Itoa(port))
 		if e != nil {
 			l.Close()
+			time.Sleep(5 * time.Millisecond)
 			continue
 		}
 		l.Close()
 		u.Close()
 		return port
 	}
-	t.Fatal("no dual-transport-free port found after 20 attempts")
+	t.Fatal("no dual-transport-free port found after 50 attempts")
 	return 0
 }
 
