@@ -157,7 +157,13 @@ func agentTestBundle(t *testing.T, in matrixInstance, meshPort, userPort int, re
 // side to another process on loaded machines and flaked setup 1-in-6.
 func freeMeshPort(t *testing.T) int {
 	t.Helper()
-	for attempt := 0; attempt < 20; attempt++ {
+	// Hardened after observed Windows-host flakes: a closed UDP probe
+	// socket and the TCP bind on the same port race inside the host
+	// loopback stack, so a single retry burst of 20 attempts occasionally
+	// ran out. 50 attempts with a short settle pause between tries makes
+	// the helper deterministic without weakening the dual-transport
+	// guarantee (the returned port must be free for BOTH TCP and UDP).
+	for attempt := 0; attempt < 50; attempt++ {
 		u, err := net.ListenPacket("udp", "127.0.0.1:0")
 		if err != nil {
 			t.Fatal(err)
@@ -166,13 +172,14 @@ func freeMeshPort(t *testing.T) int {
 		ln, err := net.Listen("tcp", "127.0.0.1:"+strconv.Itoa(port))
 		if err != nil {
 			u.Close()
-			continue // TCP side taken: pick another ephemeral port
+			time.Sleep(5 * time.Millisecond) // let the loopback stack settle
+			continue                         // TCP side taken: pick another ephemeral port
 		}
 		u.Close()
 		ln.Close()
 		return port
 	}
-	t.Fatal("no dual-transport-free port found after 20 attempts")
+	t.Fatal("no dual-transport-free port found after 50 attempts")
 	return 0
 }
 
