@@ -369,3 +369,40 @@ func TestNetopsStatusNoFalseDriftFromFormatting(t *testing.T) {
 		t.Fatalf("real drift not detected: %+v", res.Drift)
 	}
 }
+
+// TestNetopsStackedAppliesRevertToTrueOriginals pins the baseline-chain fix:
+// apply #1 (originals O1), apply #2 (state after #1 becomes its baseline),
+// rollback of #2, then revert must restore the TRUE pre-netopt values O1 —
+// not apply #1's values. (Live-acceptance finding: with a single baseline,
+// stacked applies stranded intermediate values.)
+func TestNetopsStackedAppliesRevertToTrueOriginals(t *testing.T) {
+	files, dirs, exec := netAgentOnlyFixture(t)
+	netApplyStubEnv(t, files, dirs, exec)
+	// somaxconn original (O1) = 32768
+	files["/proc/sys/net/core/somaxconn"] = "32768\n"
+
+	// apply #1: 32768 -> 8192
+	if _, err := NetopApply(netRoleAuto, "", "", nil); err != nil {
+		t.Fatalf("apply #1: %v", err)
+	}
+	// apply #2 (another operator, another cycle): the live value is now 8192
+	if _, err := NetopApply(netRoleAuto, "", "", nil); err != nil {
+		t.Fatalf("apply #2 (no-op expected): %v", err)
+	}
+	// force a second REAL generation: drift the value, then apply again
+	files["/proc/sys/net/core/somaxconn"] = "12345\n"
+	if _, err := NetopApply(netRoleAuto, "", "", nil); err != nil {
+		t.Fatalf("apply #3: %v", err)
+	}
+	if got := files[netSysctlPath("net.core.somaxconn")]; strings.TrimSpace(got) != "4096" {
+		t.Fatalf("after apply #3 somaxconn = %q, want the Conservative 4096", got)
+	}
+
+	// revert must walk the chain back to the TRUE original 32768
+	if _, err := NetopRevert(); err != nil {
+		t.Fatalf("revert: %v", err)
+	}
+	if got := strings.TrimSpace(files[netSysctlPath("net.core.somaxconn")]); got != "32768" {
+		t.Fatalf("revert restored %q, want the true original 32768 (baseline chain broken)", got)
+	}
+}
