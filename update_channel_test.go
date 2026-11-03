@@ -322,6 +322,9 @@ func TestRunningReleaseTag(t *testing.T) {
 }
 
 func TestHandleUpdateRefusesNotNewer(t *testing.T) {
+	withTempConfig(t)   // -count=N shares TestMain's configDir; isolate update.json
+	dropReleaseCache()  // the 10-minute in-memory release cache leaks across counts
+	t.Cleanup(dropReleaseCache)
 	old := panelVersion
 	defer func() { panelVersion = old }()
 	defer func(f func() ([]ghRelease, error)) { releasesFetcher = f }(releasesFetcher)
