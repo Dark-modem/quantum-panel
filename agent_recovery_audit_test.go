@@ -579,7 +579,7 @@ func quiesceObservers() { AgentObserverWait() }
 func newAgentTunnelLabWithDrain(t *testing.T) *agentTunnelLab {
 	lab := newAgentTunnelLab(t)
 	t.Cleanup(func() {
-		agentHubCloseAll()
+		agentHubDrainAll()
 		agentTunnelWG.Wait()
 		AgentObserverWait()
 	})

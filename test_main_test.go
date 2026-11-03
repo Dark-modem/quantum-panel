@@ -22,13 +22,13 @@ func withTempConfig(t *testing.T) {
 	// Hub sessions from earlier tests may still persist state asynchronously;
 	// wait for them before rotating the configDir seam (cross-test race).
 	if agentHubConns != nil {
-		agentHubCloseAll()
+		agentHubDrainAll()
 	}
 	AgentObserverWait()
 	old := configDir
 	configDir = t.TempDir()
 	t.Cleanup(func() {
-		agentHubCloseAll()
+		agentHubDrainAll()
 		AgentObserverWait()
 		configDir = old
 	})

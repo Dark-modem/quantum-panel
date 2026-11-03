@@ -72,9 +72,51 @@ var (
 // can quiesce before asserting (they race with the async ack path).
 var agentObserverWG sync.WaitGroup
 
+// agentHubRunDones tracks every session goroutine's exit signal — including
+// superseded sessions no longer in the hub map — so test drains can wait for
+// full exit before rotating the configDir seam.
+var (
+	agentHubRunDonesMu sync.Mutex
+	agentHubRunDones   []chan struct{}
+)
+
+func agentHubTrackRun(runDone chan struct{}) {
+	agentHubRunDonesMu.Lock()
+	agentHubRunDones = append(agentHubRunDones, runDone)
+	// Trim completed entries to keep the slice bounded in production.
+	alive := agentHubRunDones[:0]
+	for _, d := range agentHubRunDones {
+		select {
+		case <-d:
+		default:
+			alive = append(alive, d)
+		}
+	}
+	agentHubRunDones = alive
+	agentHubRunDonesMu.Unlock()
+}
+
 // AgentObserverWait quiesces the async ack/relay goroutines so tests can
 // assert on their file/state effects without racing the observer path.
 func AgentObserverWait() { agentObserverWG.Wait() }
+
+// agentHubDrainAll closes every live agent session and waits for all session
+// goroutines — current and superseded — to fully exit, including their final
+// registry writes. Test-only: production sets configDir once at startup
+// before any goroutine exists.
+func agentHubDrainAll() {
+	agentHubCloseAll()
+	agentHubRunDonesMu.Lock()
+	dones := append([]chan struct{}(nil), agentHubRunDones...)
+	agentHubRunDones = nil
+	agentHubRunDonesMu.Unlock()
+	for _, d := range dones {
+		select {
+		case <-d:
+		case <-time.After(3 * time.Second):
+		}
+	}
+}
 
 var (
 	agentHubMu    sync.Mutex
@@ -121,14 +163,6 @@ func agentHubCloseAll() {
 	agentHubMu.Unlock()
 	for _, c := range conns {
 		c.shutdown("test drain")
-	}
-	// Wait for the session goroutines to fully exit: their cleanup path
-	// persists state and reads the configDir seam that tests rotate.
-	for _, c := range conns {
-		select {
-		case <-c.runDone:
-		case <-time.After(3 * time.Second):
-		}
 	}
 	AgentObserverWait()
 }
@@ -201,6 +235,7 @@ func handleAgentWS(w http.ResponseWriter, r *http.Request) {
 	agentHubConns[id] = conn
 	agentHubMu.Unlock()
 
+	agentHubTrackRun(conn.runDone)
 	defer conn.cleanup()
 	defer close(conn.runDone)
 	conn.run()

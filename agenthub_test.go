@@ -32,7 +32,7 @@ func agentHubTestServer(t *testing.T) *httptest.Server {
 	mux.HandleFunc("GET /api/agent-ws", handleAgentWS)
 	srv := httptest.NewServer(mux)
 	t.Cleanup(func() {
-		agentHubCloseAll()
+		agentHubDrainAll()
 		srv.Close()
 	})
 	return srv
