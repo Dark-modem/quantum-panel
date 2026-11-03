@@ -240,6 +240,12 @@ func TestAgentDesiredRevisionRules(t *testing.T) {
 func TestAgentHubApply(t *testing.T) {
 	agentLab(t)
 	port, userPort := freeMeshPort(t), freeMeshPort(t)
+	// freeMeshPort probes-and-closes; the OS may hand the same ephemeral port
+	// back twice in quick succession, and validateMatrixSettings refuses a
+	// forwarded port equal to the mesh port (Session 4 Linux -count=5 CI).
+	for userPort == port {
+		userPort = freeMeshPort(t)
+	}
 	ack := agentApplyDesired(nil, agentHubDesired("10", port, []int{userPort}))
 	if !ack.OK {
 		t.Fatalf("hub apply failed: %+v", ack)
