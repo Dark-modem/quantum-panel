@@ -446,7 +446,11 @@ func (s *agentSession) readLoop() {
 				s.fail(uerr)
 				return
 			}
-			go s.handleDesired(d)
+			agentOpsWG.Add(1)
+			go func() {
+				defer agentOpsWG.Done()
+				s.handleDesired(d)
+			}()
 		case agentMsgCommand:
 			var c agentCommand
 			if uerr := json.Unmarshal(data, &c); uerr != nil {
@@ -454,7 +458,11 @@ func (s *agentSession) readLoop() {
 				s.fail(uerr)
 				return
 			}
-			go s.handleCommand(c)
+			agentOpsWG.Add(1)
+			go func() {
+				defer agentOpsWG.Done()
+				s.handleCommand(c)
+			}()
 		case agentMsgWelcome:
 			s.deliver(typ, data)
 		default:
