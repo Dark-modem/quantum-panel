@@ -106,8 +106,11 @@ func TestFirewallAgentIntegrationReadiness(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if teardown.ReleasedPorts != 1 {
-		t.Fatalf("exactly one registry port must be released: %+v", teardown)
+	// The apply in step 4 auto-recorded 8443/tcp+udp, the reserve below
+	// added 18443 — after teardown the owner must own NOTHING (the remove
+	// path drops ownership records whether the rule was present or not).
+	if len(portEntriesForOwner("tunnel:at_ready")) != 0 {
+		t.Fatalf("owner entries must be gone after teardown, got %+v", portEntriesForOwner("tunnel:at_ready"))
 	}
 	fwRoundTrip(t, teardown)
 	joined := strings.Join(fake.recorded(), "\n")

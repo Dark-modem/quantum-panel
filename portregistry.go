@@ -317,6 +317,55 @@ func portReleaseOwner(ownerKind, ownerID string) (int, error) {
 	return n, portRegistrySave(s)
 }
 
+// portRegistryRecord records ownership for a port the firewall engine just
+// opened (fwApply add path). Unlike portReserve it performs NO listener or
+// ephemeral-range checks — the plan already validated the port — and it
+// silently upserts, so an installer-only apply (no separate ports reserve
+// call) still leaves the port teardown-addressable.
+func portRegistryRecord(r fwPortRule) error {
+	kind, id := portOwnerExternal, r.Owner
+	if k, i, err := fwAgentSplitOwner(r.Owner); err == nil {
+		kind, id = k, i
+	}
+	portRegMu.Lock()
+	defer portRegMu.Unlock()
+	s := portRegistryLoad()
+	for i := range s.Entries {
+		if s.Entries[i].Port == r.Port && s.Entries[i].Proto == r.Proto {
+			s.Entries[i].OwnerKind, s.Entries[i].OwnerID = kind, id
+			s.Entries[i].Family, s.Entries[i].Note = r.Family, r.Note
+			return portRegistrySave(s)
+		}
+	}
+	s.Entries = append(s.Entries, portEntry{
+		Port: r.Port, Proto: r.Proto, OwnerKind: kind, OwnerID: id,
+		Family: r.Family, Note: r.Note, ReservedAt: time.Now().Unix(),
+	})
+	return portRegistrySave(s)
+}
+
+// portRegistryForget drops the ownership record for one port/transport
+// (fwApply remove path). A missing entry is a no-op.
+func portRegistryForget(proto string, port int) error {
+	portRegMu.Lock()
+	defer portRegMu.Unlock()
+	s := portRegistryLoad()
+	kept := s.Entries[:0]
+	dropped := false
+	for _, e := range s.Entries {
+		if e.Port == port && e.Proto == proto {
+			dropped = true
+			continue
+		}
+		kept = append(kept, e)
+	}
+	if !dropped {
+		return nil
+	}
+	s.Entries = kept
+	return portRegistrySave(s)
+}
+
 // portEntries returns all reservations sorted by port then proto. The
 // result is never nil (empty registries serialize as [] for the UI).
 func portEntries() []portEntry {

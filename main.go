@@ -566,6 +566,13 @@ func main() {
 			// Firewall & port engine CLI (Session 1): plan is dry-run,
 			// apply/teardown are --yes-gated; all output is JSON.
 			os.Exit(firewallCLI(os.Args[1], os.Args[2:]))
+		default:
+			// Unknown subcommand: fail fast with usage. Falling through
+			// would silently start a full second panel instance and look
+			// exactly like a hang to any caller probing a subcommand this
+			// binary does not have (the reported installer "detect hang").
+			fmt.Fprintf(os.Stderr, "unknown command %q — see: gre-panel --help\n", os.Args[1])
+			os.Exit(2)
 		}
 	}
 	if v := os.Getenv("GRE_PANEL_DIR"); v != "" {

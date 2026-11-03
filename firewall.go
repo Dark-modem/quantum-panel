@@ -586,6 +586,23 @@ func fwApply(plan fwPlan) (fwApplyResult, error) {
 				return res, err
 			}
 		}
+		// Ownership recording: every applied add registers the port in the
+		// registry (the plan already validated it), so a later
+		// `firewall teardown --owner …` can find and remove exactly what
+		// this apply opened. Every remove — executed OR skipped — drops
+		// the record: a skipped remove means the rule is already absent
+		// from the host, so the ownership record is stale. Without this,
+		// an installer-only apply (no separate ports reserve call) would
+		// open a port the engine could never clean up.
+		if op.Kind == "add" {
+			if err := portRegistryRecord(op.Rule); err != nil {
+				log.Printf("[FW] apply: cannot record ownership for %d/%s: %v", op.Rule.Port, op.Rule.Proto, err)
+			}
+		} else {
+			if err := portRegistryForget(op.Rule.Proto, op.Rule.Port); err != nil {
+				log.Printf("[FW] apply: cannot drop ownership for %d/%s: %v", op.Rule.Port, op.Rule.Proto, err)
+			}
+		}
 		res.Applied = append(res.Applied, applied)
 	}
 

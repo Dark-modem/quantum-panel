@@ -112,12 +112,14 @@ func TestFirewallAgentTeardownGuardsAndReleases(t *testing.T) {
 	if _, err := AgentFirewallTeardown(fwAgentTeardownParams{Owner: "tunnel:at_x"}); err == nil {
 		t.Fatal("teardown without Confirmed must be refused")
 	}
-	out, err := AgentFirewallTeardown(fwAgentTeardownParams{Owner: "tunnel:at_x", Confirmed: true})
+	_, err := AgentFirewallTeardown(fwAgentTeardownParams{Owner: "tunnel:at_x", Confirmed: true})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out.ReleasedPorts != 1 {
-		t.Fatalf("one registry port must be released, got %+v", out)
+	// The remove path drops the ownership record itself (the rule was
+	// present and is now gone), so nothing is left for the release step.
+	if len(portEntriesForOwner("tunnel:at_x")) != 0 {
+		t.Fatalf("owner entries must be gone, got %+v", portEntriesForOwner("tunnel:at_x"))
 	}
 	if !strings.Contains(strings.Join(fake.recorded(), "\n"), "iptables -D QUANTUM_FW "+spec) {
 		t.Fatalf("teardown must remove the owner's rule: %v", fake.recorded())
