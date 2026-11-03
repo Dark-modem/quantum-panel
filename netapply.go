@@ -21,6 +21,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -70,7 +71,8 @@ type netJournal struct {
 // detection snapshot taken before the change.
 type netBaseline struct {
 	Version    int                 `json:"version"`
-	Before     []netAppliedSetting `json:"before"` // per-key previous values ("" = unreadable/absent)
+	AppliedAt  int64               `json:"applied_at"` // set at apply time; names the chain file
+	Before     []netAppliedSetting `json:"before"`     // per-key previous values ("" = unreadable/absent)
 	Detect     *netHardwareReport  `json:"detect"`
 	OwnedFiles map[string]string   `json:"owned_files_before"` // owned file path -> previous content
 }
@@ -241,6 +243,7 @@ func netApply(profile netProfileName, role netRole, reasons []string) (*netJourn
 		}
 	}
 	base.Before = append(sysctlSettings, nicSettings...)
+	base.AppliedAt = time.Now().UnixNano() // chain-file identity (monotonic per ns)
 
 	// 1) sysctl drop-in (owned) + runtime apply + read-back verification.
 	var verifyErrs []string
@@ -446,15 +449,51 @@ func netRestore(j *netJournal, base *netBaseline) []string {
 }
 
 // netPersist atomically writes the journal and baseline after a decisive
-// apply/rollback outcome.
+// apply/rollback outcome. Every baseline is ALSO appended to the chain
+// directory (immutable, one file per apply) so `revert` can walk back to the
+// TRUE pre-netopt state even after several stacked applies — the single
+// baseline.json only ever describes the last apply (live-acceptance finding:
+// apply#1 → apply#2 → revert otherwise restores apply#1's state, not the
+// originals).
 func netPersist(j *netJournal, base *netBaseline) {
 	_ = os.MkdirAll(netOptDir(), 0700)
 	if b, err := json.MarshalIndent(base, "", "  "); err == nil {
 		_ = netWriteOwnedFile(netBaselinePath(), string(b), 0600)
+		if base.AppliedAt > 0 {
+			chain := filepath.Join(netOptDir(), "baselines", fmt.Sprintf("%d.json", base.AppliedAt))
+			_ = netWriteOwnedFile(chain, string(b), 0600)
+		}
 	}
 	if b, err := json.MarshalIndent(j, "", "  "); err == nil {
 		_ = netWriteOwnedFile(netJournalPath(), string(b), 0600)
 	}
+}
+
+// netBaselineChain returns every chained baseline sorted oldest-first.
+// baselines without a parseable AppliedAt sort last and are ignored for the
+// "true original" pick.
+func netBaselineChain() []*netBaseline {
+	entries, err := os.ReadDir(filepath.Join(netOptDir(), "baselines"))
+	if err != nil {
+		return nil
+	}
+	var out []*netBaseline
+	for _, e := range entries {
+		if !strings.HasSuffix(e.Name(), ".json") {
+			continue
+		}
+		b, err := os.ReadFile(filepath.Join(netOptDir(), "baselines", e.Name()))
+		if err != nil {
+			continue
+		}
+		var base netBaseline
+		if json.Unmarshal(b, &base) != nil || base.AppliedAt <= 0 {
+			continue
+		}
+		out = append(out, &base)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].AppliedAt < out[j].AppliedAt })
+	return out
 }
 
 // netLoadJournal reads the last apply's journal. Journal and baseline are
@@ -507,14 +546,23 @@ func netRollback() (string, error) {
 	return fmt.Sprintf("rolled back apply of %s (%d settings restored)", j.Profile, len(j.Applied)), nil
 }
 
-// netRevert removes every owned file and restores the stored baseline — the
-// full return to the pre-netopt state.
+// netRevert removes every owned file and restores the TRUE pre-netopt state:
+// it walks the baseline chain back to the OLDEST baseline (the one captured
+// before the first apply) so stacked applies cannot strand intermediate
+// values. With no chain it falls back to the last baseline, then to removing
+// only files this subsystem owns.
 func netRevert() (string, error) {
-	base := netLoadBaseline()
 	var errs []string
-	if base != nil {
-		errs = netRestore(&netJournal{}, base)
-	} else {
+	chain := netBaselineChain()
+	switch {
+	case len(chain) > 0:
+		oldest := chain[0]
+		errs = netRestore(&netJournal{}, oldest)
+		// the chain itself has served its purpose
+		_ = os.RemoveAll(filepath.Join(netOptDir(), "baselines"))
+	case netLoadBaseline() != nil:
+		errs = netRestore(&netJournal{}, netLoadBaseline())
+	default:
 		// No baseline stored: only remove files this subsystem owns.
 		for _, f := range []string{netOwnedSysctlFile, netOwnedUnitFile} {
 			if b, err := netReadFile(f); err == nil && strings.HasPrefix(string(b), netOwnedMarker) {
