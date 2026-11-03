@@ -141,8 +141,11 @@ func TestFirewallCLITeardownGuardsAndReleases(t *testing.T) {
 		t.Fatalf("confirmed teardown must succeed, exit %d payload %#v", exit, payload)
 	}
 	m := payload.(map[string]any)
-	if m["released_ports"] != 1 {
-		t.Fatalf("one registry port must be released, got %#v", m)
+	// The remove path drops the ownership record itself, so released_ports
+	// is 0 and the registry ends empty (asserted below) — the rule and the
+	// record are both gone.
+	if m["released_ports"] != 0 {
+		t.Fatalf("release count after the remove-path forget must be 0, got %#v", m)
 	}
 	if !strings.Contains(strings.Join(fake.recorded(), "\n"), "iptables -D QUANTUM_FW "+spec) {
 		t.Fatalf("teardown must remove the owner's rule: %v", fake.recorded())
