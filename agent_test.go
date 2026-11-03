@@ -1027,3 +1027,41 @@ func TestAgentIfaceUpTunOperstateUnknown(t *testing.T) {
 		t.Fatal("explicitly DOWN interface must report down")
 	}
 }
+
+// Regression (previously reported unfinished issue): a Matrix instance
+// whose state says "enabled with this exact configuration" but whose
+// systemd unit file was deleted from disk must be REBUILT by a re-applied
+// hub desired — not acked OK while the tunnel is actually down.
+func TestAgentHubApplyMissingUnitSelfHeal(t *testing.T) {
+	agentLab(t)
+	port, userPort := freeMeshPort(t), freeMeshPort(t)
+	for userPort == port {
+		userPort = freeMeshPort(t)
+	}
+	desired := agentHubDesired("10", port, []int{userPort})
+	if ack := agentApplyDesired(nil, desired); !ack.OK {
+		t.Fatalf("first apply failed: %+v", ack)
+	}
+	legacy := matrixLegacyInstance()
+	unitPath := matrixUnitPathOf(legacy)
+	if _, err := os.Stat(unitPath); err != nil {
+		t.Fatalf("precondition: unit file must exist after apply: %v", err)
+	}
+	if err := os.Remove(unitPath); err != nil {
+		t.Fatal(err)
+	}
+
+	// Same configuration, new revision: the idempotent short-circuit used
+	// to ack OK here while nothing backed the tunnel on the host.
+	again := agentHubDesired("11", port, []int{userPort})
+	if ack := agentApplyDesired(nil, again); !ack.OK {
+		t.Fatalf("self-heal re-apply failed: %+v", ack)
+	}
+	if _, err := os.Stat(unitPath); err != nil {
+		t.Fatalf("unit file must be recreated by the self-heal: %v", err)
+	}
+	st := loadMatrixInstance(legacy)
+	if st.Revision != "11" {
+		t.Fatalf("revision must be refreshed by the rebuild, got %+v", st)
+	}
+}

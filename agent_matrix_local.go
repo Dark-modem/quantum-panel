@@ -149,9 +149,10 @@ func agentApplyMatrixHub(d *agentDesired, m *agentDesiredMatrix) agentAck {
 		Name: "main", IP: in.hubIP(), Token: h.Token, Revision: d.Revision,
 	}
 	if st.Enabled && st.Network == in.network() {
-		if agentHubConfigEqual(st, want) {
-			// Idempotent: same configuration. Only keep the bundle revision
-			// in sync so later node registrations validate.
+		if agentHubConfigEqual(st, want) && matrixUnitFilePresent(in) {
+			// Idempotent: same configuration AND the systemd unit still
+			// exists on disk. Only keep the bundle revision in sync so
+			// later node registrations validate.
 			if st.Revision != d.Revision {
 				st.Revision = d.Revision
 				if err := saveMatrixInstance(in, st); err != nil {
@@ -160,7 +161,12 @@ func agentApplyMatrixHub(d *agentDesired, m *agentDesiredMatrix) agentAck {
 			}
 			return agentHubMainHostAck(d, in)
 		}
-		// Config drift: full rebuild (which also drops any stale pairing).
+		// Full rebuild, for either reason: config drift, or the recorded
+		// state says "enabled with this exact configuration" but the
+		// systemd unit file has vanished from disk (manual cleanup, a
+		// partial uninstall, a failed upgrade). Without this self-heal the
+		// idempotent path acked OK while the tunnel was actually down —
+		// state said enabled, nothing on the host backed it.
 		if err := matrixRemove(in, st); err != nil {
 			return agentAck{Revision: d.Revision, OK: false, Error: err.Error()}
 		}
@@ -606,4 +612,13 @@ func agentMatrixStatuses(probe bool) []agentMatrixStatus {
 		out = append(out, s)
 	}
 	return out
+}
+
+// matrixUnitFilePresent reports whether the instance's systemd unit file
+// still exists on disk. The hub apply path treats a missing unit with
+// "enabled" recorded state as a rebuild trigger (self-heal), never as an
+// idempotent no-op.
+func matrixUnitFilePresent(in matrixInstance) bool {
+	_, err := os.Stat(matrixUnitPathOf(in))
+	return err == nil
 }
