@@ -8393,6 +8393,60 @@ async function noStatus() {
   catch (e) { opsRenderJSON('noStatus', { error: e.message || String(e) }); }
 }
 
+
+// ---- typed mutations: plan -> review -> confirm -> apply (firewall/netopt) ----
+// The agent returns the plan verbatim; the operator confirms; the same op is
+// resent with confirm=true. Results and failures render as returned.
+
+function opsMutate(selId, op, payload, outId, verb) {
+  const out = $(outId); if (out) out.textContent = '...';
+  return api('/api/agents/' + encodeURIComponent(selId) + '/op', { op: op, payload: payload })
+    .then(function (plan) {
+      const planTxt = JSON.stringify(plan.result || plan.error, null, 1);
+      if (!plan.ok) { opsRenderJSON(outId, { error: plan.error || 'plan refused' }); return; }
+      if (out) out.textContent = 'PLAN:\n' + planTxt + '\n\nConfirm to ' + (verb || 'apply') + '.';
+      return entConfirm(tr('', 'Apply ' + (verb || op) + '?'),
+        docTpl('The agent returned the plan above. Applying changes the endpoint firewall/tuning. Audit-logged.', []),
+        tr('', 'Apply')).then(function (yes) {
+          if (!yes) { if (out) out.textContent = 'PLAN (not applied):\n' + planTxt; return; }
+          return api('/api/agents/' + encodeURIComponent(selId) + '/op', { op: op, payload: payload, confirm: true })
+            .then(function (res) {
+              opsRenderJSON(outId, res.ok ? res.result : { error: res.error });
+              if (res.ok) toastOk(tr('', 'Applied'), op); else toastErr(tr('', 'Failed'), res.error || '');
+            });
+        });
+    })
+    .catch(function (e) { opsRenderJSON(outId, { error: e.message || String(e) }); });
+}
+
+function fwPlanApply() {
+  const id = ($('fwAgentSel') || {}).value; if (!id) return;
+  const owner = 'service:quantum-ui-' + id.slice(-4);
+  const addRaw = window.prompt(tr('', 'Ports to OPEN (proto:port, comma sep, e.g. tcp:8443,udp:8443)'), 'tcp:8443');
+  if (!addRaw) return;
+  const add = addRaw.split(',').map(function (x) { const p = x.trim().split(':'); return { proto: p[0], port: parseInt(p[1], 10), name: 'ui-' + p[1] }; }).filter(function (s) { return s.proto && s.port > 0; });
+  const removeRaw = window.prompt(tr('', 'Ports to CLOSE (same format, empty to skip)'), '');
+  const remove = (removeRaw || '').split(',').map(function (x) { const p = x.trim().split(':'); return { proto: p[0], port: parseInt(p[1], 10), name: 'ui-' + p[1] }; }).filter(function (s) { return s.proto && s.port > 0; });
+  if (!add.length && !remove.length) return;
+  return opsMutate(id, 'firewall.apply', { owner: owner, add: add, remove: remove }, 'fwOut', 'apply firewall changes');
+}
+async function fwTeardown() {
+  const id = ($('fwAgentSel') || {}).value; if (!id) return;
+  const owner = window.prompt(tr('', 'Owner to tear down (e.g. service:quantum-agent-ssh-alt)'), '');
+  if (!owner) return;
+  await opsMutate(id, 'firewall.teardown', { owner: owner }, 'fwOut', 'teardown');
+}
+function noPlanApply() {
+  const id = ($('noAgentSel') || {}).value; if (!id) return;
+  const profile = window.prompt(tr('', 'Profile (conservative | balanced | performance)'), 'conservative');
+  if (!profile) return;
+  return opsMutate(id, 'netopt.apply', { role: 'agent', profile: profile.trim(), justify: 'quantum-ui:operator' }, 'noOut', 'apply tuning');
+}
+async function noRollback() {
+  const id = ($('noAgentSel') || {}).value; if (!id) return;
+  await opsMutate(id, 'netopt.rollback', {}, 'noOut', 'rollback');
+}
+
 // ---- agent Matrix tunnels ----
 
 // Signature detail (UnsloP direction): the Hub——Node route drawn as one
@@ -8607,6 +8661,10 @@ async function agentTunnelDelete(id) {
   if (usel) usel.onclick = () => agentUpdateOpen(Array.from(agentSelGet()));
   const fwb = $('fwDetectBtn'); if (fwb) fwb.onclick = () => { fwDetect(); fwPorts(); };
   const nob = $('noDetectBtn'); if (nob) nob.onclick = () => { noDetect(); noStatus(); };
+  const fwa = $('fwApplyBtn'); if (fwa) fwa.onclick = fwPlanApply;
+  const fwt = $('fwTeardownBtn'); if (fwt) fwt.onclick = fwTeardown;
+  const npl = $('noPlanBtn'); if (npl) npl.onclick = noPlanApply;
+  const nrb = $('noRollbackBtn'); if (nrb) nrb.onclick = noRollback;
 
   document.addEventListener('change', e => {
     const cb = e.target && e.target.matches && e.target.matches('.ag-sel');

@@ -3348,6 +3348,10 @@
           <div id="fwOut" class="ops-out u-mono" dir="ltr" aria-live="polite"></div>
           <div class="dr"><span class="k" data-i18n="ops_ports">Listening ports (from the agent)</span></div>
           <div id="fwPorts" class="ops-out u-mono" dir="ltr" aria-live="polite"></div>
+          <div class="u-flex u-gap-8 u-mt-8">
+            <button type="button" class="quantum-btn quantum-btn-secondary" id="fwApplyBtn" data-i18n="ops_fw_plan">Plan / Apply firewall change</button>
+            <button type="button" class="quantum-btn quantum-btn-danger" id="fwTeardownBtn" data-i18n="ops_fw_teardown">Teardown owner rules</button>
+          </div>
           <p class="qs-hint" data-i18n="fw_apply_hint">Plan and apply are available for Quantum-owned changes; the agent refuses mutations without an explicit confirmation step and records every operation in the audit log.</p>
         </div>
       </section>
@@ -3362,6 +3366,10 @@
           <div id="noOut" class="ops-out u-mono" dir="ltr" aria-live="polite"></div>
           <div class="dr"><span class="k" data-i18n="netopt_status">Tuning status on the agent</span></div>
           <div id="noStatus" class="ops-out u-mono" dir="ltr" aria-live="polite"></div>
+          <div class="u-flex u-gap-8 u-mt-8">
+            <button type="button" class="quantum-btn quantum-btn-secondary" id="noPlanBtn" data-i18n="ops_no_plan">Plan / Apply tuning</button>
+            <button type="button" class="quantum-btn quantum-btn-danger" id="noRollbackBtn" data-i18n="ops_no_rollback">Rollback</button>
+          </div>
           <p class="qs-hint" data-i18n="netopt_apply_hint">Apply/rollback run only with an explicit confirmation step and a justify string; profiles are chosen per node after hardware detection. No values on this page are simulated.</p>
         </div>
       </section>
