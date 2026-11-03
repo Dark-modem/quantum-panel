@@ -36,7 +36,9 @@ func matrixInstanceLab(t *testing.T) {
 		}
 		return "", nil
 	}
-	t.Cleanup(func() { configDir, matrixUnitDir, matrixTincPath, matrixExec = oldDir, oldUnit, oldTinc, oldExec })
+		t.Cleanup(func() {
+		AgentOpsWait() // agent runtime goroutines read configDir/matrix seams
+ configDir, matrixUnitDir, matrixTincPath, matrixExec = oldDir, oldUnit, oldTinc, oldExec })
 }
 
 func freeUDPPort(t *testing.T) int {

@@ -21,7 +21,10 @@ func withTempConfig(t *testing.T) {
 	t.Helper()
 	old := configDir
 	configDir = t.TempDir()
-	t.Cleanup(func() { configDir = old })
+	t.Cleanup(func() {
+		agentHubCloseAll() // sessions read configDir during their teardown
+		configDir = old
+	})
 }
 
 func TestMain(m *testing.M) {

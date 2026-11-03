@@ -264,6 +264,7 @@ func TestAgentWSRoundTrip(t *testing.T) {
 	case <-time.After(10 * time.Second):
 		t.Fatal("loop did not stop on cancel")
 	}
+	AgentOpsWait() // drain async desired/command goroutines before the labs restore
 	if atomic.LoadInt32(&conns) != 1 {
 		t.Fatalf("round trip should hold one connection, got %d", conns)
 	}
@@ -341,6 +342,7 @@ func TestAgentReconnectBackoff(t *testing.T) {
 	case <-time.After(10 * time.Second):
 		t.Fatal("loop did not stop")
 	}
+	AgentOpsWait() // drain async desired/command goroutines before the labs restore
 	if hellos < 2 || atomic.LoadInt32(&conns) < 2 || atomic.LoadInt32(&dials) < 3 {
 		t.Fatalf("expected injected dial failure then reconnect: hellos=%d conns=%d dials=%d",
 			hellos, conns, dials)

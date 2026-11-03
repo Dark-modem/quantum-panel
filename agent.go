@@ -59,6 +59,16 @@ const (
 // ceiling); a var so tests can shrink it.
 var agentBackoffBase = 2 * time.Second
 
+// agentOpsWG tracks the session's async work (desired application, command
+// execution, heartbeat loop, reconcile) so tests can wait for it to drain
+// before rotating the configDir/matrix seams those goroutines read.
+var agentOpsWG sync.WaitGroup
+
+// AgentOpsWait blocks until the agent runtime's in-flight async operations
+// have finished. Test-only drain aid; in production the process exits with
+// the session.
+func AgentOpsWait() { agentOpsWG.Wait() }
+
 // agentWS is the WebSocket surface the runtime needs; *websocket.Conn
 // satisfies it and tests can fake it.
 type agentWS interface {
@@ -391,9 +401,17 @@ func (s *agentSession) serve(ctx context.Context) error {
 	s.rt.recordWS(true, "")
 
 	// Finish whatever the last session left pending and ack it.
-	go agentReconcilePending(s)
+	agentOpsWG.Add(1)
+	go func() {
+		defer agentOpsWG.Done()
+		agentReconcilePending(s)
+	}()
 
-	go s.heartbeatLoop(ctx)
+	agentOpsWG.Add(1)
+	go func() {
+		defer agentOpsWG.Done()
+		s.heartbeatLoop(ctx)
+	}()
 
 	select {
 	case <-s.done:

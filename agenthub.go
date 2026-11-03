@@ -122,6 +122,16 @@ func agentHubCloseAll() {
 		c.shutdown("test drain")
 	}
 	AgentObserverWait()
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		agentHubMu.Lock()
+		n := len(agentHubConns)
+		agentHubMu.Unlock()
+		if n == 0 || time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
 }
 
 func agentHubOnline(id string) bool {
@@ -305,13 +315,19 @@ func (c *agentConn) cleanup() {
 	}
 	_ = c.ws.Close()
 
-	agentHubMu.Lock()
-	current := agentHubConns[c.id] == c
-	if current {
-		delete(agentHubConns, c.id)
-	}
-	agentHubMu.Unlock()
-	if current {
+	// Mark offline BEFORE dropping the hub-map entry: "the map is empty"
+	// must imply "every session's final registry write has happened", which
+	// is the invariant the test drain (agentHubCloseAll) relies on when a
+	// test rotates configDir. The brief window where a closed session is
+	// still in the map is harmless: consumers queue work for reconnects.
+	if current := func() bool {
+		agentHubMu.Lock()
+		defer agentHubMu.Unlock()
+		if agentHubConns[c.id] == c {
+			return true
+		}
+		return false
+	}(); current {
 		if err := agentRegistryUpdate(c.id, func(rec *agentRecord) {
 			if !rec.Revoked {
 				rec.Status = agentStatusOffline
@@ -320,6 +336,11 @@ func (c *agentConn) cleanup() {
 			log.Printf("[agents] cannot mark %s offline: %v", c.id, err)
 		}
 	}
+	agentHubMu.Lock()
+	if agentHubConns[c.id] == c {
+		delete(agentHubConns, c.id)
+	}
+	agentHubMu.Unlock()
 }
 
 // applyHello persists the hello-declared metadata and marks the agent online.
