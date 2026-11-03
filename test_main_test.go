@@ -19,9 +19,19 @@ import (
 // the test writes never reach another test or the host.
 func withTempConfig(t *testing.T) {
 	t.Helper()
+	// Hub sessions from earlier tests may still persist state asynchronously;
+	// wait for them before rotating the configDir seam (cross-test race).
+	if agentHubConns != nil {
+		agentHubCloseAll()
+	}
+	AgentObserverWait()
 	old := configDir
 	configDir = t.TempDir()
-	t.Cleanup(func() { configDir = old })
+	t.Cleanup(func() {
+		agentHubCloseAll()
+		AgentObserverWait()
+		configDir = old
+	})
 }
 
 func TestMain(m *testing.M) {
