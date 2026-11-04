@@ -37,8 +37,10 @@ func matrixInstanceLab(t *testing.T) {
 		return "", nil
 	}
 		t.Cleanup(func() {
-		AgentOpsWait() // agent runtime goroutines read configDir/matrix seams
- configDir, matrixUnitDir, matrixTincPath, matrixExec = oldDir, oldUnit, oldTinc, oldExec })
+		// No AgentOpsWait here: the agent runtime (and its drain helper)
+		// was removed with the controller extraction; this tree has no
+		// agent goroutines to drain before restoring the seams.
+		configDir, matrixUnitDir, matrixTincPath, matrixExec = oldDir, oldUnit, oldTinc, oldExec })
 }
 
 func freeUDPPort(t *testing.T) int {
