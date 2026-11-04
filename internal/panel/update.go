@@ -1,0 +1,691 @@
+package panel
+
+// Update API: check for a newer prebuilt panel release and install it.
+// Same safety rules as quantum.sh update_all(): verify download, keep local
+// config (panel.json) untouched, restart the service, and
+// never leave the system in a broken state on failure.
+
+import (
+	"crypto/ed25519"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"time"
+)
+
+var updateClient = &http.Client{Timeout: 25 * time.Second}
+
+// handleVersion / latestReleaseTag (channel aware) live in update_channel.go.
+
+// handleUpdate downloads the latest prebuilt binary for this arch,
+// verifies it (non-empty ELF), swaps it in, syncs the latest quantum.sh
+// next to the panel binary, and restarts the service.
+const panelScriptName = "quantum.sh"
+
+// quantumRepo is the private repository the updater pulls releases from.
+const quantumRepo = "Dark-modem/quantum"
+
+// ghFetchAsset streams release asset `name` of tag `tag` ("latest" allowed)
+// from the private quantum repository: the release's asset list is read
+// through the API (Bearer) and the asset is downloaded from its API URL with
+// Accept: application/octet-stream, which for a private repository redirects
+// to a short-lived signed URL.
+func ghFetchAsset(tag, name string, tmp *os.File) error {
+	tagPath := "tags/" + tag
+	if tag == "" || tag == "latest" {
+		tagPath = "latest"
+	}
+	var rel struct {
+		Assets []struct {
+			Name string `json:"name"`
+			URL  string `json:"url"`
+		} `json:"assets"`
+	}
+	if err := getJSON("/"+tagPath, &rel); err != nil {
+		return err
+	}
+	assetURL := ""
+	for _, a := range rel.Assets {
+		if a.Name == name {
+			assetURL = a.URL
+			break
+		}
+	}
+	if assetURL == "" {
+		return fmt.Errorf("asset %q not found in release %s", name, tag)
+	}
+	client := &http.Client{Timeout: 120 * time.Second}
+	req, err := http.NewRequest("GET", assetURL, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("User-Agent", "quantum-panel-updater/"+panelVersion)
+	req.Header.Set("Authorization", "Bearer "+githubToken())
+	req.Header.Set("Accept", "application/octet-stream")
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("asset download: %s", resp.Status)
+	}
+	if _, err := tmp.Seek(0, 0); err == nil {
+		_ = tmp.Truncate(0)
+	}
+	_, err = io.Copy(tmp, resp.Body)
+	if err != nil {
+		return err
+	}
+	return tmp.Close()
+}
+
+func handleUpdate(w http.ResponseWriter, r *http.Request) {
+	arch, asset, err := panelAsset()
+	if err != nil {
+		writeAPIError(w, r, "E-UPDATE-05", err.Error())
+		return
+	}
+	_ = arch
+	// Optional {"tag":"vX.Y.Z"}: install that exact release, older included
+	// (downgrade). No body = newest of the channel, as before.
+	var req struct {
+		Tag string `json:"tag"`
+	}
+	if r.Body != nil {
+		_ = json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<10)).Decode(&req)
+	}
+	explicit := req.Tag != ""
+	if explicit && !validTag(req.Tag) {
+		writeAPIError(w, r, "E-UPDATE-01", "unexpected release tag")
+		return
+	}
+	latest := req.Tag
+	if !explicit {
+		latest, _ = latestReleaseTag()
+		if latest == "" {
+			latest = "latest"
+		}
+		if latest != "latest" && !validTag(latest) {
+			writeAPIError(w, r, "E-UPDATE-01", "unexpected release tag")
+			return
+		}
+	}
+	if latest != "latest" && latest == panelVersion {
+		writeJSON(w, map[string]string{"status": "ok", "detail": "already latest (" + displayVersion(panelVersion) + ")"})
+		return
+	}
+	// never install something that is not newer than what is running
+	// (e.g. a stable host must not be "updated" to an older tag) —
+	// unless the operator picked the tag, which is how a downgrade works
+	if !explicit && latest != "latest" && !updateAvailable(panelVersion, latest, updateChannel()) {
+		writeJSON(w, map[string]string{"status": "ok", "detail": "already latest (" + displayVersion(panelVersion) + ")"})
+		return
+	}
+
+	LogSecurityAudit("update_initiated", cfg.Username, ClientIP(r), "from="+panelVersion+" to="+latest+" asset="+asset)
+
+	var dlURL string
+	if latest == "latest" {
+		dlURL = "https://github.com/Dark-modem/quantum/releases/latest/download/" + asset
+	} else {
+		dlURL = "https://github.com/Dark-modem/quantum/releases/download/" + latest + "/" + asset
+	}
+	tmp, err := os.CreateTemp("", "gre-panel-update-*")
+	if err != nil {
+		writeAPIError(w, r, "E-UPDATE-04", "")
+		return
+	}
+	tmpPath := tmp.Name()
+	defer os.Remove(tmpPath)
+	// downloadFile closes tmp only on success; this covers every failure path
+	// (L21). Deferred after Remove, so it runs first; a second Close is a no-op.
+	defer tmp.Close()
+
+	if err := downloadFile(dlURL, tmp); err != nil {
+		LogSecurityAudit("update_failed", cfg.Username, ClientIP(r), "download error: "+err.Error())
+		writeAPIError(w, r, "E-UPDATE-02", err.Error())
+		return
+	}
+
+	// Verify SHA256 against the release manifest. Fail-closed: an update with
+	// no manifest entry for this asset is refused (M-01) unless the operator
+	// explicitly opts out with GRE_PANEL_ALLOW_UNVERIFIED_UPDATE=1.
+	if err := verifyAssetChecksum(tmpPath, latest, asset); err != nil {
+		LogSecurityAudit("update_checksum_failed", cfg.Username, ClientIP(r), "asset="+asset+" err="+err.Error())
+		writeAPIError(w, r, "E-UPDATE-07", err.Error())
+		return
+	}
+
+	// Authenticity beyond the same-origin manifest (M2): when the release
+	// ships a detached ed25519 signature (<asset>.sig), it MUST verify
+	// against the pinned update key. Releases without one still rely on the
+	// checksum manifest until the signing workflow lands (gap-analysis G7).
+	if err := verifyAssetSignature(tmpPath, dlURL, asset); err != nil {
+		LogSecurityAudit("update_signature_failed", cfg.Username, ClientIP(r), "asset="+asset+" err="+err.Error())
+		writeAPIError(w, r, "E-UPDATE-07", err.Error())
+		return
+	}
+
+	if err := verifyELF(tmpPath); err != nil {
+		LogSecurityAudit("update_failed", cfg.Username, ClientIP(r), "ELF verification failed: "+err.Error())
+		writeAPIError(w, r, "E-UPDATE-03", err.Error())
+		return
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		writeAPIError(w, r, "E-UPDATE-04", "")
+		return
+	}
+	// Swap in the new binary. Keep a .bak so a bad binary can be rolled back.
+	bak := exe + ".bak"
+	_ = os.Remove(bak)
+	if err := os.Rename(exe, bak); err != nil {
+		writeAPIError(w, r, "E-UPDATE-04", err.Error())
+		return
+	}
+	if err := copyFile(tmpPath, exe); err != nil {
+		_ = os.Rename(bak, exe) // roll back
+		LogSecurityAudit("update_rollback", cfg.Username, ClientIP(r), "copy failed: "+err.Error())
+		writeAPIError(w, r, "E-UPDATE-04", err.Error())
+		return
+	}
+	_ = os.Chmod(exe, 0755)
+	// Keep quantum.sh in sync with the binary
+	syncPanelScriptFrom(latest)
+
+	LogSecurityAudit("update_success", cfg.Username, ClientIP(r), "installed version "+latest)
+	guarded := guardUpdate(exe, panelVersion, latest)
+	writeJSON(w, map[string]any{"status": "ok", "detail": "updated to " + displayVersion(latest) + " — restarting panel",
+		"from": displayVersion(panelVersion), "to": displayVersion(latest), "guarded": guarded})
+	go func() {
+		time.Sleep(1000 * time.Millisecond)
+		restartSelf()
+	}()
+}
+
+// panelAsset maps runtime arch to the release asset name.
+func panelAsset() (arch, asset string, err error) {
+	switch runtime.GOARCH {
+	case "amd64":
+		return "amd64", "gre-panel-linux-amd64", nil
+	case "arm64":
+		return "arm64", "gre-panel-linux-arm64", nil
+	}
+	return "", "", fmt.Errorf("unsupported arch for update: %s", runtime.GOARCH)
+}
+
+// isOfficialGitHubURL restricts downloads to official GitHub repositories only (CWE-494)
+func isOfficialGitHubURL(u string) bool {
+	parsed, err := url.Parse(u)
+	if err != nil {
+		return false
+	}
+	host := strings.ToLower(parsed.Host)
+	return host == "github.com" || host == "raw.githubusercontent.com" ||
+		host == "api.github.com" || host == "objects.githubusercontent.com" ||
+		host == "mirror.ghproxy.com" || host == "ghproxy.net" ||
+		host == "gh.ddlc.top" || host == "fastly.jsdelivr.net"
+}
+
+// manifestFetcher is swapped in tests.
+var manifestFetcher = fetchChecksumManifest
+
+// verifyAssetChecksum checks tmpPath against the release's checksum manifest.
+// Missing manifest / missing entry => error (fail-closed) unless
+// GRE_PANEL_ALLOW_UNVERIFIED_UPDATE=1.
+func verifyAssetChecksum(tmpPath, tag, asset string) error {
+	allowUnverified := os.Getenv("GRE_PANEL_ALLOW_UNVERIFIED_UPDATE") == "1"
+	manifest, ferr := manifestFetcher(tag)
+	expected, ok := "", false
+	if manifest != nil {
+		expected, ok = manifest[asset]
+	}
+	if !ok {
+		if allowUnverified {
+			LogSecurityAudit("update_unverified_allowed", "system", "local", "asset="+asset)
+			return nil
+		}
+		if ferr != nil {
+			return fmt.Errorf("refusing unverified update: checksum manifest unavailable (%v)", ferr)
+		}
+		return fmt.Errorf("refusing unverified update: no checksum entry for %s", asset)
+	}
+	if err := VerifyFileSHA256(tmpPath, expected); err != nil {
+		return err
+	}
+	LogSecurityAudit("update_checksum_verified", "system", "local", "asset="+asset+" sha256="+expected)
+	return nil
+}
+
+// verifyAssetSignature checks the release's detached ed25519 signature
+// (<asset>.sig, base64 over the artifact bytes) against the pinned update
+// key. Session 4 gate (SU-1): verification is FAIL-CLOSED — a build with no
+// pinned key and a release without a signature are REFUSED. The only bypass
+// is the explicit emergency override QUANTUM_UPDATE_ALLOW_UNSIGNED=1, which
+// is audited on every use, must be set deliberately by the operator, and is
+// documented as an emergency measure to be removed once the signing workflow
+// is live. Invalid, malformed, or wrong-key signatures always fail.
+func verifyAssetSignature(tmpPath, dlURL, asset string) error {
+	override := os.Getenv("QUANTUM_UPDATE_ALLOW_UNSIGNED") == "1"
+	if agentUpdatePubKeyPEM == "" {
+		if !override {
+			LogSecurityAudit("update_signature_refused", "system", "local", "no update public key pinned in this build; asset="+asset)
+			return errors.New("update refused: no update public key is pinned in this build (set QUANTUM_UPDATE_ALLOW_UNSIGNED=1 only as an audited emergency)")
+		}
+		LogSecurityAudit("update_signature_skipped_emergency", "system", "local", "no pinned key; QUANTUM_UPDATE_ALLOW_UNSIGNED=1 override in effect; asset="+asset)
+		return nil
+	}
+	sigResp, err := http.Get(dlURL + ".sig") //nolint — same release origin as the artifact
+	if err != nil {
+		return fmt.Errorf("cannot fetch the artifact signature: %w", err)
+	}
+	defer sigResp.Body.Close()
+	if sigResp.StatusCode == http.StatusNotFound {
+		if !override {
+			LogSecurityAudit("update_signature_refused", "system", "local", "release ships no signature (.sig 404); asset="+asset)
+			return errors.New("update refused: the release does not ship a detached signature (.sig); QUANTUM_UPDATE_ALLOW_UNSIGNED=1 overrides this emergency-only")
+		}
+		LogSecurityAudit("update_signature_absent_emergency", "system", "local", "release unsigned; QUANTUM_UPDATE_ALLOW_UNSIGNED=1 override in effect; asset="+asset)
+		return nil
+	}
+	if sigResp.StatusCode != http.StatusOK {
+		return fmt.Errorf("signature fetch returned HTTP %d", sigResp.StatusCode)
+	}
+	sigBytes, err := io.ReadAll(io.LimitReader(sigResp.Body, 4096))
+	if err != nil {
+		return err
+	}
+	sig, err := base64.StdEncoding.DecodeString(strings.TrimSpace(string(sigBytes)))
+	if err != nil || len(sig) != ed25519.SignatureSize {
+		return errors.New("artifact signature is malformed")
+	}
+	key, err := agentUpdateVerifyKey(agentUpdatePubKeyPEM)
+	if err != nil {
+		return err
+	}
+	artifact, err := os.ReadFile(tmpPath)
+	if err != nil {
+		return err
+	}
+	if !ed25519.Verify(key, artifact, sig) {
+		return errors.New("artifact signature verification FAILED")
+	}
+	LogSecurityAudit("update_signature_verified", "system", "local", "asset="+asset)
+	return nil
+}
+
+// fetchChecksumManifest downloads checksums.txt or SHA256SUMS from the release.
+// Only from GitHub itself: the binary may come through a third-party mirror,
+// and a manifest from the same mirror could simply match a forged binary.
+// If GitHub is unreachable the update fails closed (see verifyAssetChecksum).
+func fetchChecksumManifest(tag string) (map[string]string, error) {
+	for _, name := range []string{"checksums.txt", "SHA256SUMS"} {
+		tmp, err := os.CreateTemp("", "quantum-manifest-*")
+		if err != nil {
+			return nil, err
+		}
+		tmpPath := tmp.Name()
+		err = downloadFile(releaseAssetURL(tag, name), tmp)
+		tmp.Close()
+		if err == nil {
+			data, rerr := os.ReadFile(tmpPath)
+			os.Remove(tmpPath)
+			if rerr == nil && len(data) > 0 {
+				if m := ParseChecksumManifest(string(data)); len(m) > 0 {
+					return m, nil
+				}
+			}
+			continue
+		}
+		os.Remove(tmpPath)
+	}
+	return nil, fmt.Errorf("no checksum manifest found")
+}
+
+func downloadFile(rawURL string, tmp *os.File) error {
+	if !isOfficialGitHubURL(rawURL) {
+		return fmt.Errorf("untrusted download URL domain: %s", rawURL)
+	}
+
+	// With an access token (private repository) everything goes straight to
+	// GitHub: a third-party mirror would see the token and cannot authenticate
+	// anyway. Release assets resolve through the API (the github.com download
+	// endpoint does not accept API tokens for private repos); raw files get
+	// the Bearer header directly.
+	if token := githubToken(); token != "" {
+		if strings.HasPrefix(rawURL, "https://raw.githubusercontent.com/") {
+			client := &http.Client{Timeout: 60 * time.Second}
+			req, err := http.NewRequest("GET", rawURL, nil)
+			if err != nil {
+				return err
+			}
+			req.Header.Set("User-Agent", "quantum-panel-updater/"+panelVersion)
+			req.Header.Set("Authorization", "Bearer "+token)
+			resp, err := client.Do(req)
+			if err != nil {
+				return err
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				return fmt.Errorf("http %s", resp.Status)
+			}
+			if _, err := tmp.Seek(0, 0); err == nil {
+				_ = tmp.Truncate(0)
+			}
+			_, err = io.Copy(tmp, resp.Body)
+			if err != nil {
+				return err
+			}
+			return tmp.Close()
+		}
+		if strings.HasPrefix(rawURL, "https://github.com/"+quantumRepo+"/releases/") {
+			rest := strings.TrimPrefix(rawURL, "https://github.com/"+quantumRepo+"/releases/")
+			tag, name := "", ""
+			switch {
+			case strings.HasPrefix(rest, "latest/download/"):
+				tag, name = "latest", strings.TrimPrefix(rest, "latest/download/")
+			case strings.HasPrefix(rest, "download/"):
+				parts := strings.SplitN(strings.TrimPrefix(rest, "download/"), "/", 2)
+				if len(parts) == 2 {
+					tag, name = parts[0], parts[1]
+				}
+			}
+			if name != "" && !strings.Contains(name, "/") {
+				return ghFetchAsset(tag, name, tmp)
+			}
+		}
+	}
+
+	// Mirrors only for release assets, which are then checked against the
+	// checksum manifest fetched from GitHub directly. raw.githubusercontent.com
+	// files (quantum.sh from main) have no checksum, so for them GitHub's own
+	// TLS is the only integrity check and a mirror could serve anything.
+	urlsToTry := []string{rawURL}
+	if strings.HasPrefix(rawURL, "https://github.com/") {
+		urlsToTry = append(urlsToTry,
+			"https://mirror.ghproxy.com/"+rawURL,
+			"https://ghproxy.net/"+rawURL,
+			"https://gh.ddlc.top/"+rawURL,
+		)
+	}
+
+	client := &http.Client{Timeout: 60 * time.Second}
+	var lastErr error
+
+	for _, tryURL := range urlsToTry {
+		for attempt := 1; attempt <= 2; attempt++ {
+			req, err := http.NewRequest("GET", tryURL, nil)
+			if err != nil {
+				lastErr = err
+				continue
+			}
+			req.Header.Set("User-Agent", "quantum-panel-updater/"+panelVersion)
+
+			resp, err := client.Do(req)
+			if err != nil {
+				lastErr = err
+				time.Sleep(300 * time.Millisecond)
+				continue
+			}
+
+			if resp.StatusCode != http.StatusOK {
+				resp.Body.Close()
+				lastErr = fmt.Errorf("http %s from %s", resp.Status, tryURL)
+				time.Sleep(300 * time.Millisecond)
+				continue
+			}
+
+			// Clear temp file in case previous attempt wrote partial data
+			if _, err := tmp.Seek(0, 0); err == nil {
+				_ = tmp.Truncate(0)
+			}
+			if _, err := io.Copy(tmp, resp.Body); err != nil {
+				resp.Body.Close()
+				lastErr = err
+				continue
+			}
+			resp.Body.Close()
+			return tmp.Close()
+		}
+	}
+
+	return fmt.Errorf("download failed across all mirrors: %v", lastErr)
+}
+
+// verifyELF rejects empty files and non-ELF downloads (e.g. an HTML
+// error page from a stale release redirect).
+func verifyELF(path string) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	magic := make([]byte, 4)
+	n, err := io.ReadFull(f, magic)
+	if err != nil || n != 4 {
+		return fmt.Errorf("file too small")
+	}
+	if magic[0] != 0x7f || magic[1] != 'E' || magic[2] != 'L' || magic[3] != 'F' {
+		return fmt.Errorf("not an ELF binary")
+	}
+	return nil
+}
+
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0755)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	_, err = io.Copy(out, in)
+	return err
+}
+
+// restartSelf restarts the systemd unit when present, otherwise re-execs
+// the new binary in place (dev / non-systemd environments).
+func restartSelf() {
+	if _, err := exec.LookPath("systemctl"); err == nil {
+		_ = exec.Command("systemctl", "restart", "--no-block", "gre-panel").Run()
+		return
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		return
+	}
+	// Best effort: start the new binary; the old process exits.
+	_ = exec.Command(exe).Start()
+	os.Exit(0)
+}
+
+// sessionFile returns the path of the server-side session store.
+func sessionFile() string { return filepath.Join(configDir, "sessions.json") }
+
+// ---- quantum.sh sync (keeps server script in step with the binary) ----
+
+// syncPanelScript refreshes quantum.sh from the running binary's own release.
+func syncPanelScript() { syncPanelScriptFrom(runningReleaseTag()) }
+
+// syncPanelScriptFrom downloads quantum.sh from release `tag` (checksum
+// verified; main only if the tag has no such asset), syntax-checks
+// it with `bash -n`, and installs it where greScriptPath() reads from
+// (next to the running binary on servers).
+// best-effort: never blocks the binary update.
+func syncPanelScriptFrom(tag string) {
+	target := greScriptTarget()
+	if target == "" {
+		return
+	}
+	dir := filepath.Dir(target)
+	if dir != "" && dir != "." {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			recordError("E-UPDATE-06", "script-sync", "mkdir "+dir+": "+err.Error())
+			return
+		}
+	}
+	tmp, err := os.CreateTemp("", "quantum-*.sh")
+	if err != nil {
+		recordError("E-UPDATE-06", "script-sync", "tmpfile: "+err.Error())
+		return
+	}
+	tmpPath := tmp.Name()
+	_ = tmp.Close()
+	defer func() { _ = os.Remove(tmpPath) }()
+	if err := fetchScript(tag, "quantum.sh", scriptURL, tmpPath); err != nil {
+		recordError("E-UPDATE-06", "script-sync", "download: "+err.Error())
+		return
+	}
+	// Verify script integrity: minimum size and shebang check (CWE-95)
+	content, err := os.ReadFile(tmpPath)
+	if err != nil || len(content) < 500 || (!strings.HasPrefix(string(content), "#!/bin/bash") && !strings.HasPrefix(string(content), "#!/usr/bin/env bash")) {
+		recordError("E-UPDATE-06", "script-sync", "integrity check failed: invalid or corrupt script header")
+		return
+	}
+	chk := exec.Command("bash", "-n", tmpPath)
+	if out, err := chk.CombinedOutput(); err != nil {
+		recordError("E-UPDATE-06", "script-sync", "bash -n failed: "+string(out))
+		return
+	}
+	if err := copyFile(tmpPath, target); err != nil {
+		recordError("E-UPDATE-06", "script-sync", "install: "+err.Error())
+		return
+	}
+	_ = os.Chmod(target, 0755)
+	LogSecurityAudit("script_synced", "system", "local", "target="+target)
+	// Migrate servers to the new name: refresh the quantum copies + legacy
+	// gre.sh symlink, and drop a stale standalone gre.sh file (symlink wins
+	// so old lookup paths keep working).
+	for _, p := range []string{"/usr/local/bin/quantum.sh", "/usr/local/bin/quantum"} {
+		if p == target {
+			continue
+		}
+		if err := copyFile(tmpPath, p); err == nil {
+			_ = os.Chmod(p, 0755)
+		}
+	}
+	_ = os.Remove("/usr/local/bin/gre.sh")
+	_ = os.Symlink("/usr/local/bin/quantum.sh", "/usr/local/bin/gre.sh")
+}
+
+const scriptURL = "https://raw.githubusercontent.com/Dark-modem/quantum/main/quantum.sh"
+
+// greScriptURL stays as an alias: releases before the rename shipped gre.sh,
+// and external tools may import the name.
+const greScriptURL = scriptURL
+
+var (
+	_ = greScriptURL
+	_ = sessionCount
+)
+
+func mustOpen(path string) *os.File {
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	if err == nil {
+		return f
+	}
+	f2, _ := os.Create(path)
+	return f2
+}
+
+// sessionStore is the persisted set of valid session tokens.
+type sessionStore struct {
+	Tokens map[string]int64 `json:"tokens"` // token -> expires unix
+}
+
+func loadSessions() sessionStore {
+	s := sessionStore{Tokens: map[string]int64{}}
+	data, err := os.ReadFile(sessionFile())
+	if err != nil {
+		return s
+	}
+	_ = json.Unmarshal(data, &s)
+	if s.Tokens == nil {
+		s.Tokens = map[string]int64{}
+	}
+	return s
+}
+
+func (s sessionStore) save() {
+	_ = os.WriteFile(sessionFile(), mustJSON(s), 0600)
+}
+
+// pruneExpired drops expired tokens; true if anything changed.
+func (s sessionStore) pruneExpired() bool {
+	now := time.Now().Unix()
+	changed := false
+	for tok, exp := range s.Tokens {
+		if exp < now {
+			delete(s.Tokens, tok)
+			changed = true
+		}
+	}
+	return changed
+}
+
+// sessionLifetime is 24 hours (absolute expiry from login).
+const sessionLifetime = int64(24 * 3600)
+
+func validSession(token string) bool {
+	if token == "" {
+		return false
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	s := loadSessions()
+	exp, ok := s.Tokens[token]
+	if !ok || exp < time.Now().Unix() {
+		return false
+	}
+	return true
+}
+
+func addSession(token string) {
+	mu.Lock()
+	defer mu.Unlock()
+	s := loadSessions()
+	s.pruneExpired()
+	s.Tokens[token] = time.Now().Unix() + sessionLifetime
+	s.save()
+}
+
+func dropSession(token string) {
+	mu.Lock()
+	defer mu.Unlock()
+	s := loadSessions()
+	delete(s.Tokens, token)
+	s.save()
+}
+
+func dropAllSessions() {
+	mu.Lock()
+	defer mu.Unlock()
+	sessionStore{Tokens: map[string]int64{}}.save()
+}
+
+func sessionCount() int {
+	mu.Lock()
+	defer mu.Unlock()
+	s := loadSessions()
+	if s.pruneExpired() {
+		s.save()
+	}
+	n := 0
+	for range s.Tokens {
+		n++
+	}
+	return n
+}
