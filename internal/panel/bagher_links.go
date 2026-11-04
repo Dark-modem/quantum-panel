@@ -249,7 +249,7 @@ func bagherProxiesOnline(cfg SSHFwdConfig) (map[string]bool, bool) {
 		if err != nil {
 			continue
 		}
-		req.SetBasicAuth("admin", "bagher-dash-local")
+		req.SetBasicAuth(frpDashboardUser, frpDashboardPass())
 		resp, err := client.Do(req)
 		if err != nil {
 			continue

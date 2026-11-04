@@ -338,14 +338,14 @@ func buildFRPSConfig(cfg SSHFwdConfig) string {
 	return fmt.Sprintf(`bindAddr = "127.0.0.1"
 bindPort = %d
 proxyBindAddr = "0.0.0.0"
-auth.token = "quantum-bagher-sec"
+auth.token = "%s"
 transport.tcpMux = false
 
 webServer.addr = "127.0.0.1"
 webServer.port = %d
 webServer.user = "admin"
-webServer.password = "bagher-dash-local"
-`, cfg.FRPBindPort, dashPort)
+webServer.password = "%s"
+`, cfg.FRPBindPort, frpAuthToken(), dashPort, frpDashboardPass())
 }
 
 // buildFRPSService generates the systemd unit for frps on Iran host.
@@ -402,7 +402,7 @@ remotePort = %d
 	dashPort := frpBindPort + 2
 	return fmt.Sprintf(`serverAddr = "127.0.0.1"
 serverPort = %d
-auth.token = "quantum-bagher-sec"
+auth.token = "%s"
 transport.tcpMux = false
 %s
 transport.poolCount = %d
@@ -414,8 +414,8 @@ loginFailExit = false
 webServer.addr = "127.0.0.1"
 webServer.port = %d
 webServer.user = "admin"
-webServer.password = "bagher-dash-local"
-%s`, frpBindPort, bagherFRPCNoTLS, poolCount, dashPort, proxyBlocks.String())
+webServer.password = "%s"
+%s`, frpBindPort, frpAuthToken(), bagherFRPCNoTLS, poolCount, dashPort, frpDashboardPass(), proxyBlocks.String())
 }
 
 // buildForeignSetupCommand creates a standalone shell command to be executed on Foreign host.
@@ -523,7 +523,7 @@ func MakeBagherBundle(cfg SSHFwdConfig, pubKey string) (string, error) {
 		RemoteHost:   strings.TrimSpace(cfg.RemoteHost),
 		FRPPort:      cfg.FRPBindPort,
 		Ports:        cfg.Ports,
-		Token:        "quantum-bagher-sec",
+		Token:        frpAuthToken(),
 		PoolCount:    cfg.PoolCount,
 		UDP:          cfg.UDP,
 		SSHPublicKey: strings.TrimSpace(pubKey),
@@ -568,7 +568,7 @@ func ParseBagherBundle(bundleStr string) (*BagherBundle, error) {
 		b.PoolCount = 25
 	}
 	if b.Token == "" {
-		b.Token = "quantum-bagher-sec"
+		b.Token = frpAuthToken()
 	}
 	return &b, nil
 }
@@ -745,7 +745,7 @@ func getBagherLiveMetrics(cfg SSHFwdConfig) BagherLiveMetrics {
 	var clientCount, curConns int
 	gotDashboard := false
 	if err == nil {
-		req.SetBasicAuth("admin", "bagher-dash-local")
+		req.SetBasicAuth(frpDashboardUser, frpDashboardPass())
 		resp, rErr := client.Do(req)
 		if rErr == nil && resp.StatusCode == 200 {
 			var info struct {
