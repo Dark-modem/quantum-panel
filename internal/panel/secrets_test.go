@@ -16,6 +16,16 @@ func TestFrpSecretsGeneratedOncePerInstall(t *testing.T) {
 	old := configDir
 	configDir = dir
 	t.Cleanup(func() { configDir = old })
+	// Earlier tests may have populated the process-wide cache against a
+	// different configDir seam; this test owns the seam from here on.
+	frpSecretsMu.Lock()
+	frpSecretsCache = nil
+	frpSecretsMu.Unlock()
+	t.Cleanup(func() {
+		frpSecretsMu.Lock()
+		frpSecretsCache = nil
+		frpSecretsMu.Unlock()
+	})
 
 	first := loadFrpSecrets()
 	if first.AuthToken == "" || first.DashboardPassword == "" {
