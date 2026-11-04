@@ -166,6 +166,7 @@ CREATE TABLE forward_rules (
 CREATE INDEX idx_forward_rules_server ON forward_rules(local_server_id);
 ALTER TABLE agents ADD COLUMN engine_catalog TEXT NOT NULL DEFAULT '';
 ALTER TABLE agents ADD COLUMN desired_v2 TEXT NOT NULL DEFAULT '';
+ALTER TABLE agents ADD COLUMN applied_v2 TEXT NOT NULL DEFAULT '';
 ALTER TABLE agents ADD COLUMN last_ack TEXT NOT NULL DEFAULT '';
 ALTER TABLE agents ADD COLUMN last_error TEXT NOT NULL DEFAULT '';
 ALTER TABLE agents ADD COLUMN proto_version INTEGER NOT NULL DEFAULT 1;

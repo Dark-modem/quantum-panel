@@ -25,6 +25,7 @@ import (
 	"sync"
 	"time"
 
+	protocol "github.com/Dark-modem/quantum-protocol"
 	"github.com/gorilla/websocket"
 )
 
@@ -135,6 +136,10 @@ type agentConn struct {
 	cmdMu     sync.Mutex
 	pending   map[string]chan agentCommandResult // command ID -> waiter
 	state     agentSessionState
+	// protoV is the negotiated protocol version (hello envelope V clamped
+	// to 1..2). v1 sessions run the frozen matrix flow untouched; v2 adds
+	// DesiredV2 delivery and StateReportV2 ingestion.
+	protoV int
 }
 
 // agentSessionState is the session-owned slice of the agent record. It
@@ -269,7 +274,7 @@ func constantTimeHashEqual(a, b string) bool {
 func (c *agentConn) run() {
 	c.ws.SetReadLimit(agentWSReadLimit)
 	c.ws.SetReadDeadline(time.Now().Add(agentHelloTimeout))
-	typ, data, err := c.readEnvelope()
+	envV, typ, data, err := c.readEnvelopeAny()
 	if err != nil {
 		return
 	}
@@ -280,19 +285,33 @@ func (c *agentConn) run() {
 	if err := json.Unmarshal(data, &hello); err != nil || hello.ID != c.id {
 		return // hello must claim the authenticated identity
 	}
-	if err := c.send(agentMsgWelcome, agentWelcome{OK: true, Server: panelVersion}); err != nil {
+	// Version negotiation (protocol v2): the session speaks the lower of
+	// what the panel and the hello envelope declare. v1 agents (envelope
+	// V=1) keep the frozen flow; nothing about their session changes.
+	pv, err := protocol.Negotiate(protocol.ProtoVersionV2, envV)
+	if err != nil {
+		_ = c.send(agentMsgError, agentErrorMsg{Message: err.Error()})
+		return
+	}
+	c.protoV = pv
+	if err := c.sendVersioned(agentMsgWelcome, agentWelcome{OK: true, Server: panelVersion}); err != nil {
 		return
 	}
 	c.applyHello(&hello)
+	c.recordSessionV2()
 
-	// Deliver whatever desired state was queued while the agent was offline.
+	// Deliver whatever desired state was queued while the agent was offline:
+	// the v2 pending document first, then the frozen v1 matrix desired.
+	if d, ok := meshPendingDesiredV2(c.id); ok {
+		_ = c.sendVersioned(protocol.MsgDesired, d)
+	}
 	if d := agentPendingDesired(c.id); d != nil {
-		_ = c.send(agentMsgDesired, *d)
+		_ = c.sendVersioned(agentMsgDesired, *d)
 	}
 
 	for {
 		c.ws.SetReadDeadline(time.Now().Add(agentWSReadTimeout))
-		typ, data, err := c.readEnvelope()
+		_, typ, data, err := c.readEnvelopeAny()
 		if err != nil {
 			return
 		}
@@ -311,17 +330,34 @@ func (c *agentConn) run() {
 	}
 }
 
-// readEnvelope reads one protocol envelope; decode errors close the session.
-func (c *agentConn) readEnvelope() (string, json.RawMessage, error) {
+// readEnvelopeAny decodes one envelope of any supported protocol version
+// (DecodeAny accepts 1..2 and reports which was used). Decode errors close
+// the session.
+func (c *agentConn) readEnvelopeAny() (int, string, json.RawMessage, error) {
 	_, raw, err := c.ws.ReadMessage()
 	if err != nil {
-		return "", nil, err
+		return 0, "", nil, err
 	}
-	typ, data, err := agentDecode(raw)
+	v, typ, data, err := protocol.DecodeAny(raw)
 	if err != nil {
-		return "", nil, err
+		return 0, "", nil, err
 	}
-	return typ, data, nil
+	return v, typ, data, nil
+}
+
+// sendVersioned writes with the session's negotiated protocol version.
+func (c *agentConn) sendVersioned(typ string, payload any) error {
+	if c.protoV >= protocol.ProtoVersionV2 {
+		msg, err := protocol.EncodeVersioned(c.protoV, typ, payload)
+		if err != nil {
+			return err
+		}
+		c.writeMu.Lock()
+		defer c.writeMu.Unlock()
+		_ = c.ws.SetWriteDeadline(time.Now().Add(agentWriteTimeout))
+		return c.ws.WriteMessage(websocket.TextMessage, msg)
+	}
+	return c.send(typ, payload)
 }
 
 // send is the only outbound write path (single-writer discipline).
@@ -437,8 +473,23 @@ func (c *agentConn) remoteIP() string {
 
 // handleHeartbeat records liveness and the latest state; traffic rates are
 // derived from consecutive cumulative counters. Disk persistence is batched
-// (at most one write per agentPersistEvery).
+// (at most one write per agentPersistEvery). v2 sessions additionally
+// ingest the richer StateReportV2 into the mesh store.
 func (c *agentConn) handleHeartbeat(data json.RawMessage) {
+	if c.protoV >= protocol.ProtoVersionV2 {
+		var hb2 protocol.HeartbeatV2
+		if json.Unmarshal(data, &hb2) == nil && hb2.State != nil {
+			ingestStateReportV2(c.id, hb2.State)
+			if len(hb2.State.Matrix) > 0 {
+				// The v2 report keeps the v1 matrix block; feed the frozen
+				// legacy path so the existing dashboard keeps working.
+				c.ingestLegacyMatrix(hb2.State.Matrix)
+			}
+			return
+		}
+		// Not a v2 heartbeat shape: fall through to the v1 decoder so a
+		// mixed session cannot lose heartbeats.
+	}
 	var hb agentHeartbeat
 	if json.Unmarshal(data, &hb) != nil {
 		return
@@ -452,6 +503,24 @@ func (c *agentConn) handleHeartbeat(data json.RawMessage) {
 			c.state.updateTrafficLocked(hb.State.Traffic)
 		}
 	}
+	due := now.Sub(c.state.lastPersist) >= agentPersistEvery
+	c.state.mu.Unlock()
+	if due {
+		c.persistSessionState()
+	}
+}
+
+// ingestLegacyMatrix mirrors the v1 matrix block carried inside a v2 state
+// report into the frozen legacy session state, so the existing dashboard
+// keeps working unchanged while agents speak v2.
+func (c *agentConn) ingestLegacyMatrix(matrix []agentMatrixStatus) {
+	now := time.Now()
+	c.state.mu.Lock()
+	c.state.lastSeen = now.Unix()
+	if c.state.lastState == nil {
+		c.state.lastState = &agentStateReport{}
+	}
+	c.state.lastState.Matrix = matrix
 	due := now.Sub(c.state.lastPersist) >= agentPersistEvery
 	c.state.mu.Unlock()
 	if due {
@@ -558,6 +627,10 @@ func (c *agentConn) handleAck(data json.RawMessage) {
 		log.Printf("[agents] cannot record ack for %s: %v", c.id, err)
 		return
 	}
+	// Bridge the ack into the mesh store's v2 desired state (matched only
+	// when a v2 pending revision exists; the frozen v1 flow above is
+	// untouched).
+	meshHandleAckV2(c.id, ack.Revision, ack.OK, ack.Error)
 	if hook := agentAckObserver.get(); matched && hook != nil {
 		ack := ack
 		go hook(c.id, ack)

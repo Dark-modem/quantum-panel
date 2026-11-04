@@ -29,7 +29,7 @@ import (
 	"time"
 )
 
-//go:embed index.html app.js i18n-fa.js matrix_edit.js topology.js tunnel_overview.js fonts.css tokens.css base.css enterprise.css favicon.png favicon.svg apple-touch-icon.png xterm.js xterm-fit.js xterm-search.js xterm.css fonts/vazirmatn.woff2
+//go:embed index.html app.js i18n-fa.js matrix_edit.js topology.js tunnel_overview.js fonts.css tokens.css base.css enterprise.css favicon.png favicon.svg apple-touch-icon.png xterm.js xterm-fit.js xterm-search.js xterm.css fonts/vazirmatn.woff2 mesh.html mesh.js
 var panelFS embed.FS
 
 var configDir = "/etc/gre-panel"
@@ -724,6 +724,14 @@ func Main(args []string) int {
 	mux.HandleFunc("POST "+base+"/api/agent-tunnels/{id}/power", requireAuth(requireCSRF(handleAgentTunnelPower)))
 	mux.HandleFunc("POST "+base+"/api/agent-tunnels/{id}/restart", requireAuth(requireCSRF(handleAgentTunnelRestart)))
 	mux.HandleFunc("DELETE "+base+"/api/agent-tunnels/{id}", requireAuth(requireCSRF(handleAgentTunnelDelete)))
+
+	// Mesh management plane (Phase 2B): the SQLite store is the authority
+	// for the new model; legacy JSON features above stay frozen and never
+	// read the store. Mutations ride the same requireAuth(requireCSRF(...))
+	// gate and the store's audit table records the domain events.
+	registerMeshRoutes(mux, base)
+	mux.HandleFunc("GET "+base+"/mesh", requireAuth(serveMeshPage))
+	mux.HandleFunc("GET "+base+"/mesh.js", serveAsset("mesh.js", "text/javascript; charset=utf-8"))
 
 	mux.HandleFunc("GET "+base+"/api/update/peer", requireAuth(handleUpdatePeer))
 	mux.HandleFunc("POST "+base+"/api/setup", requireAuth(requireCSRF(handleSetupPost)))

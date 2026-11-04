@@ -1,0 +1,318 @@
+// mesh.js — the minimal mesh management UI (Phase 2B). Persian/English,
+// API-driven, no build step: everything is fetched from /api/mesh/*.
+// The page lives at <base>/mesh and reuses the panel session cookie.
+// Mutations need the CSRF token; the panel exposes it to same-origin JS
+// through the existing pattern (double-submit cookie), see meshCSRF().
+(function () {
+  'use strict';
+
+  var LANG = localStorage.getItem('mesh_lang') || 'en';
+  var T = {
+    en: {
+      tab_topos: 'Topologies', tab_weights: 'Weights', tab_profiles: 'Profiles',
+      tab_traffic: 'Traffic', title: 'Quantum — Mesh Management',
+      topo: 'Topology', members: 'Members', tunnels: 'Tunnels', enabled: 'Enabled',
+      engine: 'Engine', state: 'State', up: 'up', down: 'down', unknown: 'unknown',
+      tunnel: 'Tunnel', weight: 'Weight', set: 'Set', save: 'Save',
+      apply_h: 'Apply hardening profile', apply_n: 'Apply netopt profile',
+      confirm: 'Confirm (keep)', rollback: 'Rollback now',
+      confirm_banner: 'Safe-apply armed on {agent} — confirm within {s}s or the agent rolls back.',
+      no_pending: 'No pending profile confirmations.',
+      usage: 'Usage (real bytes)', overhead: 'Engine overhead', coefficient: 'Suggested coefficient',
+      wire: 'Wire', payload: 'Payload', dc: 'Datacenter', price: 'Price ratio',
+      stale: 'stale', online: 'online', offline: 'offline',
+      need_json: 'Profile JSON is invalid', pushed: 'Pushed', skipped: 'Skipped'
+    },
+    fa: {
+      tab_topos: 'توپولوژی‌ها', tab_weights: 'وزن‌ها', tab_profiles: 'پروفایل‌ها',
+      tab_traffic: 'ترافیک', title: 'کوانتوم — مدیریت مش',
+      topo: 'توپولوژی', members: 'اعضا', tunnels: 'تونل‌ها', enabled: 'فعال',
+      engine: 'موتور', state: 'وضعیت', up: 'برقرار', down: 'قطع', unknown: 'نامشخص',
+      tunnel: 'تونل', weight: 'وزن', set: 'ثبت', save: 'ذخیره',
+      apply_h: 'اعمال پروفایل hardening', apply_n: 'اعمال پروفایل netopt',
+      confirm: 'تأیید (حفظ تغییرات)', rollback: 'بازگردانی فوری',
+      confirm_banner: 'حالت apply ایمن روی {agent} فعال شد — تا {s} ثانیه تأیید کنید، وگرنه عامل خودش بازمی‌گرداند.',
+      no_pending: 'هیچ پروفایلی در انتظار تأیید نیست.',
+      usage: 'مصرف (بایت واقعی)', overhead: 'سربار موتور', coefficient: 'ضریب پیشنهادی',
+      wire: 'سیم', payload: 'بار', dc: 'دیتاسنتر', price: 'نرخ',
+      stale: 'بی‌اثر', online: 'برخط', offline: 'خارج از خط',
+      need_json: 'JSON پروفایل نامعتبر است', pushed: 'ارسال شد', skipped: 'رد شد'
+    }
+  };
+  function t(k) { return (T[LANG] && T[LANG][k]) || T.en[k] || k; }
+
+  // ---- API helpers ------------------------------------------------------
+  function base() {
+    // The panel's secret base path is the location path sans the page name.
+    var p = location.pathname.replace(/\/mesh\/?$/, '/');
+    return p;
+  }
+  function csrfToken() {
+    var m = document.cookie.match(/(?:^|;\s*)gre_csrf=([^;]+)/);
+    return m ? decodeURIComponent(m[1]) : '';
+  }
+  function api(method, path, body) {
+    var opt = { method: method, headers: { 'X-CSRF-Token': csrfToken() } };
+    if (body !== undefined) {
+      opt.headers['Content-Type'] = 'application/json';
+      opt.body = JSON.stringify(body);
+    }
+    return fetch(base() + 'api/mesh/' + path, opt).then(function (r) {
+      return r.json().then(function (j) {
+        if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+        return j;
+      });
+    });
+  }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function say(msg, isErr) {
+    var el = document.getElementById('msg');
+    el.innerHTML = '<span class="' + (isErr ? 'pill down' : 'muted') + '">' + esc(msg) + '</span>';
+  }
+  function bytes(n) {
+    if (n == null) return '—';
+    var u = ['B', 'KB', 'MB', 'GB', 'TB'], i = 0, v = Number(n);
+    while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; }
+    return v.toFixed(v >= 100 || i === 0 ? 0 : 1) + ' ' + u[i];
+  }
+
+  // ---- tabs --------------------------------------------------------------
+  var current = 'topos';
+  document.getElementById('tabs').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-tab]');
+    if (!b) return;
+    current = b.dataset.tab;
+    Array.prototype.forEach.call(document.querySelectorAll('#tabs button'), function (x) {
+      x.classList.toggle('active', x === b);
+    });
+    ['topos', 'weights', 'profiles', 'traffic'].forEach(function (id) {
+      document.getElementById('tab-' + id).style.display = id === current ? '' : 'none';
+    });
+    render();
+  });
+  document.getElementById('lang').addEventListener('click', function () {
+    LANG = LANG === 'en' ? 'fa' : 'en';
+    localStorage.setItem('mesh_lang', LANG);
+    applyLang(); render();
+  });
+  function applyLang() {
+    document.documentElement.lang = LANG;
+    document.documentElement.dir = LANG === 'fa' ? 'rtl' : 'ltr';
+    document.getElementById('title').textContent = t('title');
+    Array.prototype.forEach.call(document.querySelectorAll('[data-i18n]'), function (el) {
+      el.textContent = t(el.dataset.i18n);
+    });
+  }
+
+  // ---- state ---------------------------------------------------------------
+  var overview = null;   // /overview result
+  var agents = null;     // /agents result
+  var weightsTopo = null;
+
+  function render() {
+    if (current === 'topos') renderTopos();
+    if (current === 'weights') renderWeights();
+    if (current === 'profiles') renderProfiles();
+    if (current === 'traffic') renderTraffic();
+  }
+
+  function loadAll() {
+    return Promise.all([api('GET', 'overview'), api('GET', 'agents')]).then(function (rs) {
+      overview = rs[0]; agents = rs[1];
+      renderBanner(); render();
+    }).catch(function (e) { say(e.message, true); });
+  }
+
+  // ---- topologies + tunnels -------------------------------------------------
+  function renderTopos() {
+    var el = document.getElementById('tab-topos');
+    if (!overview) { el.innerHTML = '<p class="muted">…</p>'; return; }
+    var html = '';
+    (overview.topologies || []).forEach(function (tp) {
+      html += '<h3>' + esc(tp.name) + (tp.enabled ? '' : ' <span class="pill warn">' + esc(t('enabled')) + ': off</span>') + '</h3>';
+      html += '<p class="muted">' + esc(t('members')) + ': ' + (tp.members || []).length +
+        ' · ' + esc(t('tunnels')) + ': ' + esc(tp.tunnel_count) + '</p>';
+      var to = (overview.topologies || []).indexOf(tp) + 1;
+      var tun = topoTunnels(tp);
+      if (tun.length) {
+        html += '<table><tr><th>' + esc(t('tunnel')) + '</th><th>' + esc(t('engine')) + '</th><th>' + esc(t('state')) + '</th></tr>';
+        tun.forEach(function (tn) {
+          var rt = runtimeFor(tn.tunnel_key);
+          var st = rt == null ? t('unknown')
+            : (rt.up ? '<span class="pill ok">' + esc(t('up')) + '</span>'
+                     : '<span class="pill down">' + esc(t('down')) + '</span>');
+          html += '<tr><td>' + esc(tn.tunnel_key) + '</td><td>' + esc(tn.engine) + '</td><td>' + st + '</td></tr>';
+        });
+        html += '</table>';
+      }
+    });
+    el.innerHTML = html;
+  }
+  function topoTunnels(tp) {
+    // The overview omits tunnel rows for size; fetch per topology lazily.
+    if (tp.__tunnels) return tp.__tunnels;
+    api('GET', 'topologies/' + tp.id).then(function (j) {
+      tp.__tunnels = j.tunnels || [];
+      if (current === 'topos') renderTopos();
+    }).catch(function () {});
+    return tp.__tunnels || [];
+  }
+  function runtimeFor(key) {
+    if (!agents) return null;
+    var found = null;
+    (agents.agents || []).forEach(function (a) {
+      (a.runtime || []).forEach(function (rt) { if (rt.tunnel_id === key) found = rt; });
+    });
+    return found;
+  }
+
+  // ---- weights ---------------------------------------------------------------
+  function renderWeights() {
+    var el = document.getElementById('tab-weights');
+    if (!overview) { el.innerHTML = '<p class="muted">…</p>'; return; }
+    var html = '<div class="row"><span class="muted">' + esc(t('topo')) + ':</span><select id="wtopo">';
+    (overview.topologies || []).forEach(function (tp) {
+      html += '<option value="' + tp.id + '"' + (weightsTopo == tp.id ? ' selected' : '') + '>' + esc(tp.name) + '</option>';
+    });
+    html += '</select></div><div id="wbody"></div>';
+    el.innerHTML = html;
+    document.getElementById('wtopo').addEventListener('change', function (e) {
+      weightsTopo = Number(e.target.value); loadWeights();
+    });
+    if (!weightsTopo && (overview.topologies || []).length) weightsTopo = overview.topologies[0].id;
+    loadWeights();
+  }
+  function loadWeights() {
+    api('GET', 'topologies/' + weightsTopo).then(function (j) {
+      var rows = (j.tunnels || []).map(function (tn) {
+        var w = 1;
+        (j.weights || []).forEach(function (wp) {
+          if (wp.tunnel_id === tn.id) w = wp.weight;
+        });
+        return '<tr><td>' + esc(tn.tunnel_key) + '</td>' +
+          '<td><input type="number" min="0" max="1000" value="' + w + '" data-tid="' + tn.id + '" style="width:80px"></td>' +
+          '<td><button class="act primary" data-save="' + tn.id + '">' + esc(t('save')) + '</button></td></tr>';
+      }).join('');
+      document.getElementById('wbody').innerHTML =
+        '<table><tr><th>' + esc(t('tunnel')) + '</th><th>' + esc(t('weight')) + '</th><th></th></tr>' + rows + '</table>' +
+        '<p class="muted">0 = ' + (LANG === 'fa' ? 'خارج از چرخش' : 'excluded from balancing') + '</p>';
+      document.getElementById('wbody').addEventListener('click', function (e) {
+        var b = e.target.closest('button[data-save]');
+        if (!b) return;
+        var tid = b.dataset.save;
+        var input = document.querySelector('input[data-tid="' + tid + '"]');
+        api('POST', 'topologies/' + weightsTopo + '/weights',
+          { tunnel_id: Number(tid), weight: Number(input.value) })
+          .then(function () { say(t('set') + ' #' + tid); loadWeights(); })
+          .catch(function (er) { say(er.message, true); });
+      });
+    }).catch(function (e) { say(e.message, true); });
+  }
+
+  // ---- profiles (safe-apply) ---------------------------------------------------
+  function renderProfiles() {
+    var el = document.getElementById('tab-profiles');
+    api('GET', 'agents').then(function (j) {
+      var rows = (j.agents || []).map(function (a) {
+        return '<tr><td>' + esc(a.id) + '</td><td>' + esc(a.name || '') + '</td>' +
+          '<td>v' + esc(a.proto_version || 1) + '</td><td>' + esc(a.status) + '</td>' +
+          '<td>' +
+          '<button class="act" data-h="' + a.id + '">' + esc(t('apply_h')) + '</button> ' +
+          '<button class="act" data-n="' + a.id + '">' + esc(t('apply_n')) + '</button></td></tr>';
+      }).join('');
+      el.innerHTML = '<table><tr><th>Agent</th><th>Name</th><th>Proto</th><th>Status</th><th></th></tr>' + rows + '</table>' +
+        '<textarea id="prof" rows="6" style="width:100%;background:#11151d;color:inherit;border:1px solid #2a3140;border-radius:8px;padding:8px">{}</textarea>' +
+        '<p class="muted">' + (LANG === 'fa'
+          ? 'پروفایل JSON برای هر دو دکمه بالا استفاده می‌شود. اعمال، تایمر ۱۲۰ ثانیه‌ای بازگردانی را فعال می‌کند.'
+          : 'The JSON above is the profile both buttons apply. Applying arms the agent automatic 120 s rollback.') + '</p>';
+      el.addEventListener('click', profileClick);
+    }).catch(function (e) { say(e.message, true); });
+  }
+  function profileClick(e) {
+    var h = e.target.closest('button[data-h]');
+    var n = e.target.closest('button[data-n]');
+    if (!h && !n) return;
+    var kind = h ? 'hardening' : 'netopt';
+    var agent = h ? h.dataset.h : n.dataset.n;
+    var prof;
+    try { prof = JSON.parse(document.getElementById('prof').value); }
+    catch (err) { say(t('need_json'), true); return; }
+    api('POST', 'agents/' + agent + '/profile/' + kind,
+      { profile: prof, rollback_timer_s: 120 })
+      .then(function (r) { say((LANG === 'fa' ? 'اعمال شد؛ ' : 'applied; ') + r.rollback_timer_s + 's'); renderBanner(); })
+      .catch(function (er) { say(er.message, true); });
+  }
+  function renderBanner() {
+    var el = document.getElementById('confirm-banner');
+    api('GET', 'profiles/pending').then(function (j) {
+      var p = (j.pending || [])[0];
+      if (!p) { el.style.display = 'none'; return; }
+      var left = Math.max(0, p.deadline - Math.floor(Date.now() / 1000));
+      el.style.display = '';
+      el.innerHTML = '<b>⏱ ' + esc(t('confirm_banner').replace('{agent}', p.agent_id).replace('{s}', left)) + '</b><br>' +
+        '<button class="act primary" id="btn-confirm">' + esc(t('confirm')) + '</button> ' +
+        '<button class="act" id="btn-rollback">' + esc(t('rollback')) + '</button>';
+      document.getElementById('btn-confirm').onclick = function () {
+        api('POST', 'agents/' + p.agent_id + '/profile/confirm', {})
+          .then(function () { say('confirmed'); renderBanner(); })
+          .catch(function (er) { say(er.message, true); });
+      };
+      document.getElementById('btn-rollback').onclick = function () {
+        api('POST', 'agents/' + p.agent_id + '/profile/rollback?kind=' + p.kind, {})
+          .then(function () { say('rolled back'); renderBanner(); })
+          .catch(function (er) { say(er.message, true); });
+      };
+      // live countdown
+      var iv = setInterval(function () {
+        left -= 1;
+        var b = el.querySelector('b');
+        if (!b || left < 0) { clearInterval(iv); return; }
+        b.textContent = '⏱ ' + t('confirm_banner').replace('{agent}', p.agent_id).replace('{s}', left);
+      }, 1000);
+    }).catch(function () { el.style.display = 'none'; });
+  }
+
+  // ---- traffic + overhead ---------------------------------------------------------
+  function renderTraffic() {
+    var el = document.getElementById('tab-traffic');
+    if (!overview) { el.innerHTML = '<p class="muted">…</p>'; return; }
+    el.innerHTML = '<div class="row"><span class="muted">' + esc(t('dc')) + ':</span><select id="udc">' +
+      (overview.datacenters || []).map(function (d) {
+        return '<option value="' + d.id + '">' + esc(d.name) + '</option>';
+      }).join('') +
+      '</select><button class="act" id="ubtn">' + esc(t('usage')) + '</button>' +
+      '<button class="act" id="cbtn">' + esc(t('coefficient')) + '</button></div><div id="uout"></div>';
+    document.getElementById('ubtn').onclick = function () {
+      var dc = document.getElementById('udc').value;
+      var from = Math.floor(Date.now() / 1000) - 86400;
+      api('GET', 'usage?datacenter_id=' + dc + '&from=' + from).then(function (r) {
+        var u = r.usage;
+        document.getElementById('uout').innerHTML =
+          '<table><tr><th></th><th>' + esc(t('wire')) + '</th><th>' + esc(t('payload')) + '</th></tr>' +
+          '<tr><td>RX</td><td>' + bytes(u.wire_rx) + '</td><td>' + bytes(u.payload_rx) + '</td></tr>' +
+          '<tr><td>TX</td><td>' + bytes(u.wire_tx) + '</td><td>' + bytes(u.payload_tx) + '</td></tr></table>' +
+          '<p class="muted">' + esc(r.note) + '</p>';
+      }).catch(function (e) { say(e.message, true); });
+    };
+    document.getElementById('cbtn').onclick = function () {
+      var dc = document.getElementById('udc').value;
+      api('GET', 'coefficient?datacenter_id=' + dc).then(function (r) {
+        var rows = (r.suggestions || []).map(function (sg) {
+          return '<tr><td>' + esc(sg.engine) + '</td><td>' + (sg.overhead || 0).toFixed(3) + '</td><td>' +
+            (sg.suggested_coefficient || 0).toFixed(3) + '</td></tr>';
+        }).join('');
+        document.getElementById('uout').innerHTML =
+          '<table><tr><th>' + esc(t('engine')) + '</th><th>' + esc(t('overhead')) + '</th><th>' + esc(t('coefficient')) + '</th></tr>' +
+          rows + '</table><p class="muted">' + esc(r.note) + '</p>';
+      }).catch(function (e) { say(e.message, true); });
+    };
+  }
+
+  applyLang();
+  loadAll();
+  setInterval(loadAll, 10000); // live state, ~heartbeat cadence
+})();

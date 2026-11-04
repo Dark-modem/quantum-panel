@@ -40,6 +40,7 @@ type ForwardRule struct {
 type AgentV2State struct {
 	EngineCatalog string `json:"engine_catalog"` // JSON: the catalog the agent reported
 	DesiredV2     string `json:"desired_v2"`     // pending DesiredV2 JSON ("" = none pending)
+	AppliedV2     string `json:"applied_v2"`     // last ACKED DesiredV2 JSON ("" = none)
 	LastAck       string `json:"last_ack"`       // JSON {revision, ok, error, at}
 	LastError     string `json:"last_error"`
 	ProtoVersion  int    `json:"proto_version"` // negotiated (hello envelope V), default 1
@@ -480,8 +481,8 @@ func (s *Store) ListAgents() ([]Agent, error) {
 // AgentV2 reads the v2 session columns of one agent.
 func (s *Store) AgentV2(id string) (AgentV2State, error) {
 	var v AgentV2State
-	err := s.db.QueryRow(`SELECT engine_catalog, desired_v2, last_ack, last_error, proto_version FROM agents WHERE id = ?`, id).
-		Scan(&v.EngineCatalog, &v.DesiredV2, &v.LastAck, &v.LastError, &v.ProtoVersion)
+	err := s.db.QueryRow(`SELECT engine_catalog, desired_v2, applied_v2, last_ack, last_error, proto_version FROM agents WHERE id = ?`, id).
+		Scan(&v.EngineCatalog, &v.DesiredV2, &v.AppliedV2, &v.LastAck, &v.LastError, &v.ProtoVersion)
 	if errors.Is(err, sql.ErrNoRows) {
 		return v, ErrNotFound
 	}
@@ -536,7 +537,9 @@ func (s *Store) AckDesiredV2(id, revision string, ok bool, ackErr string) (bool,
 	}
 	ackJSON := fmt.Sprintf(`{"revision":%q,"ok":%t,"error":%q,"at":%d}`, revision, ok, ackErr, time.Now().Unix())
 	if ok {
-		_, err = s.db.Exec(`UPDATE agents SET desired_v2 = '', applied_revision = ?, last_ack = ?, last_error = '' WHERE id = ?`,
+		// The acked document becomes the applied snapshot (the minimal-
+		// revision diff compares against it) and pending clears.
+		_, err = s.db.Exec(`UPDATE agents SET applied_v2 = desired_v2, desired_v2 = '', applied_revision = ?, last_ack = ?, last_error = '' WHERE id = ?`,
 			revision, ackJSON, id)
 	} else {
 		_, err = s.db.Exec(`UPDATE agents SET last_ack = ?, last_error = ? WHERE id = ?`, ackJSON, ackErr, id)
