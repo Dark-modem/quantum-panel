@@ -60,9 +60,33 @@ type Plan struct {
 	Drift      bool         `json:"drift"`
 }
 
-// DesiredName builds the canonical node name for a datacenter.
-func DesiredName(dcName string) string {
-	return NamePrefix + strings.TrimSpace(dcName)
+// DesiredName builds the canonical node name for one (datacenter, foreign
+// server) pair. The server part is REQUIRED: upstream node names are
+// globally unique, and M foreign servers each host a node for the same
+// datacenter — "quantum:<dc>-<server>" keeps them distinct and traceable.
+func DesiredName(dcName, serverName string) string {
+	return NamePrefix + slugPart(dcName) + "-" + slugPart(serverName)
+}
+
+// slugPart lowercases and replaces anything outside [a-z0-9-_] with '-'.
+func slugPart(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	var b strings.Builder
+	for _, r := range s {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
+			b.WriteRune(r)
+		} else {
+			b.WriteRune('-')
+		}
+	}
+	out := strings.Trim(b.String(), "-")
+	if out == "" {
+		out = "x"
+	}
+	if len(out) > 24 {
+		out = out[:24]
+	}
+	return out
 }
 
 // Diff computes the plan for a desired set against the real panel.

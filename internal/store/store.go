@@ -175,6 +175,32 @@ ALTER TABLE topologies ADD COLUMN failover TEXT NOT NULL DEFAULT '';
 CREATE INDEX idx_tunnels_topology ON tunnels(topology_id);
 CREATE INDEX idx_servers_dc ON servers(datacenter_id);
 `,
+	// 3: Phase 3 PasarGuard integration. Settings hold the panel connection
+	// (url plain; username/password AES-GCM sealed with the per-install
+	// key file). pg_nodes maps (foreign server, iran datacenter) to the
+	// PasarGuard node record Quantum manages; api_key_enc is sealed the
+	// same way. drift_threshold_pct drives the usage cross-check flag.
+	`
+CREATE TABLE pasarguard_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL DEFAULT '',
+  updated_at INTEGER NOT NULL
+);
+CREATE TABLE pg_nodes (
+  id INTEGER PRIMARY KEY,
+  server_id INTEGER NOT NULL REFERENCES servers(id),
+  datacenter_id INTEGER NOT NULL REFERENCES datacenters(id),
+  pg_node_id INTEGER NOT NULL DEFAULT 0,
+  api_key_enc TEXT NOT NULL DEFAULT '',
+  server_ca TEXT NOT NULL DEFAULT '',
+  node_port INTEGER NOT NULL DEFAULT 62050,
+  note TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL,
+  UNIQUE (server_id, datacenter_id)
+);
+CREATE INDEX idx_pg_nodes_dc ON pg_nodes(datacenter_id);
+INSERT INTO pasarguard_settings (key, value, updated_at) VALUES ('drift_threshold_pct', '20', strftime('%s','now'));
+`,
 }
 
 func (s *Store) migrate() error {

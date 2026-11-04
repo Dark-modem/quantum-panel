@@ -10,7 +10,7 @@
   var T = {
     en: {
       tab_topos: 'Topologies', tab_weights: 'Weights', tab_profiles: 'Profiles',
-      tab_traffic: 'Traffic', title: 'Quantum — Mesh Management',
+      tab_traffic: 'Traffic', tab_pg: 'PasarGuard', pg_connect: 'Connect', pg_url: 'Panel URL', pg_user: 'Admin user', pg_pass: 'Admin password', pg_dry: 'Dry-run diff', pg_apply: 'Apply plan', pg_cert: 'Store certificate', pg_install: 'Install command', pg_crosscheck: 'Cross-check usage', title: 'Quantum — Mesh Management',
       topo: 'Topology', members: 'Members', tunnels: 'Tunnels', enabled: 'Enabled',
       engine: 'Engine', state: 'State', up: 'up', down: 'down', unknown: 'unknown',
       tunnel: 'Tunnel', weight: 'Weight', set: 'Set', save: 'Save',
@@ -25,7 +25,7 @@
     },
     fa: {
       tab_topos: 'توپولوژی‌ها', tab_weights: 'وزن‌ها', tab_profiles: 'پروفایل‌ها',
-      tab_traffic: 'ترافیک', title: 'کوانتوم — مدیریت مش',
+      tab_traffic: 'ترافیک', tab_pg: 'پازارگارد', pg_connect: 'اتصال', pg_url: 'آدرس پنل', pg_user: 'کاربر ادمین', pg_pass: 'رمز ادمین', pg_dry: 'بررسی تغییرات', pg_apply: 'اعمال برنامه', pg_cert: 'ذخیره گواهی', pg_install: 'دستور نصب', pg_crosscheck: 'مقایسه مصرف', title: 'کوانتوم — مدیریت مش',
       topo: 'توپولوژی', members: 'اعضا', tunnels: 'تونل‌ها', enabled: 'فعال',
       engine: 'موتور', state: 'وضعیت', up: 'برقرار', down: 'قطع', unknown: 'نامشخص',
       tunnel: 'تونل', weight: 'وزن', set: 'ثبت', save: 'ذخیره',
@@ -89,7 +89,7 @@
     Array.prototype.forEach.call(document.querySelectorAll('#tabs button'), function (x) {
       x.classList.toggle('active', x === b);
     });
-    ['topos', 'weights', 'profiles', 'traffic'].forEach(function (id) {
+    ['topos', 'weights', 'profiles', 'traffic', 'pasarguard'].forEach(function (id) {
       document.getElementById('tab-' + id).style.display = id === current ? '' : 'none';
     });
     render();
@@ -118,6 +118,7 @@
     if (current === 'weights') renderWeights();
     if (current === 'profiles') renderProfiles();
     if (current === 'traffic') renderTraffic();
+    if (current === 'pasarguard') renderPG();
   }
 
   function loadAll() {
@@ -310,6 +311,81 @@
           rows + '</table><p class="muted">' + esc(r.note) + '</p>';
       }).catch(function (e) { say(e.message, true); });
     };
+  }
+
+
+  // ---- pasarguard ------------------------------------------------------------
+  function renderPG() {
+    var el = document.getElementById('tab-pasarguard');
+    api('GET', 'pasarguard/status').then(function (st) {
+      var html = '<div class="row">' +
+        '<input id="pg-url" placeholder="' + esc(t('pg_url')) + ' (https://pg.example:8000)" style="width:280px">' +
+        '<input id="pg-user" placeholder="' + esc(t('pg_user')) + '">' +
+        '<input id="pg-pass" type="password" placeholder="' + esc(t('pg_pass')) + '">' +
+        '<button class="act primary" id="pg-connect">' + esc(t('pg_connect')) + '</button>' +
+        '<span class="muted" id="pg-status">' + (st.configured ? esc(st.url) + ' ✓' : '') + '</span></div>' +
+        '<div class="row">' +
+        '<button class="act" id="pg-dry">' + esc(t('pg_dry')) + '</button>' +
+        '<button class="act" id="pg-apply">' + esc(t('pg_apply')) + '</button>' +
+        '<button class="act" id="pg-cross">' + esc(t('pg_crosscheck')) + '</button></div>' +
+        '<div id="pg-out"></div>';
+      el.innerHTML = html;
+      document.getElementById('pg-connect').onclick = function () {
+        api('POST', 'pasarguard/connect', {
+          url: document.getElementById('pg-url').value,
+          username: document.getElementById('pg-user').value,
+          password: document.getElementById('pg-pass').value
+        }).then(function (r) { say('connected: ' + r.nodes + ' nodes'); renderPG(); })
+          .catch(function (e) { say(e.message, true); });
+      };
+      document.getElementById('pg-dry').onclick = function () { pgReconcile(false); };
+      document.getElementById('pg-apply').onclick = function () { pgReconcile(true); };
+      document.getElementById('pg-cross').onclick = function () { pgCross(); };
+      pgNodes();
+    }).catch(function (e) { el.innerHTML = '<p class="muted">' + esc(e.message) + '</p>'; });
+  }
+  function pgReconcile(apply) {
+    var out = document.getElementById('pg-out');
+    var body = { apply: !!apply };
+    if (apply) body.confirm = 'yes';
+    api('POST', 'pasarguard/reconcile', body).then(function (r) {
+      var rows = (r.plan.actions || []).map(function (a) {
+        return '<tr><td>' + esc(a.action) + '</td><td>' + esc(a.name) + '</td><td>' + esc(a.detail) + '</td></tr>';
+      }).join('');
+      out.innerHTML = '<table><tr><th>Action</th><th>Node</th><th>Detail</th></tr>' + rows + '</table>' +
+        '<p class="muted">creates=' + r.plan.creates + ' updates=' + r.plan.updates +
+        ' reconnects=' + r.plan.reconnects + ' stale=' + r.plan.stale + ' applied=' + r.applied + '</p>' +
+        (r.warnings || []).map(function (w) { return '<p class="muted">⚠ ' + esc(w) + '</p>'; }).join('');
+    }).catch(function (e) { say(e.message, true); });
+  }
+  function pgNodes() {
+    api('GET', 'pasarguard/nodes').then(function (r) {
+      var rows = (r.nodes || []).map(function (n) {
+        var owned = n.name.indexOf('quantum:') === 0;
+        return '<tr><td>' + esc(n.name) + (owned ? ' <span class="pill ok">Q</span>' : '') + '</td><td>' + esc(n.address) +
+          '</td><td>' + (n.usage_coefficient || 1) + '</td><td><span class="pill ' +
+          (n.status === 'connected' ? 'ok' : 'down') + '">' + esc(n.status) + '</span></td></tr>';
+      }).join('');
+      var box = document.getElementById('pg-out');
+      if (!box) return;
+      box.insertAdjacentHTML('afterbegin',
+        '<table><tr><th>Node</th><th>Address</th><th>Coefficient</th><th>Status</th></tr>' + rows + '</table>');
+    }).catch(function () {});
+  }
+  function pgCross() {
+    var dc = (overview && overview.datacenters && overview.datacenters[0]) ? overview.datacenters[0].id : 0;
+    if (!dc) { say('no datacenter configured', true); return; }
+    api('GET', 'pasarguard/crosscheck?datacenter_id=' + dc).then(function (r) {
+      var rows = (r.rows || []).map(function (x) {
+        return '<tr><td>' + esc(x.pg_node_name) + '</td><td>' + bytes(x.pg_total) + '</td><td>' + bytes(x.quantum_wire) +
+          '</td><td>' + (x.ratio_wire || 0).toFixed(2) + '</td><td>' +
+          (x.drift ? '<span class="pill down">drift</span>' : '<span class="pill ok">ok</span>') + '</td></tr>';
+      }).join('');
+      document.getElementById('pg-out').innerHTML =
+        '<table><tr><th>PG node</th><th>PG usage</th><th>Quantum wire</th><th>Ratio</th><th></th></tr>' + rows + '</table>' +
+        '<p class="muted">configured=' + (r.configured_coefficient || 1) + ' suggested=' +
+        (r.suggested_coefficient || 0).toFixed(3) + ' · ' + esc(r.note) + '</p>';
+    }).catch(function (e) { say(e.message, true); });
   }
 
   applyLang();
