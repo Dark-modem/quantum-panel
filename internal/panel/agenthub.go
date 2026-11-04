@@ -309,10 +309,14 @@ func (c *agentConn) run() {
 	// Persist the negotiated version BEFORE the welcome: a push that races
 	// the handshake must already see the session's protocol version.
 	c.recordSessionV2()
-	if err := c.sendVersioned(agentMsgWelcome, agentWelcome{OK: true, Server: panelVersion}); err != nil {
+	// The welcome PAYLOAD carries the negotiated version: the agent's
+	// NegotiateOrV1 reads w.Version (absent = v1). Without this a v2
+	// agent would silently stay on the v1 path.
+	if err := c.sendVersioned(agentMsgWelcome, agentWelcome{OK: true, Server: panelVersion, Version: pv}); err != nil {
 		return
 	}
 	c.applyHello(&hello)
+	c.recordEngineCatalog(&hello)
 
 	// Deliver whatever desired state was queued while the agent was offline:
 	// the v2 pending document first, then the frozen v1 matrix desired.

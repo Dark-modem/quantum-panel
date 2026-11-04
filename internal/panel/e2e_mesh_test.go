@@ -97,6 +97,9 @@ type fakeAgentV2 struct {
 	ws  *websocket.Conn
 	id  string
 	key string
+	// welcomeVersion is the negotiated version the panel's welcome
+	// payload declared (integration Step 2: must be 2 for v2 agents).
+	welcomeVersion int
 }
 
 func dialFakeAgentV2(t *testing.T, srv *httptest.Server, id, key string) *fakeAgentV2 {
@@ -111,12 +114,19 @@ func dialFakeAgentV2(t *testing.T, srv *httptest.Server, id, key string) *fakeAg
 	t.Cleanup(func() { ws.Close() })
 	fa := &fakeAgentV2{t: t, ws: ws, id: id, key: key}
 	// hello with envelope V=2 → the panel negotiates v2 for this session.
-	hello := protocol.Hello{ID: id, Version: "2.0.0", Hostname: "fake-" + id, OS: "linux", Arch: "amd64"}
+	hello := protocol.Hello{ID: id, Version: "2.0.0", Hostname: "fake-" + id, OS: "linux", Arch: "amd64",
+		MaxVersion: protocol.ProtoVersionV2, EngineCatalog: []string{"matrix", "fake"},
+		Engines: []protocol.EngineInfo{{ID: "matrix", Version: "2.0.0"}, {ID: "fake", Version: "2.0.0"}}}
 	fa.send(protocol.MsgHello, hello)
-	typ, _ := fa.read()
+	typ, data := fa.read()
 	if typ != protocol.MsgWelcome {
 		t.Fatalf("fake agent: want welcome, got %s", typ)
 	}
+	var w protocol.Welcome
+	if err := json.Unmarshal(data, &w); err != nil {
+		t.Fatalf("welcome decode: %v", err)
+	}
+	fa.welcomeVersion = w.Version
 	return fa
 }
 
@@ -457,3 +467,94 @@ func TestE2Ev1AgentUntouched(t *testing.T) {
 		t.Fatal("v1 agent must not receive DesiredV2")
 	}
 }
+
+// TestE2EForwardsWelcomeAndCatalog covers the integration session's Step-2
+// wiring: the welcome payload carries the negotiated version, forwards +
+// target groups compile into the pushed DesiredV2 (panel ForwardSpec form
+// and balanced-group form), and hello's engine catalog is stored.
+func TestE2EForwardsWelcomeAndCatalog(t *testing.T) {
+	f := e2eSetup(t)
+
+	gen := meshPut(t, f.client, f.srv, "POST", "/api/mesh/topologies/generate", TopoGenRequest{
+		Name: "drak-hz", IranServers: f.iran[0:2], ForeignServers: f.foreign,
+		TunnelsPerPair: 2, Engines: []string{"matrix", "fake"}, Enabled: true,
+	})
+	topoID := int64(gen["topology_id"].(float64))
+
+	ag, key := f.enrollLinkCatalog(t, "drak-1", f.iran[0])
+	fa := dialFakeAgentV2(t, f.srv, ag, key)
+
+	// Forward rules via REST: one balanced (no explicit target), one
+	// explicit-target, one disabled — the third must NOT be delivered.
+	meshPut(t, f.client, f.srv, "POST", "/api/mesh/forwards", store.ForwardRule{
+		TopologyID: &topoID, LocalServerID: f.iran[0], ListenPort: 8443,
+		Proto: "tcp", Enabled: true,
+	})
+	meshPut(t, f.client, f.srv, "POST", "/api/mesh/forwards", store.ForwardRule{
+		TopologyID: &topoID, LocalServerID: f.iran[0], RemoteServerID: &f.foreign[0],
+		ListenPort: 2201, Proto: "tcp", Target: "10.189.0.2:22", Enabled: true,
+	})
+	meshPut(t, f.client, f.srv, "POST", "/api/mesh/forwards", store.ForwardRule{
+		TopologyID: &topoID, LocalServerID: f.iran[0], ListenPort: 9999,
+		Proto: "tcp", Target: "10.189.0.9", Enabled: false,
+	})
+
+	if push := meshPut(t, f.client, f.srv, "POST", "/api/mesh/agents/"+ag+"/push", nil); push["pushed"] != true {
+		t.Fatalf("push: %+v", push)
+	}
+
+	// The FIRST message after push-welcome is the desired (the welcome
+	// was already consumed by dialFakeAgentV2; the pending desired is
+	// delivered on the next connection — so push over the live session
+	// delivers here).
+	typ, data := fa.read()
+	if typ != protocol.MsgDesired {
+		t.Fatalf("want desired, got %s: %s", typ, data)
+	}
+	var d protocol.DesiredV2
+	if err := json.Unmarshal(data, &d); err != nil {
+		t.Fatal(err)
+	}
+
+	// Forwards: balanced + explicit delivered; disabled filtered.
+	if len(d.Forwards) != 2 {
+		t.Fatalf("forwards delivered = %d, want 2 (disabled filtered): %+v", len(d.Forwards), d.Forwards)
+	}
+	balanced := d.Forwards[0]
+	if balanced.TargetGroup == "" || !strings.Contains(balanced.TargetGroup, "drak-hz") ||
+		balanced.TargetPort != 8443 || !balanced.IsEnabled() {
+		t.Fatalf("balanced forward = %+v", balanced)
+	}
+	explicit := d.Forwards[1]
+	// Explicit-target form: the panel-chosen target (addr:port) rides in
+	// Target; TargetPort stays 0 (= same as listen port per contract).
+	if explicit.TargetGroup != "" || explicit.Target != "10.189.0.2:22" || explicit.TargetPort != 0 {
+		t.Fatalf("explicit forward = %+v", explicit)
+	}
+
+	// Target groups: one per referenced group definition.
+	if len(d.TargetGroups) == 0 {
+		t.Fatalf("target groups missing: %+v", d.TargetGroups)
+	}
+	for _, g := range d.TargetGroups {
+		if g.TopologyID == "" {
+			t.Fatalf("group without topology: %+v", g)
+		}
+	}
+
+	// The welcome the fake agent saw must carry Version=2 (it negotiated
+	// v2 via the hello envelope) — assert through a second dial.
+	fa2 := dialFakeAgentV2(t, f.srv, ag, key)
+	if fa2.welcomeVersion != 2 {
+		t.Fatalf("welcome version = %d, want 2 (v2 agents must leave the v1 path)", fa2.welcomeVersion)
+	}
+
+	// Catalog storage: the store keeps what hello reported.
+	fa2.send(protocol.MsgHeartbeat, protocol.HeartbeatV2{TS: time.Now().Unix()})
+	agentTestWaitFor(t, "engine catalog stored", func() bool {
+		v2, err := f.s.AgentV2(ag)
+		return err == nil && strings.Contains(v2.EngineCatalog, "matrix")
+	})
+}
+
+var protocolTruePtr = true

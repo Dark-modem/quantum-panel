@@ -15,6 +15,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"sort"
 	"strconv"
@@ -56,6 +57,12 @@ func compileDesiredV2(s *store.Store, ag store.Agent) (desired *protocol.Desired
 	var specs []protocol.TunnelSpec
 	engineUsed := map[string]bool{}
 	topoSeen := map[int64]bool{}
+	var (
+		forwards     []protocol.ForwardRule
+		targetGroups []protocol.TargetGroup
+		groupSeen    = map[string]bool{}
+		groupDefs    = map[string]protocol.TargetGroup{}
+	)
 	for _, t := range tunnels {
 		if !t.Enabled {
 			continue
@@ -167,12 +174,81 @@ func compileDesiredV2(s *store.Store, ag store.Agent) (desired *protocol.Desired
 				bal.Failover = fo
 			}
 		}
+		// Forwards of this topology scoped to this agent's server
+		// (PROTOCOL-REQUESTS R1 delivery): rules targeting another
+		// server's listen side are skipped. A rule with a RemoteServerID
+		// balances across that one server's tunnels; without one it
+		// spans the topology's whole foreign pool.
+		topoForwards, err := s.ListForwardRules(topoID)
+		if err != nil {
+			warnings = append(warnings, fmt.Sprintf("topology %s: forward rules unreadable (%v)", tp.Name, err))
+			continue
+		}
+		for _, f := range topoForwards {
+			if !f.Enabled || f.LocalServerID != server.ID {
+				continue
+			}
+			fw, grp, ferr := compileForwardRule(s, topoID, f)
+			if ferr != nil {
+				warnings = append(warnings, fmt.Sprintf("forward %d: %v", f.ID, ferr))
+				continue
+			}
+			forwards = append(forwards, *fw)
+			if grp != nil {
+				groupSeen[grp.ID] = true
+				groupDefs[grp.ID] = *grp
+			}
+		}
 	}
+
+	// Target groups referenced by the compiled rules (the agent resolves
+	// a group to its running tunnels via topology + optional remote
+	// server — never a tunnel list, so any N/M/K and engine mix works).
+	for gid := range groupSeen {
+		if g, ok := groupDefs[gid]; ok {
+			targetGroups = append(targetGroups, g)
+		}
+	}
+	sort.Slice(targetGroups, func(i, j int) bool { return targetGroups[i].ID < targetGroups[j].ID })
+	sort.Slice(forwards, func(i, j int) bool { return forwards[i].ID < forwards[j].ID })
 
 	desired = &protocol.DesiredV2{
 		Engines: engines, Tunnels: specs, Balancing: &bal,
+		TargetGroups: targetGroups, Forwards: forwards,
 	}
 	return desired, "", warnings, nil
+}
+
+// compileForwardRule maps one store forward rule to its wire form and
+// the target group it needs (balancing group for the topology's pool,
+// scoped to one remote server when the rule names one). group == nil for
+// explicit-target rules.
+func compileForwardRule(s *store.Store, topoID int64, f store.ForwardRule) (*protocol.ForwardRule, *protocol.TargetGroup, error) {
+	topoName := topoNameCache(s, topoID)
+	wire := &protocol.ForwardRule{
+		ID:         fmt.Sprintf("fw-%d", f.ID),
+		ListenPort: f.ListenPort,
+		Proto:      f.Proto,
+		Enabled:    &f.Enabled,
+		TopologyID: topoName,
+	}
+	if !protocol.ValidForwardProto(f.Proto) {
+		return nil, nil, fmt.Errorf("invalid proto %q", f.Proto)
+	}
+	if f.Target != "" {
+		wire.Target = f.Target // explicit single target (panel-chosen)
+		return wire, nil, nil
+	}
+	var gid, remoteName string
+	if f.RemoteServerID != nil && *f.RemoteServerID != 0 {
+		remoteName = serverNameCache(s, *f.RemoteServerID)
+		gid = fmt.Sprintf("grp-%s-%s", topoName, remoteName)
+	} else {
+		gid = fmt.Sprintf("grp-%s-pool", topoName)
+	}
+	wire.TargetGroup = gid
+	wire.TargetPort = f.ListenPort // the foreign side serves the same port
+	return wire, &protocol.TargetGroup{ID: gid, TopologyID: topoName, RemoteServer: remoteName}, nil
 }
 
 // name caches keep the compiler off the DB for repeated lookups inside one
@@ -335,6 +411,52 @@ func (c *agentConn) recordSessionV2() {
 		return
 	}
 	_ = s.SetAgentV2Session(c.id, c.protoV, v2.EngineCatalog)
+}
+
+// recordEngineCatalog persists the engine catalog the agent reported in
+// hello (PROTOCOL-REQUESTS R3): rich entries when present, else the id
+// list. Best effort like recordSessionV2.
+func (c *agentConn) recordEngineCatalog(h *agentHello) {
+	if len(h.Engines) == 0 && len(h.EngineCatalog) == 0 {
+		return
+	}
+	s, err := MeshStore()
+	if err != nil {
+		noteStoreRetry()
+		return
+	}
+	if _, err := s.AgentV2(c.id); err != nil {
+		return // not in the store (legacy registry only)
+	}
+	type catEntry struct {
+		ID           string          `json:"id"`
+		Version      string          `json:"version,omitempty"`
+		ParamsSchema json.RawMessage `json:"params_schema,omitempty"`
+	}
+	entries := make([]catEntry, 0, len(h.Engines))
+	for _, e := range h.Engines {
+		if e.ID == "" {
+			continue
+		}
+		entries = append(entries, catEntry{ID: e.ID, Version: e.Version, ParamsSchema: e.ParamsSchema})
+	}
+	if len(entries) == 0 {
+		for _, id := range h.EngineCatalog {
+			if id != "" {
+				entries = append(entries, catEntry{ID: id})
+			}
+		}
+	}
+	if len(entries) == 0 {
+		return
+	}
+	b, err := json.Marshal(entries)
+	if err != nil {
+		return
+	}
+	if err := s.SetAgentV2Session(c.id, c.protoV, string(b)); err != nil {
+		log.Printf("[agents] cannot store engine catalog for %s: %v", c.id, err)
+	}
 }
 
 // meshPendingDesiredV2 returns the agent's pending DesiredV2 document.
