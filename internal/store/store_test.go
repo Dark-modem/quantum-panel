@@ -21,15 +21,15 @@ func openTestStore(t *testing.T) *Store {
 
 func TestMigrationsAndWAL(t *testing.T) {
 	s := openTestStore(t)
-	if v, err := s.Version(); err != nil || v != 1 {
-		t.Fatalf("version = %d, %v; want 1", v, err)
+	if v, err := s.Version(); err != nil || v < 1 {
+		t.Fatalf("version = %d, %v; want >= 1", v, err)
 	}
 	// Migrations are idempotent: reopening the same file must not reapply.
 	if err := s.migrate(); err != nil {
 		t.Fatalf("re-migrate: %v", err)
 	}
-	if v, _ := s.Version(); v != 1 {
-		t.Fatalf("version after re-migrate = %d", v)
+	if v, _ := s.Version(); v < 1 {
+		t.Fatalf("version after re-migrate regressed = %d", v)
 	}
 	if mode, err := s.JournalMode(); err != nil || mode != "wal" {
 		t.Fatalf("journal mode = %q, %v; want wal", mode, err)

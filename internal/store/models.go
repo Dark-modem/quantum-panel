@@ -19,89 +19,96 @@ func wrapNotFound(err error) error {
 // Datacenter is an Iran or foreign datacenter. PriceCoefficient is a
 // pricing hint; it is NEVER applied to byte statistics.
 type Datacenter struct {
-	ID               int64
-	Kind             string // "iran" | "foreign"
-	Name             string
-	PriceCoefficient float64
-	CreatedAt        int64
+	ID               int64   `json:"id"`
+	Kind             string  `json:"kind"` // "iran" | "foreign"
+	Name             string  `json:"name"`
+	PriceCoefficient float64 `json:"price_coefficient"`
+	CreatedAt        int64   `json:"created_at"`
 }
 
 // Server is one tunnel endpoint machine.
 type Server struct {
-	ID           int64
-	Name         string
-	Role         string // "iran" | "foreign"
-	DatacenterID int64  // 0 = unset
-	Address      string
-	CreatedAt    int64
+	ID           int64  `json:"id"`
+	Name         string `json:"name"`
+	Role         string `json:"role"`          // "iran" | "foreign"
+	DatacenterID int64  `json:"datacenter_id"` // 0 = unset
+	Address      string `json:"address"`
+	CreatedAt    int64  `json:"created_at"`
 }
 
 // Topology groups servers that tunnel through each other.
 type Topology struct {
-	ID        int64
-	Name      string
-	Enabled   bool
-	CreatedAt int64
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
+	// Enabled gates tunnel generation and desired-state compilation.
+	Enabled   bool  `json:"enabled"`
+	CreatedAt int64 `json:"created_at"`
+	// HealthCheck/Failover are JSON blobs (protocol.HealthCheckParams /
+	// protocol.FailoverRules shapes) the desired-state compiler copies
+	// into BalancingPolicy; the agents enforce them locally.
+	HealthCheck string `json:"health_check,omitempty"`
+	Failover    string `json:"failover,omitempty"`
 }
 
 // Tunnel is one tunnel instance. EngineParams is opaque JSON the named
 // engine validates.
 type Tunnel struct {
-	ID             int64
-	TunnelKey      string
-	TopologyID     int64
-	LocalServerID  int64
-	RemoteServerID int64
-	Engine         string
-	EngineParams   string
-	Enabled        bool
-	CreatedAt      int64
+	ID             int64  `json:"id"`
+	TunnelKey      string `json:"tunnel_key"`
+	TopologyID     int64  `json:"topology_id"`
+	LocalServerID  int64  `json:"local_server_id"`
+	RemoteServerID int64  `json:"remote_server_id"`
+	Engine         string `json:"engine"`
+	EngineParams   string `json:"engine_params"` // opaque JSON, engine-validated
+	Enabled        bool   `json:"enabled"`
+	CreatedAt      int64  `json:"created_at"`
 }
 
 // TrafficSample is one per-tunnel counter reading: BOTH byte views,
 // always real bytes.
 type TrafficSample struct {
-	TunnelID      int64
-	At            int64
-	WireRx        uint64
-	WireTx        uint64
-	PayloadRx     uint64
-	PayloadTx     uint64
-	CountersKnown bool
+	TunnelID      int64  `json:"tunnel_id"`
+	At            int64  `json:"at"`
+	WireRx        uint64 `json:"wire_rx"`
+	WireTx        uint64 `json:"wire_tx"`
+	PayloadRx     uint64 `json:"payload_rx"`
+	PayloadTx     uint64 `json:"payload_tx"`
+	CountersKnown bool   `json:"counters_known"`
 }
 
 // PasarguardNode is one Pasarguard node on a foreign server serving one
 // Iran datacenter. Coefficient applies to user quota INSIDE Pasarguard
 // only.
 type PasarguardNode struct {
-	ID           int64
-	ServerID     int64
-	DatacenterID int64
-	Name         string
-	Coefficient  float64
+	ID           int64   `json:"id"`
+	ServerID     int64   `json:"server_id"`
+	DatacenterID int64   `json:"datacenter_id"`
+	Name         string  `json:"name"`
+	Coefficient  float64 `json:"coefficient"`
 }
 
 // Agent is one enrolled endpoint agent.
 type Agent struct {
-	ID              string
-	ServerID        int64
-	Name            string
-	Role            string
-	KeyHash         string
-	Status          string
-	Version         string
-	Hostname        string
-	PublicIP        string
-	LastSeen        int64
-	AppliedRevision string
+	ID              string `json:"id"`
+	ServerID        int64  `json:"server_id"`
+	Name            string `json:"name"`
+	Role            string `json:"role"`
+	KeyHash         string `json:"-"`
+	Status          string `json:"status"`
+	Version         string `json:"version"`
+	Hostname        string `json:"hostname"`
+	PublicIP        string `json:"public_ip"`
+	LastSeen        int64  `json:"last_seen"`
+	AppliedRevision string `json:"applied_revision"`
 }
 
 // AuditEntry is one audit-log record.
 type AuditEntry struct {
-	At     int64
-	Actor  string
-	Action string
-	Detail string
+	ID     int64  `json:"id"`
+	At     int64  `json:"at"`
+	Actor  string `json:"actor"`
+	Action string `json:"action"`
+	Detail string `json:"detail"`
 }
 
 func now() int64 { return time.Now().Unix() }

@@ -143,6 +143,37 @@ CREATE TABLE audit_log (
 );
 CREATE INDEX idx_audit_log_at ON audit_log(at);
 `,
+	// 2: Phase 2B management-plane additions. Forward rules are panel-side
+	// policy until the protocol grows DesiredV2.Forwards (see
+	// 00-ADMIN/PROTOCOL-REQUESTS.md); agents gain the v2 session state the
+	// compiler and report ingester need; topologies gain the balancing
+	// defaults the agents enforce locally.
+	`
+CREATE TABLE forward_rules (
+  id INTEGER PRIMARY KEY,
+  topology_id INTEGER REFERENCES topologies(id),
+  local_server_id INTEGER NOT NULL REFERENCES servers(id),
+  remote_server_id INTEGER REFERENCES servers(id),
+  tunnel_id INTEGER REFERENCES tunnels(id),
+  listen_port INTEGER NOT NULL,
+  proto TEXT NOT NULL CHECK (proto IN ('tcp','udp')),
+  target TEXT NOT NULL DEFAULT '',
+  enabled INTEGER NOT NULL DEFAULT 1,
+  note TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL,
+  UNIQUE (topology_id, local_server_id, listen_port, proto)
+);
+CREATE INDEX idx_forward_rules_server ON forward_rules(local_server_id);
+ALTER TABLE agents ADD COLUMN engine_catalog TEXT NOT NULL DEFAULT '';
+ALTER TABLE agents ADD COLUMN desired_v2 TEXT NOT NULL DEFAULT '';
+ALTER TABLE agents ADD COLUMN last_ack TEXT NOT NULL DEFAULT '';
+ALTER TABLE agents ADD COLUMN last_error TEXT NOT NULL DEFAULT '';
+ALTER TABLE agents ADD COLUMN proto_version INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE topologies ADD COLUMN health_check TEXT NOT NULL DEFAULT '';
+ALTER TABLE topologies ADD COLUMN failover TEXT NOT NULL DEFAULT '';
+CREATE INDEX idx_tunnels_topology ON tunnels(topology_id);
+CREATE INDEX idx_servers_dc ON servers(datacenter_id);
+`,
 }
 
 func (s *Store) migrate() error {
