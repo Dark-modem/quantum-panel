@@ -553,10 +553,6 @@ func main() {
 			os.Exit(cliSettings(os.Args[2:]))
 		case "doctor":
 			os.Exit(cliDoctor(os.Args[2:]))
-		case "agent":
-			// Headless endpoint agent: own runtime, never touches the
-			// panel's listeners, registry or background workers.
-			os.Exit(agentCmd(os.Args[2:]))
 		case "netopt":
 			// Network Optimization subsystem (Session 2): measure, plan,
 			// apply/rollback owned tuning. See docs/NETOPT-INVENTORY.md.
