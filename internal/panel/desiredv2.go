@@ -338,7 +338,16 @@ func compileAndPushAgent(s *store.Store, agentID string) (map[string]any, error)
 			"skip": "desired state already applied (no change since last ack)", "warnings": warnings}, nil
 	}
 	desired.Revision = newMeshRevision()
+	// Offline agents get the document QUEUED for the next connect
+	// (persisted pending, delivered by the hub at hello) and an honest
+	// pushed=false — the API must not claim a delivery that did not
+	// happen (PROTOCOL-REQUESTS R1 flow + E2E drop contract).
 	if err := agentHubDeliverDesiredV2(agentID, *desired); err != nil {
+		if errors.Is(err, errAgentSessionDead) {
+			return map[string]any{"agent_id": agentID, "pushed": false,
+				"skip": "agent offline; desired queued for the next connect", "revision": desired.Revision,
+				"warnings": warnings}, nil
+		}
 		return nil, err
 	}
 	meshAudit(meshActor(nil), "mesh.desired.push",
@@ -459,6 +468,13 @@ func (c *agentConn) recordEngineCatalog(h *agentHello) {
 	}
 }
 
+// docWithRevision re-marshals a desired document that already carries
+// its assigned revision (the caller assigns before queuing).
+func docWithRevision(d *protocol.DesiredV2) string {
+	b, _ := json.Marshal(d)
+	return string(b)
+}
+
 // meshPendingDesiredV2 returns the agent's pending DesiredV2 document.
 func meshPendingDesiredV2(agentID string) (protocol.DesiredV2, bool) {
 	var d protocol.DesiredV2
@@ -496,10 +512,29 @@ func agentHubDeliverDesiredV2(agentID string, d protocol.DesiredV2) error {
 	conn := agentHubConns[agentID]
 	agentHubMu.Unlock()
 	if conn != nil && conn.protoV >= protocol.ProtoVersionV2 {
-		return conn.sendVersioned(protocol.MsgDesired, d)
+		if err := conn.sendVersioned(protocol.MsgDesired, d); err != nil {
+			// The session died between the map lookup and the write (the
+			// read loop deregisters asynchronously). The document IS
+			// durably pending; drop the stale session and tell the
+			// caller the delivery did NOT happen (the push handler then
+			// reports "queued for reconnect" instead of a false claim).
+			log.Printf("[mesh] push to %s hit a dead session (will deliver on reconnect): %v", agentID, err)
+			agentHubMu.Lock()
+			if agentHubConns[agentID] == conn {
+				delete(agentHubConns, agentID)
+			}
+			agentHubMu.Unlock()
+			go conn.shutdown("dead session on push: " + err.Error())
+			return errAgentSessionDead
+		}
 	}
 	return nil
 }
+
+// errAgentSessionDead: the hub map still held a session whose socket was
+// already gone. The desired document is durably pending; the push should
+// be reported as queued, not delivered.
+var errAgentSessionDead = errors.New("agent session died before delivery")
 
 // meshHandleAckV2 bridges an ack to the store's v2 desired state. The v1
 // registry handling in handleAck is unchanged (frozen flow); this only
