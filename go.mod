@@ -10,7 +10,7 @@ require (
 )
 
 require (
-	github.com/Dark-modem/quantum-protocol v0.0.0
+	github.com/Dark-modem/quantum-protocol v0.0.0-20261104202430-f34074e8f830
 	modernc.org/sqlite v1.34.5
 )
 
@@ -24,5 +24,3 @@ require (
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.8.2 // indirect
 )
-
-replace github.com/Dark-modem/quantum-protocol => ../quantum-protocol

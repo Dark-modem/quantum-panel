@@ -6,8 +6,14 @@ on:
 jobs:
   build-vet-test:
     runs-on: ubuntu-latest
+    env:
+      GOPRIVATE: "github.com/Dark-modem/*"
     steps:
       - uses: actions/checkout@v4
+      # The panel requires the private github.com/Dark-modem/quantum-protocol
+      # module; fetch it with the repo-scoped CI token (see MERGE-DONE.md §4).
+      - name: Configure private module fetch
+        run: git config --global url."https://x-access-token:${{ secrets.CI_GIT_TOKEN }}@github.com/".insteadOf "https://github.com/"
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
