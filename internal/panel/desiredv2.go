@@ -148,11 +148,11 @@ func compileDesiredV2(s *store.Store, ag store.Agent) (desired *protocol.Desired
 				w = 1
 			}
 			bal.Weights = append(bal.Weights, protocol.WeightRule{
-				TopologyID:  topoNameCache(s, topoID),
-				TunnelID:    t.TunnelKey,
-				LocalServer: serverNameCache(s, t.LocalServerID),
+				TopologyID:   topoNameCache(s, topoID),
+				TunnelID:     t.TunnelKey,
+				LocalServer:  serverNameCache(s, t.LocalServerID),
 				RemoteServer: serverNameCache(s, t.RemoteServerID),
-				Weight:      w,
+				Weight:       w,
 			})
 		}
 		if tp.HealthCheck != "" {
@@ -233,6 +233,11 @@ func compileAndPushAgent(s *store.Store, agentID string) (map[string]any, error)
 	v2state, err := s.AgentV2(agentID)
 	if err != nil {
 		return nil, err
+	}
+	// The live session's negotiated version wins while a session exists
+	// (the store value updates at hello time but a push can race it).
+	if v := agentHubSessionVersion(agentID); v > 0 {
+		v2state.ProtoVersion = v
 	}
 	if v2state.ProtoVersion < 2 {
 		return map[string]any{

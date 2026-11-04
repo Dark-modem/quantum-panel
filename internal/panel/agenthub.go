@@ -155,6 +155,18 @@ type agentSessionState struct {
 	lastPersist time.Time
 }
 
+// agentHubSessionVersion returns the negotiated protocol version of the
+// agent's live session (0 = offline). The store mirrors it at hello time,
+// but the live value is authoritative while a session exists.
+func agentHubSessionVersion(id string) int {
+	agentHubMu.Lock()
+	defer agentHubMu.Unlock()
+	if c := agentHubConns[id]; c != nil {
+		return c.protoV
+	}
+	return 0
+}
+
 // agentHubOnline reports whether the agent currently has a live session.
 // agentHubCloseAll closes every live agent session. Test-only drain: it
 // lets session goroutines finish their registry writes before a test
@@ -294,11 +306,13 @@ func (c *agentConn) run() {
 		return
 	}
 	c.protoV = pv
+	// Persist the negotiated version BEFORE the welcome: a push that races
+	// the handshake must already see the session's protocol version.
+	c.recordSessionV2()
 	if err := c.sendVersioned(agentMsgWelcome, agentWelcome{OK: true, Server: panelVersion}); err != nil {
 		return
 	}
 	c.applyHello(&hello)
-	c.recordSessionV2()
 
 	// Deliver whatever desired state was queued while the agent was offline:
 	// the v2 pending document first, then the frozen v1 matrix desired.

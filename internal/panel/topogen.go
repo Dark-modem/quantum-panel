@@ -23,12 +23,12 @@ import (
 
 // TopoGenRequest is the mesh API's generate body.
 type TopoGenRequest struct {
-	Name           string            `json:"name"`              // unique topology name
-	IranServers    []int64           `json:"iran_servers"`      // server IDs, role=iran
-	ForeignServers []int64           `json:"foreign_servers"`   // server IDs, role=foreign
-	TunnelsPerPair int               `json:"tunnels_per_pair"`  // 1..26
-	Engines        []string          `json:"engines"`           // exactly TunnelsPerPair entries, one per slot
-	EngineParams   []json.RawMessage `json:"engine_params"`     // optional: 0 or TunnelsPerPair entries
+	Name           string            `json:"name"`             // unique topology name
+	IranServers    []int64           `json:"iran_servers"`     // server IDs, role=iran
+	ForeignServers []int64           `json:"foreign_servers"`  // server IDs, role=foreign
+	TunnelsPerPair int               `json:"tunnels_per_pair"` // 1..26
+	Engines        []string          `json:"engines"`          // exactly TunnelsPerPair entries, one per slot
+	EngineParams   []json.RawMessage `json:"engine_params"`    // optional: 0 or TunnelsPerPair entries
 	Enabled        bool              `json:"enabled"`
 	HealthCheck    json.RawMessage   `json:"health_check,omitempty"` // protocol.HealthCheckParams shape
 	Failover       json.RawMessage   `json:"failover,omitempty"`     // protocol.FailoverRules shape
@@ -218,6 +218,7 @@ func slotLetter(slot int) string {
 //   - no linked agent / empty catalog → builtin list decides; unknown ids
 //     return a WARNING string (accepted — the engine validates its params);
 //   - a catalog exists → the engine MUST be in it (hard error).
+//
 // The catalog entries are {"id": "...", ...}; only the id field matters.
 func validateEngineAgainstCatalog(s *store.Store, serverID int64, engine string) (warning string, err error) {
 	if !engineIDRe.MatchString(engine) {

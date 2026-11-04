@@ -49,7 +49,9 @@ func meshRuntimeFresh(agentID string, maxAge time.Duration) bool {
 	return time.Now().Unix()-meshRuntimeSeen[agentID] < int64(maxAge.Seconds())
 }
 
-const meshSampleMinGap = 5 * time.Second // do not persist identical-second samples
+// meshSampleMinGap throttles sample writes (identical-second heartbeats
+// must not flood the table); a var so tests can disable the throttle.
+var meshSampleMinGap = 5 * time.Second
 var meshLastSampleAt = map[string]int64{}
 var meshSampleMu sync.Mutex
 

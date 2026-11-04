@@ -246,11 +246,11 @@ func handleMeshAgentsList(w http.ResponseWriter, r *http.Request) {
 	}
 	type agentView struct {
 		store.Agent
-		ProtoVersion  int             `json:"proto_version"`
-		EngineCatalog json.RawMessage `json:"engine_catalog,omitempty"`
-		HasPending    bool            `json:"has_pending_desired"`
-		AppliedV2     bool            `json:"has_applied_v2"`
-		LastError     string          `json:"last_error,omitempty"`
+		ProtoVersion  int                         `json:"proto_version"`
+		EngineCatalog json.RawMessage             `json:"engine_catalog,omitempty"`
+		HasPending    bool                        `json:"has_pending_desired"`
+		AppliedV2     bool                        `json:"has_applied_v2"`
+		LastError     string                      `json:"last_error,omitempty"`
 		Runtime       []protocolTunnelRuntimeView `json:"runtime,omitempty"`
 	}
 	out := []agentView{}
@@ -301,12 +301,19 @@ func handleMeshAgentLink(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{"ok": true})
 }
 
-// validAgentID matches the enrollment id shape ("agt_" + hex).
+// validAgentID matches the enrollment id shape: "agt_" + 12..32 lowercase
+// hex (the generator uses 12 today; tolerate a longer id if the enrollment
+// length ever grows).
 func validAgentID(id string) bool {
-	if len(id) != 4+24 || !strings.HasPrefix(id, "agt_") {
+	const prefix = "agt_"
+	if !strings.HasPrefix(id, prefix) {
 		return false
 	}
-	for _, c := range id[4:] {
+	hex := id[len(prefix):]
+	if len(hex) < 12 || len(hex) > 32 {
+		return false
+	}
+	for _, c := range hex {
 		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
 			return false
 		}
@@ -361,13 +368,13 @@ func handleMeshAgentCatalog(w http.ResponseWriter, r *http.Request) {
 // profilePending tracks an armed safe-apply window per agent so the UI can
 // render the countdown and confirm/rollback can find the context.
 type profilePending struct {
-	Kind      string    `json:"kind"` // hardening | netopt
-	AgentID   string    `json:"agent_id"`
-	Revision  string    `json:"revision,omitempty"`
-	AppliedAt int64     `json:"applied_at"`
-	TimerSec  int       `json:"rollback_timer_s"`
-	Deadline  int64     `json:"deadline"`
-	Note      string    `json:"note,omitempty"`
+	Kind      string `json:"kind"` // hardening | netopt
+	AgentID   string `json:"agent_id"`
+	Revision  string `json:"revision,omitempty"`
+	AppliedAt int64  `json:"applied_at"`
+	TimerSec  int    `json:"rollback_timer_s"`
+	Deadline  int64  `json:"deadline"`
+	Note      string `json:"note,omitempty"`
 }
 
 var (
@@ -417,8 +424,8 @@ func meshProfileApply(w http.ResponseWriter, r *http.Request, kind string) {
 		return
 	}
 	var body struct {
-		Profile         json.RawMessage `json:"profile"`
-		RollbackTimerS  int             `json:"rollback_timer_s"`
+		Profile        json.RawMessage `json:"profile"`
+		RollbackTimerS int             `json:"rollback_timer_s"`
 	}
 	if !meshReadBody(w, r, &body) {
 		return

@@ -25,6 +25,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/Dark-modem/quantum-panel/internal/store"
 	"unicode"
 	"unicode/utf8"
 )
@@ -359,8 +361,30 @@ func handleAgentEnroll(w http.ResponseWriter, r *http.Request) {
 	}
 	agentRegMu.Unlock()
 
+	// Mirror the enrollment into the mesh store (best effort: enrollment
+	// succeeds even if the store is down; the registry file stays
+	// authoritative for identity and credentials).
+	meshMirrorAgentEnroll(rec)
 	LogSecurityAudit("agent_enroll", id, ip, "role="+tok.Role)
 	writeJSON(w, map[string]string{"id": id, "key": key, "base_path": cfg.BasePath})
+}
+
+// meshMirrorAgentEnroll upserts an enrolled agent into the store's agents
+// table so the management plane sees new endpoints without a re-import.
+// The key hash is NOT copied: the registry keeps the credential, the store
+// only mirrors identity and session state.
+func meshMirrorAgentEnroll(rec agentRecord) {
+	s, err := MeshStore()
+	if err != nil {
+		noteStoreRetry()
+		return
+	}
+	if err := s.UpsertAgent(store.Agent{
+		ID: rec.ID, Name: rec.Name, Role: rec.Role, Status: rec.Status,
+		Version: rec.Version, Hostname: rec.Hostname, PublicIP: rec.PublicIP,
+	}); err != nil {
+		log.Printf("[mesh] cannot mirror agent enrollment for %s: %v", rec.ID, err)
+	}
 }
 
 // ---- enrollment token management (session-authenticated upstream) ----

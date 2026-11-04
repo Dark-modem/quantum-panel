@@ -127,7 +127,11 @@ func (s *Store) UpsertDatacenter(dc Datacenter) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return lastInsertID(res)
+	_ = res
+	// Lookup by the unique field, never lastInsertID: on the UPDATE path of
+	// an upsert, modernc/sqlite reports the PREVIOUS insert's rowid, which
+	// silently mis-parents everything created afterwards.
+	return s.lookupID(`SELECT id FROM datacenters WHERE name = ?`, dc.Name)
 }
 
 // DatacenterByName returns the datacenter with that name.
@@ -152,7 +156,8 @@ func (s *Store) UpsertServer(sv Server) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return lastInsertID(res)
+	_ = res // see the lookupID note in UpsertDatacenter
+	return s.lookupID(`SELECT id FROM servers WHERE name = ?`, sv.Name)
 }
 
 // ServerByName returns the server with that name.
@@ -170,21 +175,14 @@ func (s *Store) UpsertTopology(t Topology) (int64, error) {
 	if t.CreatedAt == 0 {
 		t.CreatedAt = now()
 	}
-	res, err := s.db.Exec(`INSERT INTO topologies (name, enabled, created_at)
+	_, err := s.db.Exec(`INSERT INTO topologies (name, enabled, created_at)
 		VALUES (?, ?, ?)
 		ON CONFLICT(name) DO UPDATE SET enabled=excluded.enabled`,
 		t.Name, boolInt(t.Enabled), t.CreatedAt)
 	if err != nil {
 		return 0, err
 	}
-	id, err := lastInsertID(res)
-	if err != nil {
-		return 0, err
-	}
-	if id == 0 { // updated row: look up its id
-		err = s.db.QueryRow(`SELECT id FROM topologies WHERE name = ?`, t.Name).Scan(&id)
-	}
-	return id, err
+	return s.lookupID(`SELECT id FROM topologies WHERE name = ?`, t.Name)
 }
 
 // AddTopologyMember adds a server to a topology (idempotent).
@@ -231,12 +229,16 @@ func (s *Store) UpsertTunnel(t Tunnel) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	id, err := lastInsertID(res)
-	if err != nil {
-		return 0, err
-	}
-	if id == 0 {
-		err = s.db.QueryRow(`SELECT id FROM tunnels WHERE tunnel_key = ?`, t.TunnelKey).Scan(&id)
+	_ = res // see the lookupID note in UpsertDatacenter
+	return s.lookupID(`SELECT id FROM tunnels WHERE tunnel_key = ?`, t.TunnelKey)
+}
+
+// lookupID runs a single-value id query with the shared not-found mapping.
+func (s *Store) lookupID(query string, args ...any) (int64, error) {
+	var id int64
+	err := s.db.QueryRow(query, args...).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, ErrNotFound
 	}
 	return id, err
 }
@@ -389,22 +391,15 @@ func (s *Store) SuggestedCoefficient(datacenterID int64, engine string) (float64
 
 // UpsertPasarguardNode inserts or updates the node for (server, iran DC).
 func (s *Store) UpsertPasarguardNode(n PasarguardNode) (int64, error) {
-	res, err := s.db.Exec(`INSERT INTO pasarguard_nodes (server_id, datacenter_id, name, coefficient)
+	_, err := s.db.Exec(`INSERT INTO pasarguard_nodes (server_id, datacenter_id, name, coefficient)
 		VALUES (?, ?, ?, ?)
 		ON CONFLICT(server_id, datacenter_id) DO UPDATE SET name=excluded.name, coefficient=excluded.coefficient`,
 		n.ServerID, n.DatacenterID, n.Name, n.Coefficient)
 	if err != nil {
 		return 0, err
 	}
-	id, err := lastInsertID(res)
-	if err != nil {
-		return 0, err
-	}
-	if id == 0 {
-		err = s.db.QueryRow(`SELECT id FROM pasarguard_nodes WHERE server_id = ? AND datacenter_id = ?`,
-			n.ServerID, n.DatacenterID).Scan(&id)
-	}
-	return id, err
+	return s.lookupID(`SELECT id FROM pasarguard_nodes WHERE server_id = ? AND datacenter_id = ?`,
+		n.ServerID, n.DatacenterID)
 }
 
 // PasarguardNodesForServer lists the nodes of one foreign server.
