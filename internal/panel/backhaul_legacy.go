@@ -1,3 +1,18 @@
+//go:build legacy
+
+// LEGACY host-operator code — excluded from default builds.
+//
+// One-shot migration for units installed by the old separate
+// "Modified Backhaul" script (backhaul-iranN / backhaul-kharejN systemd
+// units on the panel host). This is panel-host operator machinery from
+// before the controller/agent split: in the current architecture the
+// panel must not operate host network state directly. Kept per the
+// architect's rule (do not delete); build with `-tags legacy` to
+// compile and run it (main.go still calls migrateLegacyBackhaul, which
+// is a no-op stub in default builds — see legacy_disabled.go).
+//
+//nolint:unused // legacy path, only compiled under -tags legacy
+
 package panel
 
 import (

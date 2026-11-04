@@ -1,0 +1,30 @@
+name: ci
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-vet-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build (default)
+        run: go build ./...
+      - name: Vet (default)
+        run: go vet ./...
+      - name: Build (legacy tag)
+        run: go build -tags legacy ./...
+      - name: Gofmt
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "gofmt needed on: $unformatted"
+            exit 1
+          fi
+      - name: Test (default)
+        run: go test -count=1 ./...
+      - name: Test (legacy tag)
+        run: go test -count=1 -tags legacy ./...
