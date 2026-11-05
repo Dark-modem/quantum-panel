@@ -114,6 +114,7 @@ func meshErr(w http.ResponseWriter, r *http.Request, err error) {
 
 func registerMeshRoutes(mux *http.ServeMux, base string) {
 	p := base + "/api/mesh"
+	registerPasarGuardRoutes(mux, base)
 	// reads
 	mux.HandleFunc("GET "+p+"/overview", requireAuth(handleMeshOverview))
 	mux.HandleFunc("GET "+p+"/datacenters", requireAuth(handleMeshDCList))
