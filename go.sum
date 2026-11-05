@@ -1,5 +1,7 @@
 github.com/Dark-modem/quantum-protocol v0.0.0-20261104214734-bb34a4f9e4fe h1:dtvX5S/sLtFp/11UXMJfBU7TAq16OhGm54j6HVvvEao=
 github.com/Dark-modem/quantum-protocol v0.0.0-20261104214734-bb34a4f9e4fe/go.mod h1:HQhGZms5tAyPOLVfcnaF4+mJf91sIYePXz4jR2zj3L0=
+github.com/Dark-modem/quantum-protocol v0.0.0-20261105171823-7b751ed2541a h1:z8FgL9EduJ+uGrTVECJhsrlkb7DzTcf0azCSJXdgT50=
+github.com/Dark-modem/quantum-protocol v0.0.0-20261105171823-7b751ed2541a/go.mod h1:HQhGZms5tAyPOLVfcnaF4+mJf91sIYePXz4jR2zj3L0=
 github.com/creack/pty v1.1.24 h1:bJrF4RRfyJnbTJqzRLHzcGaZK1NeM5kTC9jGgovnR1s=
 github.com/creack/pty v1.1.24/go.mod h1:08sCNb52WyoAwi2QDyzUCTgcvVFhUzewun7wtTfvcwE=
 github.com/dustin/go-humanize v1.1.0 h1:dbKTrvD0klcbBV/h4AWJdMuZogJACoMlvWIWZ5b2xWg=

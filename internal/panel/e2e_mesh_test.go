@@ -290,10 +290,10 @@ func TestE2EBothShapesDesiredAndReports(t *testing.T) {
 	tun1 := d1.Tunnels[0].ID
 	fa1.report(protocol.StateReportV2{AppliedRevision: d1.Revision,
 		Tunnels: []protocol.TunnelRuntime{{TunnelID: tun1, Engine: "matrix", Up: true,
-			WireRx: 1000, WireTx: 800, PayloadRx: 900, PayloadTx: 700, CountersKnown: true}}})
+			WireRx: 1000, WireTx: 800, PayloadRx: 900, PayloadTx: 700, CountersKnown: true, PayloadKnown: true}}})
 	fa1.report(protocol.StateReportV2{AppliedRevision: d1.Revision,
 		Tunnels: []protocol.TunnelRuntime{{TunnelID: tun1, Engine: "matrix", Up: true,
-			WireRx: 3000, WireTx: 2400, PayloadRx: 2700, PayloadTx: 2100, CountersKnown: true}}})
+			WireRx: 3000, WireTx: 2400, PayloadRx: 2700, PayloadTx: 2100, CountersKnown: true, PayloadKnown: true}}})
 	agentTestWaitFor(t, "traffic samples ingested", func() bool {
 		var n int
 		if err := f.s.DB().QueryRow(`SELECT COUNT(*) FROM traffic_samples`).Scan(&n); err != nil {
@@ -304,10 +304,10 @@ func TestE2EBothShapesDesiredAndReports(t *testing.T) {
 	// Reset: counters restart BELOW the previous values (reboot), then grow.
 	fa1.report(protocol.StateReportV2{AppliedRevision: d1.Revision,
 		Tunnels: []protocol.TunnelRuntime{{TunnelID: tun1, Engine: "matrix", Up: true,
-			WireRx: 120, WireTx: 90, PayloadRx: 100, PayloadTx: 80, CountersKnown: true}}})
+			WireRx: 120, WireTx: 90, PayloadRx: 100, PayloadTx: 80, CountersKnown: true, PayloadKnown: true}}})
 	fa1.report(protocol.StateReportV2{AppliedRevision: d1.Revision,
 		Tunnels: []protocol.TunnelRuntime{{TunnelID: tun1, Engine: "matrix", Up: true,
-			WireRx: 620, WireTx: 590, PayloadRx: 600, PayloadTx: 580, CountersKnown: true}}})
+			WireRx: 620, WireTx: 590, PayloadRx: 600, PayloadTx: 580, CountersKnown: true, PayloadKnown: true}}})
 	agentTestWaitFor(t, "post-reset samples ingested", func() bool {
 		var n int
 		_ = f.s.DB().QueryRow(`SELECT COUNT(*) FROM traffic_samples`).Scan(&n)

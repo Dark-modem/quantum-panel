@@ -613,49 +613,96 @@ func (u Usage) add(o Usage) Usage {
 }
 
 // TunnelUsage sums the deltas of one tunnel's samples with `at` in
-// (fromAt, toAt]. counters_known = 0 samples contribute nothing (unknown
-// counters must never invent bytes).
+// (fromAt, toAt]. Every reporter (agent) is an independent counter
+// stream; unknown counters must never invent bytes: the wire view is
+// gated by counters_known, the payload view by payload_known.
 func (s *Store) TunnelUsage(tunnelID int64, fromAt, toAt int64) (Usage, error) {
-	rows, err := s.db.Query(`SELECT at, wire_rx, wire_tx, payload_rx, payload_tx, counters_known
-		FROM traffic_samples WHERE tunnel_id = ? AND at > ? AND at <= ? ORDER BY at`, tunnelID, fromAt, toAt)
-	if err != nil {
-		return Usage{}, err
-	}
-	defer rows.Close()
-	return aggregateSampleDeltas(rows)
+	all, _, err := s.TunnelUsageDetailed(tunnelID, fromAt, toAt)
+	return all, err
 }
 
-func aggregateSampleDeltas(rows *sql.Rows) (Usage, error) {
-	var total Usage
-	var prevRX, prevTX, prevPRX, prevPTX int64
-	have := false
+// TunnelUsageDetailed returns (all, iran) usage for one tunnel. `iran`
+// sums only the streams reported by agents whose registry role is 'iran'
+// — the Iran DC's billable view (download into Iran = the iran-side
+// agent's wire rx). Legacy rows (agent_id ”) stay in the all view only.
+func (s *Store) TunnelUsageDetailed(tunnelID int64, fromAt, toAt int64) (Usage, Usage, error) {
+	rows, err := s.db.Query(`SELECT ts.at, ts.agent_id, COALESCE(a.role,''),
+		ts.wire_rx, ts.wire_tx, ts.payload_rx, ts.payload_tx, ts.counters_known, ts.payload_known
+		FROM traffic_samples ts LEFT JOIN agents a ON a.id = ts.agent_id
+		WHERE ts.tunnel_id = ? AND ts.at > ? AND ts.at <= ? ORDER BY ts.agent_id, ts.at`, tunnelID, fromAt, toAt)
+	if err != nil {
+		return Usage{}, Usage{}, err
+	}
+	defer rows.Close()
+	var all, iran Usage
+	acc := usageAccum{}
+	iranAcc := usageAccum{}
+	curAgent, curRole := "", ""
 	for rows.Next() {
 		var at, rx, tx, prx, ptx int64
-		var known bool
-		if err := rows.Scan(&at, &rx, &tx, &prx, &ptx, &known); err != nil {
-			return Usage{}, err
+		var agent, role string
+		var wireKnown, payloadKnown bool
+		if err := rows.Scan(&at, &agent, &role, &rx, &tx, &prx, &ptx, &wireKnown, &payloadKnown); err != nil {
+			return Usage{}, Usage{}, err
 		}
-		if !known {
-			have = false // counters unreadable in this report: reset the base
-			continue
+		if agent != curAgent {
+			// New reporter stream: flush the finished one, reset the bases.
+			all = all.add(acc.usage)
+			iran = iran.add(iranAcc.usage)
+			acc, iranAcc = usageAccum{}, usageAccum{}
+			curAgent, curRole = agent, role
 		}
-		if have {
-			total.WireRx += deltaUint(prevRX, rx)
-			total.WireTx += deltaUint(prevTX, tx)
-			total.PayloadRx += deltaUint(prevPRX, prx)
-			total.PayloadTx += deltaUint(prevPTX, ptx)
-		} else {
-			// First known sample in the window: nothing to subtract, so its
-			// counters are the usage (same zero-base rule as a reset).
-			total.WireRx += uint64(rx)
-			total.WireTx += uint64(tx)
-			total.PayloadRx += uint64(prx)
-			total.PayloadTx += uint64(ptx)
+		acc.ingest(rx, tx, prx, ptx, wireKnown, payloadKnown)
+		if curRole == "iran" {
+			iranAcc.ingest(rx, tx, prx, ptx, wireKnown, payloadKnown)
 		}
-		prevRX, prevTX, prevPRX, prevPTX = rx, tx, prx, ptx
-		have = true
 	}
-	return total, rows.Err()
+	if err := rows.Err(); err != nil {
+		return Usage{}, Usage{}, err
+	}
+	all = all.add(acc.usage)
+	iran = iran.add(iranAcc.usage)
+	return all, iran, nil
+}
+
+// usageAccum accumulates one reporter's delta stream with independent
+// bases for the wire and payload views (a sample whose counters are
+// unknown resets that view's base; the other view keeps accumulating).
+type usageAccum struct {
+	usage                            Usage
+	prevRX, prevTX, prevPRX, prevPTX int64
+	haveWire, havePayload            bool
+}
+
+func (a *usageAccum) ingest(rx, tx, prx, ptx int64, wireKnown, payloadKnown bool) {
+	if wireKnown {
+		if a.haveWire {
+			a.usage.WireRx += deltaUint(a.prevRX, rx)
+			a.usage.WireTx += deltaUint(a.prevTX, tx)
+		} else {
+			// First known sample of the stream/window: nothing to subtract,
+			// so its counters are the usage (same zero-base rule as a reset).
+			a.usage.WireRx += uint64(rx)
+			a.usage.WireTx += uint64(tx)
+			a.haveWire = true
+		}
+		a.prevRX, a.prevTX = rx, tx
+	} else {
+		a.haveWire = false // wire counters unreadable: reset the wire base
+	}
+	if payloadKnown {
+		if a.havePayload {
+			a.usage.PayloadRx += deltaUint(a.prevPRX, prx)
+			a.usage.PayloadTx += deltaUint(a.prevPTX, ptx)
+		} else {
+			a.usage.PayloadRx += uint64(prx)
+			a.usage.PayloadTx += uint64(ptx)
+			a.havePayload = true
+		}
+		a.prevPRX, a.prevPTX = prx, ptx
+	} else {
+		a.havePayload = false
+	}
 }
 
 func deltaUint(prev, cur int64) uint64 {
@@ -668,15 +715,23 @@ func deltaUint(prev, cur int64) uint64 {
 // UsageForTunnels aggregates usage across a set of tunnels (server /
 // datacenter / topology views).
 func (s *Store) UsageForTunnels(tunnelIDs []int64, fromAt, toAt int64) (Usage, error) {
-	var total Usage
+	all, _, err := s.UsageForTunnelsDetailed(tunnelIDs, fromAt, toAt)
+	return all, err
+}
+
+// UsageForTunnelsDetailed is UsageForTunnels with the Iran-side billable
+// view summed across the same tunnels.
+func (s *Store) UsageForTunnelsDetailed(tunnelIDs []int64, fromAt, toAt int64) (Usage, Usage, error) {
+	var all, iran Usage
 	for _, id := range tunnelIDs {
-		u, err := s.TunnelUsage(id, fromAt, toAt)
+		u, ir, err := s.TunnelUsageDetailed(id, fromAt, toAt)
 		if err != nil {
-			return total, err
+			return all, iran, err
 		}
-		total = total.add(u)
+		all = all.add(u)
+		iran = iran.add(ir)
 	}
-	return total, nil
+	return all, iran, nil
 }
 
 // PruneTrafficSamples drops samples older than keepBefore (retention).

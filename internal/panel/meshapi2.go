@@ -49,6 +49,7 @@ func handleMeshUsage(w http.ResponseWriter, r *http.Request) {
 	}
 	var (
 		usage store.Usage
+		iran  store.Usage // iran-side streams only: the billable view
 		scope string
 		err   error
 	)
@@ -60,7 +61,7 @@ func handleMeshUsage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		scope = fmt.Sprintf("tunnel:%d", tid)
-		usage, err = s.TunnelUsage(tid, from, to)
+		usage, iran, err = s.TunnelUsageDetailed(tid, from, to)
 	case q.Get("server_id") != "":
 		sid, ok := meshQueryInt64(r, "server_id")
 		if !ok {
@@ -73,7 +74,7 @@ func handleMeshUsage(w http.ResponseWriter, r *http.Request) {
 			err = e
 			break
 		}
-		usage, err = s.UsageForTunnels(tunnelIDs(tunnels), from, to)
+		usage, iran, err = s.UsageForTunnelsDetailed(tunnelIDs(tunnels), from, to)
 	case q.Get("topology_id") != "":
 		tpid, ok := meshQueryInt64(r, "topology_id")
 		if !ok {
@@ -86,7 +87,7 @@ func handleMeshUsage(w http.ResponseWriter, r *http.Request) {
 			err = e
 			break
 		}
-		usage, err = s.UsageForTunnels(tunnelIDs(tunnels), from, to)
+		usage, iran, err = s.UsageForTunnelsDetailed(tunnelIDs(tunnels), from, to)
 	case q.Get("datacenter_id") != "":
 		dcid, ok := meshQueryInt64(r, "datacenter_id")
 		if !ok {
@@ -110,7 +111,7 @@ func handleMeshUsage(w http.ResponseWriter, r *http.Request) {
 				ids = append(ids, tunnelIDs(tunnels)...)
 			}
 		}
-		usage, err = s.UsageForTunnels(ids, from, to)
+		usage, iran, err = s.UsageForTunnelsDetailed(ids, from, to)
 	default:
 		writeAPIError(w, r, "E-IN-02", "one of tunnel_id, server_id, topology_id, datacenter_id is required")
 		return
@@ -119,8 +120,24 @@ func handleMeshUsage(w http.ResponseWriter, r *http.Request) {
 		meshErr(w, r, err)
 		return
 	}
-	writeJSON(w, map[string]any{"scope": scope, "from": from, "to": to, "usage": usage,
-		"note": "real bytes; no coefficient is ever applied"})
+	// Per-direction overhead from the aggregated real bytes (absent =
+	// unknown); billable = the iran-side streams only (download into the
+	// Iran DC is what the Iran datacenter bills).
+	resp := map[string]any{"scope": scope, "from": from, "to": to, "usage": usage,
+		"note": "real bytes; no coefficient is ever applied"}
+	if usage.PayloadRx > 0 {
+		resp["overhead_rx"] = float64(usage.WireRx) / float64(usage.PayloadRx)
+	}
+	if usage.PayloadTx > 0 {
+		resp["overhead_tx"] = float64(usage.WireTx) / float64(usage.PayloadTx)
+	}
+	resp["billable"] = map[string]uint64{
+		"download_wire":    iran.WireRx,
+		"upload_wire":      iran.WireTx,
+		"download_payload": iran.PayloadRx,
+		"upload_payload":   iran.PayloadTx,
+	}
+	writeJSON(w, resp)
 }
 
 func tunnelIDs(tunnels []store.Tunnel) []int64 {
@@ -146,8 +163,9 @@ func handleMeshOverhead(w http.ResponseWriter, r *http.Request) {
 	// The engines table is small; expose every engine we have seen.
 	dcs, _ := s.ListDatacenters()
 	type engineView struct {
-		Engine string  `json:"engine"`
-		Ratio  float64 `json:"ratio"` // 0 = unknown (never guessed)
+		Engine  string  `json:"engine"`
+		Ratio   float64 `json:"ratio"`    // rx direction; 0 = unknown (never guessed)
+		RatioTx float64 `json:"ratio_tx"` // upload direction; 0 = unknown
 	}
 	engines := []engineView{}
 	for _, e := range meshKnownEngines(s) {
@@ -155,7 +173,11 @@ func handleMeshOverhead(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			continue
 		}
-		engines = append(engines, engineView{Engine: e, Ratio: ratio})
+		ratioTx, err := s.EngineOverheadRatioTx(e)
+		if err != nil {
+			ratioTx = 0
+		}
+		engines = append(engines, engineView{Engine: e, Ratio: ratio, RatioTx: ratioTx})
 	}
 	writeJSON(w, map[string]any{"engines": engines, "datacenters": nonNil(dcs)})
 }

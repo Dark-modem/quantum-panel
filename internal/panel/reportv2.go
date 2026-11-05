@@ -86,13 +86,15 @@ func ingestStateReportV2(agentID string, rep *protocol.StateReportV2) {
 				PayloadRx:     tr.PayloadRx,
 				PayloadTx:     tr.PayloadTx,
 				CountersKnown: tr.CountersKnown,
+				AgentID:       agentID, // each reporter is its own counter stream
+				PayloadKnown:  tr.PayloadKnown,
 			})
 		}
 		for _, es := range rep.Engines {
 			if es.Engine == "" {
 				continue
 			}
-			_ = s.ObserveEngineOverhead(es.Engine, es.WireRx, es.PayloadRx)
+			_ = s.ObserveEngineOverhead(es.Engine, es.WireRx, es.PayloadRx, es.WireTx, es.PayloadTx)
 		}
 	}
 

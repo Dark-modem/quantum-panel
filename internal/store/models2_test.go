@@ -186,10 +186,10 @@ func TestUsageAggregationResetsSafe(t *testing.T) {
 	//   t=40: REBOOT: counters restarted, smaller than before → zero base
 	//         contributes (100, 50, 90, 40) — no negative, no double count
 	samples := []TrafficSample{
-		{TunnelID: tun, At: 10, WireRx: 1000, WireTx: 800, PayloadRx: 900, PayloadTx: 700, CountersKnown: true},
-		{TunnelID: tun, At: 20, WireRx: 1500, WireTx: 1200, PayloadRx: 1350, PayloadTx: 1050, CountersKnown: true},
+		{TunnelID: tun, At: 10, WireRx: 1000, WireTx: 800, PayloadRx: 900, PayloadTx: 700, CountersKnown: true, PayloadKnown: true},
+		{TunnelID: tun, At: 20, WireRx: 1500, WireTx: 1200, PayloadRx: 1350, PayloadTx: 1050, CountersKnown: true, PayloadKnown: true},
 		{TunnelID: tun, At: 30, CountersKnown: false},
-		{TunnelID: tun, At: 40, WireRx: 100, WireTx: 50, PayloadRx: 90, PayloadTx: 40, CountersKnown: true},
+		{TunnelID: tun, At: 40, WireRx: 100, WireTx: 50, PayloadRx: 90, PayloadTx: 40, CountersKnown: true, PayloadKnown: true},
 	}
 	for _, sm := range samples {
 		if err := s.AddTrafficSample(sm); err != nil {

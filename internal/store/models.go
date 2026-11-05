@@ -73,7 +73,11 @@ type TrafficSample struct {
 	WireTx        uint64 `json:"wire_tx"`
 	PayloadRx     uint64 `json:"payload_rx"`
 	PayloadTx     uint64 `json:"payload_tx"`
-	CountersKnown bool   `json:"counters_known"`
+	CountersKnown bool   `json:"counters_known"` // legacy: wire counters known
+	// AgentID is the reporting agent ("" = legacy rows); payload_known
+	// gates the payload byte view independently of the wire view.
+	AgentID      string `json:"agent_id,omitempty"`
+	PayloadKnown bool   `json:"payload_known"`
 }
 
 // PasarguardNode is one Pasarguard node on a foreign server serving one
@@ -313,10 +317,13 @@ func (s *Store) WeightFor(topologyID, localServerID, remoteServerID, tunnelID in
 // --- traffic samples ---
 
 // AddTrafficSample records one counter reading (real bytes only).
+// AgentID identifies the reporting agent: both endpoints of a tunnel
+// report under the same tunnel key and each reporter is an independent
+// counter stream (Phase-4; empty = legacy/unattributed).
 func (s *Store) AddTrafficSample(t TrafficSample) error {
-	_, err := s.db.Exec(`INSERT INTO traffic_samples (tunnel_id, at, wire_rx, wire_tx, payload_rx, payload_tx, counters_known)
-		VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		t.TunnelID, t.At, int64(t.WireRx), int64(t.WireTx), int64(t.PayloadRx), int64(t.PayloadTx), boolInt(t.CountersKnown))
+	_, err := s.db.Exec(`INSERT INTO traffic_samples (tunnel_id, at, wire_rx, wire_tx, payload_rx, payload_tx, counters_known, agent_id, payload_known)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		t.TunnelID, t.At, int64(t.WireRx), int64(t.WireTx), int64(t.PayloadRx), int64(t.PayloadTx), boolInt(t.CountersKnown), t.AgentID, boolInt(t.PayloadKnown))
 	return err
 }
 
@@ -334,20 +341,24 @@ func (s *Store) LatestTrafficSample(tunnelID int64) (TrafficSample, error) {
 
 // --- engine overhead ---
 
-// ObserveEngineOverhead folds one wire/payload pair into the per-engine
-// running totals. Real bytes in, real bytes out.
-func (s *Store) ObserveEngineOverhead(engine string, wireBytes, payloadBytes uint64) error {
-	if payloadBytes == 0 {
+// ObserveEngineOverhead folds one engine's wire/payload pairs into the
+// per-engine running totals, per direction. Real bytes in, real bytes
+// out; a direction with unknown payload contributes nothing (never
+// guessed).
+func (s *Store) ObserveEngineOverhead(engine string, wireRx, payloadRx, wireTx, payloadTx uint64) error {
+	if payloadRx == 0 && payloadTx == 0 {
 		return nil // nothing derivable; never guess
 	}
-	_, err := s.db.Exec(`INSERT INTO engine_overhead (engine, samples, wire_bytes, payload_bytes, updated_at)
-		VALUES (?, 1, ?, ?, ?)
+	_, err := s.db.Exec(`INSERT INTO engine_overhead (engine, samples, wire_bytes, payload_bytes, wire_tx_bytes, payload_tx_bytes, updated_at)
+		VALUES (?, 1, ?, ?, ?, ?, ?)
 		ON CONFLICT(engine) DO UPDATE SET
 		  samples = samples + 1,
 		  wire_bytes = wire_bytes + excluded.wire_bytes,
 		  payload_bytes = payload_bytes + excluded.payload_bytes,
+		  wire_tx_bytes = wire_tx_bytes + excluded.wire_tx_bytes,
+		  payload_tx_bytes = payload_tx_bytes + excluded.payload_tx_bytes,
 		  updated_at = excluded.updated_at`,
-		engine, int64(wireBytes), int64(payloadBytes), now())
+		engine, int64(wireRx), int64(payloadRx), int64(wireTx), int64(payloadTx), now())
 	return err
 }
 
@@ -355,6 +366,24 @@ func (s *Store) ObserveEngineOverhead(engine string, wireBytes, payloadBytes uin
 func (s *Store) EngineOverheadRatio(engine string) (float64, error) {
 	var wire, payload int64
 	err := s.db.QueryRow(`SELECT wire_bytes, payload_bytes FROM engine_overhead WHERE engine = ?`, engine).
+		Scan(&wire, &payload)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	if payload <= 0 {
+		return 0, nil
+	}
+	return float64(wire) / float64(payload), nil
+}
+
+// EngineOverheadRatioTx returns wire_tx/payload_tx for an engine
+// (upload-direction overhead); 0 = unknown.
+func (s *Store) EngineOverheadRatioTx(engine string) (float64, error) {
+	var wire, payload int64
+	err := s.db.QueryRow(`SELECT wire_tx_bytes, payload_tx_bytes FROM engine_overhead WHERE engine = ?`, engine).
 		Scan(&wire, &payload)
 	if errors.Is(err, sql.ErrNoRows) {
 		return 0, nil

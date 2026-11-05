@@ -201,6 +201,22 @@ CREATE TABLE pg_nodes (
 CREATE INDEX idx_pg_nodes_dc ON pg_nodes(datacenter_id);
 INSERT INTO pasarguard_settings (key, value, updated_at) VALUES ('drift_threshold_pct', '20', strftime('%s','now'));
 `,
+	// 4: Phase 4 directional accounting. Both endpoints of a tunnel report
+	// StateReportV2 under the same tunnel key, so traffic_samples gains
+	// agent_id: each reporter is an independent counter stream and the
+	// usage aggregation resets its base per stream (mixing two machines'
+	// cumulative counters produced garbage deltas). payload_known makes
+	// the payload byte view honest per sample (the legacy counters_known
+	// only ever meant wire-known); legacy rows keep payload_known=1 which
+	// matches the old behavior exactly (unknown engines reported zeros,
+	// so nothing was invented). engine_overhead gains the tx direction.
+	`
+ALTER TABLE traffic_samples ADD COLUMN agent_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE traffic_samples ADD COLUMN payload_known INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE engine_overhead ADD COLUMN wire_tx_bytes INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE engine_overhead ADD COLUMN payload_tx_bytes INTEGER NOT NULL DEFAULT 0;
+CREATE INDEX idx_traffic_samples_tunnel_agent_at ON traffic_samples(tunnel_id, agent_id, at);
+`,
 }
 
 func (s *Store) migrate() error {

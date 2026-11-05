@@ -185,7 +185,7 @@ func TestOverheadAndSuggestedCoefficient(t *testing.T) {
 	}
 
 	// 10 GB payload over the wire as 10.5 GB: ratio 1.05, suggestion 1.05.
-	if err := s.ObserveEngineOverhead("matrix", 10_500_000_000, 10_000_000_000); err != nil {
+	if err := s.ObserveEngineOverhead("matrix", 10_500_000_000, 10_000_000_000, 2_100_000_000, 2_000_000_000); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.AddTrafficSample(TrafficSample{ // per-tunnel real bytes
@@ -201,12 +201,16 @@ func TestOverheadAndSuggestedCoefficient(t *testing.T) {
 	if err != nil || ratio < 1.0499 || ratio > 1.0501 {
 		t.Fatalf("ratio = %v, %v; want ~1.05", ratio, err)
 	}
+	// The upload direction accumulates independently (Phase-4).
+	if ratioTx, err := s.EngineOverheadRatioTx("matrix"); err != nil || ratioTx < 1.0499 || ratioTx > 1.0501 {
+		t.Fatalf("tx ratio = %v, %v; want ~1.05", ratioTx, err)
+	}
 	coef, err := s.SuggestedCoefficient(dc, "matrix")
 	if err != nil || coef < 1.0499 || coef > 1.0501 {
 		t.Fatalf("suggested coefficient = %v, %v; want ~1.05", coef, err)
 	}
 	// Zero-payload observations are ignored (never divide by zero).
-	if err := s.ObserveEngineOverhead("matrix", 500, 0); err != nil {
+	if err := s.ObserveEngineOverhead("matrix", 500, 0, 0, 0); err != nil {
 		t.Fatal(err)
 	}
 	if ratio2, _ := s.EngineOverheadRatio("matrix"); ratio2 != ratio {
@@ -271,5 +275,79 @@ func TestNotFoundAndAudit(t *testing.T) {
 	}
 	if n, err := s.AuditCount(); err != nil || n != 1 {
 		t.Fatalf("audit count = %d, %v", n, err)
+	}
+}
+
+// TestUsagePerAgentStreamsAndBillable pins the Phase-4 directional
+// accounting: both endpoints of a tunnel report under the same key, so
+// each agent is an independent counter stream (no cross-machine delta
+// garbage), the wire and payload views are gated independently, and the
+// iran-role streams form the billable view.
+func TestUsagePerAgentStreamsAndBillable(t *testing.T) {
+	s := openTestStore(t)
+	topo, _ := s.UpsertTopology(Topology{Name: "topo-usage", Enabled: true})
+	local, _ := s.UpsertServer(Server{Name: "l", Role: "iran"})
+	remote, _ := s.UpsertServer(Server{Name: "f", Role: "foreign"})
+	tun, _ := s.UpsertTunnel(Tunnel{TunnelKey: "tu1", TopologyID: topo, LocalServerID: local, RemoteServerID: remote, Engine: "matrix", Enabled: true})
+
+	// The two reporting agents and their roles (the billable view joins
+	// the agents table).
+	if err := s.UpsertAgent(Agent{ID: "agt_iran000001", Role: "iran"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpsertAgent(Agent{ID: "agt_foreign001", Role: "foreign"}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Stream 1 (iran agent): cumulative counters grow 100 -> 200.
+	s.AddTrafficSample(TrafficSample{TunnelID: tun, At: 100, AgentID: "agt_iran000001",
+		WireRx: 105, WireTx: 21, PayloadRx: 100, PayloadTx: 20, CountersKnown: true, PayloadKnown: true})
+	s.AddTrafficSample(TrafficSample{TunnelID: tun, At: 200, AgentID: "agt_iran000001",
+		WireRx: 210, WireTx: 42, PayloadRx: 200, PayloadTx: 40, CountersKnown: true, PayloadKnown: true})
+	// Stream 2 (foreign agent): its own counter base, same tunnel key.
+	s.AddTrafficSample(TrafficSample{TunnelID: tun, At: 110, AgentID: "agt_foreign001",
+		WireRx: 500, WireTx: 60, PayloadRx: 480, PayloadTx: 55, CountersKnown: true, PayloadKnown: true})
+	s.AddTrafficSample(TrafficSample{TunnelID: tun, At: 210, AgentID: "agt_foreign001",
+		WireRx: 1000, WireTx: 120, PayloadRx: 960, PayloadTx: 110, CountersKnown: true, PayloadKnown: true})
+
+	all, iran, err := s.TunnelUsageDetailed(tun, 0, 1000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// All streams. The first known sample of each stream contributes its
+	// full cumulative counter (zero-base rule), so:
+	//   iran:    wire 105 + (210-105) = 210,   payload 100 + 100 = 200
+	//   foreign: wire 500 + (1000-500) = 1000,  payload 480 + 480 = 960
+	want := Usage{WireRx: 1210, WireTx: 162, PayloadRx: 1160, PayloadTx: 150}
+	if all != want {
+		t.Fatalf("all = %+v, want %+v", all, want)
+	}
+	// Billable (iran side only).
+	wantIran := Usage{WireRx: 210, WireTx: 42, PayloadRx: 200, PayloadTx: 40}
+	if iran != wantIran {
+		t.Fatalf("iran = %+v, want %+v", iran, wantIran)
+	}
+
+	// Legacy rows (agent_id '') form their own stream and never pollute
+	// the attributed ones.
+	s.AddTrafficSample(TrafficSample{TunnelID: tun, At: 300, AgentID: "",
+		WireRx: 7, WireTx: 3, PayloadRx: 6, PayloadTx: 2, CountersKnown: true, PayloadKnown: true})
+	all, _, _ = s.TunnelUsageDetailed(tun, 0, 1000)
+	if all.WireRx != 1217 || all.PayloadRx != 1166 {
+		t.Fatalf("legacy row not a separate stream: %+v", all)
+	}
+	// A counters_known=0 row resets the iran stream's WIRE base and
+	// contributes nothing (no invented bytes); the payload view keeps
+	// accumulating (payload_known stays 1).
+	s.AddTrafficSample(TrafficSample{TunnelID: tun, At: 400, AgentID: "agt_iran000001",
+		WireRx: 999, WireTx: 1, PayloadRx: 300, PayloadTx: 60, CountersKnown: false, PayloadKnown: true})
+	all, iran, _ = s.TunnelUsageDetailed(tun, 0, 1000)
+	// iran wire stays 210 (the unknown row derives nothing);
+	// iran payload: 200 + (300-200) = 300.
+	if iran.WireRx != 210 || iran.PayloadRx != 300 {
+		t.Fatalf("independent gating: iran = %+v", iran)
+	}
+	if all.WireRx != 1217 || all.PayloadRx != 1266 {
+		t.Fatalf("independent gating: all = %+v", all)
 	}
 }
