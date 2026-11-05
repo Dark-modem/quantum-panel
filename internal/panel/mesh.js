@@ -203,8 +203,10 @@
       };
       var rows = (j.tunnels || []).map(function (tn) {
         var hit = findW(function (wp) { return wp.tunnel_id === tn.id; });
-        var scope = 'tunnel';
-        if (!hit) {
+        var scope = 'default';
+        if (hit) {
+          scope = 'tunnel';
+        } else {
           hit = findW(function (wp) {
             return !wp.tunnel_id && wp.local_server_id === tn.local_server_id &&
                    wp.remote_server_id === tn.remote_server_id;
