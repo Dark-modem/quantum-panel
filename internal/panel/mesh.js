@@ -189,18 +189,48 @@
   }
   function loadWeights() {
     api('GET', 'topologies/' + weightsTopo).then(function (j) {
+      // Resolution order (same specificity chain as the panel store):
+      // tunnel > server pair (local,remote) > topology. The editor prefills
+      // the RESOLVED value and shows the scope it came from; saving writes
+      // a tunnel-scoped weight (most specific), which then becomes the
+      // resolved one.
+      var wts = j.weights || [];
+      var findW = function (pred) {
+        for (var k = 0; k < wts.length; k++) {
+          if (wts[k].weight != null && pred(wts[k])) return wts[k];
+        }
+        return null;
+      };
       var rows = (j.tunnels || []).map(function (tn) {
-        var w = 1;
-        (j.weights || []).forEach(function (wp) {
-          if (wp.tunnel_id === tn.id) w = wp.weight;
-        });
+        var hit = findW(function (wp) { return wp.tunnel_id === tn.id; });
+        var scope = 'tunnel';
+        if (!hit) {
+          hit = findW(function (wp) {
+            return !wp.tunnel_id && wp.local_server_id === tn.local_server_id &&
+                   wp.remote_server_id === tn.remote_server_id;
+          });
+          if (hit) scope = 'server pair';
+        }
+        if (!hit) {
+          hit = findW(function (wp) {
+            return !wp.tunnel_id && !wp.local_server_id && !wp.remote_server_id;
+          });
+          if (hit) scope = 'topology';
+        }
+        if (!hit) hit = { weight: 1 };
+        var resolved = hit.weight;
+        var scopeTag = '<span class="pill ' + (scope === 'tunnel' ? 'ok' : '') + '">' +
+          esc(scope) + '</span> <span class="muted">resolved ' + resolved + '</span>';
         return '<tr><td>' + esc(tn.tunnel_key) + '</td>' +
-          '<td><input type="number" min="0" max="1000" value="' + w + '" data-tid="' + tn.id + '" style="width:80px"></td>' +
+          '<td><input type="number" min="0" max="1000" value="' + resolved + '" data-tid="' + tn.id + '" style="width:80px"></td>' +
+          '<td>' + scopeTag + '</td>' +
           '<td><button class="act primary" data-save="' + tn.id + '">' + esc(t('save')) + '</button></td></tr>';
       }).join('');
       document.getElementById('wbody').innerHTML =
-        '<table><tr><th>' + esc(t('tunnel')) + '</th><th>' + esc(t('weight')) + '</th><th></th></tr>' + rows + '</table>' +
-        '<p class="muted">0 = ' + (LANG === 'fa' ? 'خارج از چرخش' : 'excluded from balancing') + '</p>';
+        '<table><tr><th>' + esc(t('tunnel')) + '</th><th>' + esc(t('weight')) + '</th><th>' +
+        (LANG === 'fa' ? 'منبع' : 'resolved from') + '</th><th></th></tr>' + rows + '</table>' +
+        '<p class="muted">0 = ' + (LANG === 'fa' ? 'خارج از چرخش' : 'excluded from balancing') +
+        ' · ' + (LANG === 'fa' ? 'ترتیب حل: تونل ← جفت‌سرور ← توپولوژی' : 'resolution: tunnel > server pair > topology') + '</p>';
       document.getElementById('wbody').addEventListener('click', function (e) {
         var b = e.target.closest('button[data-save]');
         if (!b) return;
