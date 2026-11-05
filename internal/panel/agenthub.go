@@ -245,8 +245,10 @@ func handleAgentWS(w http.ResponseWriter, r *http.Request) {
 
 	ws, err := agentHubUpgrader.Upgrade(w, r, nil)
 	if err != nil {
+		log.Printf("[agent-ws] %s: upgrade error: %v", id, err)
 		return // Upgrade already wrote the HTTP error
 	}
+	log.Printf("[agent-ws] %s: upgrade OK (remote=%s)", id, ClientIP(r))
 	conn := &agentConn{
 		id:      id,
 		ws:      ws,
@@ -284,19 +286,25 @@ func constantTimeHashEqual(a, b string) bool {
 // run performs the hello handshake, pushes any pending desired state, then
 // serves the read loop until the connection dies.
 func (c *agentConn) run() {
+	log.Printf("[agent-ws] %s: session started, waiting for hello (timeout %v)", c.id, agentHelloTimeout)
 	c.ws.SetReadLimit(agentWSReadLimit)
 	c.ws.SetReadDeadline(time.Now().Add(agentHelloTimeout))
 	envV, typ, data, err := c.readEnvelopeAny()
 	if err != nil {
+		log.Printf("[agent-ws] %s: hello read error: %v", c.id, err)
 		return
 	}
+	log.Printf("[agent-ws] %s: hello decoded (envV=%d typ=%s)", c.id, envV, typ)
 	if typ != agentMsgHello {
+		log.Printf("[agent-ws] %s: unexpected type %s, closing", c.id, typ)
 		return
 	}
 	var hello agentHello
 	if err := json.Unmarshal(data, &hello); err != nil || hello.ID != c.id {
+		log.Printf("[agent-ws] %s: hello unmarshal/identity error: %v (hello.ID=%q c.id=%q)", c.id, err, hello.ID, c.id)
 		return // hello must claim the authenticated identity
 	}
+	log.Printf("[agent-ws] %s: hello OK, negotiating (envV=%d)", c.id, envV)
 	// Version negotiation (protocol v2): the session speaks the lower of
 	// what the panel and the hello envelope declare. v1 agents (envelope
 	// V=1) keep the frozen flow; nothing about their session changes.
@@ -313,8 +321,10 @@ func (c *agentConn) run() {
 	// NegotiateOrV1 reads w.Version (absent = v1). Without this a v2
 	// agent would silently stay on the v1 path.
 	if err := c.sendVersioned(agentMsgWelcome, agentWelcome{OK: true, Server: panelVersion, Version: pv}); err != nil {
+		log.Printf("[agent-ws] %s: welcome send error: %v", c.id, err)
 		return
 	}
+	log.Printf("[agent-ws] %s: welcome sent (session v%d)", c.id, pv)
 	c.applyHello(&hello)
 	c.recordEngineCatalog(&hello)
 
