@@ -19,6 +19,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -281,13 +282,45 @@ func authDetail(body []byte) string {
 
 func trimDetail(body []byte) string {
 	var e struct {
-		Detail string `json:"detail"`
+		Detail json.RawMessage `json:"detail"`
 	}
-	if json.Unmarshal(body, &e) == nil && strings.TrimSpace(e.Detail) != "" {
-		if len(e.Detail) > 200 {
-			return e.Detail[:200]
+	if json.Unmarshal(body, &e) != nil || len(e.Detail) == 0 {
+		return ""
+	}
+	var s string
+	if json.Unmarshal(e.Detail, &s) == nil && strings.TrimSpace(s) != "" {
+		return truncateDetail(s)
+	}
+	// FastAPI 422: [{"loc": [...], "msg": "..."}, …]
+	var arr []struct {
+		Msg string `json:"msg"`
+		Loc []any  `json:"loc"`
+	}
+	if json.Unmarshal(e.Detail, &arr) == nil && len(arr) > 0 {
+		var msgs []string
+		for _, a := range arr {
+			if a.Msg != "" {
+				msgs = append(msgs, a.Msg)
+			}
 		}
-		return e.Detail
+		return truncateDetail(strings.Join(msgs, "; "))
+	}
+	// Pydantic field validators: {"field": "Value error, msg", …}
+	var dict map[string]string
+	if json.Unmarshal(e.Detail, &dict) == nil && len(dict) > 0 {
+		var msgs []string
+		for k, v := range dict {
+			msgs = append(msgs, k+": "+v)
+		}
+		sort.Strings(msgs)
+		return truncateDetail(strings.Join(msgs, "; "))
 	}
 	return ""
+}
+
+func truncateDetail(s string) string {
+	if len(s) > 300 {
+		return s[:300]
+	}
+	return s
 }

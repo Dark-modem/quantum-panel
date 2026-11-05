@@ -1,6 +1,9 @@
 // api.go — the typed node operations (paths verified in
 // 00-ADMIN/PASARGUARD-INTEGRATION.md §4; note the singular/plural router
-// prefix: /api/node with literal "s" suffixes for the collection routes).
+// prefix: /api/node — the LIST route is the literal "s" suffix
+// (/api/nodes) while create/modify/delete/reconnect stay SINGULAR
+// (/api/node, /api/node/{id}, ...). Verified against 5.2.1 sources and
+// the live 5.6 panel (405 on POST /api/nodes).
 
 package pasarguard
 
@@ -36,7 +39,7 @@ func (c *Client) ListNodes(ctx context.Context, search string) ([]Node, error) {
 // GetNode returns one node by id.
 func (c *Client) GetNode(ctx context.Context, id int) (*Node, error) {
 	var n Node
-	if err := c.do(ctx, http.MethodGet, "/api/nodes/"+strconv.Itoa(id), nil, &n); err != nil {
+	if err := c.do(ctx, http.MethodGet, "/api/node/"+strconv.Itoa(id), nil, &n); err != nil {
 		return nil, err
 	}
 	return &n, nil
@@ -49,7 +52,7 @@ func (c *Client) CreateNode(ctx context.Context, req CreateRequest) (*Node, erro
 		return nil, err
 	}
 	var n Node
-	if err := c.do(ctx, http.MethodPost, "/api/nodes", req, &n); err != nil {
+	if err := c.do(ctx, http.MethodPost, "/api/node", req, &n); err != nil {
 		return nil, err
 	}
 	return &n, nil
@@ -59,7 +62,7 @@ func (c *Client) CreateNode(ctx context.Context, req CreateRequest) (*Node, erro
 // NodeModify is fully optional; coefficient-only updates are the norm).
 func (c *Client) ModifyNode(ctx context.Context, id int, req ModifyRequest) (*Node, error) {
 	var n Node
-	if err := c.do(ctx, http.MethodPut, "/api/nodes/"+strconv.Itoa(id), req, &n); err != nil {
+	if err := c.do(ctx, http.MethodPut, "/api/node/"+strconv.Itoa(id), req, &n); err != nil {
 		return nil, err
 	}
 	return &n, nil
@@ -68,12 +71,12 @@ func (c *Client) ModifyNode(ctx context.Context, id int, req ModifyRequest) (*No
 // DeleteNode removes a node record (204). The reconciler gates this behind
 // explicit confirmation and the quantum: name prefix.
 func (c *Client) DeleteNode(ctx context.Context, id int) error {
-	return c.do(ctx, http.MethodDelete, "/api/nodes/"+strconv.Itoa(id), nil, nil)
+	return c.do(ctx, http.MethodDelete, "/api/node/"+strconv.Itoa(id), nil, nil)
 }
 
 // ReconnectNode asks the panel to redial the node.
 func (c *Client) ReconnectNode(ctx context.Context, id int) error {
-	return c.do(ctx, http.MethodPost, "/api/nodes/"+strconv.Itoa(id)+"/reconnect",
+	return c.do(ctx, http.MethodPost, "/api/node/"+strconv.Itoa(id)+"/reconnect",
 		map[string]any{}, nil)
 }
 
@@ -137,9 +140,11 @@ func (r CreateRequest) validate() error {
 	if strings.TrimSpace(r.Name) == "" || len(r.Name) > 64 {
 		return fmt.Errorf("pasarguard: node name must be 1-64 chars")
 	}
-	if strings.HasPrefix(r.Name, NamePrefix) == false || r.Name == NamePrefix {
-		return fmt.Errorf("pasarguard: node name must carry the %q ownership prefix", NamePrefix)
-	}
+	// NOTE: the quantum: ownership prefix is NOT enforced here — the client
+	// is a transport for the upstream API and an operator may legitimately
+	// manage bare-named nodes through it. The RECONCILER enforces the
+	// prefix (DeleteOrphans refuses non-prefixed ids; Apply only ever sends
+	// DesiredName()-shaped names).
 	if strings.TrimSpace(r.Address) == "" || len(r.Address) > 255 {
 		return fmt.Errorf("pasarguard: node address required")
 	}
@@ -155,8 +160,8 @@ func (r CreateRequest) validate() error {
 	if !strings.Contains(r.ServerCA, "BEGIN CERTIFICATE") || len(r.ServerCA) > 2048 {
 		return fmt.Errorf("pasarguard: server_ca must be a PEM certificate ≤ 2048 chars (public part only)")
 	}
-	if len(r.APIKey) != 36 || strings.Count(r.APIKey, "-") != 4 {
-		return fmt.Errorf("pasarguard: api_key must be a UUID")
+	if !validUUID(r.APIKey) {
+		return fmt.Errorf("pasarguard: api_key must be a UUID (Python uuid.UUID accepts the 32-hex undashed form too)")
 	}
 	if r.KeepAlive <= 0 || r.KeepAlive > 3600 {
 		return fmt.Errorf("pasarguard: keep_alive out of range")
@@ -165,4 +170,30 @@ func (r CreateRequest) validate() error {
 		return fmt.Errorf("pasarguard: core_config_id required (upstream default core is id 1)")
 	}
 	return nil
+}
+
+// validUUID mirrors python uuid.UUID: canonical 8-4-4-4-12 OR plain 32 hex.
+func validUUID(s string) bool {
+	hexOK := func(x string) bool {
+		for _, c := range x {
+			if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+				return false
+			}
+		}
+		return true
+	}
+	if len(s) == 36 {
+		parts := strings.Split(s, "-")
+		if len(parts) == 5 &&
+			len(parts[0]) == 8 && len(parts[1]) == 4 && len(parts[2]) == 4 && len(parts[3]) == 4 && len(parts[4]) == 12 {
+			for _, p := range parts {
+				if !hexOK(p) {
+					return false
+				}
+			}
+			return true
+		}
+		return false
+	}
+	return len(s) == 32 && hexOK(s)
 }

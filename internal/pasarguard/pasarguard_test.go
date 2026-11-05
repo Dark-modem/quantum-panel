@@ -44,10 +44,12 @@ func newFakePanel(t *testing.T) *fakePanel {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/admin/token", f.handleToken)
 	mux.HandleFunc("GET /api/nodes", f.handleList)
-	mux.HandleFunc("POST /api/nodes", f.handleCreate)
-	mux.HandleFunc("PUT /api/nodes/", f.handleModify)
-	mux.HandleFunc("DELETE /api/nodes/", f.handleDelete)
-	mux.HandleFunc("POST /api/nodes/{id}/reconnect", f.handleReconnect)
+	// Upstream 5.2.1/5.6: create/modify/delete/reconnect are SINGULAR
+	// (/api/node...); only the collection GET is /api/nodes.
+	mux.HandleFunc("POST /api/node", f.handleCreate)
+	mux.HandleFunc("PUT /api/node/", f.handleModify)
+	mux.HandleFunc("DELETE /api/node/", f.handleDelete)
+	mux.HandleFunc("POST /api/node/{id}/reconnect", f.handleReconnect)
 	mux.HandleFunc("GET /api/node/usage", f.handleUsage)
 	f.srv = httptest.NewServer(mux)
 	t.Cleanup(f.srv.Close)
@@ -126,7 +128,7 @@ func (f *fakePanel) handleModify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var id int
-	if _, err := fmt.Sscanf(strings.TrimPrefix(r.URL.Path, "/api/nodes/"), "%d", &id); err != nil {
+	if _, err := fmt.Sscanf(strings.TrimPrefix(r.URL.Path, "/api/node/"), "%d", &id); err != nil {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -157,7 +159,7 @@ func (f *fakePanel) handleDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var id int
-	if _, err := fmt.Sscanf(strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/api/nodes/"), "/"), "%d", &id); err != nil {
+	if _, err := fmt.Sscanf(strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/api/node/"), "/"), "%d", &id); err != nil {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -439,15 +441,11 @@ func TestDiffAndApply(t *testing.T) {
 	}
 }
 
-func TestCreateRejectsBareName(t *testing.T) {
-	_, err := testClient(t, "http://127.0.0.1:1").CreateNode(context.Background(), CreateRequest{
-		Name: "bare-name", Address: "1.2.3.4", Port: 1, APIPort: 2,
-		UsageCoefficient: 1, ConnectionType: ConnectionTypeGRPC,
-		ServerCA: "-----BEGIN CERTIFICATE-----", KeepAlive: 60, CoreConfigID: 1,
-		APIKey: "12345678-1234-1234-1234-123456789abc",
-	})
-	if err == nil || !strings.Contains(err.Error(), "prefix") {
-		t.Fatalf("bare node names must be refused: %v", err)
+func TestDesiredNameKeepsPrefixContract(t *testing.T) {
+	// The reconciler-side ownership contract lives in DesiredName (client
+	// create deliberately accepts bare names: it is a transport).
+	if n := DesiredName("drak", "hz-a"); !strings.HasPrefix(n, NamePrefix) {
+		t.Fatalf("DesiredName lost the prefix: %q", n)
 	}
 }
 

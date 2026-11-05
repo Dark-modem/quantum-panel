@@ -43,7 +43,7 @@ func newPGFakeUpstream(t *testing.T) *pgFakeUpstream {
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"nodes": out, "total": len(out)})
 	})
-	mux.HandleFunc("POST /api/nodes", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/node", func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "Bearer tok" {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
