@@ -443,6 +443,16 @@ func TestAgentTunnelControllerLoopRealHub(t *testing.T) {
 	})
 	hub, node := &agentE2EConn{t: t, ws: hubWS}, &agentE2EConn{t: t, ws: nodeWS}
 
+	// Both agents connect over httptest (loopback remote address), which the
+	// Phase-4 guard refuses to record as the mesh address. Set the explicit
+	// public addresses the way an operator would
+	// (POST /api/mesh/agents/{id}/public-ip) before provisioning.
+	for _, aid := range []string{hubID, nodeID} {
+		if err := agentRegistryUpdate(aid, func(rec *agentRecord) { rec.PublicIPOverride = "203.0.113.9" }); err != nil {
+			t.Fatalf("set public-ip override for %s: %v", aid, err)
+		}
+	}
+
 	pem := agentTestRSAPem(t)
 	hubSaw := make(chan agentCommand, 4)
 	// Hub brain: ack hub desired with the host file; answer register relay.

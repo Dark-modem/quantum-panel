@@ -150,6 +150,7 @@ func registerMeshRoutes(mux *http.ServeMux, base string) {
 	mux.HandleFunc("PATCH "+p+"/pasarguard/{id}", requireAuth(requireCSRF(handleMeshPGPatch)))
 	mux.HandleFunc("DELETE "+p+"/pasarguard/{id}", requireAuth(requireCSRF(handleMeshPGDelete)))
 	mux.HandleFunc("POST "+p+"/agents/{id}/link", requireAuth(requireCSRF(handleMeshAgentLink)))
+	mux.HandleFunc("POST "+p+"/agents/{id}/public-ip", requireAuth(requireCSRF(handleMeshAgentPublicIP)))
 	mux.HandleFunc("POST "+p+"/agents/{id}/engine-catalog", requireAuth(requireCSRF(handleMeshAgentCatalog)))
 	mux.HandleFunc("POST "+p+"/agents/{id}/push", requireAuth(requireCSRF(handleMeshAgentPush)))
 	mux.HandleFunc("POST "+p+"/agents/{id}/profile/hardening", requireAuth(requireCSRF(handleMeshProfileHardening)))

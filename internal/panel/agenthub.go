@@ -462,7 +462,9 @@ func (c *agentConn) applyHello(h *agentHello) {
 	c.state.mu.Unlock()
 	err := agentRegistryUpdate(c.id, func(rec *agentRecord) {
 		rec.Status = agentStatusOnline
-		rec.PublicIP = c.remoteIP()
+		if ip := agentSafePublicIP(c.remoteIP()); ip != "" {
+			rec.PublicIP = ip
+		}
 		rec.LastSeen = now
 		if h.Version != "" {
 			rec.Version = agentValidText(h.Version, 64)

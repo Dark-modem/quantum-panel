@@ -438,7 +438,7 @@ func agentTunnelProvision(tunnelID string) {
 	}
 
 	if hubAddr == "" {
-		fail("hub", "hub agent public address unknown (agent never connected)")
+		fail("hub", fmt.Sprintf("hub agent %s has no usable public address (never connected, or enrolled from a private address; set one explicitly via POST /api/mesh/agents/%s/public-ip)", t.HubAgentID, t.HubAgentID))
 		return
 	}
 
@@ -770,6 +770,12 @@ func agentTunnelRegisterRelay(reg agentRegisterMsg, fromAgentID string) agentReg
 	nodeAddr := ""
 	if info, ok := agentTunnelAgent(t.NodeAgentID); ok {
 		nodeAddr = info.PublicIP
+	}
+	if nodeAddr == "" {
+		// The node's address goes into the hub's matrix.register params;
+		// an empty one would register an unusable node (Phase-4: the
+		// loopback-enroll poison). Fail with the fix, not a mystery.
+		return agentRegisterResult{OK: false, Error: fmt.Sprintf("node agent %s has no usable public address (enrolled from a private address; set one explicitly via POST /api/mesh/agents/%s/public-ip)", t.NodeAgentID, t.NodeAgentID)}
 	}
 	params := map[string]string{
 		"instance":  t.Instance,

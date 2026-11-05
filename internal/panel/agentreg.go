@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -35,27 +36,31 @@ import (
 // agent key (the plaintext key is shown once at enrollment). Desired is the
 // pending desired state: it stays until the agent acks it applied.
 type agentRecord struct {
-	ID              string                    `json:"id"` // "agt_" + 12 hex chars
-	Name            string                    `json:"name"`
-	KeyHash         string                    `json:"key_hash"`       // sha256 hex of the agent key
-	Role            string                    `json:"role,omitempty"` // "iran"|"foreign" chosen at token creation
-	Caps            []string                  `json:"caps,omitempty"`
-	Version         string                    `json:"version,omitempty"`
-	Hostname        string                    `json:"hostname,omitempty"`
-	OS              string                    `json:"os,omitempty"`
-	Arch            string                    `json:"arch,omitempty"`
-	PublicIP        string                    `json:"public_ip,omitempty"` // last WS/enroll remote address
-	Status          string                    `json:"status"`              // "online"|"offline"|"revoked"
-	CreatedAt       int64                     `json:"created_at"`
-	LastSeen        int64                     `json:"last_seen,omitempty"`
-	AppliedRevision string                    `json:"applied_revision,omitempty"`
-	Desired         *agentDesired             `json:"desired,omitempty"`      // pending until acked
-	LastAck         *agentAckRecord           `json:"last_ack,omitempty"`     // latest ack for a desired revision
-	LastState       *agentStateReport         `json:"last_state,omitempty"`   // latest heartbeat state
-	PrevTraffic     *agentTrafficReport       `json:"prev_traffic,omitempty"` // previous heartbeat's counters (for deltas)
-	TrafficRate     map[string]agentIfaceRate `json:"traffic_rate,omitempty"`
-	Revoked         bool                      `json:"revoked,omitempty"`
-	LastError       string                    `json:"last_error,omitempty"`
+	ID       string   `json:"id"` // "agt_" + 12 hex chars
+	Name     string   `json:"name"`
+	KeyHash  string   `json:"key_hash"`       // sha256 hex of the agent key
+	Role     string   `json:"role,omitempty"` // "iran"|"foreign" chosen at token creation
+	Caps     []string `json:"caps,omitempty"`
+	Version  string   `json:"version,omitempty"`
+	Hostname string   `json:"hostname,omitempty"`
+	OS       string   `json:"os,omitempty"`
+	Arch     string   `json:"arch,omitempty"`
+	PublicIP string   `json:"public_ip,omitempty"` // last WS/enroll remote address
+	// PublicIPOverride is the operator-set explicit mesh address; when
+	// non-empty it wins over the auto-detected PublicIP (Phase-4: a way
+	// to set the address explicitly behind NAT/carrier-grade NAT).
+	PublicIPOverride string                    `json:"public_ip_override,omitempty"`
+	Status           string                    `json:"status"` // "online"|"offline"|"revoked"
+	CreatedAt        int64                     `json:"created_at"`
+	LastSeen         int64                     `json:"last_seen,omitempty"`
+	AppliedRevision  string                    `json:"applied_revision,omitempty"`
+	Desired          *agentDesired             `json:"desired,omitempty"`      // pending until acked
+	LastAck          *agentAckRecord           `json:"last_ack,omitempty"`     // latest ack for a desired revision
+	LastState        *agentStateReport         `json:"last_state,omitempty"`   // latest heartbeat state
+	PrevTraffic      *agentTrafficReport       `json:"prev_traffic,omitempty"` // previous heartbeat's counters (for deltas)
+	TrafficRate      map[string]agentIfaceRate `json:"traffic_rate,omitempty"`
+	Revoked          bool                      `json:"revoked,omitempty"`
+	LastError        string                    `json:"last_error,omitempty"`
 }
 
 // agentAckRecord is what the agent answered about one desired revision.
@@ -263,6 +268,28 @@ func agentValidCaps(caps []string) []string {
 
 // ---- enrollment (unauthenticated; token is the credential) ----
 
+// agentPublicIPUsable reports whether an IP address is a real public
+// address: not loopback, not unspecified, not link-local. The mesh hub
+// address must never be a 127.0.0.1 or ::1 enrollment artifact
+// (Phase-4 bug fix: a 127.0.0.1 enrollment poisoned the mesh hub
+// address).
+func agentPublicIPUsable(ipStr string) bool {
+	ip := net.ParseIP(strings.TrimSpace(ipStr))
+	if ip == nil {
+		return false
+	}
+	return !ip.IsLoopback() && !ip.IsUnspecified() && !ip.IsLinkLocalUnicast() && !ip.IsLinkLocalMulticast()
+}
+
+// agentSafePublicIP returns the IP if usable, else "" (the mesh hub
+// address must never be a loopback/link-local artifact).
+func agentSafePublicIP(ipStr string) string {
+	if agentPublicIPUsable(ipStr) {
+		return strings.TrimSpace(ipStr)
+	}
+	return ""
+}
+
 // handleAgentEnroll trades a one-time enrollment token for a permanent
 // agent identity. POST, no panel session: the endpoint agent calls this
 // before it has credentials. Errors are deliberately generic so scanners
@@ -346,7 +373,7 @@ func handleAgentEnroll(w http.ResponseWriter, r *http.Request) {
 		Hostname:  agentValidText(body.Hostname, 255),
 		OS:        agentValidText(body.OS, 64),
 		Arch:      agentValidText(body.Arch, 64),
-		PublicIP:  ip,
+		PublicIP:  agentSafePublicIP(ip),
 		Status:    agentStatusOffline,
 		CreatedAt: now,
 	}
@@ -581,6 +608,7 @@ func agentPublicView(rec agentRecord) map[string]any {
 		"os":                  rec.OS,
 		"arch":                rec.Arch,
 		"public_ip":           rec.PublicIP,
+		"public_ip_override":  rec.PublicIPOverride,
 		"caps":                caps,
 		"last_seen":           rec.LastSeen,
 		"applied_revision":    rec.AppliedRevision,

@@ -193,8 +193,11 @@ func TestAgentHubHappyPath(t *testing.T) {
 		a := agentTestRawAgent(t, id)
 		return a.Status == agentStatusOnline && a.Version == "1.0.0" && a.Hostname == "node1" && a.OS == "linux"
 	})
-	if a := agentTestAgent(t, id); a.PublicIP == "" {
-		t.Fatalf("public_ip not recorded on connect")
+	// The hub connects over httptest (loopback remote address): the Phase-4
+	// guard must NOT let a loopback remote address poison the mesh address,
+	// so PublicIP stays empty here.
+	if a := agentTestAgent(t, id); a.PublicIP != "" {
+		t.Fatalf("loopback remote address must not be recorded as public_ip, got %q", a.PublicIP)
 	}
 
 	// Two heartbeats with cumulative counters: the controller derives Bps.

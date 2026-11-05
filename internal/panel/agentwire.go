@@ -19,12 +19,16 @@ func agentTunnelRegistryLookup(id string) (agentTunnelAgentInfo, bool) {
 			continue
 		}
 		rec := agents[i]
+		publicIP := rec.PublicIP
+		if rec.PublicIPOverride != "" {
+			publicIP = rec.PublicIPOverride // operator-set explicit address wins
+		}
 		info := agentTunnelAgentInfo{
 			ID:              rec.ID,
 			Name:            rec.Name,
 			Role:            rec.Role,
 			Status:          rec.Status,
-			PublicIP:        rec.PublicIP,
+			PublicIP:        publicIP,
 			Version:         rec.Version,
 			Hostname:        rec.Hostname,
 			Caps:            rec.Caps,

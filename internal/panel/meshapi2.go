@@ -301,6 +301,42 @@ func handleMeshAgentLink(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{"ok": true})
 }
 
+// handleMeshAgentPublicIP sets or clears the operator-explicit mesh
+// address for one agent (Phase-4: a way to set the address explicitly
+// when the agent is behind NAT and its enroll/WS remote address is not
+// usable). Body {"public_ip":"203.0.113.7"} sets the override;
+// {"public_ip":""} clears it and returns to auto-detection. A non-empty
+// value must be a real public address: loopback/unspecified/link-local
+// are rejected with a clear error instead of poisoning the mesh.
+func handleMeshAgentPublicIP(w http.ResponseWriter, r *http.Request) {
+	agentID := r.PathValue("id")
+	if !validAgentID(agentID) {
+		writeAPIError(w, r, "E-IN-06", "bad agent id")
+		return
+	}
+	var body struct {
+		PublicIP string `json:"public_ip"`
+	}
+	if !meshReadBody(w, r, &body) {
+		return
+	}
+	ip := strings.TrimSpace(body.PublicIP)
+	if ip != "" && !agentPublicIPUsable(ip) {
+		writeAPIError(w, r, "E-IN-07",
+			"public_ip must be a usable public address (not loopback, unspecified or link-local); send \"\" to clear the override")
+		return
+	}
+	err := agentRegistryUpdate(agentID, func(rec *agentRecord) {
+		rec.PublicIPOverride = ip
+	})
+	if err != nil {
+		meshErr(w, r, err)
+		return
+	}
+	meshAudit(meshActor(r), "mesh.agent.public_ip", fmt.Sprintf(`{"agent":%q,"public_ip":%q}`, agentID, ip))
+	writeJSON(w, map[string]any{"ok": true, "public_ip_override": ip})
+}
+
 // validAgentID matches the enrollment id shape: "agt_" + 12..32 lowercase
 // hex (the generator uses 12 today; tolerate a longer id if the enrollment
 // length ever grows).
