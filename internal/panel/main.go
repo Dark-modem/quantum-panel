@@ -568,7 +568,7 @@ func Main(args []string) int {
 			fmt.Println(panelVersion)
 			return 0
 		case "--help", "-h", "help":
-			fmt.Println("Usage: gre-panel [password <new-password> | info | version | tls [status|issue|renew|remove|ip|custom] | settings [show|2fa off|terminal on|off|idle N] | doctor [check|fix] | tls-proxy | pathtest | cluster [status|pool|member|join-code|add-hub|events|rules|reset] | firewall [detect|snapshot|plan|apply|teardown] | ports [list|check]]")
+			fmt.Println("Usage: gre-panel [backup --out F --passphrase-file F | restore --in F --passphrase-file F [--force] | password <new-password> | info | version | tls [status|issue|renew|remove|ip|custom] | settings [show|2fa off|terminal on|off|idle N] | doctor [check|fix] | tls-proxy | pathtest | cluster [status|pool|member|join-code|add-hub|events|rules|reset] | firewall [detect|snapshot|plan|apply|teardown] | ports [list|check]]")
 			return 0
 		case "tls-proxy":
 			os.Exit(tlsProxyCmd(args[1:]))
@@ -580,6 +580,10 @@ func Main(args []string) int {
 			os.Exit(cliPathTest(args[1:]))
 		case "cluster", "mesh":
 			os.Exit(cliCluster(args[1:]))
+		case "backup":
+			return BackupCmd(args[1:])
+		case "restore":
+			return RestoreCmd(args[1:])
 		case "password", "pass", "set-password":
 			os.Exit(cliSetPassword(args[1:]))
 		case "info", "status", "url":
@@ -769,6 +773,8 @@ func Main(args []string) int {
 	registerMeshRoutes(mux, base)
 	// Phase 5 R5: engine artifact store + agent manifest (engineartifacts.go).
 	registerEngineArtifactRoutes(mux, base)
+	// Phase 5 TASK 2: encrypted backup download behind re-auth (backupapi.go).
+	registerBackupRoutes(mux, base)
 	mux.HandleFunc("GET "+base+"/mesh", requireAuth(serveMeshPage))
 	mux.HandleFunc("GET "+base+"/mesh.js", serveAsset("mesh.js", "text/javascript; charset=utf-8"))
 

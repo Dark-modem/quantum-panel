@@ -16,6 +16,7 @@
       eng_name: 'Download name (optional)', eng_sig: 'Detached signature (base64 ed25519)',
       eng_key_snippet: 'Agent build snippet (pin this public key)', eng_no_key: 'No engine-artifact public key configured',
       eng_none: 'No artifacts uploaded yet.', eng_sha: 'SHA-256', eng_size: 'Size', eng_uploaded: 'Uploaded',
+      backup_btn: '⬇ Backup', backup_ask_pw: 'Panel password (re-auth):', backup_ask_pass: 'Backup passphrase (min 12 chars) — STORE IT SAFELY, without it the backup is unreadable:', backup_ok: 'Backup downloaded (encrypted).', backup_denied: 'Backup denied: wrong panel password.',
       eng_del: 'Remove', eng_warning: 'Coverage warning', eng_agent_col: 'Agent', eng_arch_col: 'Arch',
       eng_engines_col: 'Engines', eng_uploading: 'Uploading…', eng_uploaded_ok: 'Artifact stored',
       topo: 'Topology', members: 'Members', tunnels: 'Tunnels', enabled: 'Enabled',
@@ -38,6 +39,7 @@
       eng_name: 'نام دانلود (اختیاری)', eng_sig: 'امضای جداشده (base64 ed25519)',
       eng_key_snippet: 'قطعه کد ساخت عامل (این کلید عمومی را پین کنید)', eng_no_key: 'هیچ کلید عمومی موتور تنظیم نشده',
       eng_none: 'هنوز فایلی بارگذاری نشده.', eng_sha: 'SHA-256', eng_size: 'حجم', eng_uploaded: 'بارگذاری',
+      backup_btn: '⬇ پشتیبان', backup_ask_pw: 'رمز پنل (تأیید دوباره):', backup_ask_pass: 'گذرواژهٔ پشتیبان (حداقل ۱۲ نویسه) — آن را ایمن نگه دارید؛ بدون آن پشتیبان خواندنی نیست:', backup_ok: 'پشتیبان رمزنگاری‌شده دانلود شد.', backup_denied: 'پشتیبان رد شد: رمز پنل نادرست است.',
       eng_del: 'حذف', eng_warning: 'هشدار پوشش', eng_agent_col: 'عامل', eng_arch_col: 'معماری',
       eng_engines_col: 'موتورها', eng_uploading: 'در حال بارگذاری…', eng_uploaded_ok: 'فایل ذخیره شد',
       topo: 'توپولوژی', members: 'اعضا', tunnels: 'تونل‌ها', enabled: 'فعال',
@@ -526,6 +528,29 @@
       }
     }).catch(function (e) { el.innerHTML = '<p class="muted">' + esc(e.message) + '</p>'; });
   }
+
+  // ---- backup (TASK 2): encrypted download behind re-auth ---------------
+  document.getElementById('backup').addEventListener('click', function () {
+    var pw = window.prompt(t('backup_ask_pw'));
+    if (!pw) return;
+    var pass = window.prompt(t('backup_ask_pass'));
+    if (!pass || pass.length < 12) { say(t('backup_denied'), true); return; }
+    fetch(base() + 'api/mesh/backup', {
+      method: 'POST',
+      headers: { 'X-CSRF-Token': csrfToken(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pw, passphrase: pass })
+    }).then(function (r) {
+      if (!r.ok) { say(t('backup_denied'), true); return null; }
+      return r.blob();
+    }).then(function (blob) {
+      if (!blob) return;
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'quantum-panel-backup.qpbak';
+      document.body.appendChild(a); a.click(); a.remove();
+      say(t('backup_ok'));
+    }).catch(function (e) { say(e.message, true); });
+  });
 
   applyLang();
   loadAll();
