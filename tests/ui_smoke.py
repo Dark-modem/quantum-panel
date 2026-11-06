@@ -27,7 +27,7 @@ from playwright.sync_api import sync_playwright
 BASE = "http://127.0.0.1:8000/ui"
 USER = "admin"
 PASS = "ui-secret-123"
-TABS = ["topos", "weights", "profiles", "traffic", "pasarguard", "engines"]
+TABS = ["topos", "weights", "profiles", "traffic", "pasarguard", "engines", "alerts"]
 
 console_errors = []
 page_errors = []
@@ -195,6 +195,7 @@ def main():
             "traffic": "usage",
             "pasarguard": "Connect",
             "engines": "0.61.1",
+            "alerts": "Alert rules",
         }
         for i, tab in enumerate(TABS):
             page.click(f'button[data-tab="{tab}"]')
@@ -221,6 +222,18 @@ def main():
                     console_errors.append("tab engines: coverage warning missing")
                 if "go build -ldflags" not in body:
                     console_errors.append("tab engines: agent build snippet missing")
+
+            if tab == "alerts":
+                body = page.inner_text("#tab-alerts")
+                if "Alert rules" not in body:
+                    console_errors.append("tab alerts: rules heading missing")
+                # no notifier configured in the smoke → the test button must
+                # surface the honest "no notifier" note, not fake success
+                page.click("#al-test")
+                time.sleep(1.0)
+                note = page.inner_text("#msg")
+                if "no notifier configured" not in note.lower():
+                    console_errors.append(f"tab alerts: test button note wrong: {note!r}")
 
         # -- 3b. engines tab: the REAL upload form (file input → multipart) --
         page.click('button[data-tab="engines"]')
@@ -286,13 +299,26 @@ def main():
 
         browser.close()
 
-    print(json.dumps({
-        "ok": not console_errors and not page_errors and not bad_requests,
+    # Known-benign entries: the app's designed pre-login 401 auth probes,
+    # and the 400/409 from the DELIBERATE negative tests (tampered upload,
+    # hash-conflict). Everything else (real tab assertions, page errors,
+    # unexpected 4xx/5xx) fails the run.
+    known_console = [c for c in console_errors if "401 (Unauthorized)" in c or c.endswith("(Bad Request)") or c.endswith("(Conflict)")]
+    known_bad = [b for b in bad_requests
+                 if ("/api/status" in b or "/api/logs" in b)
+                 or ("engines/artifacts" in b and (b.startswith("400 ") or b.startswith("409 ")))]
+    real_console = [c for c in console_errors if c not in known_console]
+    real_bad = [b for b in bad_requests if b not in known_bad]
+    summary = {
+        "ok": not real_console and not page_errors and not real_bad,
         "screenshots": shots,
         "console_errors": console_errors,
         "page_errors": page_errors,
         "bad_requests": bad_requests,
-    }, indent=2))
+    }
+    print(json.dumps(summary, indent=2))
+    if not summary["ok"]:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

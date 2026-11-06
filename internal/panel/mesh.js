@@ -16,6 +16,12 @@
       eng_name: 'Download name (optional)', eng_sig: 'Detached signature (base64 ed25519)',
       eng_key_snippet: 'Agent build snippet (pin this public key)', eng_no_key: 'No engine-artifact public key configured',
       eng_none: 'No artifacts uploaded yet.', eng_sha: 'SHA-256', eng_size: 'Size', eng_uploaded: 'Uploaded',
+      tab_alerts: 'Alerts', al_rules: 'Alert rules', al_open: 'Open alerts', al_history: 'Recent notifications',
+      al_none: 'No alerts — all quiet.', al_enable: 'Alerts enabled', al_offline: 'Agent offline after (min)',
+      al_cert: 'Cert expiry warn (days)', al_disk: 'Disk max (%)', al_tg: 'Telegram bot token',
+      al_chat: 'Telegram chat id', al_hook: 'Webhook URL (http(s))', al_save: 'Save settings',
+      al_test: 'Send test notification', al_test_ok: 'Test notification sent to', al_notif: 'notifier(s)',
+      al_no_conf: 'No notifier configured — fill Telegram or webhook first.',
       backup_btn: '⬇ Backup', backup_ask_pw: 'Panel password (re-auth):', backup_ask_pass: 'Backup passphrase (min 12 chars) — STORE IT SAFELY, without it the backup is unreadable:', backup_ok: 'Backup downloaded (encrypted).', backup_denied: 'Backup denied: wrong panel password.',
       eng_del: 'Remove', eng_warning: 'Coverage warning', eng_agent_col: 'Agent', eng_arch_col: 'Arch',
       eng_engines_col: 'Engines', eng_uploading: 'Uploading…', eng_uploaded_ok: 'Artifact stored',
@@ -39,6 +45,12 @@
       eng_name: 'نام دانلود (اختیاری)', eng_sig: 'امضای جداشده (base64 ed25519)',
       eng_key_snippet: 'قطعه کد ساخت عامل (این کلید عمومی را پین کنید)', eng_no_key: 'هیچ کلید عمومی موتور تنظیم نشده',
       eng_none: 'هنوز فایلی بارگذاری نشده.', eng_sha: 'SHA-256', eng_size: 'حجم', eng_uploaded: 'بارگذاری',
+      tab_alerts: 'هشدارها', al_rules: 'قواعد هشدار', al_open: 'هشدارهای باز', al_history: 'اعلان‌های اخیر',
+      al_none: 'هیچ هشداری نیست — همه چیز آرام است.', al_enable: 'هشدارها فعال', al_offline: 'عامل آفلاین بعد از (دقیقه)',
+      al_cert: 'هشدار انقضای گواهی (روز)', al_disk: 'حداکثر دیسک (%)', al_tg: 'توکن ربات تلگرام',
+      al_chat: 'شناسه چت تلگرام', al_hook: 'آدرس وب‌هوک (http(s))', al_save: 'ذخیره تنظیمات',
+      al_test: 'ارسال اعلان آزمایشی', al_test_ok: 'اعلان آزمایشی به', al_notif: 'مجری ارسال شد',
+      al_no_conf: 'هیچ مجری ارسالی تنظیم نشده — ابتدا تلگرام یا وب‌هوک را پر کنید.',
       backup_btn: '⬇ پشتیبان', backup_ask_pw: 'رمز پنل (تأیید دوباره):', backup_ask_pass: 'گذرواژهٔ پشتیبان (حداقل ۱۲ نویسه) — آن را ایمن نگه دارید؛ بدون آن پشتیبان خواندنی نیست:', backup_ok: 'پشتیبان رمزنگاری‌شده دانلود شد.', backup_denied: 'پشتیبان رد شد: رمز پنل نادرست است.',
       eng_del: 'حذف', eng_warning: 'هشدار پوشش', eng_agent_col: 'عامل', eng_arch_col: 'معماری',
       eng_engines_col: 'موتورها', eng_uploading: 'در حال بارگذاری…', eng_uploaded_ok: 'فایل ذخیره شد',
@@ -105,7 +117,7 @@
     Array.prototype.forEach.call(document.querySelectorAll('#tabs button'), function (x) {
       x.classList.toggle('active', x === b);
     });
-    ['topos', 'weights', 'profiles', 'traffic', 'pasarguard', 'engines'].forEach(function (id) {
+    ['topos', 'weights', 'profiles', 'traffic', 'pasarguard', 'engines', 'alerts'].forEach(function (id) {
       document.getElementById('tab-' + id).style.display = id === current ? '' : 'none';
     });
     render();
@@ -136,6 +148,7 @@
     if (current === 'traffic') renderTraffic();
     if (current === 'pasarguard') renderPG();
     if (current === 'engines') renderEngines();
+    if (current === 'alerts') renderAlerts();
   }
 
   function loadAll() {
@@ -551,6 +564,54 @@
       say(t('backup_ok'));
     }).catch(function (e) { say(e.message, true); });
   });
+
+  // ---- alerts (TASK 3) ------------------------------------------------------
+  function renderAlerts() {
+    var el = document.getElementById('tab-alerts');
+    api('GET', 'alerts').then(function (d) {
+      var open = (d.open || []).map(function (a) {
+        return '<tr><td><span class="pill ' + (a.sev === 'crit' ? 'down' : 'warn') + '">' + esc(a.rule) + '</span></td>' +
+          '<td>' + esc(a.text) + '</td><td class="muted">' + new Date(a.at * 1000).toLocaleString() + '</td></tr>';
+      }).join('');
+      var hist = (d.history || []).map(function (a) {
+        return '<tr><td>' + (a.recovery ? '<span class="pill ok">OK</span>' : '<span class="pill warn">⚠</span>') + '</td>' +
+          '<td>' + esc(a.rule) + '</td><td>' + esc(a.text) + '</td><td class="muted">' + new Date(a.at * 1000).toLocaleString() + '</td></tr>';
+      }).join('');
+      el.innerHTML =
+        '<h3 style="font-size:0.98rem">' + esc(t('al_open')) + '</h3>' +
+        (open ? '<table><tr><th></th><th></th><th></th></tr>' + open + '</table>' : '<p class="muted">' + esc(t('al_none')) + '</p>') +
+        '<h3 style="font-size:0.98rem">' + esc(t('al_rules')) + '</h3>' +
+        '<div class="row"><label><input type="checkbox" id="al-en"' + (d.enabled ? ' checked' : '') + '> ' + esc(t('al_enable')) + '</label></div>' +
+        '<div class="row"><input id="al-off" type="number" value="' + d.agent_offline_min + '" style="width:90px"> ' + esc(t('al_offline')) +
+        '<input id="al-cert" type="number" value="' + d.cert_expire_days + '" style="width:90px"> ' + esc(t('al_cert')) +
+        '<input id="al-disk" type="number" value="' + d.disk_max_percent + '" style="width:90px"> ' + esc(t('al_disk')) + '</div>' +
+        '<div class="row"><input id="al-tg" placeholder="' + esc(t('al_tg')) + '" style="width:260px">' +
+        '<input id="al-chat" placeholder="' + esc(t('al_chat')) + '" style="width:140px">' +
+        '<input id="al-hook" placeholder="' + esc(t('al_hook')) + '" style="width:260px"></div>' +
+        '<div class="row"><button class="act primary" id="al-save">' + esc(t('al_save')) + '</button>' +
+        '<button class="act" id="al-test">' + esc(t('al_test')) + '</button>' +
+        '<span class="muted">' + (d.telegram_set ? 'Telegram ✓ ' : '') + (d.webhook_set ? 'Webhook ✓' : '') + '</span></div>' +
+        '<h3 style="font-size:0.98rem">' + esc(t('al_history')) + '</h3>' +
+        (hist ? '<table><tr><th></th><th></th><th></th><th></th></tr>' + hist + '</table>' : '');
+      document.getElementById('al-save').onclick = function () {
+        api('POST', 'alerts/settings', {
+          enabled: document.getElementById('al-en').checked,
+          agent_offline_min: parseInt(document.getElementById('al-off').value, 10),
+          cert_expire_days: parseInt(document.getElementById('al-cert').value, 10),
+          disk_max_percent: parseInt(document.getElementById('al-disk').value, 10),
+          telegram_token: document.getElementById('al-tg').value,
+          telegram_chat: document.getElementById('al-chat').value,
+          webhook_url: document.getElementById('al-hook').value
+        }).then(function () { say('alerts: ok'); renderAlerts(); })
+          .catch(function (e) { say(e.message, true); });
+      };
+      document.getElementById('al-test').onclick = function () {
+        api('POST', 'alerts/test').then(function (r) {
+          say(r.sent ? t('al_test_ok') + ' ' + r.sent + ' ' + t('al_notif') : t('al_no_conf'), !r.sent);
+        }).catch(function (e) { say(e.message, true); });
+      };
+    }).catch(function (e) { el.innerHTML = '<p class="muted">' + esc(e.message) + '</p>'; });
+  }
 
   applyLang();
   loadAll();

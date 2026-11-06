@@ -775,6 +775,8 @@ func Main(args []string) int {
 	registerEngineArtifactRoutes(mux, base)
 	// Phase 5 TASK 2: encrypted backup download behind re-auth (backupapi.go).
 	registerBackupRoutes(mux, base)
+	// Phase 5 TASK 3: mesh alert engine + notifiers (meshalerts_*.go).
+	registerMeshAlertRoutes(mux, base)
 	mux.HandleFunc("GET "+base+"/mesh", requireAuth(serveMeshPage))
 	mux.HandleFunc("GET "+base+"/mesh.js", serveAsset("mesh.js", "text/javascript; charset=utf-8"))
 
@@ -881,6 +883,7 @@ func Main(args []string) int {
 	go startRescueMonitor()
 	go startClusterMonitor()
 	go startMeshLoop()
+	meshAlertEng.Run() // TASK 3: alert engine tick loop
 	go startLimitsLoop()
 	go func() {
 		cc := loadCarrierConfig()
