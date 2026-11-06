@@ -42,7 +42,10 @@ func handleStatus(w http.ResponseWriter, r *http.Request) {
 		lv.Rx, lv.Tx = snap.LocalRx, snap.LocalTx
 	}
 	resp := map[string]any{"local": lv, "peers": peers, "peer_count": len(peers), "peer_max": maxPeers(), "snapshot_age_ms": snap.AgeMs(),
-		"counters_at": countersAtMs(snap)}
+		"counters_at": countersAtMs(snap),
+		// M3: the UI hides the legacy host-operator pages unless this is on.
+		"legacy_enabled":   legacyOpsEnabled(),
+		"terminal_enabled": termEnabled()}
 	if c, err := r.Cookie("gre_session"); err == nil && c.Value != "" {
 		resp["csrf_token"] = GenerateCSRFToken(c.Value)
 	}

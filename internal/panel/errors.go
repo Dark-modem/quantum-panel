@@ -195,6 +195,8 @@ var errCatalog = map[string]errInfo{
 	"E-AGENT-06": {502, "the endpoint refused the tunnel command", "See the per-agent errors: one endpoint rejected start/stop/restart — its agent log (journalctl -u gre-agent) has the cause."},
 	"E-AGENT-08": {428, "mutation needs explicit confirmation", "Fetch the plan first (confirm=false), review it, then resend the same operation with confirm=true."},
 	"E-AGENT-07": {400, "agent update refused", "The artifact must be https, match the agent architecture, and carry a valid ed25519 signature from the pinned update key — or no update key is pinned in this build."},
+	// Legacy host-operator gate (M3)
+	"E-LEGACY-01": {403, "legacy host-operator commands are disabled", "Set legacy_enabled=true in panel.json (or GRE_PANEL_LEGACY=1) if you need the legacy matrix/tunnel/host-command pages."},
 	// R5 engine artifact store (engineartifacts.go)
 	"E-ENG-01":     {409, "artifact version+arch already stored with a DIFFERENT build", "Pick a new version tag, or remove the old artifact in the Engines tab, then upload again."},
 	"E-ENG-02":     {409, "artifact download name already in use", "Choose a different download name (it must be unique across all artifacts)."},

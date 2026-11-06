@@ -2161,11 +2161,36 @@ function renderTunChips(st) {
     if (target && target.scrollIntoView) target.scrollIntoView({behavior: 'smooth', block: 'start'});
   });
 }
+// applyLegacyVisibility hides the legacy host-operator nav entries and
+// bounces the user off those tabs when the surface is disabled.
+let _legacyApplied = null;
+function applyLegacyVisibility(on) {
+  if (_legacyApplied === on) return;
+  _legacyApplied = on;
+  const legacyTabs = ['tunnel', 'agents', 'cluster', 'setup', 'xray', 'watchdog'];
+  legacyTabs.forEach(t => {
+    const btn = document.querySelector('.sidebar-nav [data-tab="' + t + '"]');
+    if (btn) btn.classList.toggle('hidden', !on);
+    const page = $('tab-' + t);
+    if (page && !on) page.hidden = true;
+  });
+  const note = document.getElementById('legacyNote');
+  if (note) note.classList.toggle('hidden', on);
+  if (!on) {
+    const cur = document.querySelector('.sidebar-nav [data-tab].on');
+    if (cur && legacyTabs.includes(cur.dataset.tab)) goTab('dashboard');
+  }
+}
+
 async function refresh() {
   let ok = true;
   try {
     const s = await api('/api/status');
     _statusCountersAt = s.counters_at || null;
+    // M3: legacy host-operator pages hidden unless the operator turned
+    // them on (legacy_enabled in panel.json / GRE_PANEL_LEGACY=1). The
+    // mesh management surface (/ui/mesh) is unaffected.
+    applyLegacyVisibility(!!s.legacy_enabled);
     // peers first: renderTunChips (called inside renderTunnel) reads the cache
     tunPeerCache = s.peers || null;
     if (s.local && Object.prototype.hasOwnProperty.call(s.local, 'matrix')) {

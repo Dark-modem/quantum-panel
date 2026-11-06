@@ -42,7 +42,7 @@ func savePathMTU(v int) error {
 	if v < pathMTUMin || v >= greMTUDefault {
 		return os.Remove(pathMTUFile())
 	}
-	return os.WriteFile(pathMTUFile(), []byte(strconv.Itoa(v)+"\n"), 0644)
+	return os.WriteFile(pathMTUFile(), []byte(strconv.Itoa(v)+"\n"), 0600) // panel-internal state (audit: no world-readable panel files)
 }
 
 // pathMTURun runs ip / iptables; swappable so tests never touch the host.

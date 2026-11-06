@@ -298,7 +298,7 @@ func writeLBSideFiles(c ClusterConfig) {
 		_ = os.Remove(lbPooledPortsFile())
 		return
 	}
-	_ = os.WriteFile(lbPooledPortsFile(), []byte(b.String()), 0o644)
+	_ = os.WriteFile(lbPooledPortsFile(), []byte(b.String()), 0o640)
 }
 
 // ---- events ----
@@ -1138,7 +1138,7 @@ func lbWriteBinds(want map[string]string) {
 	for _, s := range svcs {
 		fmt.Fprintf(&b, "%s %s\n", s, want[s])
 	}
-	_ = os.WriteFile(lbBindsFile(), []byte(b.String()), 0o644)
+	_ = os.WriteFile(lbBindsFile(), []byte(b.String()), 0o640)
 }
 
 // ---- API ----

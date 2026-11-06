@@ -108,8 +108,28 @@ func meshErr(w http.ResponseWriter, r *http.Request, err error) {
 	case err != nil && strings.Contains(err.Error(), "referenced by other records"):
 		writeAPIError(w, r, "E-IN-05", err.Error())
 	default:
-		writeAPIError(w, r, "E-SYS-01", err.Error())
+		writeAPIError(w, r, "E-SYS-01", meshSafeDetail(err))
 	}
+}
+
+// meshSafeDetail maps raw store/driver error text to fixed strings —
+// sqlite internals (table/column names, driver markers, lock states)
+// must not reach the client (SECURITY-AUDIT-PANEL L1). Operator-actionable
+// messages (wrapFK's "referenced by other records", ErrNotFound) keep
+// their own branches above.
+func meshSafeDetail(err error) string {
+	if err == nil {
+		return "request failed"
+	}
+	msg := err.Error()
+	for _, marker := range []string{"SQLITE_", "sqlite:", "no such table", "no such column",
+		"no such function", "UNIQUE constraint", "NOT NULL constraint", "database is locked",
+		"modernc.org", "malformed"} {
+		if strings.Contains(strings.ToLower(msg), strings.ToLower(marker)) {
+			return "store operation failed (details in the panel error journal)"
+		}
+	}
+	return msg
 }
 
 func registerMeshRoutes(mux *http.ServeMux, base string) {

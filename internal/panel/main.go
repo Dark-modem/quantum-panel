@@ -67,6 +67,12 @@ type panelConfig struct {
 	// cleartext listener on a public interface by default). The env
 	// GRE_PANEL_HTTP_BIND overrides both for containers/units.
 	HTTPBindHost string `json:"http_bind_host,omitempty"`
+	// LegacyEnabled turns the legacy host-command surface (matrix,
+	// tunnel/peers/watchdog/carrier/xray/limits/revpath/swap/setup/
+	// terminal commands exec'd on THIS host) back on. DISABLED by default
+	// (SECURITY-AUDIT-PANEL M3) — the mesh API and agent management are
+	// unaffected. Env GRE_PANEL_LEGACY=1 overrides.
+	LegacyEnabled bool `json:"legacy_enabled,omitempty"`
 	// PortsFinalized marks that the panel has successfully bound its
 	// HTTP+TLS ports once. After that the ports (and the base path) are
 	// FROZEN: a busy port at a later start is a loud fatal error, never
@@ -767,22 +773,22 @@ func Main(args []string) int {
 	mux.HandleFunc("GET "+base+"/api/releases", requireAuth(handleReleases))
 	mux.HandleFunc("GET "+base+"/api/update/github-token", requireAuth(handleGithubTokenGet))
 	mux.HandleFunc("POST "+base+"/api/update/github-token", requireAuth(requireCSRF(handleGithubTokenPost)))
-	mux.HandleFunc("POST "+base+"/api/matrix/setup", requireAuth(requireCSRF(handleMatrixSetupPost)))
+	mux.HandleFunc("POST "+base+"/api/matrix/setup", requireAuth(requireLegacy(requireCSRF(handleMatrixSetupPost))))
 	mux.HandleFunc("GET "+base+"/api/matrix/status", requireAuth(handleMatrixStatus))
 	mux.HandleFunc("GET "+base+"/api/matrix/instances", requireAuth(handleMatrixInstancesGet))
-	mux.HandleFunc("POST "+base+"/api/matrix/remove", requireAuth(requireCSRF(handleMatrixRemovePost)))
-	mux.HandleFunc("POST "+base+"/api/matrix/restart", requireAuth(requireCSRF(handleMatrixRestartPost)))
-	mux.HandleFunc("POST "+base+"/api/matrix/foreign-setup", requireAuth(requireCSRF(handleMatrixForeignSetup)))
-	mux.HandleFunc("POST "+base+"/api/matrix/foreign-remove", requireAuth(requireCSRF(handleMatrixForeignRemove)))
+	mux.HandleFunc("POST "+base+"/api/matrix/remove", requireAuth(requireLegacy(requireCSRF(handleMatrixRemovePost))))
+	mux.HandleFunc("POST "+base+"/api/matrix/restart", requireAuth(requireLegacy(requireCSRF(handleMatrixRestartPost))))
+	mux.HandleFunc("POST "+base+"/api/matrix/foreign-setup", requireAuth(requireLegacy(requireCSRF(handleMatrixForeignSetup))))
+	mux.HandleFunc("POST "+base+"/api/matrix/foreign-remove", requireAuth(requireLegacy(requireCSRF(handleMatrixForeignRemove))))
 	mux.HandleFunc("GET "+base+"/api/matrix/local-service", requireAuth(handleMatrixLocalService))
-	mux.HandleFunc("POST "+base+"/api/matrix/local-service", requireAuth(requireCSRF(handleMatrixLocalService)))
+	mux.HandleFunc("POST "+base+"/api/matrix/local-service", requireAuth(requireLegacy(requireCSRF(handleMatrixLocalService))))
 	mux.HandleFunc("GET "+base+"/api/topologies", requireAuth(handleTopologiesGet))
 	mux.HandleFunc("POST "+base+"/api/topologies", requireAuth(requireCSRF(handleTopologiesPost)))
 	mux.HandleFunc("PATCH "+base+"/api/topologies/{id}", requireAuth(requireCSRF(handleTopologyPatch)))
 	mux.HandleFunc("DELETE "+base+"/api/topologies/{id}", requireAuth(requireCSRF(handleTopologyDelete)))
 	mux.HandleFunc("POST "+base+"/api/topologies/{id}/active", requireAuth(requireCSRF(handleTopologyPowerPost)))
-	mux.HandleFunc("POST "+base+"/api/matrix/edit", requireAuth(requireCSRF(handleMatrixEdit)))
-	mux.HandleFunc("POST "+base+"/api/matrix/register", handleMatrixRegister)
+	mux.HandleFunc("POST "+base+"/api/matrix/edit", requireAuth(requireLegacy(requireCSRF(handleMatrixEdit))))
+	mux.HandleFunc("POST "+base+"/api/matrix/register", requireLegacy(handleMatrixRegister))
 
 	// Agents: central controller <-> lightweight endpoint agents. The
 	// enroll + WS routes authenticate with agent credentials, not sessions.
@@ -803,10 +809,10 @@ func Main(args []string) int {
 	// transport auth (release binaries are public artifacts).
 
 	mux.HandleFunc("GET "+base+"/api/agent-tunnels", requireAuth(handleAgentTunnelsGet))
-	mux.HandleFunc("POST "+base+"/api/agent-tunnels", requireAuth(requireCSRF(handleAgentTunnelsPost)))
-	mux.HandleFunc("POST "+base+"/api/agent-tunnels/{id}/power", requireAuth(requireCSRF(handleAgentTunnelPower)))
-	mux.HandleFunc("POST "+base+"/api/agent-tunnels/{id}/restart", requireAuth(requireCSRF(handleAgentTunnelRestart)))
-	mux.HandleFunc("DELETE "+base+"/api/agent-tunnels/{id}", requireAuth(requireCSRF(handleAgentTunnelDelete)))
+	mux.HandleFunc("POST "+base+"/api/agent-tunnels", requireAuth(requireLegacy(requireCSRF(handleAgentTunnelsPost))))
+	mux.HandleFunc("POST "+base+"/api/agent-tunnels/{id}/power", requireAuth(requireLegacy(requireCSRF(handleAgentTunnelPower))))
+	mux.HandleFunc("POST "+base+"/api/agent-tunnels/{id}/restart", requireAuth(requireLegacy(requireCSRF(handleAgentTunnelRestart))))
+	mux.HandleFunc("DELETE "+base+"/api/agent-tunnels/{id}", requireAuth(requireLegacy(requireCSRF(handleAgentTunnelDelete))))
 
 	// Mesh management plane (Phase 2B): the SQLite store is the authority
 	// for the new model; legacy JSON features above stay frozen and never
@@ -823,10 +829,10 @@ func Main(args []string) int {
 	mux.HandleFunc("GET "+base+"/mesh.js", serveAsset("mesh.js", "text/javascript; charset=utf-8"))
 
 	mux.HandleFunc("GET "+base+"/api/update/peer", requireAuth(handleUpdatePeer))
-	mux.HandleFunc("POST "+base+"/api/setup", requireAuth(requireCSRF(handleSetupPost)))
+	mux.HandleFunc("POST "+base+"/api/setup", requireAuth(requireLegacy(requireCSRF(handleSetupPost))))
 	mux.HandleFunc("GET "+base+"/api/peers", requireAuth(handlePeersGet))
-	mux.HandleFunc("POST "+base+"/api/peers", requireAuth(requireCSRF(handlePeersPost)))
-	mux.HandleFunc("PATCH "+base+"/api/peers", requireAuth(requireCSRF(handlePeersPatch)))
+	mux.HandleFunc("POST "+base+"/api/peers", requireAuth(requireLegacy(requireCSRF(handlePeersPost))))
+	mux.HandleFunc("PATCH "+base+"/api/peers", requireAuth(requireLegacy(requireCSRF(handlePeersPatch))))
 	mux.HandleFunc("GET "+base+"/api/tls", requireAuth(handleTLSGet))
 	mux.HandleFunc("POST "+base+"/api/tls", requireAuth(requireCSRF(handleTLSIssue)))
 	mux.HandleFunc("DELETE "+base+"/api/tls", requireAuth(requireCSRF(handleTLSRemove)))
@@ -837,31 +843,31 @@ func Main(args []string) int {
 	mux.HandleFunc("GET "+base+"/api/tls/ip/ca", requireAuth(handleTLSIPCAGet))
 	mux.HandleFunc("GET "+base+"/api/tls/proxy-config", requireAuth(handleReverseProxyConfig))
 	mux.HandleFunc("GET "+base+"/api/watchdog", requireAuth(handleWatchdogGet))
-	mux.HandleFunc("POST "+base+"/api/watchdog", requireAuth(requireCSRF(handleWatchdogPost)))
+	mux.HandleFunc("POST "+base+"/api/watchdog", requireAuth(requireLegacy(requireCSRF(handleWatchdogPost))))
 	mux.HandleFunc("GET "+base+"/api/watchdog/backup-download", requireAuth(handleBackupDownload))
 	mux.HandleFunc("POST "+base+"/api/watchdog/backup-download", requireAuth(requireCSRF(handleBackupDownload)))
 	mux.HandleFunc("GET "+base+"/api/perf", requireAuth(handlePerfGet))
 	mux.HandleFunc("POST "+base+"/api/perf", requireAuth(requireCSRF(handlePerfPost)))
 	mux.HandleFunc("GET "+base+"/api/carrier", requireAuth(handleCarrierGet))
-	mux.HandleFunc("POST "+base+"/api/carrier", requireAuth(requireCSRF(handleCarrierPost)))
+	mux.HandleFunc("POST "+base+"/api/carrier", requireAuth(requireLegacy(requireCSRF(handleCarrierPost))))
 	mux.HandleFunc("GET "+base+"/api/tunnel/swap", requireAuth(handleSwapGet))
-	mux.HandleFunc("POST "+base+"/api/tunnel/swap", requireAuth(requireCSRF(handleSwapPost)))
+	mux.HandleFunc("POST "+base+"/api/tunnel/swap", requireAuth(requireLegacy(requireCSRF(handleSwapPost))))
 	mux.HandleFunc("GET "+base+"/api/spoof", requireAuth(handleSpoofGet))
 	mux.HandleFunc("POST "+base+"/api/spoof", requireAuth(requireCSRF(handleSpoofPost)))
 	mux.HandleFunc("GET "+base+"/api/spoof/tester", requireAuth(handleSpoofTester))
 	mux.HandleFunc("POST "+base+"/api/spoof/tester", requireAuth(requireCSRF(handleSpoofTester)))
 	mux.HandleFunc("GET "+base+"/api/xray", requireAuth(handleXrayGet))
-	mux.HandleFunc("POST "+base+"/api/xray", requireAuth(requireCSRF(handleXrayPost)))
+	mux.HandleFunc("POST "+base+"/api/xray", requireAuth(requireLegacy(requireCSRF(handleXrayPost))))
 	mux.HandleFunc("GET "+base+"/api/limits", requireAuth(handleLimitsGet))
-	mux.HandleFunc("POST "+base+"/api/limits", requireAuth(requireCSRF(handleLimitsPost)))
+	mux.HandleFunc("POST "+base+"/api/limits", requireAuth(requireLegacy(requireCSRF(handleLimitsPost))))
 	mux.HandleFunc("POST "+base+"/api/link-name", requireAuth(requireCSRF(handleLinkName)))
 	mux.HandleFunc("GET "+base+"/api/fleet", requireAuth(handleFleet))
 	mux.HandleFunc("GET "+base+"/api/selfstats", requireAuth(handleSelfStats))
 	mux.HandleFunc("GET "+base+"/api/tunnel-health", requireAuth(handleTunnelHealthGet))
-	mux.HandleFunc("POST "+base+"/api/tunnel-health/run", requireAuth(requireCSRF(handleTunnelHealthRun)))
+	mux.HandleFunc("POST "+base+"/api/tunnel-health/run", requireAuth(requireLegacy(requireCSRF(handleTunnelHealthRun))))
 	mux.HandleFunc("GET "+base+"/api/revpath", requireAuth(handleRevPathGet))
-	mux.HandleFunc("POST "+base+"/api/revpath/run", requireAuth(requireCSRF(handleRevPathRun)))
-	mux.HandleFunc("POST "+base+"/api/revpath/fix", requireAuth(requireCSRF(handleRevPathFix)))
+	mux.HandleFunc("POST "+base+"/api/revpath/run", requireAuth(requireLegacy(requireCSRF(handleRevPathRun))))
+	mux.HandleFunc("POST "+base+"/api/revpath/fix", requireAuth(requireLegacy(requireCSRF(handleRevPathFix))))
 	mux.HandleFunc("GET "+base+"/api/revpath/fixes", requireAuth(handleRevPathFixes))
 	mountDebug(mux, base)
 	mux.HandleFunc("GET "+base+"/api/dial", requireAuth(handleDialGet))

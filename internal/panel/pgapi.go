@@ -11,9 +11,12 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -113,6 +116,14 @@ func handlePGConnect(w http.ResponseWriter, r *http.Request) {
 	tlsOpts := pasarguard.TLSOptions{CAPem: body.CAPEM, PinSHA256: body.PinSHA256}
 	if len(body.CAPEM) > 64<<10 || len(body.PinSHA256) > 64 {
 		writeAPIError(w, r, "E-IN-06", "ca_pem/pin too long")
+		return
+	}
+	// L2 (SECURITY-AUDIT-PANEL): optional SSRF guard. The PasarGuard URL
+	// is an operator setting, so the panel fetching it is privileged by
+	// design; when pasarguard_block_private is set, private/loopback
+	// targets are refused before any request leaves the panel.
+	if err := pgGuardPrivateURL(body.URL); err != nil {
+		writeAPIError(w, r, "E-IN-06", err.Error())
 		return
 	}
 	cl, err := pasarguard.New(body.URL, pasarguard.Credentials{
@@ -701,4 +712,35 @@ func firstEngine(s *store.Store) string {
 		return ""
 	}
 	return engines[0]
+}
+
+// pgGuardPrivateURL is the opt-in SSRF guard for the PasarGuard client
+// URL (audit L2). Default OFF (operator is root-equivalent; the real
+// deployments may legitimately use private addresses). When the
+// pasarguard_block_private setting is true, URLs whose host is an IP
+// literal in a private/loopback/link-local range — or a localhost name —
+// are refused with a fixed message before the client is built.
+func pgGuardPrivateURL(rawURL string) error {
+	s, err := MeshStore()
+	if err != nil || s == nil {
+		return nil // store down: the connect flow fails later anyway
+	}
+	v, err := s.Setting("pasarguard_block_private")
+	if err != nil || (v != "1" && v != "true") {
+		return nil
+	}
+	u, perr := url.Parse(strings.TrimSpace(rawURL))
+	if perr != nil || u.Host == "" {
+		return nil // malformed: pasarguard.New refuses it with its own error
+	}
+	host := u.Hostname()
+	if strings.EqualFold(host, "localhost") || strings.HasSuffix(strings.ToLower(host), ".localhost") || host == "::1" {
+		return errors.New("pasarguard URL host is not allowed (pasarguard_block_private is on)")
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsUnspecified() {
+			return errors.New("pasarguard URL host is not allowed (pasarguard_block_private is on)")
+		}
+	}
+	return nil
 }

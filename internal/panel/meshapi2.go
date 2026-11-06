@@ -105,8 +105,12 @@ func handleMeshUsage(w http.ResponseWriter, r *http.Request) {
 			if sv.DatacenterID == dcid {
 				tunnels, e := s.TunnelsForServer(sv.ID)
 				if e != nil {
-					err = e
-					continue
+					// M2 (SECURITY-AUDIT-PANEL): propagate immediately —
+					// assigning `err` and continuing let the final
+					// UsageForTunnelsDetailed call overwrite it, silently
+					// reporting zero usage on a store error.
+					meshErr(w, r, e)
+					return
 				}
 				ids = append(ids, tunnelIDs(tunnels)...)
 			}
