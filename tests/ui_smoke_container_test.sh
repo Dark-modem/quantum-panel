@@ -31,7 +31,8 @@ if command -v go >/dev/null 2>&1; then
     GOFLAGS=-mod=mod GOPROXY=off CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
         go build -trimpath -o "$WORK/quantum-panel" ./cmd/quantum-panel
 else
-    wsl.exe -d Ubuntu-24.04 -- bash -lc "export GOFLAGS=-mod=mod GOPROXY=file:///tmp/goproxy,https://proxy.golang.org GOSUMDB=off GOPRIVATE=github.com/Dark-modem/* GOPATH=\$HOME/go; cd /mnt/c/Users/-Mahdi/Downloads/Quantum/01-REPOSITORIES/wt-phase4-ui && CGO_ENABLED=0 go build -trimpath -o /mnt/c/Users/-Mahdi/Downloads/Quantum/01-REPOSITORIES/wt-phase4-ui/tests/.ui-work/quantum-panel ./cmd/quantum-panel"
+    WSLDIR="$(cygpath -u "$(pwd)")"
+    wsl.exe -d Ubuntu-24.04 -- bash -lc "export GOFLAGS=-mod=mod GOPROXY=file:///tmp/goproxy,https://proxy.golang.org GOSUMDB=off GOPRIVATE=github.com/Dark-modem/* GOPATH=\$HOME/go; cd '$WSLDIR' && CGO_ENABLED=0 go build -trimpath -o '$WSLDIR/tests/.ui-work/quantum-panel' ./cmd/quantum-panel"
 fi
 [ -f "$WORK/quantum-panel" ] || { echo "FAIL: panel binary missing"; exit 1; }
 
@@ -74,6 +75,6 @@ docker exec "$CT" bash -c "cd / && python smoke.py"
 SMOKE_RC=$?
 
 echo "== artifacts =="
-docker exec "$CT" ls /shots || true
+MSYS_NO_PATHCONV=1 docker.exe exec "$CT" ls /shots 2>/dev/null || docker exec "$CT" ls /shots || true
 echo "== smoke rc=$SMOKE_RC (panel was 127.0.0.1:${PORT}) =="
 [ "$SMOKE_RC" -eq 0 ]

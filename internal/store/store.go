@@ -217,6 +217,31 @@ ALTER TABLE engine_overhead ADD COLUMN wire_tx_bytes INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE engine_overhead ADD COLUMN payload_tx_bytes INTEGER NOT NULL DEFAULT 0;
 CREATE INDEX idx_traffic_samples_tunnel_agent_at ON traffic_samples(tunnel_id, agent_id, at);
 `,
+	// 5: Phase 5 R5 engine artifact store. One row per signed engine
+	// binary artifact the operator uploaded; the file itself lives in
+	// <configDir>/engine-artifacts/ (0600), the row carries the pins the
+	// agent enforces again on its side (sha256 + ed25519 signature — the
+	// panel is NEVER trusted for integrity, R5). UNIQUE(engine, version,
+	// goos, goarch) makes the duplicate rule a constraint: re-uploading
+	// the same build is an update, a different hash for the same slot is
+	// rejected by the handler (hash conflict).
+	`
+CREATE TABLE engine_artifacts (
+  id INTEGER PRIMARY KEY,
+  engine TEXT NOT NULL,
+  version TEXT NOT NULL,
+  goos TEXT NOT NULL DEFAULT 'linux',
+  goarch TEXT NOT NULL,
+  artifact TEXT NOT NULL UNIQUE,
+  sha256 TEXT NOT NULL,
+  size INTEGER NOT NULL,
+  signature TEXT NOT NULL,
+  uploader TEXT NOT NULL DEFAULT '',
+  uploaded_at INTEGER NOT NULL,
+  UNIQUE (engine, version, goos, goarch)
+);
+CREATE INDEX idx_engine_artifacts_engine ON engine_artifacts(engine, goarch);
+`,
 }
 
 func (s *Store) migrate() error {

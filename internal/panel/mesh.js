@@ -11,6 +11,13 @@
     en: {
       tab_topos: 'Topologies', tab_weights: 'Weights', tab_profiles: 'Profiles',
       tab_traffic: 'Traffic', tab_pg: 'PasarGuard', pg_connect: 'Connect', pg_url: 'Panel URL', pg_user: 'Admin user', pg_pass: 'Admin password', pg_dry: 'Dry-run diff', pg_apply: 'Apply plan', pg_cert: 'Store certificate', pg_install: 'Install command', pg_crosscheck: 'Cross-check usage', title: 'Quantum — Mesh Management',
+      tab_engines: 'Engines', eng_artifacts: 'Signed engine artifacts', eng_agents: 'Agents: reported engines',
+      eng_upload: 'Upload artifact', eng_version: 'Version', eng_arch: 'Arch', eng_goos: 'OS',
+      eng_name: 'Download name (optional)', eng_sig: 'Detached signature (base64 ed25519)',
+      eng_key_snippet: 'Agent build snippet (pin this public key)', eng_no_key: 'No engine-artifact public key configured',
+      eng_none: 'No artifacts uploaded yet.', eng_sha: 'SHA-256', eng_size: 'Size', eng_uploaded: 'Uploaded',
+      eng_del: 'Remove', eng_warning: 'Coverage warning', eng_agent_col: 'Agent', eng_arch_col: 'Arch',
+      eng_engines_col: 'Engines', eng_uploading: 'Uploading…', eng_uploaded_ok: 'Artifact stored',
       topo: 'Topology', members: 'Members', tunnels: 'Tunnels', enabled: 'Enabled',
       engine: 'Engine', state: 'State', up: 'up', down: 'down', unknown: 'unknown',
       tunnel: 'Tunnel', weight: 'Weight', set: 'Set', save: 'Save',
@@ -26,6 +33,13 @@
     fa: {
       tab_topos: 'توپولوژی‌ها', tab_weights: 'وزن‌ها', tab_profiles: 'پروفایل‌ها',
       tab_traffic: 'ترافیک', tab_pg: 'پازارگارد', pg_connect: 'اتصال', pg_url: 'آدرس پنل', pg_user: 'کاربر ادمین', pg_pass: 'رمز ادمین', pg_dry: 'بررسی تغییرات', pg_apply: 'اعمال برنامه', pg_cert: 'ذخیره گواهی', pg_install: 'دستور نصب', pg_crosscheck: 'مقایسه مصرف', title: 'کوانتوم — مدیریت مش',
+      tab_engines: 'موتورها', eng_artifacts: 'موتورهای امضاشده', eng_agents: 'عامل‌ها: موتورهای اعلام‌شده',
+      eng_upload: 'بارگذاری فایل', eng_version: 'نسخه', eng_arch: 'معماری', eng_goos: 'سیستم‌عامل',
+      eng_name: 'نام دانلود (اختیاری)', eng_sig: 'امضای جداشده (base64 ed25519)',
+      eng_key_snippet: 'قطعه کد ساخت عامل (این کلید عمومی را پین کنید)', eng_no_key: 'هیچ کلید عمومی موتور تنظیم نشده',
+      eng_none: 'هنوز فایلی بارگذاری نشده.', eng_sha: 'SHA-256', eng_size: 'حجم', eng_uploaded: 'بارگذاری',
+      eng_del: 'حذف', eng_warning: 'هشدار پوشش', eng_agent_col: 'عامل', eng_arch_col: 'معماری',
+      eng_engines_col: 'موتورها', eng_uploading: 'در حال بارگذاری…', eng_uploaded_ok: 'فایل ذخیره شد',
       topo: 'توپولوژی', members: 'اعضا', tunnels: 'تونل‌ها', enabled: 'فعال',
       engine: 'موتور', state: 'وضعیت', up: 'برقرار', down: 'قطع', unknown: 'نامشخص',
       tunnel: 'تونل', weight: 'وزن', set: 'ثبت', save: 'ذخیره',
@@ -89,7 +103,7 @@
     Array.prototype.forEach.call(document.querySelectorAll('#tabs button'), function (x) {
       x.classList.toggle('active', x === b);
     });
-    ['topos', 'weights', 'profiles', 'traffic', 'pasarguard'].forEach(function (id) {
+    ['topos', 'weights', 'profiles', 'traffic', 'pasarguard', 'engines'].forEach(function (id) {
       document.getElementById('tab-' + id).style.display = id === current ? '' : 'none';
     });
     render();
@@ -119,6 +133,7 @@
     if (current === 'profiles') renderProfiles();
     if (current === 'traffic') renderTraffic();
     if (current === 'pasarguard') renderPG();
+    if (current === 'engines') renderEngines();
   }
 
   function loadAll() {
@@ -418,6 +433,98 @@
         '<p class="muted">configured=' + (r.configured_coefficient || 1) + ' suggested=' +
         (r.suggested_coefficient || 0).toFixed(3) + ' · ' + esc(r.note) + '</p>';
     }).catch(function (e) { say(e.message, true); });
+  }
+
+  // ---- engines (Phase 5 R5: signed engine artifact store) --------------------
+  // Multipart upload: fetch with the CSRF header, no Content-Type override
+  // (the browser sets the multipart boundary).
+  function apiForm(path, form) {
+    return fetch(base() + 'api/mesh/' + path, {
+      method: 'POST', headers: { 'X-CSRF-Token': csrfToken() }, body: form
+    }).then(function (r) {
+      return r.json().then(function (j) {
+        if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+        return j;
+      });
+    });
+  }
+  function renderEngines() {
+    var el = document.getElementById('tab-engines');
+    api('GET', 'engines').then(function (d) {
+      var warns = (d.warnings || []).map(function (w) {
+        return '<div class="row"><span class="pill warn">⚠ ' + esc(t('eng_warning')) + '</span>' +
+          '<span class="muted">' + esc(w.text) + '</span></div>';
+      }).join('');
+      var arts = (d.artifacts || []).map(function (a) {
+        return '<tr><td>' + esc(a.engine) + '</td><td>' + esc(a.version) + '</td><td>' + esc(a.goos) + '/' + esc(a.goarch) +
+          '</td><td class="muted" style="max-width:180px;overflow:hidden;text-overflow:ellipsis">' + esc(a.sha256.slice(0, 16)) + '…</td>' +
+          '<td>' + bytes(a.size) + '</td><td class="muted">' + esc(a.artifact) + '</td>' +
+          '<td><button class="act" data-del-art="' + a.id + '">' + esc(t('eng_del')) + '</button></td></tr>';
+      }).join('');
+      var ags = (d.agents || []).map(function (ag) {
+        var pills = (ag.engines || []).map(function (e) {
+          return '<span class="pill ' + (e.version ? 'ok' : 'warn') + '">' + esc(e.id) +
+            (e.version ? ' ' + esc(e.version) : '') + '</span>';
+        }).join(' ');
+        return '<tr><td>' + esc(ag.name || ag.id) + '</td><td>' + esc(ag.arch || '?') + '</td><td>' +
+          (pills || '<span class="muted">—</span>') + '</td></tr>';
+      }).join('');
+      var keyBox = d.key_configured
+        ? '<p class="muted" id="eng-key-line">' + esc(t('eng_key_snippet')) + '…</p>'
+        : '<p class="muted">⚠ ' + esc(t('eng_no_key')) + '</p>';
+      el.innerHTML = warns +
+        '<h3 style="font-size:0.98rem">' + esc(t('eng_artifacts')) + '</h3>' +
+        (arts
+          ? '<table><tr><th>' + esc(t('engine')) + '</th><th>' + esc(t('eng_version')) + '</th><th>' + esc(t('eng_goos')) + '/' + esc(t('eng_arch')) +
+            '</th><th>' + esc(t('eng_sha')) + '</th><th>' + esc(t('eng_size')) + '</th><th>' + esc(t('eng_name')) + '</th><th></th></tr>' + arts + '</table>'
+          : '<p class="muted">' + esc(t('eng_none')) + '</p>') +
+        '<div class="row"><input type="file" id="eng-file">' +
+        '<input id="eng-engine" placeholder="' + esc(t('engine')) + ' (frp)" style="width:110px">' +
+        '<input id="eng-version" placeholder="' + esc(t('eng_version')) + ' (0.61.1)" style="width:110px">' +
+        '<select id="eng-arch"><option value="amd64">amd64</option><option value="arm64">arm64</option></select>' +
+        '<input id="eng-name" placeholder="' + esc(t('eng_name')) + '" style="width:220px">' +
+        '<input id="eng-sig" placeholder="' + esc(t('eng_sig')) + '" style="width:280px">' +
+        '<button class="act primary" id="eng-upload">' + esc(t('eng_upload')) + '</button></div>' +
+        '<h3 style="font-size:0.98rem">' + esc(t('eng_agents')) + '</h3>' +
+        '<table><tr><th>' + esc(t('eng_agent_col')) + '</th><th>' + esc(t('eng_arch_col')) + '</th><th>' + esc(t('eng_engines_col')) + '</th></tr>' + ags + '</table>' +
+        keyBox;
+      document.getElementById('eng-upload').onclick = function () {
+        var f = document.getElementById('eng-file').files[0];
+        var engine = document.getElementById('eng-engine').value.trim();
+        if (!f || !engine) { say(t('eng_upload') + ' ?', true); return; }
+        say(t('eng_uploading'));
+        var form = new FormData();
+        form.append('file', f);
+        form.append('engine', engine);
+        form.append('version', document.getElementById('eng-version').value.trim());
+        form.append('goarch', document.getElementById('eng-arch').value);
+        form.append('goos', 'linux');
+        var nm = document.getElementById('eng-name').value.trim();
+        if (nm) form.append('name', nm);
+        form.append('signature', document.getElementById('eng-sig').value.trim());
+        apiForm('engines/artifacts', form).then(function (r) {
+          say(t('eng_uploaded_ok') + ': ' + r.artifact + ' (' + bytes(r.size) + ')');
+          renderEngines();
+        }).catch(function (e) { say(e.message, true); });
+      };
+      Array.prototype.forEach.call(el.querySelectorAll('[data-del-art]'), function (b) {
+        b.onclick = function () {
+          api('DELETE', 'engines/artifacts/' + b.dataset.delArt).then(function () { renderEngines(); })
+            .catch(function (e) { say(e.message, true); });
+        };
+      });
+      if (d.key_configured) {
+        api('GET', 'engines/keysnippet').then(function (k) {
+          var line = document.getElementById('eng-key-line');
+          if (line && k.configured) {
+            line.innerHTML = esc(t('eng_key_snippet')) + ':<br><code style="font-size:0.78rem;word-break:break-all">' +
+              esc('go build ' + k.agent_ldflags) + '</code>';
+          } else if (line && k.hint) {
+            line.textContent = k.hint;
+          }
+        }).catch(function () {});
+      }
+    }).catch(function (e) { el.innerHTML = '<p class="muted">' + esc(e.message) + '</p>'; });
   }
 
   applyLang();

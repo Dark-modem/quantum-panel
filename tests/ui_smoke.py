@@ -17,7 +17,9 @@
 #
 # Prints a JSON summary; screenshots land in /shots (mounted).
 
+import base64
 import json
+import subprocess
 import time
 
 from playwright.sync_api import sync_playwright
@@ -25,7 +27,7 @@ from playwright.sync_api import sync_playwright
 BASE = "http://127.0.0.1:8000/ui"
 USER = "admin"
 PASS = "ui-secret-123"
-TABS = ["topos", "weights", "profiles", "traffic", "pasarguard"]
+TABS = ["topos", "weights", "profiles", "traffic", "pasarguard", "engines"]
 
 console_errors = []
 page_errors = []
@@ -111,6 +113,74 @@ def main():
                                       "target": "127.0.0.1:443", "enabled": True})
         assert r["status"] < 300, f"forward: {r}"
 
+        # -- 2b. R5 engines: real key + signed artifact via openssl (the
+        #     documented operator flow in docs/ENGINE-ARTIFACTS.md, run
+        #     for real) ---------------------------------------------------
+        def sh(cmd):
+            r = subprocess.run(["bash", "-c", cmd], capture_output=True, text=True)
+            assert r.returncode == 0, f"{cmd[:60]}: rc={r.returncode} {r.stderr[-300:]}"
+            return r.stdout.strip()
+
+        sh("openssl genpkey -algorithm ed25519 -out /tmp/engine.key")
+        key_b64 = sh("openssl pkey -in /tmp/engine.key -pubout -outform DER | base64 -w0")
+        sh("mkdir -p /cfg/engine-artifacts && cp /tmp/engine-pub.b64 /cfg/engine-artifacts/engine-pub.b64 "
+           "2>/dev/null || openssl pkey -in /tmp/engine.key -pubout -outform DER | base64 -w0 > /cfg/engine-artifacts/engine-pub.b64")
+        # small placeholder artifact (content only feeds sha256+sig checks)
+        sh("mkdir -p /tmp/art/frp_0.61.1 && echo fake-frpc > /tmp/art/frp_0.61.1/frpc && "
+           "echo fake-frps > /tmp/art/frp_0.61.1/frps && tar -C /tmp/art -czf /tmp/frp-0.61.1-linux-amd64.tar.gz frp_0.61.1 && "
+           "openssl pkeyutl -sign -inkey /tmp/engine.key -rawin -in /tmp/frp-0.61.1-linux-amd64.tar.gz -out /tmp/art.sig && "
+           "base64 -w0 /tmp/art.sig > /tmp/art.sig.b64")
+        art_b64 = sh("base64 -w0 /tmp/frp-0.61.1-linux-amd64.tar.gz")
+        sig_b64 = sh("cat /tmp/art.sig.b64")
+
+        # login page context is needed for the session cookie + CSRF
+        def csrf_hdr():
+            tok = page.evaluate("() => (document.cookie.match(/(?:^|; )gre_csrf=([^;]+)/)||[])[1] || ''")
+            return {"X-CSRF-Token": tok} if tok else {}
+
+        def engine_upload(sig, body_b64):
+            return page.evaluate(
+                """async ([sig, b64, hdr]) => {
+                    const bin = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+                    const fd = new FormData();
+                    fd.append('file', new Blob([bin], {type: 'application/octet-stream'}), 'frp-0.61.1-linux-amd64.tar.gz');
+                    fd.append('engine', 'frp');
+                    fd.append('version', '0.61.1');
+                    fd.append('goarch', 'amd64');
+                    fd.append('goos', 'linux');
+                    fd.append('signature', sig);
+                    const r = await fetch('/ui/api/mesh/engines/artifacts',
+                        {method: 'POST', headers: hdr, body: fd});
+                    return {status: r.status, body: await r.json().catch(() => ({}))};
+                }""", [sig, body_b64, csrf_hdr()])
+
+        # the panel was started BEFORE the key file landed — verification
+        # reads the file per request, so uploads work without a restart
+        r = engine_upload(sig_b64, art_b64)
+        assert r["status"] == 200, f"signed upload: {r}"
+        stored_sha = r["body"].get("sha256", "")
+
+        # wrong signature (valid sig over DIFFERENT bytes) → 400
+        r = engine_upload(sig_b64, base64.b64encode(b"tampered-bytes").decode())
+        assert r["status"] == 400, f"tampered upload must fail: {r}"
+
+        # same version+arch with a DIFFERENT build → 409
+        sh("echo different-build > /tmp/art2.tar.gz && openssl pkeyutl -sign -inkey /tmp/engine.key "
+           "-rawin -in /tmp/art2.tar.gz -out /tmp/art2.sig && base64 -w0 /tmp/art2.sig > /tmp/art2.sig.b64")
+        r = engine_upload(sh("cat /tmp/art2.sig.b64"), sh("base64 -w0 /tmp/art2.tar.gz"))
+        assert r["status"] == 409, f"hash-conflict upload must be 409: {r}"
+
+        # agent manifest: unauthenticated, lists the stored pins
+        r = page.evaluate(
+            """async () => {
+                const r = await fetch('/ui/api/agent/engine-artifacts?engine=frp&goarch=amd64',
+                    {credentials: 'omit'});
+                return {status: r.status, body: await r.json().catch(() => ({}))};
+            }""")
+        assert r["status"] == 200, f"manifest: {r}"
+        arts = r["body"].get("artifacts", [])
+        assert len(arts) == 1 and arts[0]["sha256"] == stored_sha, f"manifest pins: {arts}"
+
         # -- 3. mesh page: every tab ----------------------------------------
         page.goto(BASE + "/mesh", wait_until="networkidle", timeout=30000)
         page.wait_for_selector("#tabs", timeout=15000)
@@ -124,6 +194,7 @@ def main():
             "profiles": "Agent",
             "traffic": "usage",
             "pasarguard": "Connect",
+            "engines": "0.61.1",
         }
         for i, tab in enumerate(TABS):
             page.click(f'button[data-tab="{tab}"]')
@@ -140,6 +211,33 @@ def main():
                     # the tab itself never shows credential material
                     if secret in body.lower() and secret != "api_key":
                         console_errors.append(f"tab pasarguard leaks secret: {secret}")
+            if tab == "engines":
+                body = page.inner_text("#tab-engines")
+                if "frp-0.61.1-linux-amd64.tar.gz" not in body:
+                    console_errors.append("tab engines: uploaded artifact not rendered")
+                # the seeded topology enables matrix on 12 tunnels and no
+                # agent is connected → the coverage warning must be visible
+                if "no connected agent reports it" not in body and "no signed artifact" not in body:
+                    console_errors.append("tab engines: coverage warning missing")
+                if "go build -ldflags" not in body:
+                    console_errors.append("tab engines: agent build snippet missing")
+
+        # -- 3b. engines tab: the REAL upload form (file input → multipart) --
+        page.click('button[data-tab="engines"]')
+        time.sleep(1.2)
+        # same bytes, NEW version slot (0.61.2) — signature is over the file
+        # bytes, so the sig computed earlier is valid for the new slot too
+        page.set_input_files("#eng-file", "/tmp/frp-0.61.1-linux-amd64.tar.gz")
+        page.fill("#eng-engine", "frp")
+        page.fill("#eng-version", "0.61.2")
+        page.fill("#eng-sig", sig_b64)
+        page.click("#eng-upload")
+        time.sleep(2.0)
+        ebody = page.inner_text("#tab-engines")
+        if "0.61.2" not in ebody:
+            console_errors.append("engines form upload: 0.61.2 artifact not rendered after upload")
+        page.screenshot(path="/shots/12-engines-form.png")
+        shots.append("12-engines-form.png")
 
         # -- 4. weights editor: resolved weight visible ----------------------
         page.click('button[data-tab="weights"]')
