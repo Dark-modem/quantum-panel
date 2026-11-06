@@ -67,6 +67,12 @@ type panelConfig struct {
 	// cleartext listener on a public interface by default). The env
 	// GRE_PANEL_HTTP_BIND overrides both for containers/units.
 	HTTPBindHost string `json:"http_bind_host,omitempty"`
+	// PortsFinalized marks that the panel has successfully bound its
+	// HTTP+TLS ports once. After that the ports (and the base path) are
+	// FROZEN: a busy port at a later start is a loud fatal error, never
+	// an auto-switch — an auto-switch would permanently change the URL
+	// every enrolled agent already uses (PANEL-LISTENER-NOTES.md).
+	PortsFinalized bool `json:"ports_finalized,omitempty"`
 	// DebugEnabled mounts /debug/pprof behind auth (also QUANTUM_PPROF=1).
 	DebugEnabled bool `json:"debug_enabled,omitempty"`
 	// RevPathAuto enables automatic application of reverse-path fixes
@@ -89,6 +95,13 @@ func termEnabled() bool { return cfg.TerminalEnabled }
 
 // effectiveTLSPort returns the HTTPS port (7443 default when unset).
 func effectiveTLSPort() int {
+	// Explicit operator override first (symmetric with GRE_PANEL_PORT).
+	if v := strings.TrimSpace(os.Getenv("GRE_PANEL_TLS_PORT")); v != "" {
+		if p, err := strconv.Atoi(v); err == nil && p >= 1 && p <= 65535 {
+			return p
+		}
+		log.Printf("ignoring invalid GRE_PANEL_TLS_PORT=%q (must be 1-65535)", v)
+	}
 	if cfg.TLSPort < 1 || cfg.TLSPort > 65535 {
 		return 7443
 	}
@@ -285,9 +298,16 @@ func envPanelPort() int {
 	return p
 }
 
-// ensureFreeHTTPPort guarantees cfg.Port is bindable: env override wins,
-// otherwise the saved port (or 7777 fresh) is kept; when busy we scan
-// upward and persist the new port so show_panel_url/displays stay correct.
+// ensureFreeHTTPPort resolves the HTTP listen port. Semantics
+// (PANEL-LISTENER-NOTES.md, phase 6 fix for the mid-run rebind):
+//   - the operator's explicit choice always wins: GRE_PANEL_PORT env,
+//     else the saved port, else 7777 on the very first start;
+//   - FIRST start (ports not finalized yet) with the preferred port
+//     busy: scan upward, PERSIST the new port, log it loudly — one
+//     auto-switch, ever;
+//   - every later start: the port is FROZEN. A busy port is a fatal
+//     error with fix instructions — silently moving the port would
+//     permanently break the URL every enrolled agent already uses.
 func ensureFreeHTTPPort() {
 	desired := cfg.Port
 	if p := envPanelPort(); p != 0 {
@@ -300,12 +320,34 @@ func ensureFreeHTTPPort() {
 			cfg.Port = desired
 			saveCfg()
 		}
+		finalizePorts()
 		return
 	}
+	if !listenerMoveAllowed() {
+		log.Fatalf("panel HTTP port %d is busy and the listener ports are FINALIZED — "+
+			"the panel will NOT auto-switch (enrolled agents already use this URL). "+
+			"Free the port, or set GRE_PANEL_PORT / panel.json port to another value explicitly.", desired)
+	}
 	next := pickFreePort(desired + 1)
-	log.Printf("panel port %d busy — auto-switched to %d (saved to panel.json)", desired, next)
+	log.Printf("FIRST START: panel port %d busy — auto-switched to %d and SAVED to panel.json (ports finalize after this bind; later starts refuse to move)", desired, next)
 	cfg.Port = next
 	saveCfg()
+	finalizePorts()
+}
+
+// listenerMoveAllowed reports whether an auto-switch is permitted right
+// now: only BEFORE the ports have been finalized (the very first start).
+func listenerMoveAllowed() bool { return !cfg.PortsFinalized }
+
+// finalizePorts freezes the resolved ports: after the first successful
+// bind the panel never auto-switches again (see PANEL-LISTENER-NOTES.md).
+func finalizePorts() {
+	if cfg.PortsFinalized {
+		return
+	}
+	cfg.PortsFinalized = true
+	saveCfg()
+	log.Printf("listener ports finalized: HTTP %d, TLS %d, base path /%s (they now change only when you edit them explicitly)", cfg.Port, effectiveTLSPort(), cfg.BasePath)
 }
 
 func loadOrInit() {
@@ -893,16 +935,10 @@ func Main(args []string) int {
 	}()
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
-		next := pickFreePort(cfg.Port + 1)
-		log.Printf("panel port %d busy — auto-switched to %d (saved to panel.json)", cfg.Port, next)
-		cfg.Port = next
-		saveCfg()
-		addr = panelHTTPBindAddr(cfg.Port)
-		log.Printf("gre-panel listening on %s under /%s", addr, cfg.BasePath)
-		ln, err = net.Listen("tcp", addr)
-		if err != nil {
-			log.Fatal(err)
-		}
+		// ensureFreeHTTPPort already resolved (and on first start
+		// persisted) the port. A failure HERE is the operator's business:
+		// the port froze between resolution and bind — never auto-switch.
+		log.Fatalf("panel cannot listen on %s: %v — the ports are final; free the port or set GRE_PANEL_PORT/panel.json explicitly", addr, err)
 	}
 	srv := &http.Server{
 		// errorPagesMiddleware renders the branded Persian error page for

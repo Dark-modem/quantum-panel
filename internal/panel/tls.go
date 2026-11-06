@@ -559,8 +559,13 @@ func startHTTPSListener() {
 		httpsSrv = nil
 	}
 	if !portFree(port) {
+		if cfg.PortsFinalized {
+			log.Fatalf("panel HTTPS port %d is busy and the listener ports are FINALIZED — "+
+				"the panel will NOT auto-switch (enrolled agents already use this URL). "+
+				"Free the port or set GRE_PANEL_TLS_PORT / panel.json tls_port explicitly.", port)
+		}
 		next := pickFreePort(port + 1)
-		log.Printf("panel https port %d busy — auto-switched to %d (saved to panel.json)", port, next)
+		log.Printf("FIRST START: panel https port %d busy — auto-switched to %d and SAVED to panel.json (ports finalize after this bind)", port, next)
 		cfg.TLSPort = next
 		saveCfg()
 		port = next
