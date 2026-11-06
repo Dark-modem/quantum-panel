@@ -62,6 +62,11 @@ type panelConfig struct {
 	// BindHost restricts both listeners to one address (e.g. "127.0.0.1"
 	// behind a reverse proxy). Empty binds all interfaces (default).
 	BindHost string `json:"bind_host,omitempty"`
+	// HTTPBindHost restricts ONLY the plain-HTTP listener. Empty falls
+	// back to BindHost, else 127.0.0.1 (SECURITY-AUDIT-PANEL H1: no
+	// cleartext listener on a public interface by default). The env
+	// GRE_PANEL_HTTP_BIND overrides both for containers/units.
+	HTTPBindHost string `json:"http_bind_host,omitempty"`
 	// DebugEnabled mounts /debug/pprof behind auth (also QUANTUM_PPROF=1).
 	DebugEnabled bool `json:"debug_enabled,omitempty"`
 	// RevPathAuto enables automatic application of reverse-path fixes
@@ -215,6 +220,38 @@ func panelBindAddr(port int) string {
 	host := strings.TrimSpace(cfg.BindHost)
 	if host == "" {
 		return fmt.Sprintf(":%d", port)
+	}
+	return net.JoinHostPort(host, strconv.Itoa(port))
+}
+
+// panelHTTPBindAddr builds the listen address for the PLAIN-HTTP
+// listener. Unlike HTTPS (public by design), plain HTTP defaults to
+// 127.0.0.1: this listener carries session login over cleartext and the
+// panel can reconfigure root-level agents. A wider bind is always an
+// explicit operator choice, in decreasing precedence:
+//   - GRE_PANEL_HTTP_BIND env (containers/units: "0.0.0.0"),
+//   - panel.json http_bind_host (just this listener, e.g. a cluster
+//     tunnel IP so peer mesh keeps working),
+//   - panel.json bind_host (both listeners, pre-existing behavior).
+//
+// registerUnauthRoutes wires the endpoints reachable WITHOUT any
+// credential, each behind the per-IP limiter (audit M1).
+func registerUnauthRoutes(mux *http.ServeMux, base string) {
+	mux.HandleFunc("GET "+base+"/api/health", limitUnauth(handleHealth))
+	mux.HandleFunc("POST "+base+"/api/agent/enroll", limitUnauth(handleAgentEnroll))
+	mux.HandleFunc("GET "+base+"/api/agent/artifact/{name}", limitUnauth(handleAgentArtifactGet))
+}
+
+func panelHTTPBindAddr(port int) string {
+	host := strings.TrimSpace(os.Getenv("GRE_PANEL_HTTP_BIND"))
+	if host == "" {
+		host = strings.TrimSpace(cfg.HTTPBindHost)
+	}
+	if host == "" {
+		host = strings.TrimSpace(cfg.BindHost)
+	}
+	if host == "" {
+		host = "127.0.0.1"
 	}
 	return net.JoinHostPort(host, strconv.Itoa(port))
 }
@@ -649,7 +686,7 @@ func Main(args []string) int {
 	mux.HandleFunc("POST "+base+"/api/term/allowlist", requireAuth(requireCSRF(handleTermAllowPost)))
 	mux.HandleFunc("POST "+base+"/api/term/kill", requireAuth(requireCSRF(handleTermKill)))
 	mux.HandleFunc("POST "+base+"/api/term/enable", requireAuth(requireCSRF(handleTermEnable)))
-	mux.HandleFunc("GET "+base+"/api/health", handleHealth)
+	registerUnauthRoutes(mux, base)
 	mux.HandleFunc("GET "+base+"/api/status", requireAuth(handleStatus))
 	mux.HandleFunc("GET "+base+"/api/dashboard", requireAuth(handleDashboard))
 	mux.HandleFunc("POST "+base+"/api/login", handleLogin)
@@ -703,7 +740,7 @@ func Main(args []string) int {
 
 	// Agents: central controller <-> lightweight endpoint agents. The
 	// enroll + WS routes authenticate with agent credentials, not sessions.
-	mux.HandleFunc("POST "+base+"/api/agent/enroll", handleAgentEnroll)
+
 	mux.HandleFunc("GET "+base+"/api/agent/ws", handleAgentWS)
 	mux.HandleFunc("GET "+base+"/api/agents", requireAuth(handleAgentsGet))
 	mux.HandleFunc("POST "+base+"/api/agents/tokens", requireAuth(requireCSRF(handleAgentTokenPost)))
@@ -718,7 +755,7 @@ func Main(args []string) int {
 	// Agent artifact delivery: integrity is enforced by the mandatory
 	// ed25519 signature + digest on both controller and agent, not by
 	// transport auth (release binaries are public artifacts).
-	mux.HandleFunc("GET "+base+"/api/agent/artifact/{name}", handleAgentArtifactGet)
+
 	mux.HandleFunc("GET "+base+"/api/agent-tunnels", requireAuth(handleAgentTunnelsGet))
 	mux.HandleFunc("POST "+base+"/api/agent-tunnels", requireAuth(requireCSRF(handleAgentTunnelsPost)))
 	mux.HandleFunc("POST "+base+"/api/agent-tunnels/{id}/power", requireAuth(requireCSRF(handleAgentTunnelPower)))
@@ -822,7 +859,7 @@ func Main(args []string) int {
 	mux.HandleFunc("GET "+base+"/api/pathtest", requireAuth(handlePathTestGet))
 	mux.HandleFunc("POST "+base+"/api/pathtest", requireAuth(requireCSRF(handlePathTestPost)))
 
-	addr := panelBindAddr(cfg.Port)
+	addr := panelHTTPBindAddr(cfg.Port)
 	log.Printf("gre-panel listening on %s under /%s", addr, cfg.BasePath)
 	histStop := make(chan struct{})
 	startHistoryPersistence(histStop)
@@ -851,7 +888,7 @@ func Main(args []string) int {
 		log.Printf("panel port %d busy — auto-switched to %d (saved to panel.json)", cfg.Port, next)
 		cfg.Port = next
 		saveCfg()
-		addr = fmt.Sprintf(":%d", cfg.Port)
+		addr = panelHTTPBindAddr(cfg.Port)
 		log.Printf("gre-panel listening on %s under /%s", addr, cfg.BasePath)
 		ln, err = net.Listen("tcp", addr)
 		if err != nil {

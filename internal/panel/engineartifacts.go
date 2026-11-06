@@ -141,8 +141,9 @@ func registerEngineArtifactRoutes(mux *http.ServeMux, base string) {
 	mux.HandleFunc("DELETE "+p+"/artifacts/{id}", requireAuth(requireCSRF(handleEngineArtifactDelete)))
 
 	ap := base + "/api/agent/engine-artifacts"
-	mux.HandleFunc("GET "+ap, handleEngineManifest)                    // unauth by design (see header)
-	mux.HandleFunc("GET "+ap+"/file/{name}", handleEngineManifestFile) // unauth by design
+	// unauth by design (see header) but rate-limited per IP (audit M1).
+	mux.HandleFunc("GET "+ap, limitUnauth(handleEngineManifest))
+	mux.HandleFunc("GET "+ap+"/file/{name}", limitUnauth(handleEngineManifestFile))
 }
 
 // handleEngineTab is the composite view the /mesh Engines tab renders:

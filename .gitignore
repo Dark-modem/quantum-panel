@@ -1,2 +1,3 @@
 *.exe
 tests/.ui-work/
+tests/.abuse*.sh
