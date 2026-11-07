@@ -24,6 +24,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -35,6 +36,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 )
 
@@ -585,11 +587,62 @@ func startHTTPSListener() {
 	httpsSrvPort = port
 	applyServerLimits(httpsSrv)
 	srvToStart := httpsSrv
-	go func(srv *http.Server) {
-		if err := srv.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
-			recordError("E-TLS-08", "HTTPS listener", err.Error())
+	go tlsServeWithRetry(srvToStart)
+}
+
+// tlsBindRetryDelays is the HTTPS bind-retry backoff schedule
+// (RUNBOOK-FIXES item 5: the RC2 panel lost HTTPS for good after ONE
+// failed bind — a co-tenant port race between the portFree() check and
+// the actual bind must not silently leave the panel on plain HTTP).
+// A transient bind error is retried with backoff; a port that stays busy
+// after the schedule is exhausted fails the unit LOUDLY so systemd
+// restarts it and the journal shows why. Tests shrink the schedule.
+var tlsBindRetryDelays = []time.Duration{
+	500 * time.Millisecond, time.Second, 2 * time.Second, 4 * time.Second, 8 * time.Second,
+}
+
+// tlsBindFatalf seams the loud unit failure so tests can observe it
+// without os.Exit.
+var tlsBindFatalf = log.Fatalf
+
+// tlsServeWithRetry runs the HTTPS listener: retry bind-class failures
+// with backoff, record non-bind failures once (they will not heal), and
+// fail the unit loudly when the port stays busy through every attempt.
+func tlsServeWithRetry(srv *http.Server) {
+	for i, delay := range tlsBindRetryDelays {
+		err := srv.ListenAndServeTLS("", "")
+		if err == nil || err == http.ErrServerClosed {
+			return
 		}
-	}(srvToStart)
+		if !tlsIsBindErr(err) {
+			// A non-bind error (e.g. a broken certificate configuration)
+			// will not heal by retrying — record it and keep serving
+			// plain HTTP, as before the fix.
+			recordError("E-TLS-08", "HTTPS listener", err.Error())
+			return
+		}
+		if i == len(tlsBindRetryDelays)-1 {
+			tlsBindFatalf("panel HTTPS bind on %s failed after %d attempts: %v — failing the unit loudly so systemd restarts it (RUNBOOK-FIXES 5)",
+				srv.Addr, len(tlsBindRetryDelays), err)
+			return
+		}
+		log.Printf("HTTPS bind on %s failed (attempt %d/%d): %v — retrying in %v",
+			srv.Addr, i+1, len(tlsBindRetryDelays), err, delay)
+		time.Sleep(delay)
+	}
+}
+
+// tlsIsBindErr reports whether err is a transient bind failure worth
+// retrying: port busy (co-tenant race), access denied, or an address not
+// configured YET (a boot race where the bind runs before the interface).
+func tlsIsBindErr(err error) bool {
+	var errno syscall.Errno
+	if errors.As(err, &errno) {
+		return errno == syscall.EADDRINUSE ||
+			errno == syscall.EACCES ||
+			errno == syscall.EADDRNOTAVAIL
+	}
+	return false
 }
 
 // letsencryptLiveDir is where certbot keeps the current certificate; tests
