@@ -52,6 +52,39 @@ The offline release builder already does this — see
 
 ## Step 4 — sign an artifact
 
+### Or let the packer do steps 3–5
+
+`quantum-release/scripts/pack-engine.sh <engine> <version>` automates the
+whole pipeline: it downloads the upstream release for **amd64 and arm64**
+(the Germany test server is arm64, Iran is x86_64/amd64), verifies the
+upstream checksum when the project publishes one, repackages the tarball
+in the directory shape the agents extract, ships the upstream LICENSE
+(Backhaul is AGPL-3.0 — the license text and a SOURCE.txt with the
+upstream URL/tag travel inside every artifact), signs with the
+**engine-artifact ed25519 key** (`$ENGINE_SIGNING_KEY`, default
+`~/.quantum-release/engine-signing.key` — stored OUTSIDE every repo, same
+custody rules as the release key; a missing key is generated as a DEV key
+with a loud notice) and writes a ready-to-upload folder:
+
+```
+quantum-release/dist/frp-0.61.1-pack/
+  frp-0.61.1-linux-{amd64,arm64}.tar.gz        # the artifacts
+  …tar.gz.sha256 / …tar.gz.sig.b64             # pins for the upload form
+  UPLOAD-COMMANDS.txt                          # exact curl per arch
+  ENGINE-PUB-KEY.txt                           # the panel's engine-pub.b64 + agent ldflags value
+  LICENSE-frp.txt
+```
+
+Per-engine knobs (URLs, inner directory, binaries, license) live in
+`quantum-release/engines/<engine>.conf` — a new engine is one new file.
+Offline verification: `tests/.packfake.sh` packs a FAKE upstream and
+checks shape, checksum sidecar, signature, SOURCE.txt/LICENSE and the
+upload commands; `tests/.packe2e.sh` goes further — it packs the REAL
+frp release, uploads it to a throwaway panel through the exact generated
+curl, and reads the agent manifest back.
+
+
+
 With the artifact you built (e.g. `frp-0.61.1-linux-amd64.tar.gz`):
 
 ```bash
