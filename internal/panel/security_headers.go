@@ -36,7 +36,11 @@ func securityMiddleware(next http.Handler) http.Handler {
 		}
 		switch r.Method {
 		case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
-			if !isWebSocketUpgrade(r) && r.Body != nil && r.Body != http.NoBody {
+			// The engine-artifact upload carries its OWN, larger
+			// MaxBytesReader (engineArtifactMaxUpload); the global 1 MiB
+			// JSON cap must not swallow it (caught by the pack-engine
+			// end-to-end test, phase 6).
+			if !isEngineArtifactUpload(r) && !isWebSocketUpgrade(r) && r.Body != nil && r.Body != http.NoBody {
 				r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodyBytes)
 			}
 		}
@@ -50,4 +54,10 @@ func panelHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		panelChain(panelMux).ServeHTTP(w, r)
 	})
+}
+
+// isEngineArtifactUpload matches the R5 artifact upload route regardless
+// of the secret base path prefix.
+func isEngineArtifactUpload(r *http.Request) bool {
+	return r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/api/mesh/engines/artifacts")
 }

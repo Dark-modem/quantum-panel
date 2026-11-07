@@ -6,7 +6,9 @@
 package panel
 
 import (
+	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -135,4 +137,46 @@ func TestPGGuardPrivateURLOptIn(t *testing.T) {
 	if err := pgGuardPrivateURL("http://127.0.0.1:8000"); err != nil {
 		t.Fatalf("guard must be opt-in (off = pass): %v", err)
 	}
+}
+
+func TestEngineArtifactUploadExemptFromGlobalCap(t *testing.T) {
+	// The global security middleware caps mutating bodies at 1 MiB; the
+	// R5 artifact upload (up to 256 MiB, own MaxBytesReader) must pass.
+	if !isEngineArtifactUpload(mustReqPOST("/ui/api/mesh/engines/artifacts")) {
+		t.Fatal("artifact upload path not matched")
+	}
+	if isEngineArtifactUpload(mustReqPOST("/ui/api/mesh/backup")) {
+		t.Fatal("other routes must stay capped")
+	}
+	// And through the REAL middleware chain: a 2 MiB body survives.
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /api/mesh/engines/artifacts", requireAuth(requireCSRF(func(w http.ResponseWriter, r *http.Request) {
+		n, _ := io.Copy(io.Discard, r.Body)
+		writeJSON(w, map[string]any{"received": n})
+	})))
+	h := securityMiddleware(mux)
+	srv := httptest.NewServer(h)
+	t.Cleanup(srv.Close)
+	tok := newSessionToken()
+	addSession(tok)
+	touchSession(tok)
+	body := strings.Repeat("x", 2<<20) // 2 MiB > the 1 MiB global cap
+	req, _ := http.NewRequest("POST", srv.URL+"/api/mesh/engines/artifacts", strings.NewReader(body))
+	req.AddCookie(&http.Cookie{Name: "gre_session", Value: tok})
+	req.Header.Set("X-CSRF-Token", GenerateCSRFToken(tok))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var got map[string]any
+	_ = json.NewDecoder(resp.Body).Decode(&got)
+	if n, _ := got["received"].(float64); n != float64(len(body)) {
+		t.Fatalf("2 MiB body truncated by the global cap: got %v bytes", got["received"])
+	}
+}
+
+func mustReqPOST(path string) *http.Request {
+	return httptest.NewRequest("POST", path, nil)
 }
