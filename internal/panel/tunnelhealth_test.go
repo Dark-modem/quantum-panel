@@ -347,7 +347,10 @@ func TestTunnelHealthRoutingPolicy(t *testing.T) {
 	}
 	for _, want := range []string{
 		`"GET "+base+"/api/tunnel-health", requireAuth(handleTunnelHealthGet)`,
-		`"POST "+base+"/api/tunnel-health/run", requireAuth(requireCSRF(handleTunnelHealthRun))`,
+		// The M2/M3 legacy-gating audit (8ef8f13) added requireLegacy
+		// around mutation routes; auth + CSRF are still asserted — the
+		// gate is an additional restriction on top.
+		`"POST "+base+"/api/tunnel-health/run", requireAuth(requireLegacy(requireCSRF(handleTunnelHealthRun)))`,
 	} {
 		if !strings.Contains(string(b), want) {
 			t.Errorf("main.go missing route %s", want)
