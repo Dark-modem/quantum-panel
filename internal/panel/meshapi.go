@@ -136,6 +136,7 @@ func registerMeshRoutes(mux *http.ServeMux, base string) {
 	p := base + "/api/mesh"
 	registerPasarGuardRoutes(mux, base)
 	// reads
+	mux.HandleFunc("GET "+p+"/meta", requireAuth(handleMeshMeta))
 	mux.HandleFunc("GET "+p+"/overview", requireAuth(handleMeshOverview))
 	mux.HandleFunc("GET "+p+"/datacenters", requireAuth(handleMeshDCList))
 	mux.HandleFunc("GET "+p+"/servers", requireAuth(handleMeshServerList))
@@ -177,6 +178,15 @@ func registerMeshRoutes(mux *http.ServeMux, base string) {
 	mux.HandleFunc("POST "+p+"/agents/{id}/profile/netopt", requireAuth(requireCSRF(handleMeshProfileNetopt)))
 	mux.HandleFunc("POST "+p+"/agents/{id}/profile/confirm", requireAuth(requireCSRF(handleMeshProfileConfirm)))
 	mux.HandleFunc("POST "+p+"/agents/{id}/profile/rollback", requireAuth(requireCSRF(handleMeshProfileRollback)))
+}
+
+// handleMeshMeta tells the mesh UI which shell features to offer (the
+// collapsed legacy link) and its own version. Read-only, authenticated.
+func handleMeshMeta(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, map[string]any{
+		"version":        panelVersion,
+		"legacy_enabled": legacyOpsEnabled(),
+	})
 }
 
 // ---- overview ------------------------------------------------------------
@@ -974,5 +984,20 @@ func serveWizardPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func serveMeshPage(w http.ResponseWriter, r *http.Request) {
-	serveAsset("mesh.html", "text/html; charset=utf-8").ServeHTTP(w, r)
+	data, err := panelFS.ReadFile("mesh.html")
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	page := string(data)
+	// Cache-bust first-party assets per build (24h cache on the assets).
+	for _, f := range []string{"fonts.css", "tokens.css", "base.css", "enterprise.css", "quantum-mesh.css"} {
+		page = strings.ReplaceAll(page, `href="`+f+`"`, `href="`+f+`?v=`+assetTag()+`"`)
+	}
+	page = strings.ReplaceAll(page, `src="mesh.js"`, `src="mesh.js?v=`+assetTag()+`"`)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	// The page must revalidate (its asset URLs carry the ?v= tag); the
+	// tagged assets themselves are 86400-cached.
+	w.Header().Set("Cache-Control", "no-cache")
+	_, _ = w.Write([]byte(page))
 }

@@ -127,15 +127,22 @@ func (ew *errorPageWriter) writeErrorPage(code int) {
 
 // errorPageHTML builds the self-contained Persian error page: dark Quantum
 // branding (the tokens.css palette), dir=rtl, no external assets, no request
-// details. The dashboard link is relative ("./") so it works under the random
-// base path the panel is served from.
+// details. Links are built from the configured base path so they land on the
+// real pages no matter which path triggered the error.
 func errorPageHTML(code int, ref string) string {
+	meshHref := "/mesh"
+	homeHref := "/"
+	if bp := strings.Trim(cfg.BasePath, "/"); bp != "" {
+		meshHref = "/" + bp + "/mesh"
+		homeHref = "/" + bp + "/"
+	}
 	copyPair, known := errorPageCopy[code]
 	title, expl := copyPair[0], copyPair[1]
 	if !known {
 		title = "خطا " + fmt.Sprint(code)
 		expl = "درخواست انجام نشد. چند لحظه بعد دوباره تلاش کنید."
 	}
+	loginHref := strings.TrimSuffix(meshHref, "/mesh") + "/api/login"
 	return `<!DOCTYPE html>
 <html dir="rtl" lang="fa">
 <head>
@@ -204,6 +211,22 @@ func errorPageHTML(code int, ref string) string {
   }
   .home:hover, .home:focus-visible { background: #7dd3fc; outline: none; }
   .ref { margin-top: 24px; font-size: 0.75rem; color: #8e8e98; direction: ltr; unicode-bidi: embed; }
+  .lform { display: none; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+  .lform.open { display: flex; }
+  .lform input {
+    width: 100%;
+    font: inherit;
+    color: #f4f4f5;
+    background: #09090b;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 10px;
+    padding: 10px 12px;
+    text-align: right;
+  }
+  .lform input:focus { outline: 2px solid #38bdf8; outline-offset: 1px; }
+  .lerr { font-size: 0.8125rem; color: #f87171; min-height: 1.2em; }
+  .alt { display: block; margin-top: 12px; font-size: 0.8125rem; color: #38bdf8; text-decoration: none; }
+  .alt:hover { text-decoration: underline; }
   @media (max-width: 480px) {
     body { padding: 16px; align-items: flex-start; }
     .card { padding: 32px 20px 24px; border-radius: 12px; }
@@ -218,8 +241,33 @@ func errorPageHTML(code int, ref string) string {
     </div>
     <h1>` + title + `</h1>
     <span class="code">` + fmt.Sprint(code) + `</span>
-    <p class="desc">` + expl + `</p>
-    <a class="home" href="./">بازگشت به داشبورد</a>
+    <p class="desc">` + expl + `</p>` + func() string {
+		if code == http.StatusUnauthorized {
+			return `<form class="lform open" id="lform">
+      <input id="l-user" autocomplete="username" placeholder="نام کاربری">
+      <input id="l-pass" type="password" autocomplete="current-password" placeholder="گذرواژه">
+      <div class="lerr" id="l-err"></div>
+      <button class="home" type="submit">ورود</button>
+    </form>
+    <a class="alt" href="` + meshHref + `">مدیریت مش (Mesh)</a>
+    <script>
+    document.getElementById('lform').addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      var u = document.getElementById('l-user').value;
+      var p = document.getElementById('l-pass').value;
+      fetch(` + loginHref + `, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: u, password: p }) })
+        .then(function (r) {
+          if (!r.ok) throw new Error('نام کاربری یا گذرواژه نادرست است');
+          location.replace('` + meshHref + `');
+        })
+        .catch(function (e) { document.getElementById('l-err').textContent = e.message; });
+    });
+    </script>`
+		}
+		return `<a class="home" href="` + homeHref + `">بازگشت به داشبورد</a>
+    <a class="alt" href="` + meshHref + `">مدیریت مش (Mesh)</a>`
+	}() + `
     <div class="ref">` + ref + `</div>
   </main>
 </body>

@@ -296,9 +296,18 @@ func (s *Store) ListTunnels(topologyID int64) ([]Tunnel, error) {
 // be 0 (scope-wide). The most specific rule wins at read time; the store
 // keeps them all.
 func (s *Store) SetWeightPolicy(topologyID, localServerID, remoteServerID, tunnelID int64, weight int) error {
+	// SQLite UNIQUE treats NULLs as distinct, so a plain ON CONFLICT upsert
+	// piles up duplicate rows for tunnel-scoped policies (NULL pair columns)
+	// and WeightFor's smaller-weight tie-break then keeps the OLD value
+	// (phase-10 regression: re-running the wizard would never change a
+	// tunnel weight upward). Delete the exact scope (IS = NULL-safe) first.
+	if _, err := s.db.Exec(`DELETE FROM weight_policies
+		WHERE topology_id = ? AND local_server_id IS ? AND remote_server_id IS ? AND tunnel_id IS ?`,
+		topologyID, nullInt(localServerID), nullInt(remoteServerID), nullInt(tunnelID)); err != nil {
+		return err
+	}
 	_, err := s.db.Exec(`INSERT INTO weight_policies (topology_id, local_server_id, remote_server_id, tunnel_id, weight)
-		VALUES (?, ?, ?, ?, ?)
-		ON CONFLICT(topology_id, local_server_id, remote_server_id, tunnel_id) DO UPDATE SET weight=excluded.weight`,
+		VALUES (?, ?, ?, ?, ?)`,
 		topologyID, nullInt(localServerID), nullInt(remoteServerID), nullInt(tunnelID), weight)
 	return err
 }
