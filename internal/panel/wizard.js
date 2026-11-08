@@ -13,6 +13,7 @@
   'use strict';
 
   var LANG = localStorage.getItem('wiz_lang') || 'en';
+var RENDER_GEN = 0; // bumped on every step render; async callbacks drop stale writes
   var S = { dcs: [], iran: [], foreign: [], pairs: [], weights: {}, forwards: [],
             params: {}, topoId: 0, step: 1 };
   var T = {
@@ -314,18 +315,18 @@
     });
     html += '</div>';
     el.innerHTML = html;
+    var myGen = ++RENDER_GEN;
     templates().then(function () {
+      if (myGen !== RENDER_GEN) return; // a newer render owns the DOM
       return fetch(base() + 'api/mesh/engines').then(function (r) { return r.json(); });
     }).then(function (d) {
-      // A newer re-render may have replaced this card — drop stale fetches.
-      if (!document.getElementById('step-body') || !document.querySelector('[data-engines]') === false) {
-        // still the step-4 view: continue
-      }
+      if (!d || myGen !== RENDER_GEN) return;
       var have = {};
       (d.artifacts || []).forEach(function (a) { have[a.engine + '|' + a.goarch] = true; });
       iran.forEach(function (ir) {
         S.foreign.forEach(function (fr) {
           var key = ir.id + '-' + fr.id;
+          if (myGen !== RENDER_GEN) return;
           var box = document.querySelector('[data-engines="' + key + '"]');
           if (!box || !document.contains(box)) return; // stale render
           // Agent arch: prefer the iran agent's arch (the carrying end).
