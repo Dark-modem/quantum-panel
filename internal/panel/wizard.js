@@ -13,7 +13,6 @@
   'use strict';
 
   var LANG = localStorage.getItem('wiz_lang') || 'en';
-var RENDER_GEN = 0; // bumped on every step render; async callbacks drop stale writes
   var S = { dcs: [], iran: [], foreign: [], pairs: [], weights: {}, forwards: [],
             params: {}, topoId: 0, step: 1 };
   var T = {
@@ -94,16 +93,9 @@ var RENDER_GEN = 0; // bumped on every step render; async callbacks drop stale w
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
   }
-  // safeSet: an innerHTML write that never throws — the wizard has
-  // deferred re-renders and async polls that can target an element a
-  // newer render already replaced; the DOM race is cosmetic and the
-  // newest write always wins.
-  function safeSet(el, html) {
-    try { el.innerHTML = html; } catch (e) { /* stale element */ }
-  }
   function say(m, isErr) {
     var el = document.getElementById('msg');
-    safeSet(el, '<span class="' + (isErr ? 'pill down' : 'muted') + '">' + esc(m) + '</span>');
+    el.innerHTML = '<span class="' + (isErr ? 'pill down' : 'muted') + '">' + esc(m) + '</span>';
   }
 
   // ---- step renderers ----------------------------------------------------
@@ -111,10 +103,30 @@ var RENDER_GEN = 0; // bumped on every step render; async callbacks drop stale w
 
   function renderSteps() {
     var el = document.getElementById('steps');
-    safeSet(el, STEPS.map(function (s, i) {
+    el.innerHTML = STEPS.map(function (s, i) {
       var cls = (i + 1 === S.step ? 'on' : (i + 1 < S.step ? 'done' : ''));
       return '<span class="' + cls + '">' + (i + 1) + '. ' + esc(t(s)) + '</span>';
-    }).join(''));
+    }).join('');
+  }
+
+  function step1() {
+    var el = document.getElementById('step-body');
+    el.innerHTML = '<div class="card"><div class="row">' +
+      '<input id="dc-name" placeholder="' + esc(t('dc_name')) + '">' +
+      '<input id="dc-coeff" type="number" step="0.1" min="0.1" value="1.0" style="width:110px" title="' + esc(t('coeff')) + '">' +
+      '<button class="act primary" id="add-dc">' + esc(t('add_dc')) + '</button></div>' +
+      '<table id="dc-table"><tr><th>' + esc(t('dc_name')) + '</th><th>' + esc(t('coeff')) + '</th></tr></table></div>';
+    document.getElementById('add-dc').onclick = function () {
+      var name = document.getElementById('dc-name').value.trim();
+      var coeff = parseFloat(document.getElementById('dc-coeff').value) || 1.0;
+      if (!name) { say(t('dc_name'), true); return; }
+      api('POST', 'datacenters', { name: name, kind: 'iran', price_coefficient: coeff })
+        .then(function () { S.dcs.push({ name: name, coeff: coeff }); say(''); step1(); })
+        .catch(function (e) { say(e.message, true); });
+    };
+    var rows = S.dcs.map(function (d) {
+      return '<tr><td>' + esc(d.name) + '</td><td>' + d.coeff + '</td></tr>';
+    }).join('');
     document.getElementById('dc-table').insertAdjacentHTML('beforeend', rows);
   }
 
@@ -138,7 +150,7 @@ var RENDER_GEN = 0; // bumped on every step render; async callbacks drop stale w
         '<button class="act primary" data-add-f="1">' + esc(t('add_srv')) + '</button></div>' +
         '<div data-srvlist="f"></div></div>';
     }
-    safeSet(el, html);
+    el.innerHTML = html;
     var listEl = function (k) { return document.querySelector('[data-srvlist="' + k + '"]'); };
     var renderList = function (k, list) {
       listEl(k).innerHTML = list.map(function (s) {
@@ -165,7 +177,7 @@ var RENDER_GEN = 0; // bumped on every step render; async callbacks drop stale w
               var cmd = 'sudo bash install-agent.sh --server ' + url + ' --token ' + tok.token +
                         ' --name ' + name + ' --role ' + role;
               list.push({ name: name, id: sv.id, online: false, installCmd: cmd });
-              setTimeout(function () { renderList(listKey, list); }, 0);
+              renderList(listKey, list);
               pollAgent(listKey, list, name);
               say('');
             });
@@ -301,21 +313,17 @@ var RENDER_GEN = 0; // bumped on every step render; async callbacks drop stale w
       });
     });
     html += '</div>';
-    safeSet(el, html);
-    var myGen = ++RENDER_GEN;
+    el.innerHTML = html;
     templates().then(function () {
-      if (myGen !== RENDER_GEN) return; // a newer render owns the DOM
       return fetch(base() + 'api/mesh/engines').then(function (r) { return r.json(); });
     }).then(function (d) {
-      if (!d || myGen !== RENDER_GEN) return;
       var have = {};
       (d.artifacts || []).forEach(function (a) { have[a.engine + '|' + a.goarch] = true; });
       iran.forEach(function (ir) {
         S.foreign.forEach(function (fr) {
           var key = ir.id + '-' + fr.id;
-          if (myGen !== RENDER_GEN) return;
           var box = document.querySelector('[data-engines="' + key + '"]');
-          if (!box || !document.contains(box)) return; // stale render
+          if (!box) return;
           // Agent arch: prefer the iran agent's arch (the carrying end).
           var ag = (d.agents || []).filter(function (a) { return a.id === ir.agentId || a.name === ir.name; })[0];
           var arch = (ag && ag.arch) || 'amd64';
@@ -333,10 +341,8 @@ var RENDER_GEN = 0; // bumped on every step render; async callbacks drop stale w
             inner += '<div class="row"><span class="muted">#' + (i + 1) + '</span><select data-slot="' + key + '" data-slotidx="' + i + '" data-eng="' + esc(eng) + '">' + opts + '</select></div>';
             inner += '<div data-params="' + key + '-' + i + '">' + paramFormHTML(eng, key + '-' + i, S.params[key + '-' + i]) + '</div>';
           }
-          try {
-            safeSet(box, inner);
-            box.querySelectorAll('[data-params]').forEach(function (pc) { wireGenerators(pc); });
-          } catch (e) { return; /* stale box */ }
+          box.innerHTML = inner;
+          box.querySelectorAll('[data-params]').forEach(function (pc) { wireGenerators(pc); });
         });
       });
       el.querySelectorAll('[data-k]').forEach(function (inp) {
@@ -360,11 +366,9 @@ var RENDER_GEN = 0; // bumped on every step render; async callbacks drop stale w
           S.pairs[key] = cur;
           // Re-render the params form for this slot with the new engine.
           var pc = document.querySelector('[data-params="' + key + '-' + idx + '"]');
-          if (pc && document.contains(pc)) {
-            try {
-              safeSet(pc, paramFormHTML(sel.value, key + '-' + idx, S.params[key + '-' + idx]));
-              wireGenerators(pc);
-            } catch (e) { /* the card was re-rendered mid-write */ }
+          if (pc) {
+            pc.innerHTML = paramFormHTML(sel.value, key + '-' + idx, S.params[key + '-' + idx]);
+            wireGenerators(pc);
           }
         };
       });
@@ -391,7 +395,7 @@ var RENDER_GEN = 0; // bumped on every step render; async callbacks drop stale w
         esc(t('resolved')) + ' ' + S.weights[fr.id] + '</span></div>';
     });
     html += '</div>';
-    safeSet(el, html);
+    el.innerHTML = html;
     el.querySelectorAll('[data-w]').forEach(function (sl) {
       sl.oninput = function () {
         var id = sl.dataset.w;
@@ -409,13 +413,13 @@ var RENDER_GEN = 0; // bumped on every step render; async callbacks drop stale w
     var opts = iran.map(function (ir) {
       return '<option value="' + ir.id + '">' + esc(ir.name) + '</option>';
     }).join('');
-    safeSet(el, '<div class="card"><div class="row">' +
+    el.innerHTML = '<div class="card"><div class="row">' +
       '<select id="fwd-srv">' + opts + '</select>' +
       '<input id="fwd-port" type="number" min="1" max="65535" placeholder="' + esc(t('forward_port')) + '" style="width:120px">' +
       '<select id="fwd-proto"><option value="tcp">tcp</option><option value="udp">udp</option></select>' +
       '<input id="fwd-target" placeholder="' + esc(t('target')) + ' (127.0.0.1:443)">' +
       '<button class="act primary" id="add-fwd">' + esc(t('add_fwd')) + '</button></div>' +
-      '<table id="fwd-table"><tr><th>' + esc(t('forward_port')) + '</th><th>' + esc(t('proto')) + '</th><th>' + esc(t('target')) + '</th></tr></table></div>');
+      '<table id="fwd-table"><tr><th>' + esc(t('forward_port')) + '</th><th>' + esc(t('proto')) + '</th><th>' + esc(t('target')) + '</th></tr></table></div>';
     var render = function () {
       var rows = S.forwards.map(function (f) {
         var iran = collectIran().filter(function (x) { return x.id === f.local; })[0];
@@ -454,13 +458,13 @@ var RENDER_GEN = 0; // bumped on every step render; async callbacks drop stale w
       var iran = collectIran().filter(function (x) { return x.id === f.local; })[0];
       return '<tr><td>' + esc(iran ? iran.name : '') + '</td><td>' + f.port + '</td><td>' + f.proto + '</td><td>' + esc(f.target) + '</td></tr>';
     }).join('');
-    safeSet(el, '<div class="card"><h3>' + esc(t('review')) + '</h3>' +
+    el.innerHTML = '<div class="card"><h3>' + esc(t('review')) + '</h3>' +
       '<p><b>' + iran.length + ' × ' + S.foreign.length + ' × K</b> = <b>' + tunnels + '</b> ' + esc(t('tunnels')) +
       ' (' + pairs + ' ' + esc(t('pairs')) + ')</p>' +
       '<table><tr><th>pair</th><th>K</th><th>engines</th></tr>' + plan + '</table>' +
       (fwdRows ? '<table><tr><th>iran</th><th>port</th><th>proto</th><th>target</th></tr>' + fwdRows + '</table>' : '') +
       '<button class="act primary" id="wiz-create">' + esc(t('create')) + '</button>' +
-      '<div id="wiz-tunnels"></div></div>');
+      '<div id="wiz-tunnels"></div></div>';
     document.getElementById('wiz-create').onclick = function () {
       createAll();
     };
@@ -543,14 +547,9 @@ var RENDER_GEN = 0; // bumped on every step render; async callbacks drop stale w
   // Status page: poll the created topologies (tunnel rows) + the agent
   // runtime (live up/down per tunnel — the overview's agent list carries
   // the runtime, same source the mesh topos tab uses).
-  var wizStatusIv = null, wizAgentsIv = null;
   function statusPage() {
-    // A second status page (lang re-render) must not leave two intervals
-    // writing the same element — that is the innerHTML DOM race.
-    if (wizStatusIv) { clearInterval(wizStatusIv); wizStatusIv = null; }
-    if (wizAgentsIv) { clearInterval(wizAgentsIv); wizAgentsIv = null; }
     var el = document.getElementById('step-body');
-    safeSet(el, '<div class="card"><b>' + esc(t('created')) + '</b><div id="wiz-tunnels"></div></div>');
+    el.innerHTML = '<div class="card"><b>' + esc(t('created')) + '</b><div id="wiz-tunnels"></div></div>';
     var topoIds = [];
     iranList().forEach(function (ir) {
       foreignList().forEach(function (fr) {
@@ -587,6 +586,7 @@ var RENDER_GEN = 0; // bumped on every step render; async callbacks drop stale w
     tick();
     wizStatusIv = setInterval(tick, 3000);
     wizAgentsIv = setInterval(pollAgents, 3000);
+    setTimeout(function () { clearInterval(iv); clearInterval(iv2); }, 120000);
   }
 
   // ---- navigation ---------------------------------------------------------
