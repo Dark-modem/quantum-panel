@@ -191,7 +191,7 @@
           var rec = (Array.isArray(recs) ? recs : []).filter(function (a) { return a.name === name; })[0];
           if (rec && rec.status === 'online') {
             clearInterval(iv);
-            list.forEach(function (x) { if (x.name === name) x.online = true; });
+            list.forEach(function (x) { if (x.name === name) { x.online = true; x.agentId = rec.id; } });
             renderList(listKey, list);
           }
         }).catch(function () {});
@@ -326,72 +326,82 @@
     html += '</div>';
     el.innerHTML = html;
     templates().then(function () {
-      return fetch(base() + 'api/mesh/engines').then(function (r) { return r.json(); });
-    }).then(function (d) {
-      var have = {};
-      (d.artifacts || []).forEach(function (a) { have[a.engine + '|' + a.goarch] = true; });
+      // enable-before-use (phase-11 req 6): the authoritative engine state
+      // per agent comes from the UI API; artifacts are reflected in
+      // can_enable/block_reason so the old artifacts fetch is gone.
+      var iran = collectIran();
+      var needEng = {};
+      iran.forEach(function (ir) { if (ir.agentId) needEng[ir.agentId] = true; });
+      var ids = Object.keys(needEng);
+      return Promise.all(ids.map(function (aid) {
+        return fetch(base() + 'api/ui/agents/' + aid + '/engines', { headers: { 'X-CSRF-Token': csrfToken() } })
+          .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status)); return j; }); })
+          .then(function (j) { return { agentId: aid, engines: j.engines || [] }; });
+      }));
+    }).then(function (perAgent) {
+      var engByAgent = {};
+      (perAgent || []).forEach(function (p) { engByAgent[p.agentId] = p.engines; });
+      var iran = collectIran();
       iran.forEach(function (ir) {
+        var engs = engByAgent[ir.agentId] || [];
+        var usable = engs.filter(function (e) { return e.enabled && (e.installed || e.kernel); });
+        var disabledAvail = engs.filter(function (e) { return !e.enabled; });
         S.foreign.forEach(function (fr) {
           var key = ir.id + '-' + fr.id;
           var box = document.querySelector('[data-engines="' + key + '"]');
           if (!box) return;
-          // Agent arch: prefer the iran agent's arch (the carrying end).
-          var ag = (d.agents || []).filter(function (a) { return a.id === ir.agentId || a.name === ir.name; })[0];
-          var arch = (ag && ag.arch) || 'amd64';
-          var slot = S.pairs[key] || { k: 1, engines: [defaultEngine(d.artifacts, arch)] };
-          var opts = '';
-          (d.artifacts || []).forEach(function (a) {
-            if (a.goarch !== arch) return;
-            var ok = have[a.engine + '|' + arch];
-            var tag = a.engine === 'matrix' ? (' · ' + (LANG === 'fa' ? 'پیش‌فرض' : 'default'))
-                                            : (' · ' + (LANG === 'fa' ? 'آزمایشی' : 'experimental'));
-            opts += '<option value="' + esc(a.engine) + '"' + (slot.engines[0] === a.engine ? ' selected' : '') + '>' +
-              esc(a.engine) + ' ' + esc(a.version) + tag + (ok ? '' : ' ⚠') + '</option>';
+          var slot = S.pairs[key] || { k: 1, engines: [usable.length ? usable[0].engine : 'matrix'] };
+          // chip strip: the agent's engine state + one-click enable
+          var chips = '<div class="row" data-engchips="' + key + '">';
+          chips += '<span class="muted">' + esc(LANG === 'fa' ? 'موتورهای ایجنت' : 'Agent engines') + ':</span> ';
+          engs.forEach(function (e) {
+            var cls = e.enabled ? 'ok' : 'dim';
+            chips += '<span class="pill ' + cls + '" style="margin-inline-end:6px">' + esc(e.engine) +
+              (e.enabled ? ' ✓' : '') + '</span>';
+            if (!e.enabled && e.can_enable !== false) {
+              chips += '<button class="act small" data-enage="' + esc(e.engine) + '" data-agid="' + esc(ir.agentId) + '" data-agname="' + esc(ir.name) + '" style="margin-inline-end:8px">' +
+                esc(LANG === 'fa' ? 'فعال‌سازی روی ' + ir.name : 'Enable on ' + ir.name) + '</button>';
+            }
           });
-          var inner = '';
-          for (var i = 0; i < slot.k; i++) {
-            var eng = slot.engines[i] || (slot.engines[0] || 'frp');
-            inner += '<div class="row"><span class="muted">#' + (i + 1) + '</span><select data-slot="' + key + '" data-slotidx="' + i + '" data-eng="' + esc(eng) + '">' + opts + '</select></div>';
-            inner += '<div data-params="' + key + '-' + i + '">' + paramFormHTML(eng, key + '-' + i, S.params[key + '-' + i]) + '</div>';
+          chips += '</div>';
+          if (!usable.length) {
+            box.innerHTML = chips + '<p class="muted">' + esc(LANG === 'fa' ?
+              'هیچ موتوری روی این ایجنت فعال نیست — یکی را فعال کنید.' :
+              'No engine is enabled on this agent yet — enable one first.') + '</p>';
+            return;
+          }
+          var opts = '';
+          usable.forEach(function (e) {
+            var tag = e.engine === 'matrix' ? (' · ' + (LANG === 'fa' ? 'پیش‌فرض' : 'default'))
+                                            : (' · ' + (LANG === 'fa' ? 'آزمایشی' : 'experimental'));
+            opts += '<option value="' + esc(e.engine) + '"' + (slot.engines[0] === e.engine ? ' selected' : '') + '>' +
+              esc(e.engine) + (e.version ? ' ' + esc(e.version) : '') + tag + '</option>';
+          });
+          var warn = disabledAvail.length
+            ? '<p class="muted">' + esc(LANG === 'fa' ? 'موتورهای غیرفعال بالا با یک کلیک فعال می‌شوند.' : 'Disabled engines above can be enabled with one click.') + '</p>'
+            : '';
+          var inner = chips + warn;
+          for (var i2 = 0; i2 < slot.k; i2++) {
+            var eng = slot.engines[i2];
+            if (!usable.some(function (e) { return e.engine === eng; })) eng = usable[0].engine;
+            inner += '<div class="row"><span class="muted">#' + (i2 + 1) + '</span><select data-slot="' + key + '" data-slotidx="' + i2 + '" data-eng="' + esc(eng) + '">' + opts + '</select></div>';
+            inner += '<div data-params="' + key + '-' + i2 + '">' + paramFormHTML(eng, key + '-' + i2, S.params[key + '-' + i2]) + '</div>';
           }
           box.innerHTML = inner;
           box.querySelectorAll('[data-params]').forEach(function (pc) { wireGenerators(pc); });
+          box.querySelectorAll('[data-enage]').forEach(function (b2) {
+            b2.onclick = function () {
+              var eng = b2.dataset.enage, aid = b2.dataset.agid;
+              b2.disabled = true;
+              fetch(base() + 'api/ui/agents/' + aid + '/engines/' + eng + '/enable', { method: 'POST', headers: { 'X-CSRF-Token': csrfToken() } })
+                .then(function (r) { return r.json().then(function (jj) { if (!r.ok) { var er = new Error(jj.error || 'HTTP ' + r.status); er.ui = jj.ui; throw er; } return jj; }); })
+                .then(function () { say((LANG === 'fa' ? 'موتور ' : 'Engine ') + eng + (LANG === 'fa' ? ' فعال شد' : ' enabled')); step4(); })
+                .catch(function (er) { say((er.ui && er.ui.what_to_do && (er.ui.what_to_do[LANG] || er.ui.what_to_do.en)) || er.message, true); b2.disabled = false; });
+            };
+          });
         });
       });
-      el.querySelectorAll('[data-k]').forEach(function (inp) {
-        inp.onchange = function () {
-          var key = inp.dataset.k;
-          var k = Math.max(1, Math.min(26, parseInt(inp.value, 10) || 1));
-          var cur = S.pairs[key] || { engines: ['frp'] };
-          var engines = [];
-          for (var i = 0; i < k; i++) engines.push(cur.engines[i] || (cur.engines[0] || 'frp'));
-          S.pairs[key] = { k: k, engines: engines };
-          inp.value = k;
-          step4(); // re-render slots
-        };
-      });
-      el.querySelectorAll('[data-slot]').forEach(function (sel) {
-        sel.onchange = function () {
-          var key = sel.dataset.slot;
-          var idx = parseInt(sel.dataset.slotidx, 10);
-          var cur = S.pairs[key] || { k: 1, engines: [] };
-          cur.engines[idx] = sel.value;
-          S.pairs[key] = cur;
-          // Re-render the params form for this slot with the new engine.
-          var pc = document.querySelector('[data-params="' + key + '-' + idx + '"]');
-          if (pc) {
-            pc.innerHTML = paramFormHTML(sel.value, key + '-' + idx, S.params[key + '-' + idx]);
-            wireGenerators(pc);
-          }
-        };
-      });
-      el.querySelectorAll('[data-ep]').forEach(function (inp) {
-        inp.onchange = function () {
-          var m = inp.id.match(/^ep-(.+-\d+)-/);
-          if (m) S.params[m[1]] = collectParams(m[1]);
-        };
-      });
-    }).catch(function (e) { say(e.message, true); });
+    });
   }
 
   // Step 5: PER-TUNNEL weights (phase-10 brief #6). The old pair-level
@@ -544,7 +554,7 @@
     var out = [];
     S.dcs.forEach(function (d, di) {
       (S['iranDc' + di] || []).forEach(function (s) {
-        out.push({ id: s.id, name: s.name, online: s.online, dc: d.name });
+        out.push({ id: s.id, name: s.name, online: s.online, agentId: s.agentId, dc: d.name });
       });
     });
     return out;
@@ -589,8 +599,11 @@
             var chainW = Promise.resolve();
             tunnels.forEach(function (tn, i) {
               chainW = chainW.then(function () {
-                return api('POST', 'topologies/' + topoId + '/weights',
-                           { tunnel_id: tn.id, weight: tw[i] || 1 });
+                // per-TUNNEL weight by KEY through the UI contract (§2.10)
+                return fetch(base() + 'api/ui/topologies/' + topoId + '/tunnels/' + encodeURIComponent(tn.tunnel_key) + '/weight', {
+                  method: 'POST', headers: { 'X-CSRF-Token': csrfToken(), 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ weight: tw[i] || 1 })
+                }).then(function (r) { return r.json().then(function (jj) { if (!r.ok) { var er = new Error(jj.error || 'HTTP ' + r.status); er.ui = jj.ui; throw er; } return jj; }); });
               });
             });
             return chainW.then(function () {
