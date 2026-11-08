@@ -13,7 +13,7 @@
   'use strict';
 
   var LANG = localStorage.getItem('wiz_lang') || 'en';
-  var S = { dcs: [], iran: [], foreign: [], pairs: [], weights: {}, forwards: [],
+  var S = { dcs: [], iran: [], foreign: [], pairs: [], weights: {}, tw: {}, forwards: [],
             params: {}, topoId: 0, step: 1 };
   var T = {
     en: {
@@ -299,10 +299,21 @@
   }
 
   // Step 4: for each (iran × foreign) pair choose K and the engine per slot.
+  // Matrix is the default/recommended engine; everything else is labelled
+  // experimental (plain-language note, phase-10 brief item 7).
+  function defaultEngine(artifacts, arch) {
+    var names = [];
+    (artifacts || []).forEach(function (a) { if (a.goarch === arch) names.push(a.engine); });
+    if (names.indexOf('matrix') >= 0) return 'matrix';
+    return names[0] || 'matrix';
+  }
   function step4() {
     var el = document.getElementById('step-body');
     var iran = collectIran();
-    var html = '<div class="card"><p class="muted">' + esc(t('k_hint')) + '</p>';
+    var html = '<div class="card"><p class="muted">' + esc(t('k_hint')) + '</p>' +
+      '<p class="muted">' + esc(LANG === 'fa'
+        ? 'Matrix موتور پیش‌فرض و توصیه‌شده است؛ سایر موتورها آزمایشی هستند (پوشش پارامترها و رفتار خرابی کمتر آزموده شده).'
+        : 'Matrix is the default and recommended engine; other engines are experimental (less battle-tested parameters and failure modes).') + '</p>';
     iran.forEach(function (ir) {
       S.foreign.forEach(function (fr) {
         var key = ir.id + '-' + fr.id;
@@ -327,13 +338,15 @@
           // Agent arch: prefer the iran agent's arch (the carrying end).
           var ag = (d.agents || []).filter(function (a) { return a.id === ir.agentId || a.name === ir.name; })[0];
           var arch = (ag && ag.arch) || 'amd64';
-          var slot = S.pairs[key] || { k: 1, engines: ['frp'] };
+          var slot = S.pairs[key] || { k: 1, engines: [defaultEngine(d.artifacts, arch)] };
           var opts = '';
           (d.artifacts || []).forEach(function (a) {
             if (a.goarch !== arch) return;
             var ok = have[a.engine + '|' + arch];
+            var tag = a.engine === 'matrix' ? (' · ' + (LANG === 'fa' ? 'پیش‌فرض' : 'default'))
+                                            : (' · ' + (LANG === 'fa' ? 'آزمایشی' : 'experimental'));
             opts += '<option value="' + esc(a.engine) + '"' + (slot.engines[0] === a.engine ? ' selected' : '') + '>' +
-              esc(a.engine) + ' ' + esc(a.version) + (ok ? '' : ' ⚠') + '</option>';
+              esc(a.engine) + ' ' + esc(a.version) + tag + (ok ? '' : ' ⚠') + '</option>';
           });
           var inner = '';
           for (var i = 0; i < slot.k; i++) {
@@ -381,27 +394,80 @@
     }).catch(function (e) { say(e.message, true); });
   }
 
-  // Step 5: weight slider per foreign server (pair-level policy), with the
-  // resolved preview (topology default 1 overridden per pair).
+  // Step 5: PER-TUNNEL weights (phase-10 brief #6). The old pair-level
+  // slider wrote one pair policy that overwrote the first tunnel instance
+  // (the 30/30-split defect on real servers). Now: a pair slider seeds an
+  // even per-tunnel split, each tunnel has its own editable number, and the
+  // shares are shown. Apply writes tunnel_id-scoped weights for EVERY tunnel.
+  function distributeWeight(total, k) {
+    var out = [];
+    var base = Math.floor(total / k), rem = total % k;
+    for (var i = 0; i < k; i++) out.push(base + (i < rem ? 1 : 0));
+    if (total < k) { // never 0 = "excluded" by accident: floors at 1 each
+      for (var j = 0; j < k; j++) out[j] = 1;
+    }
+    return out;
+  }
   function step5() {
     var el = document.getElementById('step-body');
     var iran = collectIran();
     var html = '<div class="card">';
-    S.foreign.forEach(function (fr) {
-      S.weights[fr.id] = S.weights[fr.id] || 1;
-      html += '<div class="row"><b>' + esc(fr.name) + '</b>' +
-        '<input type="range" class="slider" min="1" max="10" value="' + S.weights[fr.id] + '" data-w="' + fr.id + '">' +
-        '<span class="pill ok" data-wval="' + fr.id + '">' + esc(t('weight')) + ' ' + S.weights[fr.id] + ' · ' +
-        esc(t('resolved')) + ' ' + S.weights[fr.id] + '</span></div>';
+    html += '<p class="muted">' + esc(LANG === 'fa'
+      ? 'وزن هر تونل جداگانه ثبت می‌شود (تضمین: دو تونلِ یک جفت می‌توانند وزن متفاوت داشته باشند). اسلایدر، تقسیم اولیه را می‌سازد؛ هر عدد را می‌توانید جدا تغییر دهید.'
+      : 'Weights are written PER TUNNEL (two tunnels of the same pair can differ). The slider seeds an even split; each number stays editable.') + '</p>';
+    iran.forEach(function (ir) {
+      S.foreign.forEach(function (fr) {
+        var key = ir.id + '-' + fr.id;
+        var k = (S.pairs[key] || { k: 1 }).k;
+        if (!S.tw[key] || S.tw[key].length !== k) {
+          S.tw[key] = distributeWeight(S.weights[fr.id] || 1, k);
+        }
+        var sum = S.tw[key].reduce(function (a, b) { return a + b; }, 0) || 1;
+        html += '<div class="card" data-pair="' + key + '"><b>' + esc(ir.name) + ' ↔ ' + esc(fr.name) + '</b>' +
+          '<div class="row"><label>' + esc(t('weight')) + ' ' + esc(t('per_pair')) + ': ' +
+          '<input type="range" class="slider" min="1" max="26" value="' + (S.weights[fr.id] || 1) + '" data-pw="' + key + '"></label>' +
+          '<span class="pill ok" data-pwval="' + key + '">' + esc(t('weight')) + ' ' + (S.weights[fr.id] || 1) + '</span></div>' +
+          '<div data-twlist="' + key + '">' + twTable(key) + '</div></div>';
+      });
     });
     html += '</div>';
     el.innerHTML = html;
-    el.querySelectorAll('[data-w]').forEach(function (sl) {
+    el.querySelectorAll('[data-pw]').forEach(function (sl) {
       sl.oninput = function () {
-        var id = sl.dataset.w;
-        S.weights[id] = parseInt(sl.value, 10);
-        document.querySelector('[data-wval="' + id + '"]').textContent =
-          t('weight') + ' ' + S.weights[id] + ' · ' + t('resolved') + ' ' + S.weights[id];
+        var key = sl.dataset.pw;
+        var frId = key.split('-')[1];
+        S.weights[frId] = parseInt(sl.value, 10);
+        S.tw[key] = distributeWeight(S.weights[frId], (S.pairs[key] || { k: 1 }).k);
+        document.querySelector('[data-pwval="' + key + '"]').textContent = t('weight') + ' ' + S.weights[frId];
+        // Re-render ONLY this pair's table: a full step re-render detaches
+        // the other sliders mid-interaction (the DOM race the phase-9 smoke
+        // whitelisted — now avoided by construction).
+        var list = document.querySelector('[data-twlist="' + key + '"]');
+        if (list) list.innerHTML = twTable(key);
+        wireTw();
+      };
+    });
+    wireTw();
+  }
+  function twTable(key) {
+    var sum = S.tw[key].reduce(function (a, b) { return a + b; }, 0) || 1;
+    var html = '<table><tr><th>#</th><th>' + esc(t('weight')) + '</th><th>' + esc(LANG === 'fa' ? 'سهم' : 'share') + '</th></tr>';
+    S.tw[key].forEach(function (w, i) {
+      html += '<tr><td>#' + (i + 1) + '</td>' +
+        '<td><input type="number" min="0" max="1000" value="' + w + '" data-tw="' + key + '" data-i="' + i + '" style="width:80px"></td>' +
+        '<td>' + Math.round(w / sum * 100) + '%</td></tr>';
+    });
+    return html + '</table>';
+  }
+  function wireTw() {
+    var el = document.getElementById('step-body');
+    el.querySelectorAll('[data-tw]').forEach(function (inp) {
+      inp.onchange = function () {
+        var key = inp.dataset.tw;
+        S.tw[key][parseInt(inp.dataset.i, 10)] = Math.max(0, parseInt(inp.value, 10) || 0);
+        var list = document.querySelector('[data-twlist="' + key + '"]');
+        if (list) list.innerHTML = twTable(key);
+        wireTw();
       };
     });
   }
@@ -515,11 +581,19 @@
             S.topoForPair = S.topoForPair || {};
             S.topoForPair[key] = r.topology_id;
             var topoId = r.topology_id;
-            // Pair-level weight (this iran server ↔ this foreign server).
-            var w = S.weights[fr.id] || 1;
-            return api('POST', 'topologies/' + topoId + '/weights',
-                       { local_server_id: ir.id, remote_server_id: fr.id, weight: w })
-              .then(function () {
+            // PER-TUNNEL weights (phase-10 fix): one POST per tunnel with
+            // tunnel_id — never a pair-level policy (which overwrote the
+            // first tunnel instance and 30/30-split the real servers).
+            var tw = S.tw[key] || distributeWeight(S.weights[fr.id] || 1, p.k);
+            var tunnels = (r.tunnels || []).slice(0, tw.length);
+            var chainW = Promise.resolve();
+            tunnels.forEach(function (tn, i) {
+              chainW = chainW.then(function () {
+                return api('POST', 'topologies/' + topoId + '/weights',
+                           { tunnel_id: tn.id, weight: tw[i] || 1 });
+              });
+            });
+            return chainW.then(function () {
                 // Forwards pointing at this iran server land on this topo.
                 var myFwd = S.forwards.filter(function (f) { return f.local === ir.id; });
                 var chain2 = Promise.resolve();

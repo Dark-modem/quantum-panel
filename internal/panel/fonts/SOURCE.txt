@@ -1,0 +1,9 @@
+font: Vazirmatn (variable weight 100-900), webfont Vazirmatn[wght].woff2
+upstream: https://github.com/rastikerdar/vazirmatn
+release: v33.003
+sha256 (upstream Vazirmatn[wght].woff2 = bundled fonts/vazirmatn.woff2):
+  4e3fa217d38fdafc1fea4414ceb58ca5e662cf0ab5fa735a8c8c20e8b42cad92
+license: SIL Open Font License 1.1 (OFL.txt in this directory; the license
+  permits bundling and redistribution, including inside commercial software,
+  as long as the font is not sold standalone and reserved names are respected).
+verified: 2026-11-08, phase 10 UI redesign (byte-identical sha256 match).

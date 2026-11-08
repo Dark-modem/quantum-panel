@@ -29,7 +29,7 @@ import (
 	"time"
 )
 
-//go:embed index.html app.js i18n-fa.js matrix_edit.js topology.js tunnel_overview.js fonts.css tokens.css base.css enterprise.css favicon.png favicon.svg apple-touch-icon.png xterm.js xterm-fit.js xterm-search.js xterm.css fonts/vazirmatn.woff2 mesh.html mesh.js wizard.html wizard.js
+//go:embed index.html app.js i18n-fa.js matrix_edit.js topology.js tunnel_overview.js fonts.css tokens.css base.css enterprise.css quantum-mesh.css favicon.png favicon.svg apple-touch-icon.png xterm.js xterm-fit.js xterm-search.js xterm.css fonts/vazirmatn.woff2 fonts/OFL.txt fonts/SOURCE.txt mesh.html mesh.js wizard.html wizard.js
 var panelFS embed.FS
 
 var configDir = "/etc/gre-panel"
@@ -724,6 +724,8 @@ func Main(args []string) int {
 	mux.HandleFunc("GET "+base+"/fonts/vazirmatn.woff2", serveAsset("fonts/vazirmatn.woff2", "font/woff2"))
 	mux.HandleFunc("GET "+base+"/base.css", serveAsset("base.css", "text/css; charset=utf-8"))
 	mux.HandleFunc("GET "+base+"/enterprise.css", serveAsset("enterprise.css", "text/css; charset=utf-8"))
+	mux.HandleFunc("GET "+base+"/quantum-mesh.css", serveAsset("quantum-mesh.css", "text/css; charset=utf-8"))
+	mux.HandleFunc("GET "+base+"/favicon.ico", serveAsset("favicon.png", "image/png"))
 	mux.HandleFunc("GET "+base+"/favicon.png", serveAsset("favicon.png", "image/png"))
 	mux.HandleFunc("GET "+base+"/favicon.svg", serveAsset("favicon.svg", "image/svg+xml"))
 	mux.HandleFunc("GET "+base+"/apple-touch-icon.png", serveAsset("apple-touch-icon.png", "image/png"))
@@ -1046,7 +1048,8 @@ var (
 func assetTag() string {
 	assetTagOnce.Do(func() {
 		h := sha256.New()
-		for _, f := range []string{"app.js", "i18n-fa.js", "tokens.css", "base.css", "enterprise.css"} {
+		for _, f := range []string{"app.js", "i18n-fa.js", "tokens.css", "base.css", "enterprise.css",
+			"mesh.js", "quantum-mesh.css", "wizard.js"} {
 			b, _ := panelFS.ReadFile(f)
 			h.Write(b)
 		}
@@ -1093,7 +1096,14 @@ func serveIndex(w http.ResponseWriter, r *http.Request) {
 
 func writeJSON(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(v)
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		// A marshalling failure must never answer 200 with an empty body
+		// (phase-10 e2e: a plain-text agent Output wrapped as RawMessage
+		// killed the encode after WriteHeader). Answer a real error.
+		log.Printf("[api] writeJSON encode failed: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"error_code":"E-SYS-01","error":"response encode failed","hint":"See the panel log."}`))
+	}
 }
 
 // handleHealth is unauthenticated: lets browsers/proxies verify the panel

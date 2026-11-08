@@ -58,7 +58,23 @@ func TestErrorPagesRenderForBrowserNavigations(t *testing.T) {
 			if !strings.Contains(body, ref) {
 				t.Fatalf("page must show the request ref %q", ref)
 			}
-			for _, want := range []string{`dir="rtl"`, `lang="fa"`, "بازگشت به داشبورد", `href="./"`} {
+			// 401 renders the inline login form (the operator can recover
+			// right there); every other code links back to the dashboard.
+			// All pages carry the mesh link built from the configured base
+			// (other tests mutate cfg.BasePath — compute, don't assume).
+			meshHref := "/mesh"
+			homeHref := "/"
+			if bp := strings.Trim(cfg.BasePath, "/"); bp != "" {
+				meshHref = "/" + bp + "/mesh"
+				homeHref = "/" + bp + "/"
+			}
+			wants := []string{`dir="rtl"`, `lang="fa"`, `href="` + meshHref + `"`}
+			if code == http.StatusUnauthorized {
+				wants = append(wants, `id="lform"`, "/api/login", "ورود")
+			} else {
+				wants = append(wants, "بازگشت به داشبورد", `href="`+homeHref+`"`)
+			}
+			for _, want := range wants {
 				if !strings.Contains(body, want) {
 					t.Fatalf("page missing %q", want)
 				}

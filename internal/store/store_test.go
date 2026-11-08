@@ -351,3 +351,47 @@ func TestUsagePerAgentStreamsAndBillable(t *testing.T) {
 		t.Fatalf("independent gating: all = %+v", all)
 	}
 }
+
+// TestTwoTunnelsKeepDifferentWeights is the phase-10 regression for the
+// session-1 defect: writing a weight for the FIRST tunnel of a pair must
+// not touch the second tunnel — per-tunnel writes stay per-tunnel. The
+// wizard now writes tunnel_id-scoped policies for every tunnel; this test
+// pins the store contract the UI relies on.
+func TestTwoTunnelsKeepDifferentWeights(t *testing.T) {
+	s := openTestStore(t)
+	topo, _ := s.UpsertTopology(Topology{Name: "topo-w", Enabled: true})
+	local, _ := s.UpsertServer(Server{Name: "wl1", Role: "iran"})
+	remote, _ := s.UpsertServer(Server{Name: "wf1", Role: "foreign"})
+	tA, _ := s.UpsertTunnel(Tunnel{TunnelKey: "tw-a", TopologyID: topo, LocalServerID: local, RemoteServerID: remote, Enabled: true})
+	tB, _ := s.UpsertTunnel(Tunnel{TunnelKey: "tw-b", TopologyID: topo, LocalServerID: local, RemoteServerID: remote, Enabled: true})
+	tC, _ := s.UpsertTunnel(Tunnel{TunnelKey: "tw-c", TopologyID: topo, LocalServerID: local, RemoteServerID: remote, Enabled: true})
+
+	// The wizard's apply: per-tunnel writes only — 7/2/2 split (sum 11).
+	for _, tc := range []struct {
+		id int64
+		w  int
+	}{{tA, 7}, {tB, 2}, {tC, 2}} {
+		if err := s.SetWeightPolicy(topo, 0, 0, tc.id, tc.w); err != nil {
+			t.Fatalf("tunnel %d: %v", tc.id, err)
+		}
+	}
+	if w, _ := s.WeightFor(topo, local, remote, tA); w != 7 {
+		t.Fatalf("tunnel A weight = %d, want 7", w)
+	}
+	if w, _ := s.WeightFor(topo, local, remote, tB); w != 2 {
+		t.Fatalf("tunnel B weight = %d, want 2 (must not be overwritten by A's write)", w)
+	}
+	if w, _ := s.WeightFor(topo, local, remote, tC); w != 2 {
+		t.Fatalf("tunnel C weight = %d, want 2", w)
+	}
+	// Update A again: B and C stay at 2.
+	if err := s.SetWeightPolicy(topo, 0, 0, tA, 9); err != nil {
+		t.Fatal(err)
+	}
+	if w, _ := s.WeightFor(topo, local, remote, tA); w != 9 {
+		t.Fatalf("tunnel A updated weight = %d, want 9", w)
+	}
+	if w, _ := s.WeightFor(topo, local, remote, tB); w != 2 {
+		t.Fatalf("tunnel B weight drifted to %d after A's update", w)
+	}
+}

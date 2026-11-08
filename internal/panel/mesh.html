@@ -2,66 +2,70 @@
 <html lang="fa" dir="rtl">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#09090b">
 <title>Quantum — Mesh</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="fonts.css">
 <link rel="stylesheet" href="tokens.css">
 <link rel="stylesheet" href="base.css">
 <link rel="stylesheet" href="enterprise.css">
-<style>
-  body { font-family: inherit; margin: 0; background: var(--bg, #0b0e14); color: var(--fg, #e6e9f0); }
-  .wrap { max-width: 1100px; margin: 0 auto; padding: 16px; }
-  h1 { font-size: 1.1rem; margin: 8px 0 16px; }
-  .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
-  .tabs button { background: transparent; border: 1px solid var(--border, #2a3140); color: inherit;
-                 padding: 6px 14px; border-radius: 8px; cursor: pointer; }
-  .tabs button.active { background: var(--accent, #2563eb); border-color: var(--accent, #2563eb); }
-  table { width: 100%; border-collapse: collapse; margin: 8px 0 16px; font-size: 0.92rem; }
-  th, td { text-align: start; padding: 6px 10px; border-bottom: 1px solid var(--border, #2a3140); }
-  th { color: var(--muted, #8b93a7); font-weight: 600; }
-  .pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 0.78rem; }
-  .ok   { background: #12351f; color: #4ade80; }
-  .down { background: #3b1212; color: #f87171; }
-  .warn { background: #3a2b10; color: #fbbf24; }
-  .banner { border: 1px solid #f59e0b; background: #2a2005; padding: 10px 14px; border-radius: 10px;
-            margin-bottom: 12px; display: none; }
-  .banner b { color: #fbbf24; }
-  button.act { border: 1px solid var(--border, #2a3140); background: transparent; color: inherit;
-               padding: 4px 10px; border-radius: 6px; cursor: pointer; }
-  button.act.primary { border-color: var(--accent, #2563eb); color: var(--accent, #60a5fa); }
-  .muted { color: var(--muted, #8b93a7); font-size: 0.85rem; }
-  input, select { background: var(--bg2, #11151d); color: inherit; border: 1px solid var(--border, #2a3140);
-                  border-radius: 6px; padding: 4px 8px; }
-  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 8px 0; }
-  #msg { margin: 8px 0; min-height: 1.2em; }
-</style>
+<link rel="stylesheet" href="quantum-mesh.css">
 </head>
-<body>
-<div class="wrap">
-  <h1 id="title">Quantum — Mesh Management</h1>
-  <div class="row">
-    <button class="act" id="lang">FA/EN</button>
-    <button class="act" id="backup" data-i18n="backup_btn">⬇ Backup</button>
-    <span class="muted" id="csrf-note"></span>
-  </div>
-  <div class="banner" id="confirm-banner"></div>
-  <div id="msg"></div>
-  <div class="tabs" id="tabs">
-    <button data-tab="topos" class="active" data-i18n="tab_topos">Topologies</button>
-    <button data-tab="weights" data-i18n="tab_weights">Weights</button>
-    <button data-tab="profiles" data-i18n="tab_profiles">Profiles</button>
-    <button data-tab="traffic" data-i18n="tab_traffic">Traffic</button>
-    <button data-tab="pasarguard" data-i18n="tab_pg">PasarGuard</button>
-    <button data-tab="engines" data-i18n="tab_engines">Engines</button>
-    <button data-tab="alerts" data-i18n="tab_alerts">Alerts</button>
-  </div>
-  <div id="tab-topos"></div>
-  <div id="tab-weights" style="display:none"></div>
-  <div id="tab-profiles" style="display:none"></div>
-  <div id="tab-traffic" style="display:none"></div>
-  <div id="tab-pasarguard" style="display:none"></div>
-  <div id="tab-engines" style="display:none"></div>
-  <div id="tab-alerts" style="display:none"></div>
+<body data-t="dark">
+<div class="app">
+  <div class="scrim" id="scrim" hidden></div>
+  <aside class="side" id="side" aria-label="ناوبری">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      Quantum <small>مش</small>
+    </div>
+    <nav class="nav" id="nav">
+      <button data-page="dash" class="active" data-i18n="nav_dash">داشبورد</button>
+      <div class="navgroup" data-i18n="ng_mesh">زیرساخت</div>
+      <button data-page="topo" data-i18n="nav_topo">توپولوژی</button>
+      <button data-page="servers" data-i18n="nav_servers">سرورها و ایجنت‌ها</button>
+      <button data-page="tunnels" data-i18n="nav_tunnels">تونل‌ها و وزن‌ها</button>
+      <button data-page="traffic" data-i18n="nav_traffic">ترافیک و صورت‌حساب</button>
+      <div class="navgroup" data-i18n="ng_ops">عملیات</div>
+      <button data-page="engines" data-i18n="nav_engines">موتورها</button>
+      <button data-page="alerts" data-i18n="nav_alerts">هشدارها</button>
+      <button data-page="security" data-i18n="nav_security">امنیت (پروفایل‌ها)</button>
+      <button data-page="pasarguard" data-i18n="nav_pg">پاسارگارد</button>
+      <button data-page="settings" data-i18n="nav_settings">پشتیبان‌گیری و تنظیمات</button>
+    </nav>
+    <div class="sidefoot">
+      <a id="legacy-link" href="./" hidden data-i18n="nav_legacy">پیشرفته (نسخه قدیمی)</a>
+      <button id="theme"><span data-i18n="theme_lbl">پوسته روشن/تاریک</span></button>
+      <button id="lang"><span data-i18n="lang_lbl">English</span></button>
+      <a id="logout" href="logout" data-i18n="logout_lbl">خروج</a>
+    </div>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <button class="act menubtn" id="menubtn" aria-label="منو">☰</button>
+      <h1 id="title">داشبورد</h1>
+      <span class="spacer"></span>
+      <button class="act small" id="refresh" data-i18n="refresh_lbl">به‌روزرسانی</button>
+    </div>
+    <div class="banner" id="confirm-banner"></div>
+    <div class="banner err" id="global-err"></div>
+    <div class="msg" id="msg" aria-live="polite"></div>
+
+    <section id="page-dash"></section>
+    <section id="page-topo" hidden></section>
+    <section id="page-servers" hidden></section>
+    <section id="page-tunnels" hidden></section>
+    <section id="page-traffic" hidden></section>
+    <section id="page-engines" hidden></section>
+    <section id="page-alerts" hidden></section>
+    <section id="page-security" hidden></section>
+    <section id="page-pasarguard" hidden></section>
+    <section id="page-settings" hidden></section>
+  </main>
 </div>
+<div id="toasts"></div>
+<div id="modal-root"></div>
 <script src="mesh.js"></script>
 </body>
 </html>

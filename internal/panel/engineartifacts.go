@@ -157,12 +157,12 @@ func handleEngineTab(w http.ResponseWriter, r *http.Request) {
 	}
 	arts, err := s.ListEngineArtifacts()
 	if err != nil {
-		writeAPIError(w, r, "E-IN-05", "cannot list artifacts: "+err.Error())
+		writeAPIError(w, r, "E-SYS-01", "cannot list artifacts: "+err.Error())
 		return
 	}
 	enabled, err := s.EngineEnabledCounts()
 	if err != nil {
-		writeAPIError(w, r, "E-IN-05", "cannot count enabled tunnels: "+err.Error())
+		writeAPIError(w, r, "E-SYS-01", "cannot count enabled tunnels: "+err.Error())
 		return
 	}
 	agents := engineAgentsView(s)
@@ -313,7 +313,7 @@ func handleEngineArtifactList(w http.ResponseWriter, r *http.Request) {
 	}
 	arts, err := s.ListEngineArtifacts()
 	if err != nil {
-		writeAPIError(w, r, "E-IN-05", "cannot list artifacts: "+err.Error())
+		writeAPIError(w, r, "E-SYS-01", "cannot list artifacts: "+err.Error())
 		return
 	}
 	writeJSON(w, map[string]any{"artifacts": arts})
@@ -346,38 +346,36 @@ func handleEngineArtifactUpload(w http.ResponseWriter, r *http.Request) {
 	sigB64 := strings.TrimSpace(r.FormValue("signature"))
 
 	if !engineArtifactEngineRe.MatchString(engine) {
-		writeAPIError(w, r, "E-IN-04", "invalid engine id (lowercase letters, digits, -, _; starts with a letter)")
+		writeAPIError(w, r, "E-IN-06", "invalid engine id (lowercase letters, digits, -, _; starts with a letter)")
 		return
 	}
 	if !engineArtifactVersionRe.MatchString(version) {
-		writeAPIError(w, r, "E-IN-04", "invalid version tag")
+		writeAPIError(w, r, "E-IN-06", "invalid version tag")
 		return
 	}
 	if !engineArtifactArchValid[goarch] {
-		writeAPIError(w, r, "E-IN-04", "unsupported goarch (amd64, arm64, arm, 386)")
+		writeAPIError(w, r, "E-IN-06", "unsupported goarch (amd64, arm64, arm, 386)")
 		return
 	}
 	if !engineArtifactOSValid[goos] {
-		writeAPIError(w, r, "E-IN-04", "unsupported goos (linux)")
+		writeAPIError(w, r, "E-IN-06", "unsupported goos (linux)")
 		return
 	}
 	if name == "" {
 		name = engine + "-" + version + "-" + goos + "-" + goarch + ".tar.gz"
 	}
 	if !engineArtifactNameIsOK(name) {
-		writeAPIError(w, r, "E-IN-04", "invalid artifact name (lowercase letters, digits, ., _, -; no path separators)")
+		writeAPIError(w, r, "E-IN-06", "invalid artifact name (lowercase letters, digits, ., _, -; no path separators)")
 		return
 	}
 	sig, err := base64.StdEncoding.DecodeString(sigB64)
 	if err != nil || len(sig) != ed25519.SignatureSize {
-		writeAPIError(w, r, "E-IN-04", "signature must be base64 of the 64-byte ed25519 signature over the artifact bytes")
+		writeAPIError(w, r, "E-IN-06", "signature must be base64 of the 64-byte ed25519 signature over the artifact bytes")
 		return
 	}
 	key, err := engineArtifactVerifyKey()
 	if err != nil {
-		// A bad/misconfigured key (e.g. the RAW 32-byte footgun) is a
-		// VALIDATION error the operator fixes by re-exporting — 400.
-		writeAPIError(w, r, "E-IN-06", err.Error())
+		writeAPIError(w, r, "E-ENG-03", err.Error()) // fix-carrying message, real status
 		return
 	}
 
@@ -436,7 +434,7 @@ func handleEngineArtifactUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !ed25519.Verify(key, body, sig) {
-		writeAPIError(w, r, "E-IN-04", "artifact signature verification FAILED (wrong key or wrong signature over the bytes)")
+		writeAPIError(w, r, "E-IN-06", "artifact signature verification FAILED (wrong key or wrong signature over the bytes)")
 		return
 	}
 
@@ -462,7 +460,7 @@ func handleEngineArtifactUpload(w http.ResponseWriter, r *http.Request) {
 			writeAPIError(w, r, "E-ENG-02", "artifact download name is taken by another artifact")
 			return
 		}
-		writeAPIError(w, r, "E-IN-05", "cannot store artifact row: "+err.Error())
+		writeAPIError(w, r, "E-SYS-01", "cannot store artifact row: "+err.Error())
 		return
 	}
 	// Row committed: move the file into place atomically (same dir, same
