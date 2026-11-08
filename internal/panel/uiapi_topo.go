@@ -78,13 +78,13 @@ func handleUITopologyDetail(w http.ResponseWriter, r *http.Request) {
 
 	iranRows, foreignRows := []map[string]any{}, []map[string]any{}
 	allRows := []map[string]any{}
+	seenTunnels := map[int64]bool{}
 	health := map[string]int{"healthy": 0, "degraded": 0, "down": 0}
 	var ids []int64
 	for _, t := range tunnels {
 		ids = append(ids, t.ID)
 	}
 	_, billable, _ := h.RangeUsageDetailed(ids, now-now%86400, now)
-	seenTunnels := map[int64]bool{} // the FLAT list holds each tunnel ONCE
 	for _, sid := range members {
 		sv, err := h.GetServer(sid)
 		if err != nil {
@@ -100,7 +100,11 @@ func handleUITopologyDetail(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 			row := h.uiTunnelRow(h.Store, topo, t, verdicts, now)
-			rows = append(rows, row) // per-member view: both ends list it
+			rows = append(rows, row)
+			// The flat `tunnels` list must hold each tunnel ONCE; a tunnel
+			// between two members matches both ends above (phase-11 UI
+			// probe: 6 tunnels answered as 12). Per-member `rows` keep both
+			// perspectives by design.
 			if !seenTunnels[t.ID] {
 				seenTunnels[t.ID] = true
 				allRows = append(allRows, row)

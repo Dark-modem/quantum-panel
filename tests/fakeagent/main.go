@@ -183,26 +183,40 @@ reconnect:
 		var rx, tx, prx, ptx uint64
 		report := func() {
 			rt := make([]map[string]any, len(ids))
+			proc := make([]map[string]any, 0, len(ids))
 			for i, id := range ids {
 				up := i >= *downCount
 				t := map[string]any{
 					"tunnel_id": id, "engine": "matrix", "up": up,
 					"wire_known": true, "payload_known": *traffic, "counters_known": true,
+					// v2 additive fields the new UI reads (contract §4)
+					"uptime_s": uint64(3600 + i*60),
 				}
 				if up {
 					t["latency_ms"] = 12.0 + float64(i) + rng.Float64()
+					t["loss_pct"] = rng.Float64() * 0.4
+					proc = append(proc, map[string]any{"tunnel_id": id,
+						"cpu_percent": 3.0 + rng.Float64()*9, "rss_bytes": 12 << 20, "known": true})
 					if *traffic {
 						t["wire_rx"] = rx / uint64(len(ids))
 						t["wire_tx"] = tx / uint64(len(ids))
 						t["payload_rx"] = prx / uint64(len(ids))
 						t["payload_tx"] = ptx / uint64(len(ids))
 					}
+				} else {
+					t["last_error"] = "dial tcp 195.201.0.1:443: connect: connection refused"
 				}
 				rt[i] = t
 			}
 			beat := map[string]any{
 				"applied_revision": "1",
 				"tunnels":          rt,
+				"proc":             proc,
+				"engine_status": []map[string]any{{
+					"engine": "matrix", "installed": true, "version": "fake-1.0",
+					"bytes_on_disk": uint64(0), "enabled": true,
+					"instances": len(ids) - *downCount, "last_error": map[string]any(nil),
+				}},
 				"resources": map[string]any{
 					"cpu_model": "Fake Xeon", "cpu_cores": 4,
 					"cpu_percent": 8.0 + rng.Float64()*20, "load_avg_1": 0.4,

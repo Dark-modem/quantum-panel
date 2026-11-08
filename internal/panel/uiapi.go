@@ -331,6 +331,9 @@ func handleUIOverview(w http.ResponseWriter, r *http.Request) {
 		svCounts[s.Role]++
 	}
 	agCounts := map[string]int{"online": 0, "offline": 0}
+	// The counts map was initialized but never filled (phase-11 UI probe:
+	// the dashboard answered online:0/offline:0 while 3 agents were
+	// connected) — classify with the same verdict the agents list uses.
 	for _, a := range agents {
 		if uiAgentOnline(a) {
 			agCounts["online"]++

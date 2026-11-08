@@ -1996,14 +1996,11 @@ function peerRemoveClick(peerId, name) {
 // The global topbar identifies the host, never the selected tunnel or engine.
 // Values sit in <bdi> so addresses keep their order in Persian.
 const LS_ENGINE = { frp: 'GRE + FRP', backhaul: 'Backhaul (no GRE)', 'gre-backhaul': 'Backhaul (with GRE)', bagher: 'Bagher' };
-function linkStrip(s) {
+function linkStrip() {
+  // (phase 11, requirement 1) The management panel must not show its own
+  // host/IP in the fixed top bar — the roleLine stays empty.
   const el = $('roleLine');
-  if (!el || !s) return;
-  const L = s.local || s;
-  const ip = L.local_pub || '';
-  el.innerHTML = '<span class="ls-dot" aria-hidden="true"></span><bdi>' + esc(tr('dash_this_server', 'This server')) + '</bdi>' +
-    ' <span class="ls-sep" aria-hidden="true">·</span> <bdi data-no-i18n>' + esc(ip || tr('dash_unknown', 'Unknown')) + '</bdi>';
-  el.title = tr('lbl_public_ip', 'Public IP');
+  if (el) { el.innerHTML = ''; el.title = ''; }
 }
 // Engine of the base tunnel: recorded, else derived from the running unit.
 function tunEngine(st) {

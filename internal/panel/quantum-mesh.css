@@ -23,7 +23,7 @@
   font-weight: 700; font-size: 1.02rem; color: var(--tx);
 }
 .brand .logo { width: 22px; height: 22px; color: var(--ac); flex: none; }
-.brand small { color: var(--mu); font-weight: 500; margin-inline-start: auto; }
+.brand-sub { color: var(--mu); font-weight: 500; margin-inline-start: auto; }
 
 .nav { display: flex; flex-direction: column; gap: 2px; overflow-y: auto; flex: 1; }
 .nav .navgroup {
@@ -46,6 +46,7 @@
 .nav button .nvbadge.neutral { background: var(--s3); color: var(--mu); }
 
 .sidefoot { display: flex; flex-direction: column; gap: 2px; border-top: 1px solid var(--s3); padding-top: 8px; }
+.sidever { padding: 4px 10px; }
 .sidefoot button, .sidefoot a {
   display: flex; align-items: center; gap: 10px;
   background: transparent; border: 0; color: var(--mu);
@@ -254,3 +255,126 @@ button.act.small, .btn.small { padding: 3px 9px; font-size: var(--fs-caption); }
 
 /* ---- print / misc ---------------------------------------------------------- */
 @media print { .side, .topbar button, #toasts { display: none !important; } }
+
+/* ---- phase 11: minimal top bar ------------------------------------------ */
+.topbar {
+  display: flex; align-items: center; gap: 10px;
+  position: sticky; top: 0; z-index: 20;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(10px);
+  margin: -18px -22px 14px; padding: 10px 22px;
+  border-bottom: 1px solid var(--s3);
+  min-height: 52px;
+}
+.topbar-title { font-size: var(--fs-h2); font-weight: var(--fw-h2); color: var(--tx); margin: 0; }
+.iconbtn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px; flex: none;
+  background: transparent; border: 0; color: var(--mu);
+  border-radius: 9px; cursor: pointer; position: relative;
+  text-decoration: none; font: inherit;
+}
+.iconbtn svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.iconbtn:hover, .iconbtn:focus-visible { background: var(--s3); color: var(--tx); }
+.menubtn { display: none; }
+.langbtn { width: auto; min-width: 38px; padding: 0 9px; font-size: var(--fs-caption); font-weight: 700; }
+.bell-count {
+  position: absolute; top: 4px; inset-inline-end: 4px;
+  min-width: 16px; height: 16px; border-radius: 999px;
+  background: var(--er-fill); color: #fff;
+  font-size: 10px; font-weight: 700; line-height: 16px; text-align: center; padding: 0 4px;
+}
+.usermenu { position: relative; }
+.usermenu-pop {
+  position: absolute; inset-inline-end: 0; top: calc(100% + 6px);
+  background: var(--s1); border: 1px solid var(--s3); border-radius: 12px;
+  min-width: 190px; padding: 8px; z-index: 60;
+  box-shadow: 0 12px 40px rgb(0 0 0 / .3);
+}
+.usermenu-id { display: flex; flex-direction: column; gap: 2px; padding: 6px 10px 10px; border-bottom: 1px solid var(--s3); margin-bottom: 6px; }
+.usermenu-id b { color: var(--tx); font-size: var(--fs-body); }
+.usermenu-pop button {
+  display: block; width: 100%; text-align: start;
+  background: transparent; border: 0; color: var(--mu);
+  padding: 8px 10px; border-radius: 8px; cursor: pointer; font: inherit; min-height: 36px;
+}
+.usermenu-pop button:hover { background: var(--s3); color: var(--tx); }
+
+@media (max-width: 900px) {
+  .menubtn { display: inline-flex; }
+  .topbar { margin: -14px -12px 12px; padding: 8px 12px; }
+}
+
+/* ---- structured error cards --------------------------------------------- */
+.errcard {
+  background: var(--er-soft); border: 1px solid var(--er);
+  border-radius: 12px; padding: 14px 16px; margin: 10px 0;
+}
+.errcard h3 { margin: 0 0 6px; font-size: var(--fs-h4); color: var(--tx); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.errcard h3 .ecode { font-size: var(--fs-caption); color: var(--er); background: color-mix(in srgb, var(--er) 16%, transparent); border-radius: 999px; padding: 1px 9px; font-weight: 700; }
+.errcard p { margin: 4px 0; font-size: var(--fs-body); color: var(--tx); }
+.errcard .ecause { color: var(--mu); }
+.errcard .ecause b, .errcard .edo b { color: var(--tx); }
+.errcard details { margin-top: 8px; }
+.errcard details summary { cursor: pointer; color: var(--mu); font-size: var(--fs-caption); min-height: 32px; display: flex; align-items: center; }
+.errcard pre { background: var(--s2); border: 1px solid var(--s3); border-radius: 8px; padding: 8px 10px; font-size: var(--fs-caption); overflow-x: auto; direction: ltr; text-align: left; }
+.errcard .efoot { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+
+/* ---- sticky-header tables + truncation ----------------------------------- */
+.tblwrap { overflow: auto; border: 1px solid var(--s3); border-radius: 10px; margin: 8px 0 14px; max-width: 100%; }
+.tblwrap table { margin: 0; border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; }
+.tblwrap th {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--s2);
+  border-bottom: 1px solid var(--s3);
+}
+.tblwrap td { border-bottom: 1px solid color-mix(in srgb, var(--s3) 60%, transparent); }
+.trunc { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+td.num, th.num { text-align: end; font-variant-numeric: tabular-nums; unicode-bidi: plaintext; }
+.empty { border-style: solid; }
+
+/* ---- charts (inline SVG, no libraries) ------------------------------------ */
+.chart { width: 100%; height: auto; display: block; }
+.chart .bar-dl { fill: var(--ac); }
+.chart .bar-ul { fill: var(--sc-fill); opacity: .75; }
+.chart .axis { stroke: var(--s3); stroke-width: 1; }
+.chart .grid { stroke: var(--s3); stroke-width: .5; opacity: .6; }
+.chart text { fill: var(--mu); font-size: 10px; }
+.chart .legend { display: flex; gap: 14px; margin: 4px 0 8px; font-size: var(--fs-caption); color: var(--mu); flex-wrap: wrap; }
+.chart .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-inline-end: 5px; vertical-align: -1px; }
+.rng { display: inline-flex; gap: 0; border: 1px solid var(--s3); border-radius: 9px; overflow: hidden; }
+.rng button { background: var(--s2); border: 0; color: var(--mu); padding: 5px 13px; cursor: pointer; font: inherit; font-size: var(--fs-caption); min-height: 36px; }
+.rng button.active { background: var(--ac-fill); color: var(--ac-on); font-weight: 700; }
+
+/* ---- KPI aggregate cards (dashboard) -------------------------------------- */
+.aggr { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; margin-bottom: 14px; }
+.aggr .kpi { min-height: 84px; }
+.aggr .ksub { color: var(--mu); font-size: var(--fs-caption); margin-top: 4px; line-height: 1.6; }
+.aggr .ksub b { color: var(--tx); font-weight: 600; }
+.meter { height: 7px; border-radius: 999px; background: var(--s3); overflow: hidden; margin-top: 6px; }
+.meter i { display: block; height: 100%; background: var(--ok); border-radius: 999px; }
+.meter i.warn { background: var(--wr); }
+.meter i.err { background: var(--er); }
+
+/* ---- phase-11 lint fixes: tap targets, wrap-safe notes -------------------- */
+.nav button { min-height: 36px; }
+.btn, .act { min-height: 34px; }
+@media (max-width: 500px) {
+  .btn, .act { min-height: 38px; }
+  .btn.small, .act.small { min-height: 38px; padding: 8px 12px; }
+  .tblwrap a { display: inline-block; padding: 7px 0; }
+  .pill a, a .pill { display: inline-block; padding: 6px 9px; }
+}
+.note {
+  background: var(--info-soft); color: var(--tx);
+  border: 1px solid color-mix(in srgb, var(--info) 35%, transparent);
+  border-radius: 10px; padding: 10px 14px; margin: 6px 0 12px;
+  font-size: var(--fs-body); line-height: 1.7;
+}
+@media (max-width: 500px) {
+  a.pill { display: inline-block; padding: 7px 10px; }
+}
+@media (max-width: 500px) {
+  a.pill { padding: 9px 10px; }
+  .card h3 a, .toposum a { display: inline-block; padding: 8px 0; min-height: 36px; }
+}
