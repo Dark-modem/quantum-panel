@@ -547,6 +547,7 @@
   // Status page: poll the created topologies (tunnel rows) + the agent
   // runtime (live up/down per tunnel — the overview's agent list carries
   // the runtime, same source the mesh topos tab uses).
+  var wizStatusIv = null, wizAgentsIv = null;
   function statusPage() {
     var el = document.getElementById('step-body');
     el.innerHTML = '<div class="card"><b>' + esc(t('created')) + '</b><div id="wiz-tunnels"></div></div>';
