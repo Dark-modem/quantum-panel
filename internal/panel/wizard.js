@@ -560,6 +560,8 @@
     var tick = function () {
       topoIds.forEach(function (tid) {
         api('GET', 'topologies/' + tid).then(function (d) {
+          // A newer shape may have re-rendered the page: drop stale ticks.
+          if (!document.getElementById('wiz-tunnels') || S.step !== 7) return;
           var rows = (d.tunnels || []).map(function (tn) {
             var st = 'unknown';
             try {
@@ -571,8 +573,9 @@
             return '<tr><td>' + esc(tn.tunnel_key) + '</td><td>' + esc(tn.engine || '') + '</td>' +
               '<td><span class="pill ' + pill + '">' + esc(st) + '</span></td></tr>';
           }).join('');
-          document.getElementById('wiz-tunnels').innerHTML =
-            '<table><tr><th>tunnel</th><th>' + esc(t('engine')) + '</th><th>' + esc(t('state')) + '</th></tr>' + rows + '</table>';
+          var tgt = document.getElementById('wiz-tunnels');
+          if (!tgt) return;
+          try { tgt.innerHTML = '<table><tr><th>tunnel</th><th>' + esc(t('engine')) + '</th><th>' + esc(t('state')) + '</th></tr>' + rows + '</table>'; } catch (e) {}
         }).catch(function () {});
       });
     };
