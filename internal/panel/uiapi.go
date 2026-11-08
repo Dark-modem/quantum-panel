@@ -331,6 +331,13 @@ func handleUIOverview(w http.ResponseWriter, r *http.Request) {
 		svCounts[s.Role]++
 	}
 	agCounts := map[string]int{"online": 0, "offline": 0}
+	for _, a := range agents {
+		if uiAgentOnline(a) {
+			agCounts["online"]++
+		} else {
+			agCounts["offline"]++
+		}
+	}
 	tpCounts := map[string]int{"total": len(topos), "enabled": 0}
 	for _, t := range topos {
 		if t.Enabled {
