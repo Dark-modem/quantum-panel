@@ -97,7 +97,7 @@ func (s *Store) DeleteDatacenter(id int64) error {
 }
 
 func (s *Store) ListServers() ([]Server, error) {
-	rows, err := s.db.Query(`SELECT id, name, role, datacenter_id, address, created_at FROM servers ORDER BY id`)
+	rows, err := s.db.Query(`SELECT id, name, role, COALESCE(datacenter_id, 0), address, created_at FROM servers ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +115,7 @@ func (s *Store) ListServers() ([]Server, error) {
 
 func (s *Store) GetServer(id int64) (Server, error) {
 	var sv Server
-	err := s.db.QueryRow(`SELECT id, name, role, datacenter_id, address, created_at FROM servers WHERE id = ?`, id).
+	err := s.db.QueryRow(`SELECT id, name, role, COALESCE(datacenter_id, 0), address, created_at FROM servers WHERE id = ?`, id).
 		Scan(&sv.ID, &sv.Name, &sv.Role, &sv.DatacenterID, &sv.Address, &sv.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return sv, ErrNotFound

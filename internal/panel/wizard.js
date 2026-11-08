@@ -14,10 +14,13 @@
 
   var LANG = localStorage.getItem('wiz_lang') || 'en';
   var S = { dcs: [], iran: [], foreign: [], pairs: [], weights: {}, forwards: [],
-            topoId: 0, step: 1 };
+            params: {}, topoId: 0, step: 1 };
   var T = {
     en: {
       title: 'Quantum — Setup Wizard',
+      ep_title: 'Parameters', ep_gen: 'generate', ep_set: 'set', ep_unset: 'not set',
+      ep_secret_note: 'secrets are write-only: they never come back after saving',
+      ep_no_tpl: 'no parameter template for this engine — raw JSON only',
       s1: 'Datacenters', s2: 'Iran servers', s3: 'Foreign servers', s4: 'Tunnel slots',
       s5: 'Weights', s6: 'Forwards', s7: 'Review & create',
       dc_name: 'Datacenter name', coeff: 'Price coefficient', add_dc: 'Add datacenter',
@@ -37,6 +40,9 @@
     },
     fa: {
       title: 'کوانتوم — راهنمای راه‌اندازی',
+      ep_title: 'پارامترها', ep_gen: 'تولید', ep_set: 'ثبت شده', ep_unset: 'ثبت نشده',
+      ep_secret_note: 'رمزها فقط یک‌بار نوشته می‌شوند و پس از ذخیره هرگز نمایش داده نمی‌شوند',
+      ep_no_tpl: 'برای این موتور قالبی نیست — JSON خام',
       s1: 'دیتاسنترها', s2: 'سرورهای ایران', s3: 'سرورهای خارج', s4: 'اسلات تونل‌ها',
       s5: 'وزن‌ها', s6: 'فورواردها', s7: 'بازبینی و ساخت',
       dc_name: 'نام دیتاسنتر', coeff: 'ضریب قیمت', add_dc: 'افزودن دیتاسنتر',
@@ -215,6 +221,83 @@
     }
   }
 
+  // ---- engine parameter templates (phase 9 2a) ------------------------------
+  var TPL = null; // cached GET engines/templates
+  function templates() {
+    if (TPL) return Promise.resolve(TPL);
+    return api('GET', 'engines/templates').then(function (r) {
+      TPL = {};
+      (r.templates || []).forEach(function (t) { TPL[t.engine] = t.fields; });
+      return TPL;
+    });
+  }
+  // Render one typed param form; returns the inner HTML. Secret fields
+  // render as password inputs with a generate button; the value lives
+  // only in the DOM until the form is submitted.
+  function paramFormHTML(engine, key, current) {
+    var fields = (TPL && TPL[engine]) || null;
+    if (!fields) return '<p class="muted">' + esc(t('ep_no_tpl')) + '</p>';
+    var cur = {};
+    try { cur = JSON.parse(current || '{}'); } catch (e) {}
+    var html = '<p class="muted">' + esc(t('ep_secret_note')) + '</p>';
+    fields.forEach(function (f, i) {
+      var id = 'ep-' + key + '-' + i;
+      var label = LANG === 'fa' ? f.label_fa : f.label_en;
+      var v = cur[f.json];
+      var maskedSet = f.kind === 'secret' && typeof v === 'string' && v !== '';
+      html += '<div class="row"><label for="' + id + '">' + esc(label) + '</label>';
+      if (f.kind === 'number') {
+        html += '<input type="number" id="' + id + '" data-ep="' + f.json + '" data-kind="number" value="' + esc(v != null ? v : (f.default || '')) + '">';
+      } else if (f.kind === 'secret') {
+        html += '<input type="password" id="' + id + '" data-ep="' + f.json + '" data-kind="secret" data-gen="' + esc(f.generator || '') + '" placeholder="' + (maskedSet ? esc(t('ep_set')) : '') + '" value="">';
+        html += '<span class="muted">' + (maskedSet ? esc(t('ep_set')) : esc(t('ep_unset'))) + '</span>';
+        if (f.generator) html += ' <button class="act" data-genbtn="' + id + '">' + esc(t('ep_gen')) + '</button>';
+        if (f.hint) html += '<span class="muted">' + esc(f.hint) + '</span>';
+      } else {
+        html += '<input type="text" id="' + id + '" data-ep="' + f.json + '" data-kind="string" value="' + esc(v != null ? v : (f.default || '')) + '">';
+      }
+      if (f.required) html += ' <span class="muted">*</span>';
+      html += '</div>';
+    });
+    return html;
+  }
+  // Wire generate buttons inside a container: crypto.getRandomValues —
+  // the random secret is born in the browser.
+  function wireGenerators(container) {
+    container.querySelectorAll('[data-genbtn]').forEach(function (b) {
+      b.onclick = function () {
+        var inp = document.getElementById(b.dataset.genbtn);
+        if (!inp) return;
+        var bytes = new Uint8Array(24);
+        crypto.getRandomValues(bytes);
+        var val = btoa(String.fromCharCode.apply(null, bytes));
+        if (inp.dataset.gen === 'uuid') {
+          var h = '';
+          bytes.forEach(function (x) { h += ('0' + x.toString(16)).slice(-2); });
+          val = h.slice(0, 8) + '-' + h.slice(8, 12) + '-' + h.slice(12, 16) + '-' + h.slice(16, 20) + '-' + h.slice(20);
+        }
+        inp.value = val;
+        inp.type = 'text';
+      };
+    });
+  }
+  // Collect the form into engine_params JSON; masked (empty) secrets are
+  // OMITTED so the server merge keeps the stored values.
+  function collectParams(key) {
+    var out = {};
+    document.querySelectorAll('[data-ep][id^="ep-' + key + '-"]').forEach(function (inp) {
+      var v = inp.value.trim();
+      if (inp.dataset.kind === 'number') {
+        if (v !== '') out[inp.dataset.ep] = parseInt(v, 10);
+      } else if (inp.dataset.kind === 'secret') {
+        if (v !== '') out[inp.dataset.ep] = v;
+      } else if (v !== '') {
+        out[inp.dataset.ep] = v;
+      }
+    });
+    return JSON.stringify(out);
+  }
+
   // Step 4: for each (iran × foreign) pair choose K and the engine per slot.
   function step4() {
     var el = document.getElementById('step-body');
@@ -231,7 +314,9 @@
     });
     html += '</div>';
     el.innerHTML = html;
-    fetch(base() + 'api/mesh/engines').then(function (r) { return r.json(); }).then(function (d) {
+    templates().then(function () {
+      return fetch(base() + 'api/mesh/engines').then(function (r) { return r.json(); });
+    }).then(function (d) {
       var have = {};
       (d.artifacts || []).forEach(function (a) { have[a.engine + '|' + a.goarch] = true; });
       iran.forEach(function (ir) {
@@ -252,10 +337,12 @@
           });
           var inner = '';
           for (var i = 0; i < slot.k; i++) {
-            inner += '<div class="row"><span class="muted">#' + (i + 1) + '</span><select data-slot="' + key + '">' + opts + '</select>' +
-              (opts === '' ? '<span class="pill warn">⚠ ' + esc(t('no_artifact')) + '</span>' : '') + '</div>';
+            var eng = slot.engines[i] || (slot.engines[0] || 'frp');
+            inner += '<div class="row"><span class="muted">#' + (i + 1) + '</span><select data-slot="' + key + '" data-slotidx="' + i + '" data-eng="' + esc(eng) + '">' + opts + '</select></div>';
+            inner += '<div data-params="' + key + '-' + i + '">' + paramFormHTML(eng, key + '-' + i, S.params[key + '-' + i]) + '</div>';
           }
           box.innerHTML = inner;
+          box.querySelectorAll('[data-params]').forEach(function (pc) { wireGenerators(pc); });
         });
       });
       el.querySelectorAll('[data-k]').forEach(function (inp) {
@@ -273,10 +360,22 @@
       el.querySelectorAll('[data-slot]').forEach(function (sel) {
         sel.onchange = function () {
           var key = sel.dataset.slot;
-          var idx = Array.prototype.indexOf.call(sel.parentElement.parentElement.querySelectorAll('[data-slot]'), sel);
+          var idx = parseInt(sel.dataset.slotidx, 10);
           var cur = S.pairs[key] || { k: 1, engines: [] };
           cur.engines[idx] = sel.value;
           S.pairs[key] = cur;
+          // Re-render the params form for this slot with the new engine.
+          var pc = document.querySelector('[data-params="' + key + '-' + idx + '"]');
+          if (pc) {
+            pc.innerHTML = paramFormHTML(sel.value, key + '-' + idx, S.params[key + '-' + idx]);
+            wireGenerators(pc);
+          }
+        };
+      });
+      el.querySelectorAll('[data-ep]').forEach(function (inp) {
+        inp.onchange = function () {
+          var m = inp.id.match(/^ep-(.+-\d+)-/);
+          if (m) S.params[m[1]] = collectParams(m[1]);
         };
       });
     }).catch(function (e) { say(e.message, true); });
@@ -371,6 +470,10 @@
     };
   }
 
+  function iranList() { return collectIran(); }
+  function foreignList() { return S.foreign.filter(function (f) { return f.id; }); }
+  var agentsRuntime = { agents: [] };
+
   function collectIran() {
     var out = [];
     S.dcs.forEach(function (d, di) {
@@ -396,15 +499,22 @@
         var p = S.pairs[key];
         if (!p) return;
         chain = chain.then(function () {
+          var eparams = [];
+          for (var i = 0; i < p.k; i++) {
+            var pj = S.params[key + '-' + i];
+            eparams.push(pj ? JSON.parse(pj) : {});
+          }
           return api('POST', 'topologies/generate', {
             name: topoName + '-' + ir.id + '-' + fr.id,
             iran_servers: [ir.id], foreign_servers: [fr.id],
-            tunnels_per_pair: p.k, engines: p.engines, enabled: true
+            tunnels_per_pair: p.k, engines: p.engines, engine_params: eparams, enabled: true
           }).then(function (r) {
             created++;
             // The generator answers {topology_id: N, tunnels: [...]}.
-            if (!firstTopo) firstTopo = r.body.topology_id;
-            var topoId = r.body.topology_id;
+            if (!firstTopo) firstTopo = r.topology_id;
+            S.topoForPair = S.topoForPair || {};
+            S.topoForPair[key] = r.topology_id;
+            var topoId = r.topology_id;
             // Pair-level weight (this iran server ↔ this foreign server).
             var w = S.weights[fr.id] || 1;
             return api('POST', 'topologies/' + topoId + '/weights',
@@ -434,25 +544,50 @@
     }).catch(function (e) { say(e.message, true); });
   }
 
-  // Status page: poll overview until acks land / states show up.
+  // Status page: poll the created topologies (tunnel rows) + the agent
+  // runtime (live up/down per tunnel — the overview's agent list carries
+  // the runtime, same source the mesh topos tab uses).
+  var wizStatusIv = null, wizAgentsIv = null;
   function statusPage() {
     var el = document.getElementById('step-body');
     el.innerHTML = '<div class="card"><b>' + esc(t('created')) + '</b><div id="wiz-tunnels"></div></div>';
+    var topoIds = [];
+    iranList().forEach(function (ir) {
+      foreignList().forEach(function (fr) {
+        var key = ir.id + '-' + fr.id;
+        if (S.pairs[key]) topoIds.push(S.topoForPair[key]);
+      });
+    });
     var tick = function () {
-      api('GET', 'overview').then(function (d) {
-        var rows = (d.tunnels || []).map(function (tn) {
-          var st = tn.state || 'unknown';
-          var pill = st === 'up' ? 'ok' : (st === 'down' ? 'down' : 'warn');
-          return '<tr><td>' + esc(tn.tunnel_key || tn.id) + '</td><td>' + esc(tn.engine || '') + '</td>' +
-            '<td><span class="pill ' + pill + '">' + esc(st) + '</span></td></tr>';
-        }).join('');
-        document.getElementById('wiz-tunnels').innerHTML =
-          '<table><tr><th>tunnel</th><th>' + esc(t('engine')) + '</th><th>' + esc(t('state')) + '</th></tr>' + rows + '</table>';
-      }).catch(function (e) { say(e.message, true); });
+      topoIds.forEach(function (tid) {
+        api('GET', 'topologies/' + tid).then(function (d) {
+          // A newer shape may have re-rendered the page: drop stale ticks.
+          if (!document.getElementById('wiz-tunnels') || S.step !== 7) return;
+          var rows = (d.tunnels || []).map(function (tn) {
+            var st = 'unknown';
+            try {
+              (agentsRuntime.agents || []).forEach(function (a) {
+                (a.runtime || []).forEach(function (rt) { if (rt.tunnel_id === tn.tunnel_key) st = rt.up ? 'up' : 'down'; });
+              });
+            } catch (e) {}
+            var pill = st === 'up' ? 'ok' : (st === 'down' ? 'down' : 'warn');
+            return '<tr><td>' + esc(tn.tunnel_key) + '</td><td>' + esc(tn.engine || '') + '</td>' +
+              '<td><span class="pill ' + pill + '">' + esc(st) + '</span></td></tr>';
+          }).join('');
+          var tgt = document.getElementById('wiz-tunnels');
+          if (!tgt) return;
+          try { tgt.innerHTML = '<table><tr><th>tunnel</th><th>' + esc(t('engine')) + '</th><th>' + esc(t('state')) + '</th></tr>' + rows + '</table>'; } catch (e) {}
+        }).catch(function () {});
+      });
     };
+    var pollAgents = function () {
+      agentAPI('GET', 'api/agents').then(function (r) { agentsRuntime.agents = r.agents || r || []; }).catch(function () {});
+    };
+    pollAgents();
     tick();
-    var iv = setInterval(tick, 3000);
-    setTimeout(function () { clearInterval(iv); }, 120000);
+    wizStatusIv = setInterval(tick, 3000);
+    wizAgentsIv = setInterval(pollAgents, 3000);
+    setTimeout(function () { clearInterval(iv); clearInterval(iv2); }, 120000);
   }
 
   // ---- navigation ---------------------------------------------------------

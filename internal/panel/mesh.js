@@ -363,16 +363,45 @@
     };
     document.getElementById('cbtn').onclick = function () {
       var dc = document.getElementById('udc').value;
-      api('GET', 'coefficient?datacenter_id=' + dc).then(function (r) {
+      Promise.all([
+        api('GET', 'coefficient?datacenter_id=' + dc),
+        api('GET', 'overhead'),
+      ]).then(function (rs) {
+        var r = rs[0], ov = rs[1] || {};
+        var ovByEngine = {};
+        (ov.engines || []).forEach(function (e) { ovByEngine[e.engine] = e; });
         var rows = (r.suggestions || []).map(function (sg) {
-          return '<tr><td>' + esc(sg.engine) + '</td><td>' + (sg.overhead || 0).toFixed(3) + '</td><td>' +
-            (sg.suggested_coefficient || 0).toFixed(3) + '</td></tr>';
+          var e = ovByEngine[sg.engine] || {};
+          var warn = '';
+          if (!sg.overhead) warn = '<span class="pill warn">⚠ sample too small / payload Unknown</span>';
+          return '<tr><td>' + esc(sg.engine) + '</td>' +
+            '<td>' + (e.ratio ? e.ratio.toFixed(3) : '—') + '</td>' +
+            '<td>' + (e.ratio_tx ? e.ratio_tx.toFixed(3) : '—') + '</td>' +
+            '<td>' + (sg.price_ratio || 0).toFixed(3) + '</td>' +
+            '<td>' + (sg.overhead || 0).toFixed(3) + '</td>' +
+            '<td><b>' + (sg.suggested_coefficient || 0).toFixed(3) + '</b> ' + warn + '</td></tr>';
         }).join('');
         document.getElementById('uout').innerHTML =
-          '<table><tr><th>' + esc(t('engine')) + '</th><th>' + esc(t('overhead')) + '</th><th>' + esc(t('coefficient')) + '</th></tr>' +
-          rows + '</table><p class="muted">' + esc(r.note) + '</p>';
+          '<table><tr><th>' + esc(t('engine')) + '</th><th>' + esc(t('overhead')) + ' RX</th><th>' + esc(t('overhead')) + ' TX</th>' +
+          '<th>' + esc(t('price')) + '</th><th>' + esc(t('overhead')) + '</th><th>' + esc(t('coefficient')) + '</th></tr>' + rows + '</table>' +
+          '<p class="muted">' + esc(r.note) + ' — <a href="#" onclick="document.getElementById('pasarguard-tab-link')&&document.getElementById('pasarguard-tab-link').click();return false">' + esc(t('tab_pg')) + '</a></p>';
       }).catch(function (e) { say(e.message, true); });
     };
+    // Tunnel health: per tunnel state/engine/latency + wire/payload.
+    api('GET', 'usage?datacenter_id=' + (overview.datacenters || [])[0].id + '&from=' + (Math.floor(Date.now() / 1000) - 86400)).catch(function () { return null; });
+    var health = (overview.tunnels || []);
+    var hrows = health.map(function (tn) {
+      var rt = runtimeFor(tn.tunnel_key || tn.key);
+      var st = tn.state || (rt && (rt.up ? 'up' : 'down')) || 'unknown';
+      var lat = rt && rt.latency_ms != null ? rt.latency_ms.toFixed(0) + ' ms' : '—';
+      var pill = st === 'up' ? 'ok' : (st === 'down' ? 'down' : 'warn');
+      return '<tr><td>' + esc(tn.tunnel_key || tn.id) + '</td><td>' + esc(tn.engine || '') + '</td>' +
+        '<td><span class="pill ' + pill + '">' + esc(st) + '</span></td><td>' + lat + '</td>' +
+        '<td>' + bytes(rt && rt.wire_rx) + '</td><td>' + bytes(rt && rt.wire_tx) + '</td></tr>';
+    }).join('');
+    el.insertAdjacentHTML('beforeend',
+      '<h3>' + esc(t('tunnels')) + '</h3><table><tr><th>' + esc(t('tunnel')) + '</th><th>' + esc(t('engine')) + '</th>' +
+      '<th>' + esc(t('state')) + '</th><th>latency</th><th>' + esc(t('wire')) + ' RX</th><th>' + esc(t('wire')) + ' TX</th></tr>' + hrows + '</table>');
   }
 
 

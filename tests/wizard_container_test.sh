@@ -17,7 +17,7 @@ DOCKER="docker"; command -v docker >/dev/null 2>&1 || DOCKER=docker.exe
 $DOCKER info >/dev/null 2>&1 || { echo "SKIP: docker not reachable"; trap - EXIT; exit 0; }
 
 echo "== building the panel (phase6/wizard worktree) =="
-WSLDIR="/mnt/c/Users/-Mahdi/Downloads/Quantum/01-REPOSITORIES/wt-p7-wizard"
+WSLDIR="/mnt/c/Users/-Mahdi/Downloads/Quantum/01-REPOSITORIES/wt-p9-panel"
 MSYS_NO_PATHCONV=1 wsl.exe -d Ubuntu-24.04 -- bash -lc "export GOFLAGS=-mod=mod GOPROXY=file:///tmp/goproxy,https://proxy.golang.org GOSUMDB=off GOPRIVATE=github.com/Dark-modem/* GOPATH=\$HOME/go; export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:\$HOME/go/bin; cd '$WSLDIR' && CGO_ENABLED=0 go build -trimpath -o '$WSLDIR/tests/.wiz-work/quantum-panel' ./cmd/quantum-panel"
 [ -f "$WORK/quantum-panel" ] || { echo "FAIL: binary missing"; exit 1; }
 
