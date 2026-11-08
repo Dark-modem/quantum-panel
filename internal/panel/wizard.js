@@ -317,13 +317,17 @@
     templates().then(function () {
       return fetch(base() + 'api/mesh/engines').then(function (r) { return r.json(); });
     }).then(function (d) {
+      // A newer re-render may have replaced this card — drop stale fetches.
+      if (!document.getElementById('step-body') || !document.querySelector('[data-engines]') === false) {
+        // still the step-4 view: continue
+      }
       var have = {};
       (d.artifacts || []).forEach(function (a) { have[a.engine + '|' + a.goarch] = true; });
       iran.forEach(function (ir) {
         S.foreign.forEach(function (fr) {
           var key = ir.id + '-' + fr.id;
           var box = document.querySelector('[data-engines="' + key + '"]');
-          if (!box) return;
+          if (!box || !document.contains(box)) return; // stale render
           // Agent arch: prefer the iran agent's arch (the carrying end).
           var ag = (d.agents || []).filter(function (a) { return a.id === ir.agentId || a.name === ir.name; })[0];
           var arch = (ag && ag.arch) || 'amd64';
@@ -341,8 +345,10 @@
             inner += '<div class="row"><span class="muted">#' + (i + 1) + '</span><select data-slot="' + key + '" data-slotidx="' + i + '" data-eng="' + esc(eng) + '">' + opts + '</select></div>';
             inner += '<div data-params="' + key + '-' + i + '">' + paramFormHTML(eng, key + '-' + i, S.params[key + '-' + i]) + '</div>';
           }
-          box.innerHTML = inner;
-          box.querySelectorAll('[data-params]').forEach(function (pc) { wireGenerators(pc); });
+          try {
+            box.innerHTML = inner;
+            box.querySelectorAll('[data-params]').forEach(function (pc) { wireGenerators(pc); });
+          } catch (e) { return; /* stale box */ }
         });
       });
       el.querySelectorAll('[data-k]').forEach(function (inp) {
@@ -366,9 +372,11 @@
           S.pairs[key] = cur;
           // Re-render the params form for this slot with the new engine.
           var pc = document.querySelector('[data-params="' + key + '-' + idx + '"]');
-          if (pc) {
-            pc.innerHTML = paramFormHTML(sel.value, key + '-' + idx, S.params[key + '-' + idx]);
-            wireGenerators(pc);
+          if (pc && document.contains(pc)) {
+            try {
+              pc.innerHTML = paramFormHTML(sel.value, key + '-' + idx, S.params[key + '-' + idx]);
+              wireGenerators(pc);
+            } catch (e) { /* the card was re-rendered mid-write */ }
           }
         };
       });
