@@ -415,7 +415,7 @@ var RENDER_GEN = 0; // bumped on every step render; async callbacks drop stale w
       '<select id="fwd-proto"><option value="tcp">tcp</option><option value="udp">udp</option></select>' +
       '<input id="fwd-target" placeholder="' + esc(t('target')) + ' (127.0.0.1:443)">' +
       '<button class="act primary" id="add-fwd">' + esc(t('add_fwd')) + '</button></div>' +
-      '<table id="fwd-table"><tr><th>' + esc(t('forward_port')) + '</th><th>' + esc(t('proto')) + '</th><th>' + esc(t('target')) + '</th></tr></table></div>';
+      '<table id="fwd-table"><tr><th>' + esc(t('forward_port')) + '</th><th>' + esc(t('proto')) + '</th><th>' + esc(t('target')) + '</th></tr></table></div>');
     var render = function () {
       var rows = S.forwards.map(function (f) {
         var iran = collectIran().filter(function (x) { return x.id === f.local; })[0];
@@ -460,7 +460,7 @@ var RENDER_GEN = 0; // bumped on every step render; async callbacks drop stale w
       '<table><tr><th>pair</th><th>K</th><th>engines</th></tr>' + plan + '</table>' +
       (fwdRows ? '<table><tr><th>iran</th><th>port</th><th>proto</th><th>target</th></tr>' + fwdRows + '</table>' : '') +
       '<button class="act primary" id="wiz-create">' + esc(t('create')) + '</button>' +
-      '<div id="wiz-tunnels"></div></div>';
+      '<div id="wiz-tunnels"></div></div>');
     document.getElementById('wiz-create').onclick = function () {
       createAll();
     };
@@ -550,7 +550,7 @@ var RENDER_GEN = 0; // bumped on every step render; async callbacks drop stale w
     if (wizStatusIv) { clearInterval(wizStatusIv); wizStatusIv = null; }
     if (wizAgentsIv) { clearInterval(wizAgentsIv); wizAgentsIv = null; }
     var el = document.getElementById('step-body');
-    el.innerHTML = '<div class="card"><b>' + esc(t('created')) + '</b><div id="wiz-tunnels"></div></div>';
+    safeSet(el, '<div class="card"><b>' + esc(t('created')) + '</b><div id="wiz-tunnels"></div></div>');
     var topoIds = [];
     iranList().forEach(function (ir) {
       foreignList().forEach(function (fr) {
