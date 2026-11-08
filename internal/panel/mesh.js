@@ -361,7 +361,7 @@
       render();
     }).catch(function (e) {
       var ge = document.getElementById('global-err');
-      ge.style.display = '';
+      ge.style.display = 'block';
       ge.innerHTML = '<b>' + esc(t('load_fail') + e.message) + '</b> — ' + esc(t('offline_hint')) +
         ' <a href="' + esc(base()) + '">' + esc(t('login_redirect')) + '</a>';
     });
@@ -1343,7 +1343,7 @@
       var p = (j.pending || [])[0];
       if (!p) { el.style.display = 'none'; if (bannerIv) { clearInterval(bannerIv); bannerIv = null; } return; }
       var left = Math.max(0, p.deadline - Math.floor(Date.now() / 1000));
-      el.style.display = '';
+      el.style.display = 'block';
       var render_ = function () {
         el.innerHTML = '<b>⏱ ' + esc(t('confirm_banner').replace('{agent}', agentName(p.agent_id)).replace('{s}', left)) + '</b> ' +
           '<button class="act primary small" id="btn-confirm">' + esc(t('confirm')) + '</button> ' +
