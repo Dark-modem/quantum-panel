@@ -31,6 +31,11 @@ func handleUIAgentsList(w http.ResponseWriter, r *http.Request) {
 			"version": a.Version, "arch": a.Arch,
 			"last_seen": a.LastSeen,
 			"server":    h.uiServerRef(a.ServerID),
+			// UI-API-REQUESTS #3 (decided: option b): an UNLINKED agent is
+			// invisible in the per-datacenter views by design (bytes need
+			// a datacenter to land in); the UI shows the "link this
+			// agent" nudge when linked=false.
+			"linked": a.ServerID != 0,
 		})
 	}
 	writeJSON(w, map[string]any{"agents": out})
@@ -116,6 +121,7 @@ func handleUIAgentDetail(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{
 		"agent": map[string]any{
 			"id": ag.ID, "name": ag.Name, "role": ag.Role,
+			"linked":  ag.ServerID != 0,
 			"status":  uiAgentStatus(ag),
 			"version": ag.Version, "arch": ag.Arch, "os": ag.OS,
 			"hostname":            ag.Hostname,

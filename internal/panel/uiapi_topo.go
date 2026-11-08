@@ -84,6 +84,7 @@ func handleUITopologyDetail(w http.ResponseWriter, r *http.Request) {
 		ids = append(ids, t.ID)
 	}
 	_, billable, _ := h.RangeUsageDetailed(ids, now-now%86400, now)
+	seenTunnels := map[int64]bool{} // the FLAT list holds each tunnel ONCE
 	for _, sid := range members {
 		sv, err := h.GetServer(sid)
 		if err != nil {
@@ -99,16 +100,19 @@ func handleUITopologyDetail(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 			row := h.uiTunnelRow(h.Store, topo, t, verdicts, now)
-			rows = append(rows, row)
-			allRows = append(allRows, row)
-			if t.Enabled {
-				switch row["state"] {
-				case "healthy":
-					health["healthy"]++
-				case "degraded":
-					health["degraded"]++
-				default:
-					health["down"]++
+			rows = append(rows, row) // per-member view: both ends list it
+			if !seenTunnels[t.ID] {
+				seenTunnels[t.ID] = true
+				allRows = append(allRows, row)
+				if t.Enabled {
+					switch row["state"] {
+					case "healthy":
+						health["healthy"]++
+					case "degraded":
+						health["degraded"]++
+					default:
+						health["down"]++
+					}
 				}
 			}
 		}
