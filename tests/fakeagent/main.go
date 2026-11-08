@@ -22,15 +22,16 @@ import (
 )
 
 var (
-	server    = flag.String("server", "http://127.0.0.1:8000/ui", "panel base URL incl base path")
-	token     = flag.String("token", "", "enroll token")
-	name      = flag.String("name", "fake-agent", "agent name")
-	role      = flag.String("role", "iran", "role: iran|foreign")
-	tunnels   = flag.Int("tunnels", 3, "tunnels to report (synthetic ids unless -tunnel-ids)")
-	tunnelIDs = flag.String("tunnel-ids", "", "comma-separated REAL tunnel ids to report (joins panel state)")
-	downCount = flag.Int("down", 0, "report the first N tunnels as DOWN (varied health)")
-	traffic   = flag.Bool("traffic", true, "report wire/payload bytes")
-	interval  = flag.Duration("interval", 3*time.Second, "report interval")
+	server     = flag.String("server", "http://127.0.0.1:8000/ui", "panel base URL incl base path")
+	token      = flag.String("token", "", "enroll token")
+	name       = flag.String("name", "fake-agent", "agent name")
+	role       = flag.String("role", "iran", "role: iran|foreign")
+	tunnels    = flag.Int("tunnels", 3, "tunnels to report (synthetic ids unless -tunnel-ids)")
+	tunnelIDs  = flag.String("tunnel-ids", "", "comma-separated REAL tunnel ids to report (joins panel state)")
+	downCount  = flag.Int("down", 0, "report the first N tunnels as DOWN (varied health)")
+	traffic    = flag.Bool("traffic", true, "report wire/payload bytes")
+	interval   = flag.Duration("interval", 3*time.Second, "report interval")
+	desiredOut = flag.String("desired-out", "", "write every received desired document to this file (e2e: verify the compiled state)")
 )
 
 // envelope is the v2 wire shape (quantum-protocol Envelope).
@@ -151,7 +152,18 @@ reconnect:
 					return
 				}
 				var env envelope
-				if json.Unmarshal(raw, &env) != nil || env.Type != "command" {
+				if json.Unmarshal(raw, &env) != nil {
+					continue
+				}
+				if env.Type == "desired" && *desiredOut != "" {
+					// e2e aid: persist the compiled desired document exactly
+					// as received (the panel's DesiredV2 for this agent).
+					if err := os.WriteFile(*desiredOut, env.Data, 0o644); err != nil {
+						log.Printf("desired-out: %v", err)
+					}
+					continue
+				}
+				if env.Type != "command" {
 					continue
 				}
 				var cmd struct {

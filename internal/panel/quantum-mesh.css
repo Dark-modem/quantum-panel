@@ -83,7 +83,10 @@
 .card {
   background: var(--s1); border: 1px solid var(--s3); border-radius: 12px;
   padding: 14px 16px; margin: 0 0 14px;
+  min-width: 0;
 }
+/* wide tables scroll inside their card on phones instead of the page */
+.card > table, .card > div > table { display: block; overflow-x: auto; }
 .card h3 { font-size: var(--fs-h4); color: var(--tx); margin: 0 0 10px; font-weight: 600; }
 .kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin-bottom: 14px; }
 .kpi {
