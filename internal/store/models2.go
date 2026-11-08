@@ -634,11 +634,17 @@ func (s *Store) TunnelUsageDetailed(tunnelID int64, fromAt, toAt int64) (Usage, 
 		return Usage{}, Usage{}, err
 	}
 	defer rows.Close()
+	// Retention fallback: the raw samples older than the retention window
+	// are pruned after being folded into traffic_hourly — when the window
+	// holds NO raw rows, serve the period from the hourly rollups (the
+	// prune must never make history read as zero bytes).
+	hadRows := false
 	var all, iran Usage
 	acc := usageAccum{}
 	iranAcc := usageAccum{}
 	curAgent, curRole := "", ""
 	for rows.Next() {
+		hadRows = true
 		var at, rx, tx, prx, ptx int64
 		var agent, role string
 		var wireKnown, payloadKnown bool
@@ -662,6 +668,11 @@ func (s *Store) TunnelUsageDetailed(tunnelID int64, fromAt, toAt int64) (Usage, 
 	}
 	all = all.add(acc.usage)
 	iran = iran.add(iranAcc.usage)
+	if !hadRows {
+		// The retention fallback: old periods read from the hourly
+		// rollups (the raw rows were pruned after folding).
+		return s.HourlyUsageDetailed([]int64{tunnelID}, fromAt, toAt)
+	}
 	return all, iran, nil
 }
 
