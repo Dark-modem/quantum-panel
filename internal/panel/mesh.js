@@ -382,12 +382,20 @@
     return counts;
   }
 
+  var lastDashRender = 0;
   function renderDash() {
     var el = document.getElementById('page-dash');
     if (!overview) {
       el.innerHTML = '<div class="skeleton" style="width:40%"></div><div class="skeleton"></div><div class="skeleton"></div>';
       return;
     }
+    // coalesce: the 10 s tick, page clicks and manual refreshes must not
+    // stack renders (each fans out to per-DC usage + checklist probes);
+    // the skeleton branch above never sets the stamp so the first REAL
+    // render always runs.
+    var now = Date.now();
+    if (now - lastDashRender < 2000) return;
+    lastDashRender = now;
     var hc = tunnelHealthCounts();
     var online = (agents ? agents.agents : []).filter(function (a) { return a.status === 'online'; }).length;
     var total = (agents ? agents.agents : []).length;
@@ -490,14 +498,26 @@
   }
 
   // ---- topology page: inline SVG map + tunnel lists --------------------------
+  // Tunnel lists live OUTSIDE the overview object: loadAll() replaces the
+  // overview every 10 s and per-topology objects with it, so a cache keyed
+  // on the object would re-fetch ALL topologies on every tick and each
+  // fetch re-rendered the dashboard — a request storm the phase-10 e2e
+  // measured as ERR_INSUFFICIENT_RESOURCES (256 tunnels / 22 topologies).
+  var topoTunnelsCache = {};   // topo id -> tunnels
+  var topoFetchInflight = {};  // topo id -> true while fetching
   function topoTunnels(tp) {
-    if (tp.__tunnels) return tp.__tunnels;
-    api('GET', 'topologies/' + tp.id).then(function (j) {
-      tp.__tunnels = j.tunnels || [];
-      if (page === 'topo') renderTopo();
-      if (page === 'dash') renderDash();
-    }).catch(function () { tp.__tunnels = []; });
-    return tp.__tunnels || [];
+    if (topoTunnelsCache[tp.id]) return topoTunnelsCache[tp.id];
+    if (!topoFetchInflight[tp.id]) {
+      topoFetchInflight[tp.id] = true;
+      api('GET', 'topologies/' + tp.id).then(function (j) {
+        topoTunnelsCache[tp.id] = j.tunnels || [];
+        delete topoFetchInflight[tp.id];
+        // one refresh of the visible page; never the dashboard (its counts
+        // catch up on the next loadAll tick — no render cascade)
+        if (page === 'topo') renderTopo();
+      }).catch(function () { delete topoFetchInflight[tp.id]; });
+    }
+    return topoTunnelsCache[tp.id] || [];
   }
 
   function topoHealth(tp) {

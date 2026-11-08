@@ -444,6 +444,19 @@ var (
 	profilePendingBy = map[string]*profilePending{}
 )
 
+// agentResultJSON marshals an agent command's Output field. The protocol
+// says Output is short diagnostic TEXT (some agents send JSON objects) —
+// json.RawMessage(plain text) fails Marshal and produced an empty 200
+// (phase-10 e2e). Valid JSON passes through; anything else is quoted.
+func agentResultJSON(out string) json.RawMessage {
+	trimmed := strings.TrimSpace(out)
+	if json.Valid([]byte(trimmed)) {
+		return json.RawMessage(trimmed)
+	}
+	b, _ := json.Marshal(out)
+	return b
+}
+
 func profilePendingRecord(agentID, kind string, timerSec int, note string) *profilePending {
 	if timerSec <= 0 {
 		timerSec = 120
@@ -533,7 +546,7 @@ func meshProfileApply(w http.ResponseWriter, r *http.Request, kind string) {
 	writeJSON(w, map[string]any{
 		"ok": true, "agent_id": agentID, "kind": kind,
 		"rollback_timer_s": timer, "deadline": pending.Deadline,
-		"result": json.RawMessage(res.Output),
+		"result": agentResultJSON(res.Output),
 		"note":   "the agent armed its automatic rollback; confirm within the window or it reverts",
 	})
 }
@@ -613,5 +626,5 @@ func handleMeshProfileRollback(w http.ResponseWriter, r *http.Request) {
 	}
 	profilePendingResolve(agentID)
 	meshAudit(meshActor(r), "mesh.profile.rollback", fmt.Sprintf(`{"agent":%q,"kind":%q,"ok":%t}`, agentID, kind, res.OK))
-	writeJSON(w, map[string]any{"ok": res.OK, "result": json.RawMessage(res.Output)})
+	writeJSON(w, map[string]any{"ok": res.OK, "result": agentResultJSON(res.Output)})
 }
