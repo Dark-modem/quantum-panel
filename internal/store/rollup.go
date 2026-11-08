@@ -233,8 +233,6 @@ func (s *Store) HourlyUsageDetailed(tunnelIDs []int64, from, to int64) (Usage, U
 	var all, iran Usage
 	var acc, iranAcc hourlyAcc
 	curStream := ""
-	dbgN := 0
-	println("[DBG-Q] from/3600 =", from/3600, " to/3600 =", to/3600, " nstreams-in-bounds pending")
 	for rows.Next() {
 		var tid, hour int64
 		var agent, role string
@@ -251,8 +249,6 @@ func (s *Store) HourlyUsageDetailed(tunnelIDs []int64, from, to int64) (Usage, U
 			acc, iranAcc = hourlyAcc{}, hourlyAcc{}
 			curStream = stream
 		}
-		dbgN++
-		println("[DBG-H] row", tid, agent, hour, frx, lrx, wireKnown, payloadKnown, role)
 		acc.ingestHour(frx, ftx, fprx, fptx, lrx, ltx, lprx, lptx, wireKnown, payloadKnown)
 		if role == "iran" {
 			iranAcc.ingestHour(frx, ftx, fprx, fptx, lrx, ltx, lprx, lptx, wireKnown, payloadKnown)
@@ -263,6 +259,5 @@ func (s *Store) HourlyUsageDetailed(tunnelIDs []int64, from, to int64) (Usage, U
 	}
 	all = all.add(acc.usage)
 	iran = iran.add(iranAcc.usage)
-	println("[DBG-H] rows scanned:", dbgN, "usage rx:", all.WireRx)
 	return all, iran, nil
 }

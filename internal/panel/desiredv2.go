@@ -106,12 +106,30 @@ func compileDesiredV2(s *store.Store, ag store.Agent) (desired *protocol.Desired
 		return nil, "no enabled tunnels reference this server yet", nil, nil
 	}
 
-	// Engines: used ones enabled; catalog engines that are idle disabled
-	// (the engine framework uninstalls idle engines — they must consume
+	// Engines (Phase 11): a tunnel's engine is always enabled; the
+	// per-agent DESIRED flags (the enable/disable endpoints) also enable
+	// engines with no tunnels yet — matrix is desired-on by default.
+	// Catalog engines nobody desires stay disabled (idle engines consume
 	// zero resources).
-	var engines []protocol.EngineSpec
+	engEnabled := map[string]bool{}
 	for e := range engineUsed {
-		engines = append(engines, protocol.EngineSpec{ID: e, Enabled: true})
+		engEnabled[e] = true
+	}
+	if rows, derr := s.AgentEngines(ag.ID); derr == nil {
+		for _, row := range rows {
+			if row.Desired {
+				engEnabled[row.Engine] = true
+			} else if !engineUsed[row.Engine] {
+				engEnabled[row.Engine] = false // explicitly disabled by the operator
+			}
+		}
+	}
+	if on, derr := s.AgentEngineDesired(ag.ID, "matrix"); derr == nil && on {
+		engEnabled["matrix"] = true
+	}
+	var engines []protocol.EngineSpec
+	for e, on := range engEnabled {
+		engines = append(engines, protocol.EngineSpec{ID: e, Enabled: on})
 	}
 	v2state, err := s.AgentV2(ag.ID)
 	if err != nil {
@@ -125,7 +143,7 @@ func compileDesiredV2(s *store.Store, ag store.Agent) (desired *protocol.Desired
 			return nil, "", nil, fmt.Errorf("engine catalog: %v", err)
 		}
 		for _, c := range catalog {
-			if c.ID != "" && !engineUsed[c.ID] {
+			if c.ID != "" && !engEnabled[c.ID] {
 				engines = append(engines, protocol.EngineSpec{ID: c.ID, Enabled: false})
 			}
 		}
@@ -388,6 +406,11 @@ func handleMeshAgentPush(w http.ResponseWriter, r *http.Request) {
 	agentID := r.PathValue("id")
 	if !validAgentID(agentID) {
 		writeAPIError(w, r, "E-IN-06", "bad agent id")
+		return
+	}
+	// Phase 11 requirement 5: pushing must not ship tunnels whose engine
+	// is not enabled (or has no artifact) on one of the two ends.
+	if !uiValidateAgentTunnels(w, r, s, agentID) {
 		return
 	}
 	res, err := compileAndPushAgent(s, agentID)

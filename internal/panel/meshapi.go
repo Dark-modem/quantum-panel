@@ -690,6 +690,12 @@ func handleMeshTunnelCreate(w http.ResponseWriter, r *http.Request) {
 	} else if warn != "" {
 		meshAudit(meshActor(r), "mesh.tunnel.engine_warning", fmt.Sprintf(`{"engine":%q,"warn":%q}`, body.Engine, warn))
 	}
+	// Phase 11 requirement 5: the engine must be ENABLED on both endpoint
+	// agents (with a signed artifact for its arch) before a tunnel can
+	// use it — the refusal names the agent, engine and UI path.
+	if body.Enabled && !uiValidateTunnelEngines(w, r, s, body.LocalServerID, body.RemoteServerID, body.Engine) {
+		return
+	}
 	id, err := s.UpsertTunnel(store.Tunnel{
 		TunnelKey: key, TopologyID: body.TopologyID,
 		LocalServerID: body.LocalServerID, RemoteServerID: body.RemoteServerID,

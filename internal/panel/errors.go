@@ -119,7 +119,7 @@ var errCatalog = map[string]errInfo{
 	"E-BH-03":     {0, "backhaul rejected the config file", "The binary does not understand this config dialect (sectioned premium schema vs flat server/client). Re-run the Backhaul setup in `quantum`."},
 	"E-BH-04":     {0, "backhaul transport mismatch: the link is up but carries no data", "The two servers use different Backhaul transports of the same family (tcp vs tcpmux, ws vs wsmux): the control channel connects, every connection fails. Set the same transport on both, or set the foreign side up again from the Iran bundle."},
 	"E-FRP-10":    {0, "frpc login failed with EOF (likely tcpMux mismatch)", "tcpMux mismatch: hub is likely tcpMux=true, run `quantum perf tcpmux on|off` so both ends match (default OFF)."},
-	"E-SYS-01":    {0, "host tool unavailable", "journalctl/systemctl/ip missing on this host."},
+	"E-SYS-01":    {503, "host tool unavailable", "journalctl/systemctl/ip missing on this host."},
 	"E-SYS-02":    {503, "panel is busy (too many requests in flight)", "Retry in a couple of seconds; /api/selfstats still answers."},
 	"E-RESCUE-01": {400, "bad rescue request", "Reload the page and try again."},
 	"E-RESCUE-02": {409, "no peer address known to test against", "Pair this server with its peer first (Settings > Peer link) or create a tunnel."},
@@ -214,6 +214,17 @@ var errCatalog = map[string]errInfo{
 	"E-WD-04": {500, "backup restore failed", "Decryption failed or backup archive is corrupted."},
 	"E-WD-05": {502, "telegram route unreachable", "Ensure tunnel is up or switch route to direct."},
 	"E-WD-00": {0, "Watchdog settings updated", "Informational: watchdog, backup or schedule settings changed."},
+	// E-SYS-03: the fallback for codes not in the catalog. It must carry
+	// a REAL status — reusing E-SYS-01 (an informational status-0 entry)
+	// made every unmapped error WriteHeader(0) and panic the handler.
+	"E-SYS-03": {400, "request failed", "See the panel log (journalctl -u gre-panel) for the cause."},
+	// The E-IN family the mesh/CRUD handlers use — these codes were
+	// referenced for months WITHOUT a catalog entry (every response rode
+	// the fallback with no hint). E-IN-04 is the generic validation
+	// refusal (bad field, unknown id); E-IN-05 the conflict refusal.
+	"E-IN-04": {400, "bad request value or unknown record", "Fix the field or id named in the message and resubmit."},
+	"E-IN-05": {409, "request conflicts with the current state", "Read the message — it names the conflict (dependent records, key format, ...)."},
+	"E-IN-06": {400, "bad request value", "Fix the field named in the message and resubmit."},
 	// performance & obfuscation
 	"E-PERF-00": {0, "Performance settings applied", "Informational: settings saved and tunnels updated."},
 	"E-PERF-01": {400, "bad performance request", "Check request parameters and try again."},
@@ -240,8 +251,11 @@ func errorLogPath() string { return filepath.Join(configDir, "panel-errors.log")
 func writeAPIError(w http.ResponseWriter, r *http.Request, code, detail string) {
 	info, ok := errCatalog[code]
 	if !ok {
-		info = errInfo{Status: http.StatusBadRequest, Msg: "request failed", Hint: ""}
-		code = "E-SYS-01"
+		info = errCatalog["E-SYS-03"]
+		code = "E-SYS-03"
+	}
+	if info.Status == 0 { // informational catalog entries never write headers
+		info.Status = http.StatusInternalServerError
 	}
 	msg := info.Msg
 	if detail != "" {

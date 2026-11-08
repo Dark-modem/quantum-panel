@@ -242,6 +242,67 @@ CREATE TABLE engine_artifacts (
 );
 CREATE INDEX idx_engine_artifacts_engine ON engine_artifacts(engine, goarch);
 `,
+	// 6: Phase 11 UI data. The dashboard/agent/topology/tunnel views need
+	// DATA that did not exist in the store before:
+	//   - agents gain the ResourceReport the v2 heartbeat already carried
+	//     (it was received and DISCARDED) plus arch/os (hello) and the
+	//     manual public-IP override the UI edits;
+	//   - agent_engines persists the per-agent engine installation state
+	//     (installed/version/bytes/desired/instances/last error) the agent
+	//     now reports in engine_status[];
+	//   - tunnel_proc is the LATEST per-(tunnel,agent) process sample
+	//     (upsert — not a history: the UI shows "now");
+	//   - tunnel_events is a bounded per-tunnel state-change + error log
+	//     (pruned to 7 days);
+	//   - idx_traffic_samples_at speeds the "current partial hour" raw
+	//     tail scan the overview does on every poll.
+	`
+ALTER TABLE agents ADD COLUMN arch TEXT NOT NULL DEFAULT '';
+ALTER TABLE agents ADD COLUMN os TEXT NOT NULL DEFAULT '';
+ALTER TABLE agents ADD COLUMN cpu_cores INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE agents ADD COLUMN cpu_pct REAL NOT NULL DEFAULT 0;
+ALTER TABLE agents ADD COLUMN load1 REAL NOT NULL DEFAULT 0;
+ALTER TABLE agents ADD COLUMN mem_total_mb INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE agents ADD COLUMN mem_used_mb INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE agents ADD COLUMN disk_total_gb REAL NOT NULL DEFAULT 0;
+ALTER TABLE agents ADD COLUMN disk_used_gb REAL NOT NULL DEFAULT 0;
+ALTER TABLE agents ADD COLUMN uptime_s INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE agents ADD COLUMN virt TEXT NOT NULL DEFAULT '';
+ALTER TABLE agents ADD COLUMN public_ip_override TEXT NOT NULL DEFAULT '';
+CREATE TABLE agent_engines (
+  agent_id TEXT NOT NULL,
+  engine TEXT NOT NULL,
+  installed INTEGER NOT NULL DEFAULT 0,
+  version TEXT NOT NULL DEFAULT '',
+  bytes_on_disk INTEGER NOT NULL DEFAULT 0,
+  desired INTEGER NOT NULL DEFAULT 0,
+  instances INTEGER NOT NULL DEFAULT 0,
+  last_error TEXT NOT NULL DEFAULT '',
+  updated_at INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (agent_id, engine)
+);
+CREATE TABLE tunnel_proc (
+  tunnel_id INTEGER NOT NULL,
+  agent_id TEXT NOT NULL,
+  cpu_pct REAL NOT NULL DEFAULT 0,
+  rss_bytes INTEGER NOT NULL DEFAULT 0,
+  processes INTEGER NOT NULL DEFAULT 0,
+  at INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (tunnel_id, agent_id)
+);
+CREATE TABLE tunnel_events (
+  id INTEGER PRIMARY KEY,
+  tunnel_id INTEGER NOT NULL,
+  at INTEGER NOT NULL,
+  kind TEXT NOT NULL DEFAULT 'state',
+  from_state TEXT NOT NULL DEFAULT '',
+  to_state TEXT NOT NULL DEFAULT '',
+  code TEXT NOT NULL DEFAULT '',
+  text TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX idx_tunnel_events_tunnel ON tunnel_events(tunnel_id, at);
+CREATE INDEX idx_traffic_samples_at ON traffic_samples(at);
+`,
 }
 
 func (s *Store) migrate() error {

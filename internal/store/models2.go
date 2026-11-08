@@ -461,7 +461,8 @@ func (s *Store) SetPasarguardCoefficient(id int64, coefficient float64) error {
 // ---- agents: v2 state + linking ------------------------------------------
 
 func (s *Store) ListAgents() ([]Agent, error) {
-	rows, err := s.db.Query(`SELECT id, server_id, name, role, key_hash, status, version, hostname, public_ip, last_seen, applied_revision
+	rows, err := s.db.Query(`SELECT id, server_id, name, role, key_hash, status, version, hostname, public_ip, last_seen, applied_revision,
+		arch, os, cpu_cores, cpu_pct, load1, mem_total_mb, mem_used_mb, disk_total_gb, disk_used_gb, uptime_s, virt, public_ip_override
 		FROM agents ORDER BY id`)
 	if err != nil {
 		return nil, err
@@ -470,7 +471,8 @@ func (s *Store) ListAgents() ([]Agent, error) {
 	var out []Agent
 	for rows.Next() {
 		var a Agent
-		if err := rows.Scan(&a.ID, &a.ServerID, &a.Name, &a.Role, &a.KeyHash, &a.Status, &a.Version, &a.Hostname, &a.PublicIP, &a.LastSeen, &a.AppliedRevision); err != nil {
+		if err := rows.Scan(&a.ID, &a.ServerID, &a.Name, &a.Role, &a.KeyHash, &a.Status, &a.Version, &a.Hostname, &a.PublicIP, &a.LastSeen, &a.AppliedRevision,
+			&a.Arch, &a.OS, &a.CPUCores, &a.CPUPct, &a.Load1, &a.MemTotalMB, &a.MemUsedMB, &a.DiskTotalGB, &a.DiskUsedGB, &a.UptimeS, &a.Virt, &a.PublicIPOverride); err != nil {
 			return nil, err
 		}
 		out = append(out, a)
