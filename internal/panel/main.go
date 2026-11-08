@@ -629,8 +629,17 @@ func Main(args []string) int {
 		case "cluster", "mesh":
 			os.Exit(cliCluster(args[1:]))
 		case "backup":
+			// The backup/restore CLIs must honor GRE_PANEL_DIR like the
+			// other subcommands do — otherwise the documented env-driven
+			// workflow backs up /etc/gre-panel regardless.
+			if v := os.Getenv("GRE_PANEL_DIR"); v != "" {
+				configDir = v
+			}
 			return BackupCmd(args[1:])
 		case "restore":
+			if v := os.Getenv("GRE_PANEL_DIR"); v != "" {
+				configDir = v
+			}
 			return RestoreCmd(args[1:])
 		case "password", "pass", "set-password":
 			os.Exit(cliSetPassword(args[1:]))
