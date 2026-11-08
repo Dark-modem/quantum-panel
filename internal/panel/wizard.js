@@ -122,7 +122,7 @@ var RENDER_GEN = 0; // bumped on every step render; async callbacks drop stale w
       var coeff = parseFloat(document.getElementById('dc-coeff').value) || 1.0;
       if (!name) { say(t('dc_name'), true); return; }
       api('POST', 'datacenters', { name: name, kind: 'iran', price_coefficient: coeff })
-        .then(function () { S.dcs.push({ name: name, coeff: coeff }); say(''); step1(); })
+        .then(function () { S.dcs.push({ name: name, coeff: coeff }); say(''); setTimeout(step1, 0); })
         .catch(function (e) { say(e.message, true); });
     };
     var rows = S.dcs.map(function (d) {
@@ -178,7 +178,7 @@ var RENDER_GEN = 0; // bumped on every step render; async callbacks drop stale w
               var cmd = 'sudo bash install-agent.sh --server ' + url + ' --token ' + tok.token +
                         ' --name ' + name + ' --role ' + role;
               list.push({ name: name, id: sv.id, online: false, installCmd: cmd });
-              renderList(listKey, list);
+              setTimeout(function () { renderList(listKey, list); }, 0);
               pollAgent(listKey, list, name);
               say('');
             });
