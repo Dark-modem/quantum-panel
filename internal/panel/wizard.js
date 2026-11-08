@@ -470,6 +470,10 @@
     };
   }
 
+  function iranList() { return collectIran(); }
+  function foreignList() { return S.foreign.filter(function (f) { return f.id; }); }
+  var agentsRuntime = { agents: [] };
+
   function collectIran() {
     var out = [];
     S.dcs.forEach(function (d, di) {
@@ -507,8 +511,10 @@
           }).then(function (r) {
             created++;
             // The generator answers {topology_id: N, tunnels: [...]}.
-            if (!firstTopo) firstTopo = r.body.topology_id;
-            var topoId = r.body.topology_id;
+            if (!firstTopo) firstTopo = r.topology_id;
+            S.topoForPair = S.topoForPair || {};
+            S.topoForPair[key] = r.topology_id;
+            var topoId = r.topology_id;
             // Pair-level weight (this iran server ↔ this foreign server).
             var w = S.weights[fr.id] || 1;
             return api('POST', 'topologies/' + topoId + '/weights',
@@ -538,25 +544,46 @@
     }).catch(function (e) { say(e.message, true); });
   }
 
-  // Status page: poll overview until acks land / states show up.
+  // Status page: poll the created topologies (tunnel rows) + the agent
+  // runtime (live up/down per tunnel — the overview's agent list carries
+  // the runtime, same source the mesh topos tab uses).
   function statusPage() {
     var el = document.getElementById('step-body');
     el.innerHTML = '<div class="card"><b>' + esc(t('created')) + '</b><div id="wiz-tunnels"></div></div>';
+    var topoIds = [];
+    iranList().forEach(function (ir) {
+      foreignList().forEach(function (fr) {
+        var key = ir.id + '-' + fr.id;
+        if (S.pairs[key]) topoIds.push(S.topoForPair[key]);
+      });
+    });
     var tick = function () {
-      api('GET', 'overview').then(function (d) {
-        var rows = (d.tunnels || []).map(function (tn) {
-          var st = tn.state || 'unknown';
-          var pill = st === 'up' ? 'ok' : (st === 'down' ? 'down' : 'warn');
-          return '<tr><td>' + esc(tn.tunnel_key || tn.id) + '</td><td>' + esc(tn.engine || '') + '</td>' +
-            '<td><span class="pill ' + pill + '">' + esc(st) + '</span></td></tr>';
-        }).join('');
-        document.getElementById('wiz-tunnels').innerHTML =
-          '<table><tr><th>tunnel</th><th>' + esc(t('engine')) + '</th><th>' + esc(t('state')) + '</th></tr>' + rows + '</table>';
-      }).catch(function (e) { say(e.message, true); });
+      topoIds.forEach(function (tid) {
+        api('GET', 'topologies/' + tid).then(function (d) {
+          var rows = (d.tunnels || []).map(function (tn) {
+            var st = 'unknown';
+            try {
+              (agentsRuntime.agents || []).forEach(function (a) {
+                (a.runtime || []).forEach(function (rt) { if (rt.tunnel_id === tn.tunnel_key) st = rt.up ? 'up' : 'down'; });
+              });
+            } catch (e) {}
+            var pill = st === 'up' ? 'ok' : (st === 'down' ? 'down' : 'warn');
+            return '<tr><td>' + esc(tn.tunnel_key) + '</td><td>' + esc(tn.engine || '') + '</td>' +
+              '<td><span class="pill ' + pill + '">' + esc(st) + '</span></td></tr>';
+          }).join('');
+          document.getElementById('wiz-tunnels').innerHTML =
+            '<table><tr><th>tunnel</th><th>' + esc(t('engine')) + '</th><th>' + esc(t('state')) + '</th></tr>' + rows + '</table>';
+        }).catch(function () {});
+      });
     };
+    var pollAgents = function () {
+      agentAPI('GET', 'api/agents').then(function (r) { agentsRuntime.agents = r.agents || r || []; }).catch(function () {});
+    };
+    pollAgents();
     tick();
     var iv = setInterval(tick, 3000);
-    setTimeout(function () { clearInterval(iv); }, 120000);
+    var iv2 = setInterval(pollAgents, 3000);
+    setTimeout(function () { clearInterval(iv); clearInterval(iv2); }, 120000);
   }
 
   // ---- navigation ---------------------------------------------------------
