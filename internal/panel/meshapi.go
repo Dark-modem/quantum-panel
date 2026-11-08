@@ -950,6 +950,12 @@ func handleMeshPGDelete(w http.ResponseWriter, r *http.Request) {
 
 // serveMeshPage renders the mesh management page (session-authed like the
 // rest of the UI; the page itself is static, all data comes from the API).
+// serveWizardPage serves the guided setup wizard (phase 7) at
+// <base>/mesh-wizard — the same embedded-asset pattern as the mesh page.
+func serveWizardPage(w http.ResponseWriter, r *http.Request) {
+	serveAsset("wizard.html", "text/html; charset=utf-8").ServeHTTP(w, r)
+}
+
 func serveMeshPage(w http.ResponseWriter, r *http.Request) {
 	serveAsset("mesh.html", "text/html; charset=utf-8").ServeHTTP(w, r)
 }
