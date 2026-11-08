@@ -41,6 +41,9 @@ func handleStatus(w http.ResponseWriter, r *http.Request) {
 	if lv.Rx == nil {
 		lv.Rx, lv.Tx = snap.LocalRx, snap.LocalTx
 	}
+	// Phase 11 requirement 7: the panel host's own IP is not UI data
+	// (the top bar reads GET /api/ui/session now).
+	lv.LocalPub = ""
 	resp := map[string]any{"local": lv, "peers": peers, "peer_count": len(peers), "peer_max": maxPeers(), "snapshot_age_ms": snap.AgeMs(),
 		"counters_at": countersAtMs(snap),
 		// M3: the UI hides the legacy host-operator pages unless this is on.

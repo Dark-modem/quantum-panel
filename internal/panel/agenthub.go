@@ -485,6 +485,13 @@ func (c *agentConn) applyHello(h *agentHello) {
 	if err != nil {
 		log.Printf("[agents] cannot mark %s online: %v", c.id, err)
 	}
+	// Phase 11: mirror arch/os into the store too (the legacy registry
+	// above is not what the UI reads; migration 6 gave agents columns).
+	if h.OS != "" || h.Arch != "" {
+		if st, serr := MeshStore(); serr == nil {
+			_ = st.SetAgentArchOS(c.id, agentValidText(h.Arch, 64), agentValidText(h.OS, 64))
+		}
+	}
 	c.state.mu.Lock()
 	c.state.lastPersist = time.Now()
 	c.state.mu.Unlock()

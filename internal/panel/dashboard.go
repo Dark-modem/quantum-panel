@@ -175,12 +175,14 @@ func handleDashboard(w http.ResponseWriter, r *http.Request) {
 		"snapshot_age_ms": snap.AgeMs(),
 		"snapshot_at":     nilIfEmpty(snapAt),
 		"role":            nilIfEmpty(st.Role),
-		"local_pub":       nilIfEmpty(snap.PublicIP),
-		"remote_pub":      nilIfEmpty(st.RemotePub),
-		"active_engine":   engine,
-		"active_carrier":  carrierCfg.ActiveCarrier,
-		"auto_failover":   peerCfg.AutoPilotEnabled,
-		"last_error":      lastErr,
+		// Phase 11 requirement 7: the panel host's own IP is NOT UI data
+		// (the central panel carries no tunnels). The top bar reads
+		// GET /api/ui/session instead.
+		"remote_pub":     nilIfEmpty(st.RemotePub),
+		"active_engine":  engine,
+		"active_carrier": carrierCfg.ActiveCarrier,
+		"auto_failover":  peerCfg.AutoPilotEnabled,
+		"last_error":     lastErr,
 		"gre": map[string]any{
 			"exists": st.Gre.Exists,
 			"inner":  nilIfEmpty(st.Gre.Inner),

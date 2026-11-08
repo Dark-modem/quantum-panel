@@ -104,6 +104,21 @@ type Agent struct {
 	PublicIP        string `json:"public_ip"`
 	LastSeen        int64  `json:"last_seen"`
 	AppliedRevision string `json:"applied_revision"`
+	// Phase 11: the v2 report's ResourceReport + hello identity, now
+	// persisted (migration 6). PublicIPOverride is the manual override
+	// the UI edits; effective IP = override when non-empty, else PublicIP.
+	Arch             string  `json:"arch,omitempty"`
+	OS               string  `json:"os,omitempty"`
+	CPUCores         int     `json:"cpu_cores,omitempty"`
+	CPUPct           float64 `json:"cpu_pct,omitempty"`
+	Load1            float64 `json:"load1,omitempty"`
+	MemTotalMB       int64   `json:"mem_total_mb,omitempty"`
+	MemUsedMB        int64   `json:"mem_used_mb,omitempty"`
+	DiskTotalGB      float64 `json:"disk_total_gb,omitempty"`
+	DiskUsedGB       float64 `json:"disk_used_gb,omitempty"`
+	UptimeS          int64   `json:"uptime_s,omitempty"`
+	Virt             string  `json:"virt,omitempty"`
+	PublicIPOverride string  `json:"public_ip_override,omitempty"`
 }
 
 // AuditEntry is one audit-log record.
@@ -465,10 +480,12 @@ func (s *Store) UpsertAgent(a Agent) error {
 
 // GetAgent returns one agent.
 func (s *Store) GetAgent(id string) (Agent, error) {
-	row := s.db.QueryRow(`SELECT id, COALESCE(server_id, 0), name, role, key_hash, status, version, hostname, public_ip, last_seen, applied_revision
+	row := s.db.QueryRow(`SELECT id, COALESCE(server_id, 0), name, role, key_hash, status, version, hostname, public_ip, last_seen, applied_revision,
+		arch, os, cpu_cores, cpu_pct, load1, mem_total_mb, mem_used_mb, disk_total_gb, disk_used_gb, uptime_s, virt, public_ip_override
 		FROM agents WHERE id = ?`, id)
 	var a Agent
-	err := row.Scan(&a.ID, &a.ServerID, &a.Name, &a.Role, &a.KeyHash, &a.Status, &a.Version, &a.Hostname, &a.PublicIP, &a.LastSeen, &a.AppliedRevision)
+	err := row.Scan(&a.ID, &a.ServerID, &a.Name, &a.Role, &a.KeyHash, &a.Status, &a.Version, &a.Hostname, &a.PublicIP, &a.LastSeen, &a.AppliedRevision,
+		&a.Arch, &a.OS, &a.CPUCores, &a.CPUPct, &a.Load1, &a.MemTotalMB, &a.MemUsedMB, &a.DiskTotalGB, &a.DiskUsedGB, &a.UptimeS, &a.Virt, &a.PublicIPOverride)
 	return a, wrapNotFound(err)
 }
 

@@ -819,6 +819,7 @@ func Main(args []string) int {
 	// read the store. Mutations ride the same requireAuth(requireCSRF(...))
 	// gate and the store's audit table records the domain events.
 	registerMeshRoutes(mux, base)
+	registerUIAPIRoutes(mux, base)
 	// Phase 5 R5: engine artifact store + agent manifest (engineartifacts.go).
 	registerEngineArtifactRoutes(mux, base)
 	// Phase 5 TASK 2: encrypted backup download behind re-auth (backupapi.go).

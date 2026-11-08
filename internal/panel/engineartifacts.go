@@ -375,7 +375,9 @@ func handleEngineArtifactUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	key, err := engineArtifactVerifyKey()
 	if err != nil {
-		writeAPIError(w, r, "E-IN-05", err.Error())
+		// A bad/misconfigured key (e.g. the RAW 32-byte footgun) is a
+		// VALIDATION error the operator fixes by re-exporting — 400.
+		writeAPIError(w, r, "E-IN-06", err.Error())
 		return
 	}
 

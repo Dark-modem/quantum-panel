@@ -103,6 +103,13 @@ func ingestStateReportV2(agentID string, rep *protocol.StateReportV2) {
 	meshRuntimeSeen[agentID] = now
 	meshRuntimeMu.Unlock()
 
+	// Phase 11 UI data: persist what the new report sections carry.
+	ingestUISections(s, agentID, rep, now)
+
+	// Persist per-tunnel state transitions + errors into the bounded
+	// event log (drives the tunnel detail view's history).
+	recordTunnelEvents(s, agentID, rep, now)
+
 	// Mirror the session facts into the store's agents table (the store has
 	// no revoked concept; revocation lives in the legacy registry).
 	if rep.AppliedRevision != "" {
@@ -110,10 +117,93 @@ func ingestStateReportV2(agentID string, rep *protocol.StateReportV2) {
 	}
 	_, _ = s.DB().Exec(`UPDATE agents SET status = 'online', last_seen = ? WHERE id = ?`, now, agentID)
 
-	// Retention: cheap and rare.
+	// Retention: cheap and rare. Prune raw samples past retention AND
+	// fold every COMPLETE hour into traffic_hourly first (the watermark
+	// makes the fold idempotent; without a production caller the hourly
+	// table stayed empty and 30d ranges lost their history).
 	if now%60 == 0 {
+		if n, err := s.RollupTrafficHourly(now - 2*3600); err != nil {
+			log.Printf("[mesh] traffic rollup: %v", err)
+		} else if n > 0 {
+			log.Printf("[mesh] folded %d hourly traffic rows", n)
+		}
 		if n, err := s.PruneTrafficSamples(now - 30*24*3600); err == nil && n > 0 {
 			log.Printf("[mesh] pruned %d traffic samples", n)
+		}
+		if n, err := s.PruneTunnelEvents(now - 7*24*3600); err == nil && n > 0 {
+			log.Printf("[mesh] pruned %d tunnel events", n)
+		}
+	}
+}
+
+// ingestUISections persists the Phase-11 report sections: host metrics
+// into agents, engine_status[] into agent_engines, proc[] into
+// tunnel_proc. All best-effort: a UI-data failure must never break the
+// tunnel data path.
+func ingestUISections(s *store.Store, agentID string, rep *protocol.StateReportV2, now int64) {
+	if r := rep.Resources; r != nil {
+		_ = s.UpdateAgentResources(agentID, r.CPUCores, r.CPUPercent, r.LoadAvg1,
+			int64(r.MemTotalMB), int64(r.MemUsedMB), float64(r.DiskTotalGB), float64(r.DiskUsedGB),
+			int64(r.UptimeS), r.Virt)
+	}
+	for _, es := range rep.EngineStatus {
+		if es.Engine == "" {
+			continue
+		}
+		_ = s.UpsertAgentEngine(store.AgentEngine{
+			AgentID: agentID, Engine: es.Engine, Installed: es.Installed,
+			Version: es.Version, BytesOnDisk: es.BytesOnDisk,
+			Desired: es.Enabled, Instances: es.Instances,
+			LastError: es.LastError, UpdatedAt: now,
+		})
+	}
+	for _, tp := range rep.Proc {
+		if tp.TunnelID == "" || !tp.Known {
+			continue // unknown tunnel ids are skipped; unknown metrics are not stored
+		}
+		tid, err := tunnelIDByKey(s, tp.TunnelID)
+		if err != nil {
+			continue
+		}
+		_ = s.UpsertTunnelProc(store.TunnelProcNow{
+			TunnelID: tid, AgentID: agentID, CPUPct: tp.CPUPercent,
+			RSSBytes: tp.RSSBytes, Processes: tp.Processes, At: now,
+		})
+	}
+}
+
+// recordTunnelEvents writes a tunnel_events row on every observed state
+// flip (healthy→down and back via Up) and on every reported per-tunnel
+// error. Bounded by the 7-day prune above.
+func recordTunnelEvents(s *store.Store, agentID string, rep *protocol.StateReportV2, now int64) {
+	prev := meshRuntimeSnapshot(agentID)
+	wasUp := map[string]bool{}
+	wasErr := map[string]string{}
+	for _, tr := range prev {
+		wasUp[tr.TunnelID] = tr.Up
+		if tr.LastError != "" {
+			wasErr[tr.TunnelID] = tr.LastError
+		}
+	}
+	for _, tr := range rep.Tunnels {
+		tid, err := tunnelIDByKey(s, tr.TunnelID)
+		if err != nil {
+			continue
+		}
+		if was, seen := wasUp[tr.TunnelID]; seen && was != tr.Up {
+			from, to := "down", "up"
+			if was {
+				from, to = "up", "down"
+			}
+			_ = s.AddTunnelEvent(store.TunnelEvent{
+				TunnelID: tid, At: now, Kind: "state", FromState: from, ToState: to,
+			})
+		}
+		if tr.LastError != "" && tr.LastError != wasErr[tr.TunnelID] {
+			_ = s.AddTunnelEvent(store.TunnelEvent{
+				TunnelID: tid, At: now, Kind: "error", Code: "E-ENGINE-UNKNOWN-ERROR",
+				Text: redactErrorText(tr.LastError),
+			})
 		}
 	}
 }
