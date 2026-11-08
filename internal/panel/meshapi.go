@@ -471,6 +471,10 @@ func handleMeshTopoGet(w http.ResponseWriter, r *http.Request) {
 	}
 	weights, _ := s.ListWeights(id)
 	forwards, _ := s.ListForwardRules(id)
+	// Phase 9 2a: SECRET engine_params fields are never echoed back.
+	for i := range tunnels {
+		tunnels[i].EngineParams = stripEngineSecrets(tunnels[i].Engine, tunnels[i].EngineParams)
+	}
 	writeJSON(w, map[string]any{
 		"topology": tp, "members": nonNil(members),
 		"tunnels": nonNil(tunnels), "weights": nonNil(weights), "forwards": nonNil(forwards),
@@ -672,7 +676,13 @@ func handleMeshTunnelCreate(w http.ResponseWriter, r *http.Request) {
 			writeAPIError(w, r, "E-IN-06", "engine_params must be valid JSON <= 16 KiB")
 			return
 		}
-		params = string(body.EngineParams)
+		np := string(body.EngineParams)
+		// Phase 9 2a: a re-create of an EXISTING key merges — masked
+		// secret fields (empty in the form) keep their stored values.
+		if prev, err := s.GetTunnelByKey(key); err == nil && prev.EngineParams != "" {
+			np = mergeEngineSecrets(body.Engine, prev.EngineParams, np)
+		}
+		params = np
 	}
 	if warn, err := validateEngineAgainstCatalog(s, body.LocalServerID, body.Engine); err != nil {
 		writeAPIError(w, r, "E-IN-06", err.Error())
@@ -732,7 +742,8 @@ func handleMeshTunnelPatch(w http.ResponseWriter, r *http.Request) {
 			writeAPIError(w, r, "E-IN-06", "engine_params must be valid JSON <= 16 KiB")
 			return
 		}
-		t.EngineParams = string(*body.EngineParams)
+		np := mergeEngineSecrets(t.Engine, t.EngineParams, string(*body.EngineParams))
+		t.EngineParams = np
 	}
 	if body.Enabled != nil {
 		t.Enabled = *body.Enabled

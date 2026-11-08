@@ -825,6 +825,8 @@ func Main(args []string) int {
 	registerBackupRoutes(mux, base)
 	// Phase 5 TASK 3: mesh alert engine + notifiers (meshalerts_*.go).
 	registerMeshAlertRoutes(mux, base)
+	// Phase 9 TASK 2a: engine parameter templates (enginetemplates.go).
+	registerEngineTemplateRoutes(mux, base)
 	mux.HandleFunc("GET "+base+"/mesh", requireAuth(serveMeshPage))
 	mux.HandleFunc("GET "+base+"/mesh.js", serveAsset("mesh.js", "text/javascript; charset=utf-8"))
 	// Phase 7: the /mesh setup wizard (wizard.html + wizard.js, fa/en) —
