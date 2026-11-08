@@ -384,7 +384,7 @@
         document.getElementById('uout').innerHTML =
           '<table><tr><th>' + esc(t('engine')) + '</th><th>' + esc(t('overhead')) + ' RX</th><th>' + esc(t('overhead')) + ' TX</th>' +
           '<th>' + esc(t('price')) + '</th><th>' + esc(t('overhead')) + '</th><th>' + esc(t('coefficient')) + '</th></tr>' + rows + '</table>' +
-          '<p class="muted">' + esc(r.note) + ' — <a href="#" onclick="document.getElementById('pasarguard-tab-link')&&document.getElementById('pasarguard-tab-link').click();return false">' + esc(t('tab_pg')) + '</a></p>';
+          '<p class="muted">' + esc(r.note) + ' — <a href="#" onclick="var l=document.getElementById(&quot;pasarguard-tab-link&quot;);if(l)l.click();return false">' + esc(t('tab_pg')) + '</a></p>';
       }).catch(function (e) { say(e.message, true); });
     };
     // Tunnel health: per tunnel state/engine/latency + wire/payload.

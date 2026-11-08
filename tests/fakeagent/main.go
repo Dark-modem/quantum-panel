@@ -1,6 +1,8 @@
 // fakeagent — a minimal v2 agent for local UI audits and performance
-// runs: connects to the panel over WS, enrolls with a token, reports
-// hello + runtime (N tunnels up) + usage every few seconds. NOT shipped.
+// runs: enrolls with a token, connects over WS, and speaks the REAL v2
+// envelope ({"v":2,"type":T,"data":P}): hello, then a heartbeat every few
+// seconds carrying StateReportV2-shaped tunnel runtime, per-engine
+// overhead samples and resources. NOT shipped.
 package main
 
 import (
@@ -13,38 +15,54 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
 )
 
 var (
-	server   = flag.String("server", "http://127.0.0.1:8000/ui", "panel base URL incl base path")
-	token    = flag.String("token", "", "enroll token")
-	name     = flag.String("name", "fake-agent", "agent name")
-	role     = flag.String("role", "iran", "role: iran|foreign")
-	tunnels  = flag.Int("tunnels", 3, "tunnels to report")
-	traffic  = flag.Bool("traffic", true, "report wire/payload bytes")
-	interval = flag.Duration("interval", 3*time.Second, "report interval")
+	server    = flag.String("server", "http://127.0.0.1:8000/ui", "panel base URL incl base path")
+	token     = flag.String("token", "", "enroll token")
+	name      = flag.String("name", "fake-agent", "agent name")
+	role      = flag.String("role", "iran", "role: iran|foreign")
+	tunnels   = flag.Int("tunnels", 3, "tunnels to report (synthetic ids unless -tunnel-ids)")
+	tunnelIDs = flag.String("tunnel-ids", "", "comma-separated REAL tunnel ids to report (joins panel state)")
+	downCount = flag.Int("down", 0, "report the first N tunnels as DOWN (varied health)")
+	traffic   = flag.Bool("traffic", true, "report wire/payload bytes")
+	interval  = flag.Duration("interval", 3*time.Second, "report interval")
 )
 
-type agentIdentity struct {
-	Server   string `json:"server"`
-	BasePath string `json:"base_path"`
-	Key      string `json:"key"`
-	Name     string `json:"name"`
+// envelope is the v2 wire shape (quantum-protocol Envelope).
+type envelope struct {
+	V    int             `json:"v"`
+	Type string          `json:"type"`
+	Data json.RawMessage `json:"data,omitempty"`
 }
 
+func wrap(v int, typ string, payload any) ([]byte, error) {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(envelope{V: v, Type: typ, Data: data})
+}
 
 func main() {
 	flag.Parse()
-	rand.New(rand.NewSource(time.Now().UnixNano()))
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 	base := strings.TrimRight(*server, "/")
 	// enroll
 	enrollURL := base + "/api/agent/enroll"
-	resp, err := http.Post(enrollURL, "application/json",
+	req, err := http.NewRequest("POST", enrollURL,
 		strings.NewReader(fmt.Sprintf(`{"name":%q,"hostname":%q,"os":"linux","arch":"amd64","caps":["matrix","v2"]}`,
 			*name, *name)))
+	if err != nil {
+		log.Fatal("enroll: ", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Enroll-Token", *token)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		log.Fatal("enroll: ", err)
 	}
@@ -62,10 +80,22 @@ func main() {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
 
-	stop := make(chan struct{})
+	ids := []string{}
+	if *tunnelIDs != "" {
+		for _, s := range strings.Split(*tunnelIDs, ",") {
+			if s = strings.TrimSpace(s); s != "" {
+				ids = append(ids, s)
+			}
+		}
+	}
+	for len(ids) < *tunnels {
+		ids = append(ids, fmt.Sprintf("t-%s-%d", *name, len(ids)))
+	}
+
+reconnect:
 	for {
 		select {
-		case <-stop:
+		case <-sig:
 			return
 		default:
 		}
@@ -75,6 +105,7 @@ func main() {
 		hdr.Set("X-Agent-Key", er.Key)
 		ws, _, err := websocket.DefaultDialer.Dial(wsURL, hdr)
 		if err != nil {
+			log.Printf("ws dial: %v (retry 2s)", err)
 			select {
 			case <-sig:
 				return
@@ -82,41 +113,119 @@ func main() {
 				continue
 			}
 		}
-		// hello
-		hello := map[string]any{
-			"v": 2, "typ": "hello", "version": "fake-1.0", "hostname": *name,
-			"os": "linux", "arch": "amd64", "caps": []string{"matrix", "v2"},
-			"engine_catalog": []map[string]any{{"id": "matrix", "version": "fake"}},
+		dead := make(chan struct{})
+		var wmu sync.Mutex // gorilla: one writer at a time
+		write := func(typ string, payload any) {
+			if b, err := wrap(2, typ, payload); err == nil {
+				wmu.Lock()
+				_ = ws.WriteMessage(websocket.TextMessage, b)
+				wmu.Unlock()
+			}
 		}
-		ws.WriteJSON(hello)
+		// hello (data = protocol.Hello; ID must match the authenticated identity)
+		hello := map[string]any{
+			"id": er.ID, "version": "fake-1.0", "hostname": *name,
+			"os": "linux", "arch": "amd64", "caps": []string{"matrix", "v2"},
+			"max_version": 2, "engine_catalog": []string{"matrix"},
+		}
+		write("hello", hello)
 		go func() {
 			<-sig
 			ws.Close()
 		}()
+		// inbound: drain welcome/desired; ANSWER commands with a result
+		// (ok=true) so panel flows that need an agent ack — e.g. the
+		// hardening safe-apply pending-confirm window — complete.
+		go func() {
+			<-sig
+			ws.Close()
+		}()
+		// inbound: drain welcome/desired; ANSWER commands with a result
+		// (ok=true) so panel flows that need an agent ack — e.g. the
+		// hardening safe-apply pending-confirm window — complete.
+		go func() {
+			for {
+				_, raw, err := ws.ReadMessage()
+				if err != nil {
+					close(dead)
+					return
+				}
+				var env envelope
+				if json.Unmarshal(raw, &env) != nil || env.Type != "command" {
+					continue
+				}
+				var cmd struct {
+					ID string `json:"id"`
+				}
+				if json.Unmarshal(env.Data, &cmd) != nil || cmd.ID == "" {
+					continue
+				}
+				write("result", map[string]any{
+					"id": cmd.ID, "ok": true, "output": "fake agent applied",
+					"data": map[string]any{"journal": "fake apply", "armed": true,
+						"timer_unit": "s", "verify": "ok"},
+				})
+			}
+		}()
 		tick := time.NewTicker(*interval)
-		defer tick.Stop()
-		var rx, tx uint64
-		rt := make([]map[string]any, *tunnels)
-		for i := range rt {
-			rt[i] = map[string]any{"tunnel_id": fmt.Sprintf("t-%s-%d", *name, i),
-				"engine": "matrix", "up": true, "latency_ms": 12.0 + float64(i),
-				"wire_known": true, "payload_known": false}
+		var rx, tx, prx, ptx uint64
+		report := func() {
+			rt := make([]map[string]any, len(ids))
+			for i, id := range ids {
+				up := i >= *downCount
+				t := map[string]any{
+					"tunnel_id": id, "engine": "matrix", "up": up,
+					"wire_known": true, "payload_known": *traffic, "counters_known": true,
+				}
+				if up {
+					t["latency_ms"] = 12.0 + float64(i) + rng.Float64()
+					if *traffic {
+						t["wire_rx"] = rx / uint64(len(ids))
+						t["wire_tx"] = tx / uint64(len(ids))
+						t["payload_rx"] = prx / uint64(len(ids))
+						t["payload_tx"] = ptx / uint64(len(ids))
+					}
+				}
+				rt[i] = t
+			}
+			beat := map[string]any{
+				"applied_revision": "1",
+				"tunnels":          rt,
+				"resources": map[string]any{
+					"cpu_model": "Fake Xeon", "cpu_cores": 4,
+					"cpu_percent": 8.0 + rng.Float64()*20, "load_avg_1": 0.4,
+					"mem_total_mb": 4096, "mem_used_mb": 1200 + uint64(rng.Intn(400)),
+					"disk_total_gb": 80, "disk_used_gb": 21, "uptime_s": 86400,
+				},
+			}
+			if *traffic && prx > 0 {
+				// one per-engine overhead sample (wire ≈ payload × 1.08)
+				beat["engines"] = []map[string]any{{
+					"engine": "matrix", "tunnels": len(ids),
+					"wire_rx": rx, "payload_rx": prx, "wire_tx": tx, "payload_tx": ptx,
+					"ratio": float64(rx) / float64(prx), "ratio_tx": float64(tx) / float64(ptx),
+				}}
+			}
+			write("heartbeat", map[string]any{
+				"ts": time.Now().Unix(), "uptime_s": 86400, "state": beat,
+			})
 		}
 		for {
 			select {
-			case <-stop:
+			case <-sig:
 				ws.Close()
 				return
+			case <-dead:
+				log.Printf("session closed by panel, reconnecting")
+				ws.Close()
+				goto reconnect
 			case <-tick.C:
-				rx += uint64(100000 + rand.Intn(50000))
-				tx += uint64(80000 + rand.Intn(40000))
-				for i := range rt {
-					rt[i]["wire_rx"], rt[i]["wire_tx"] = rx/uint64(*tunnels), tx/uint64(*tunnels)
-				}
-				ws.WriteJSON(map[string]any{"v": 2, "typ": "runtime", "tunnels": rt})
-				ws.WriteJSON(map[string]any{"v": 2, "typ": "usage", "wire_rx": rx, "wire_tx": tx,
-					"payload_known": false})
-				_ = *traffic
+				rx += uint64(100000 + rng.Intn(50000))
+				tx += uint64(80000 + rng.Intn(40000))
+				// wire ≈ payload × ~1.08 (realistic overhead)
+				prx = uint64(float64(rx) / 1.08)
+				ptx = uint64(float64(tx) / 1.08)
+				report()
 			}
 		}
 	}

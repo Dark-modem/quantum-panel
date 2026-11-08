@@ -103,31 +103,44 @@ var errCatalog = map[string]errInfo{
 	// speed and volume limits
 	"E-LIMIT-01": {400, "bad limits request", "The detail names the field; fix it and try again."},
 	// log diagnostics (annotation only, also reused by status hints)
-	"E-GRE-01":    {0, "GRE interface missing / down", "Tunnel setup did not create it, or it was deleted — reinstall that peer."},
-	"E-GRE-02":    {0, "GRE ping failed (100% loss / unreachable)", "Peers cannot reach each other: firewall, wrong public IP, or GRE blocked."},
-	"E-FRP-01":    {0, "frps service not active", "Start it from the peer card (Restart) or check its log."},
-	"E-FRP-02":    {0, "frp authentication failed (token mismatch)", "Re-copy the token from the Iran peer card to the Foreign side."},
-	"E-FRP-03":    {0, "frp bind conflict (address already in use)", "Another tunnel uses this port — change frp_port or the reverse port."},
-	"E-FRP-04":    {0, "frp cannot reach server (connection refused/timeout)", "Iran unreachable: wrong IP/port, firewall, or frps down."},
-	"E-FRP-05":    {0, "file descriptor limit reached (too many open files)", "Process hit LimitNOFILE. Ensure LimitNOFILE=1048576 in systemd and kernel fs.file-max."},
-	"E-FRP-06":    {0, "heartbeat timeout (FRP control link dropped)", "Network jitter or heavy bandwidth contention delayed heartbeat packets. Heartbeat timeout relaxed to 90s."},
-	"E-FRP-07":    {0, "connection reset by peer / broken pipe", "Remote peer or network carrier reset the TCP stream."},
-	"E-FRP-08":    {0, "connection tracking table full (packet dropped)", "Kernel nf_conntrack_max limit reached under high concurrent connections. Run Optimize in Tunnel tab."},
-	"E-FRP-09":    {0, "yamux stream capacity / buffer overflow", "High stream contention on single TCP mux. Increase poolCount in frpc."},
-	"E-BH-01":     {0, "backhaul authentication failed (token mismatch)", "The client token differs from the server token. Re-copy it from the Iran side; the token shown in logs is masked."},
-	"E-BH-02":     {0, "backhaul control channel failed (EOF)", "Usually a wrong token or a transport mismatch (e.g. tcp vs tcpmux/ws) between hub and spoke. Make both ends use the same transport and token."},
-	"E-BH-03":     {0, "backhaul rejected the config file", "The binary does not understand this config dialect (sectioned premium schema vs flat server/client). Re-run the Backhaul setup in `quantum`."},
-	"E-BH-04":     {0, "backhaul transport mismatch: the link is up but carries no data", "The two servers use different Backhaul transports of the same family (tcp vs tcpmux, ws vs wsmux): the control channel connects, every connection fails. Set the same transport on both, or set the foreign side up again from the Iran bundle."},
-	"E-FRP-10":    {0, "frpc login failed with EOF (likely tcpMux mismatch)", "tcpMux mismatch: hub is likely tcpMux=true, run `quantum perf tcpmux on|off` so both ends match (default OFF)."},
-	"E-SYS-01":    {503, "host tool unavailable", "journalctl/systemctl/ip missing on this host."},
-	"E-SYS-02":    {503, "panel is busy (too many requests in flight)", "Retry in a couple of seconds; /api/selfstats still answers."},
-	"E-RESCUE-01": {400, "bad rescue request", "Reload the page and try again."},
-	"E-RESCUE-02": {409, "no peer address known to test against", "Pair this server with its peer first (Settings > Peer link) or create a tunnel."},
-	"E-RESCUE-03": {400, "invalid port list", "Use ports like 1020, 1030 or a range 2000-2005 (max 64)."},
-	"E-RESCUE-04": {400, "cannot enable rescue", "See the message for the cause; nothing was left behind."},
-	"E-RESCUE-05": {400, "cannot apply rescue code", "Paste the full code generated on the blocked server."},
-	"E-RESCUE-06": {409, "rescue is not active on this server", "Enable rescue on the blocked server first."},
-	"E-RESCUE-07": {403, "rescue offer denied", "Only the server named when rescue was enabled may fetch the offer."},
+	"E-GRE-01": {0, "GRE interface missing / down", "Tunnel setup did not create it, or it was deleted — reinstall that peer."},
+	"E-GRE-02": {0, "GRE ping failed (100% loss / unreachable)", "Peers cannot reach each other: firewall, wrong public IP, or GRE blocked."},
+	"E-FRP-01": {0, "frps service not active", "Start it from the peer card (Restart) or check its log."},
+	"E-FRP-02": {0, "frp authentication failed (token mismatch)", "Re-copy the token from the Iran peer card to the Foreign side."},
+	"E-FRP-03": {0, "frp bind conflict (address already in use)", "Another tunnel uses this port — change frp_port or the reverse port."},
+	"E-FRP-04": {0, "frp cannot reach server (connection refused/timeout)", "Iran unreachable: wrong IP/port, firewall, or frps down."},
+	"E-FRP-05": {0, "file descriptor limit reached (too many open files)", "Process hit LimitNOFILE. Ensure LimitNOFILE=1048576 in systemd and kernel fs.file-max."},
+	"E-FRP-06": {0, "heartbeat timeout (FRP control link dropped)", "Network jitter or heavy bandwidth contention delayed heartbeat packets. Heartbeat timeout relaxed to 90s."},
+	"E-FRP-07": {0, "connection reset by peer / broken pipe", "Remote peer or network carrier reset the TCP stream."},
+	"E-FRP-08": {0, "connection tracking table full (packet dropped)", "Kernel nf_conntrack_max limit reached under high concurrent connections. Run Optimize in Tunnel tab."},
+	"E-FRP-09": {0, "yamux stream capacity / buffer overflow", "High stream contention on single TCP mux. Increase poolCount in frpc."},
+	"E-BH-01":  {0, "backhaul authentication failed (token mismatch)", "The client token differs from the server token. Re-copy it from the Iran side; the token shown in logs is masked."},
+	"E-BH-02":  {0, "backhaul control channel failed (EOF)", "Usually a wrong token or a transport mismatch (e.g. tcp vs tcpmux/ws) between hub and spoke. Make both ends use the same transport and token."},
+	"E-BH-03":  {0, "backhaul rejected the config file", "The binary does not understand this config dialect (sectioned premium schema vs flat server/client). Re-run the Backhaul setup in `quantum`."},
+	"E-BH-04":  {0, "backhaul transport mismatch: the link is up but carries no data", "The two servers use different Backhaul transports of the same family (tcp vs tcpmux, ws vs wsmux): the control channel connects, every connection fails. Set the same transport on both, or set the foreign side up again from the Iran bundle."},
+	"E-FRP-10": {0, "frpc login failed with EOF (likely tcpMux mismatch)", "tcpMux mismatch: hub is likely tcpMux=true, run `quantum perf tcpmux on|off` so both ends match (default OFF)."},
+	"E-SYS-01": {500, "request failed", "See the panel error journal for the cause."},
+	"E-SYS-02": {503, "panel is busy (too many requests in flight)", "Retry in a couple of seconds; /api/selfstats still answers."},
+	// Input/API family used across the mesh + artifact handlers (phase 10
+	// audit: these codes were used ~90 times but never registered, so every
+	// one of them answered with the accidental unknown-code 400 and no
+	// catalog message).
+	"E-IN-01":       {400, "bad upload", "Check the file size and the multipart form and retry."},
+	"E-IN-02":       {400, "missing required field", "Fill the highlighted field and retry."},
+	"E-IN-03":       {400, "bad JSON body", "Reload the page and retry; if it persists the client sent malformed JSON."},
+	"E-IN-04":       {404, "no such record", "The record was deleted or the id is wrong — refresh the list."},
+	"E-IN-05":       {409, "record referenced by other records", "Delete or disable the dependent records first."},
+	"E-IN-06":       {400, "invalid input value", "Correct the highlighted field and retry."},
+	"E-IN-07":       {400, "invalid address value", "Use a usable public address (not loopback, unspecified or link-local)."},
+	"E-UPSTREAM-01": {502, "upstream service failed", "The external service (e.g. PasarGuard) refused or timed out — check its address and credentials."},
+	"E-ENG-03":      {400, "engine-artifact public key misconfigured", "Fix engine-pub.b64 (base64 DER SPKI) or rebuild the panel with the pinned key, then retry."},
+	"E-RESCUE-01":   {400, "bad rescue request", "Reload the page and try again."},
+	"E-RESCUE-02":   {409, "no peer address known to test against", "Pair this server with its peer first (Settings > Peer link) or create a tunnel."},
+	"E-RESCUE-03":   {400, "invalid port list", "Use ports like 1020, 1030 or a range 2000-2005 (max 64)."},
+	"E-RESCUE-04":   {400, "cannot enable rescue", "See the message for the cause; nothing was left behind."},
+	"E-RESCUE-05":   {400, "cannot apply rescue code", "Paste the full code generated on the blocked server."},
+	"E-RESCUE-06":   {409, "rescue is not active on this server", "Enable rescue on the blocked server first."},
+	"E-RESCUE-07":   {403, "rescue offer denied", "Only the server named when rescue was enabled may fetch the offer."},
 	// ssh forward carrier (Phase 4)
 	"E-SSHFWD-01": {400, "invalid ssh-forward request", "Check required fields (remote host, ports)."},
 	"E-SSHFWD-02": {400, "invalid port list", "Provide valid TCP ports between 1 and 65535."},
@@ -214,17 +227,6 @@ var errCatalog = map[string]errInfo{
 	"E-WD-04": {500, "backup restore failed", "Decryption failed or backup archive is corrupted."},
 	"E-WD-05": {502, "telegram route unreachable", "Ensure tunnel is up or switch route to direct."},
 	"E-WD-00": {0, "Watchdog settings updated", "Informational: watchdog, backup or schedule settings changed."},
-	// E-SYS-03: the fallback for codes not in the catalog. It must carry
-	// a REAL status — reusing E-SYS-01 (an informational status-0 entry)
-	// made every unmapped error WriteHeader(0) and panic the handler.
-	"E-SYS-03": {400, "request failed", "See the panel log (journalctl -u gre-panel) for the cause."},
-	// The E-IN family the mesh/CRUD handlers use — these codes were
-	// referenced for months WITHOUT a catalog entry (every response rode
-	// the fallback with no hint). E-IN-04 is the generic validation
-	// refusal (bad field, unknown id); E-IN-05 the conflict refusal.
-	"E-IN-04": {400, "bad request value or unknown record", "Fix the field or id named in the message and resubmit."},
-	"E-IN-05": {409, "request conflicts with the current state", "Read the message — it names the conflict (dependent records, key format, ...)."},
-	"E-IN-06": {400, "bad request value", "Fix the field named in the message and resubmit."},
 	// performance & obfuscation
 	"E-PERF-00": {0, "Performance settings applied", "Informational: settings saved and tunnels updated."},
 	"E-PERF-01": {400, "bad performance request", "Check request parameters and try again."},
@@ -250,12 +252,12 @@ func errorLogPath() string { return filepath.Join(configDir, "panel-errors.log")
 // stable JSON {error_code, error, hint} + journal entry.
 func writeAPIError(w http.ResponseWriter, r *http.Request, code, detail string) {
 	info, ok := errCatalog[code]
-	if !ok {
-		info = errCatalog["E-SYS-03"]
-		code = "E-SYS-03"
-	}
-	if info.Status == 0 { // informational catalog entries never write headers
-		info.Status = http.StatusInternalServerError
+	if !ok || info.Status == 0 {
+		// Unknown code, or a legacy catalog entry without an HTTP status:
+		// WriteHeader(0) panics the connection (audit 2026-11) — always
+		// answer with a real status.
+		info = errInfo{Status: http.StatusInternalServerError, Msg: "request failed", Hint: ""}
+		code = "E-SYS-01"
 	}
 	msg := info.Msg
 	if detail != "" {

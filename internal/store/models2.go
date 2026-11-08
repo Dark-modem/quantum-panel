@@ -461,7 +461,7 @@ func (s *Store) SetPasarguardCoefficient(id int64, coefficient float64) error {
 // ---- agents: v2 state + linking ------------------------------------------
 
 func (s *Store) ListAgents() ([]Agent, error) {
-	rows, err := s.db.Query(`SELECT id, server_id, name, role, key_hash, status, version, hostname, public_ip, last_seen, applied_revision,
+	rows, err := s.db.Query(`SELECT id, COALESCE(server_id, 0), name, role, key_hash, status, version, hostname, public_ip, last_seen, applied_revision,
 		arch, os, cpu_cores, cpu_pct, load1, mem_total_mb, mem_used_mb, disk_total_gb, disk_used_gb, uptime_s, virt, public_ip_override
 		FROM agents ORDER BY id`)
 	if err != nil {
