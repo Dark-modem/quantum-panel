@@ -556,7 +556,12 @@ var RENDER_GEN = 0; // bumped on every step render; async callbacks drop stale w
   // Status page: poll the created topologies (tunnel rows) + the agent
   // runtime (live up/down per tunnel — the overview's agent list carries
   // the runtime, same source the mesh topos tab uses).
+  var wizStatusIv = null, wizAgentsIv = null;
   function statusPage() {
+    // A second status page (lang re-render) must not leave two intervals
+    // writing the same element — that is the innerHTML DOM race.
+    if (wizStatusIv) { clearInterval(wizStatusIv); wizStatusIv = null; }
+    if (wizAgentsIv) { clearInterval(wizAgentsIv); wizAgentsIv = null; }
     var el = document.getElementById('step-body');
     el.innerHTML = '<div class="card"><b>' + esc(t('created')) + '</b><div id="wiz-tunnels"></div></div>';
     var topoIds = [];
@@ -593,9 +598,8 @@ var RENDER_GEN = 0; // bumped on every step render; async callbacks drop stale w
     };
     pollAgents();
     tick();
-    var iv = setInterval(tick, 3000);
-    var iv2 = setInterval(pollAgents, 3000);
-    setTimeout(function () { clearInterval(iv); clearInterval(iv2); }, 120000);
+    wizStatusIv = setInterval(tick, 3000);
+    wizAgentsIv = setInterval(pollAgents, 3000);
   }
 
   // ---- navigation ---------------------------------------------------------
