@@ -456,12 +456,11 @@
     var iranDC = dcs.some(function (d) { return d.kind === 'iran'; });
     var linkedAgent = ags.some(function (a) { return a.server_id > 0 && a.status === 'online'; });
     var hasTopo = topos.some(function (tp) { return (tp.tunnel_count || 0) > 0; });
-    Promise.all(topos.map(function (tp) {
-      return api('GET', 'topologies/' + tp.id + '/weights').then(function (w) {
-        return (w.weights || []).some(function (wp) { return wp.weight != null && wp.weight !== 1; });
-      }).catch(function () { return false; });
-    })).then(function (flags) {
-      var hasWeights = flags.some(Boolean);
+    // ONE call instead of per-topology fan-out (the 22-parallel-fetch
+    // version starved the browser pool at scale — phase-10 e2e).
+    api('GET', 'weights/check').then(function (w) {
+      return !!w.any_custom;
+    }).catch(function () { return false; }).then(function (hasWeights) {
       api('GET', 'pasarguard/status').then(function (st) {
         return !!st.configured;
       }).catch(function () { return false; }).then(function (pgOK) {

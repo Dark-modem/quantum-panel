@@ -137,6 +137,7 @@ func registerMeshRoutes(mux *http.ServeMux, base string) {
 	registerPasarGuardRoutes(mux, base)
 	// reads
 	mux.HandleFunc("GET "+p+"/meta", requireAuth(handleMeshMeta))
+	mux.HandleFunc("GET "+p+"/weights/check", requireAuth(handleMeshWeightsCheck))
 	mux.HandleFunc("GET "+p+"/overview", requireAuth(handleMeshOverview))
 	mux.HandleFunc("GET "+p+"/datacenters", requireAuth(handleMeshDCList))
 	mux.HandleFunc("GET "+p+"/servers", requireAuth(handleMeshServerList))
@@ -187,6 +188,25 @@ func handleMeshMeta(w http.ResponseWriter, r *http.Request) {
 		"version":        panelVersion,
 		"legacy_enabled": legacyOpsEnabled(),
 	})
+}
+
+// handleMeshWeightsCheck answers ONE boolean for the dashboard's first-run
+// checklist: does any non-default weight policy exist? (The checklist used
+// to fetch /topologies/{id}/weights for EVERY topology on every render —
+// with many topologies that fan-out starved the browser's connection pool
+// and Chromium answered ERR_INSUFFICIENT_RESOURCES, phase-10 e2e.)
+// Read-only, authenticated.
+func handleMeshWeightsCheck(w http.ResponseWriter, r *http.Request) {
+	s := meshStoreOr503(w, r)
+	if s == nil {
+		return
+	}
+	var n int
+	if err := s.DB().QueryRow(`SELECT COUNT(*) FROM weight_policies WHERE weight != 1`).Scan(&n); err != nil {
+		meshErr(w, r, err)
+		return
+	}
+	writeJSON(w, map[string]any{"any_custom": n > 0})
 }
 
 // ---- overview ------------------------------------------------------------
