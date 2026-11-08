@@ -27,9 +27,17 @@ func Open(path string) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	// modernc/sqlite serializes writes per connection; a small pool is
-	// enough and avoids SQLITE_BUSY under concurrent writers.
-	db.SetMaxOpenConns(1)
+	// modernc/sqlite in WAL mode supports CONCURRENT READERS with a
+	// single writer; busy_timeout absorbs write contention. A pool of 6
+	// lets the UI read paths (12+ pollers) stop starving behind the
+	// heartbeat writes (phase-12 soak: the 1-conn pool was the last
+	// serialization point). :memory: must stay at 1 connection (each
+	// extra connection would see its own empty database).
+	if path == ":memory:" {
+		db.SetMaxOpenConns(1)
+	} else {
+		db.SetMaxOpenConns(6)
+	}
 	s := &Store{db: db}
 	if err := s.migrate(); err != nil {
 		_ = db.Close()

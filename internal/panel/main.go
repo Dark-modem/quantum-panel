@@ -636,6 +636,8 @@ func Main(args []string) int {
 				configDir = v
 			}
 			return BackupCmd(args[1:])
+		case "report":
+			return cliReport(args[1:])
 		case "restore":
 			if v := os.Getenv("GRE_PANEL_DIR"); v != "" {
 				configDir = v

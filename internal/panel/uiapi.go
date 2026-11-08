@@ -44,6 +44,9 @@ func registerUIAPIRoutes(mux *http.ServeMux, base string) {
 	mux.HandleFunc("GET "+base+"/api/ui/topologies/{id}", requireAuth(handleUITopologyDetail))
 	mux.HandleFunc("GET "+base+"/api/ui/tunnels/{key}", requireAuth(handleUITunnelDetail))
 	mux.HandleFunc("POST "+base+"/api/ui/topologies/{id}/tunnels/{key}/weight", requireAuth(requireCSRF(handleUITunnelWeight)))
+	// Phase 12 TASK 4: the billing export (UI screen requests it via
+	// UI-API-REQUESTS.md; the CLI `quantum-panel report` shares the code).
+	mux.HandleFunc("GET "+base+"/api/ui/reports/billing", requireAuth(handleUIBillingReport))
 }
 
 // ---- shared helpers ---------------------------------------------------
@@ -307,7 +310,16 @@ var (
 	uiOverviewAt      int64
 )
 
-const uiOverviewCacheTTL = 60 * time.Second
+const uiOverviewCacheTTL = 10 * time.Second // the UI poll cadence
+
+// uiOverviewCacheReset drops the cached traffic block (tests; each test
+// server must not inherit the previous test's tunnels).
+func uiOverviewCacheReset() {
+	uiOverviewMu.Lock()
+	uiOverviewTraffic = nil
+	uiOverviewAt = 0
+	uiOverviewMu.Unlock()
+}
 
 func handleUIOverview(w http.ResponseWriter, r *http.Request) {
 	h, ok := uiOpen(w, r)
@@ -374,7 +386,7 @@ func handleUIOverview(w http.ResponseWriter, r *http.Request) {
 		name  string
 		value float64
 	}
-	res := map[string]any{}
+	var res map[string]any
 	{
 		var n int
 		var cpuSum, cpuMaxV, memSum, memPctSum, memMaxV, diskSum, diskPctSum, diskMaxV float64
@@ -422,15 +434,13 @@ func handleUIOverview(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Traffic: today recomputed live; 7d/30d from the cache.
-	trafficToday := h.uiTrafficTotals(tunnelIDs, now)["today"]
+	// Traffic: the WHOLE block is cached at the UI poll cadence (10 s) —
+	// every poller shares one computation instead of N concurrent range
+	// scans (the phase-12 soak's worst hotspot after write batching).
 	uiOverviewMu.Lock()
 	if uiOverviewTraffic == nil || now-uiOverviewAt >= int64(uiOverviewCacheTTL.Seconds()) {
-		uiOverviewTraffic = map[string]any{
-			"7d":             h.uiTrafficTotals(tunnelIDs, now)["7d"],
-			"30d":            h.uiTrafficTotals(tunnelIDs, now)["30d"],
-			"per_datacenter": h.uiDatacenterBlock(now),
-		}
+		uiOverviewTraffic = h.uiTrafficTotals(tunnelIDs, now)
+		uiOverviewTraffic["per_datacenter"] = h.uiDatacenterBlock(now)
 		uiOverviewAt = now
 	}
 	cachedBlock := uiOverviewTraffic
@@ -471,7 +481,7 @@ func handleUIOverview(w http.ResponseWriter, r *http.Request) {
 		},
 		"resources": res,
 		"traffic": map[string]any{
-			"today":          trafficToday,
+			"today":          cachedBlock["today"],
 			"7d":             cachedBlock["7d"],
 			"30d":            cachedBlock["30d"],
 			"per_datacenter": cachedBlock["per_datacenter"],

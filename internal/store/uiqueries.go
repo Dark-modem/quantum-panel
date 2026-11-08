@@ -749,3 +749,91 @@ func (s *Store) AgentByServer(serverID int64) (Agent, error) {
 		&a.Arch, &a.OS, &a.CPUCores, &a.CPUPct, &a.Load1, &a.MemTotalMB, &a.MemUsedMB, &a.DiskTotalGB, &a.DiskUsedGB, &a.UptimeS, &a.Virt, &a.PublicIPOverride)
 	return a, wrapNotFound(err)
 }
+
+// ---- batched writes (phase 12 TASK 3) ---------------------------------
+//
+// One heartbeat carries ~6 samples + ~6 proc upserts + ~2 engine rows;
+// issued as individual Execs each held the single write connection in
+// its own transaction (measured: UI p95 in the seconds under load).
+// These batch variants wrap one heartbeat's writes in ONE transaction.
+
+func (s *Store) AddTrafficSamplesBatch(samples []TrafficSample) error {
+	if len(samples) == 0 {
+		return nil
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	stmt, err := tx.Prepare(`INSERT INTO traffic_samples (tunnel_id, at, wire_rx, wire_tx, payload_rx, payload_tx,
+		counters_known, agent_id, payload_known) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	for _, t := range samples {
+		if _, err := stmt.Exec(t.TunnelID, t.At, t.WireRx, t.WireTx, t.PayloadRx, t.PayloadTx,
+			t.CountersKnown, t.AgentID, t.PayloadKnown); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+func (s *Store) UpsertTunnelProcBatch(procs []TunnelProcNow) error {
+	if len(procs) == 0 {
+		return nil
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	stmt, err := tx.Prepare(`INSERT INTO tunnel_proc (tunnel_id, agent_id, cpu_pct, rss_bytes, processes, at)
+		VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(tunnel_id, agent_id) DO UPDATE SET
+		cpu_pct=excluded.cpu_pct, rss_bytes=excluded.rss_bytes, processes=excluded.processes, at=excluded.at`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	for _, p := range procs {
+		if _, err := stmt.Exec(p.TunnelID, p.AgentID, p.CPUPct, p.RSSBytes, p.Processes, p.At); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+func (s *Store) UpsertAgentEnginesBatch(engines []AgentEngine) error {
+	if len(engines) == 0 {
+		return nil
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	stmt, err := tx.Prepare(`INSERT INTO agent_engines (agent_id, engine, installed, version, bytes_on_disk,
+		desired, instances, last_error, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(agent_id, engine) DO UPDATE SET installed=excluded.installed, version=excluded.version,
+		  bytes_on_disk=excluded.bytes_on_disk, instances=excluded.instances,
+		  last_error=excluded.last_error, updated_at=excluded.updated_at`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	for _, e := range engines {
+		ii, dd := 0, 0
+		if e.Installed {
+			ii = 1
+		}
+		if e.Desired {
+			dd = 1
+		}
+		if _, err := stmt.Exec(e.AgentID, e.Engine, ii, e.Version, e.BytesOnDisk, dd, e.Instances, e.LastError, e.UpdatedAt); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}

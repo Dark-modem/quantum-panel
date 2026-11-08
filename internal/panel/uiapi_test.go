@@ -26,6 +26,7 @@ func uiServer(t *testing.T) *httptest.Server {
 	withTempConfig(t)
 	withMeshStore(t)
 	mux := http.NewServeMux()
+	uiOverviewCacheReset()
 	registerMeshRoutes(mux, "")
 	registerUIAPIRoutes(mux, "")
 	mux.HandleFunc("POST /api/agents/tokens", handleAgentTokenPost)

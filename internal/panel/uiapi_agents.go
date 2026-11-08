@@ -151,6 +151,7 @@ func (h uiStoreHandle) uiAgentTopologies(s *store.Store, ag store.Agent, withTun
 		return out
 	}
 	verdicts := uiTunnelVerdicts()
+	lat := uiLatencyMap()
 	now := timeNowUnix()
 	for _, topoID := range members {
 		topo, err := h.GetTopology(topoID)
@@ -176,14 +177,13 @@ func (h uiStoreHandle) uiAgentTopologies(s *store.Store, ag store.Agent, withTun
 		if withTunnels {
 			tunnels, _ := h.ListTunnels(topoID)
 			rows := []map[string]any{}
+			pcts := h.uiResolvedPercents(topoID, tunnels)
 			for _, t := range tunnels {
 				if t.LocalServerID != ag.ServerID && t.RemoteServerID != ag.ServerID {
 					continue
 				}
 				tunnelCount++
-				if withTunnels {
-					rows = append(rows, h.uiTunnelRow(s, topo, t, verdicts, now))
-				}
+				rows = append(rows, h.uiTunnelRow(s, topo, t, verdicts, now, pcts, lat))
 			}
 			entry["tunnel_count"] = tunnelCount
 			entry["tunnels"] = rows

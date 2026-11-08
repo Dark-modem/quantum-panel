@@ -73,12 +73,21 @@ func ingestStateReportV2(agentID string, rep *protocol.StateReportV2) {
 		// Hammering heartbeats must not flood the samples table; the latest
 		// report still updates the runtime view below.
 	} else {
+		// Hostile-agent hardening (phase 12 TASK 2): caps + OWNERSHIP
+		// before anything touches the store — an agent may only report
+		// ITS OWN server's tunnels, and row/string/number limits apply.
+		allowed, aerr := agentAllowedTunnels(s, agentID)
+		if aerr != nil {
+			allowed = map[string]int64{}
+		}
+		rep.Tunnels, _ = sanitizeReportTunnels(rep, allowed)
+		samples := make([]store.TrafficSample, 0, len(rep.Tunnels))
 		for _, tr := range rep.Tunnels {
-			tid, err := tunnelIDByKey(s, tr.TunnelID)
-			if err != nil {
-				continue // unknown tunnel id: the store only holds declared tunnels
+			tid := allowed[tr.TunnelID] // pre-resolved: no per-row query
+			if tid == 0 {
+				continue
 			}
-			_ = s.AddTrafficSample(store.TrafficSample{
+			samples = append(samples, store.TrafficSample{
 				TunnelID:      tid,
 				At:            now,
 				WireRx:        tr.WireRx,
@@ -90,12 +99,18 @@ func ingestStateReportV2(agentID string, rep *protocol.StateReportV2) {
 				PayloadKnown:  tr.PayloadKnown,
 			})
 		}
+		if err := s.AddTrafficSamplesBatch(samples); err != nil {
+			log.Printf("[mesh] sample batch: %v", err)
+		}
 		for _, es := range rep.Engines {
-			if es.Engine == "" {
+			if es.Engine == "" || len(es.Engine) > 64 {
 				continue
 			}
 			_ = s.ObserveEngineOverhead(es.Engine, es.WireRx, es.PayloadRx, es.WireTx, es.PayloadTx)
 		}
+		// Phase 11 UI data (throttled WITH the samples — heartbeat spam
+		// must not become a DB write flood through the upsert paths).
+		ingestUISections(s, agentID, rep, now)
 	}
 
 	meshRuntimeMu.Lock()
@@ -103,11 +118,10 @@ func ingestStateReportV2(agentID string, rep *protocol.StateReportV2) {
 	meshRuntimeSeen[agentID] = now
 	meshRuntimeMu.Unlock()
 
-	// Phase 11 UI data: persist what the new report sections carry.
-	ingestUISections(s, agentID, rep, now)
-
 	// Persist per-tunnel state transitions + errors into the bounded
-	// event log (drives the tunnel detail view's history).
+	// event log (drives the tunnel detail view's history). The flip
+	// detection MUST see every heartbeat (it compares consecutive
+	// reports); the event WRITES stay naturally rare (flips only).
 	recordTunnelEvents(s, agentID, rep, now)
 
 	// Mirror the session facts into the store's agents table (the store has
@@ -136,39 +150,67 @@ func ingestStateReportV2(agentID string, rep *protocol.StateReportV2) {
 	}
 }
 
+// satI64 saturates a uint64 into int64 (a hostile MaxUint64 must not
+// wrap into a negative number — gosec G115).
+func satI64(v uint64) int64 {
+	if v > uint64(1)<<63-1 {
+		return int64(uint64(1)<<63 - 1)
+	}
+	return int64(v)
+}
+
 // ingestUISections persists the Phase-11 report sections: host metrics
 // into agents, engine_status[] into agent_engines, proc[] into
 // tunnel_proc. All best-effort: a UI-data failure must never break the
 // tunnel data path.
 func ingestUISections(s *store.Store, agentID string, rep *protocol.StateReportV2, now int64) {
 	if r := rep.Resources; r != nil {
-		_ = s.UpdateAgentResources(agentID, r.CPUCores, r.CPUPercent, r.LoadAvg1,
-			int64(r.MemTotalMB), int64(r.MemUsedMB), float64(r.DiskTotalGB), float64(r.DiskUsedGB),
-			int64(r.UptimeS), r.Virt)
-	}
-	for _, es := range rep.EngineStatus {
-		if es.Engine == "" {
-			continue
+		// Sanity: negatives/nonsense never reach the agents table.
+		cpuPct, load := r.CPUPercent, r.LoadAvg1
+		if cpuPct < 0 || cpuPct > 100*64 {
+			cpuPct = 0
 		}
-		_ = s.UpsertAgentEngine(store.AgentEngine{
+		if load < 0 {
+			load = 0
+		}
+		memTotal, memUsed := satI64(r.MemTotalMB), satI64(r.MemUsedMB)
+		diskTotal, diskUsed := float64(r.DiskTotalGB), float64(r.DiskUsedGB)
+		uptime := satI64(r.UptimeS)
+		if memUsed < 0 || diskUsed < 0 || uptime < 0 {
+			return // hostile metrics block: drop the whole section
+		}
+		_ = s.UpdateAgentResources(agentID, r.CPUCores, cpuPct, load,
+			memTotal, memUsed, diskTotal, diskUsed, uptime, capReportString(r.Virt, 64))
+	}
+	allowed, aerr := agentAllowedTunnels(s, agentID)
+	if aerr != nil {
+		allowed = map[string]int64{}
+	}
+	engines := make([]store.AgentEngine, 0, len(rep.EngineStatus))
+	for _, es := range sanitizeReportEngines(rep) {
+		engines = append(engines, store.AgentEngine{
 			AgentID: agentID, Engine: es.Engine, Installed: es.Installed,
 			Version: es.Version, BytesOnDisk: es.BytesOnDisk,
 			Desired: es.Enabled, Instances: es.Instances,
 			LastError: es.LastError, UpdatedAt: now,
 		})
 	}
-	for _, tp := range rep.Proc {
-		if tp.TunnelID == "" || !tp.Known {
-			continue // unknown tunnel ids are skipped; unknown metrics are not stored
-		}
-		tid, err := tunnelIDByKey(s, tp.TunnelID)
-		if err != nil {
+	if err := s.UpsertAgentEnginesBatch(engines); err != nil {
+		log.Printf("[mesh] engine status batch: %v", err)
+	}
+	procs := make([]store.TunnelProcNow, 0, len(rep.Proc))
+	for _, tp := range sanitizeReportProc(rep, allowed) {
+		tid := allowed[tp.TunnelID]
+		if tid == 0 {
 			continue
 		}
-		_ = s.UpsertTunnelProc(store.TunnelProcNow{
+		procs = append(procs, store.TunnelProcNow{
 			TunnelID: tid, AgentID: agentID, CPUPct: tp.CPUPercent,
-			RSSBytes: tp.RSSBytes, Processes: tp.Processes, At: now,
+			RSSBytes: tp.RSSBytes, Processes: int(tp.Processes), At: now,
 		})
+	}
+	if err := s.UpsertTunnelProcBatch(procs); err != nil {
+		log.Printf("[mesh] proc batch: %v", err)
 	}
 }
 

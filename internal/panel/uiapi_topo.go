@@ -6,7 +6,6 @@ package panel
 import (
 	"encoding/json"
 	"net/http"
-	"sort"
 	"time"
 
 	"github.com/Dark-modem/quantum-panel/internal/store"
@@ -14,8 +13,32 @@ import (
 
 // uiTunnelRow is the shared per-tunnel summary row (topology detail and
 // agent topologies).
+// uiLatencyMap: one locked pass over the runtime for every fresh
+// tunnel's latency (the per-row scans were an N+1 hotspot in the
+// phase-12 soak).
+func uiLatencyMap() map[string]float64 {
+	out := map[string]float64{}
+	now := time.Now().Unix()
+	meshRuntimeMu.Lock()
+	for agentID, rts := range meshRuntimeBy {
+		if now-meshRuntimeSeen[agentID] > 90 {
+			continue
+		}
+		for _, tr := range rts {
+			if tr.LatencyMs > 0 {
+				out[tr.TunnelID] = tr.LatencyMs
+			}
+		}
+	}
+	meshRuntimeMu.Unlock()
+	return out
+}
+
+// uiTunnelRow renders one row from PRECOMPUTED shares (pcts) and the
+// shared latency map — per-row recomputation was the topology detail's
+// N+1 hotspot (phase-12 soak).
 func (h uiStoreHandle) uiTunnelRow(s *store.Store, topo store.Topology, t store.Tunnel,
-	verdicts map[string]string, now int64) map[string]any {
+	verdicts map[string]string, now int64, pcts map[int64]float64, lat map[string]float64) map[string]any {
 	verdict := "unknown"
 	if !t.Enabled {
 		verdict = "disabled"
@@ -23,21 +46,14 @@ func (h uiStoreHandle) uiTunnelRow(s *store.Store, topo store.Topology, t store.
 		verdict = v
 	}
 	w, _ := h.WeightFor(topo.ID, t.LocalServerID, t.RemoteServerID, t.ID)
-	pcts := h.uiResolvedPercents(topo.ID, mustListTunnels(h.Store, topo.ID))
 	usage, _, err := h.RangeUsageDetailed([]int64{t.ID}, now-now%86400, now)
 	if err != nil {
 		usage = store.Usage{}
 	}
-	latency := any(nil)
-	meshRuntimeMu.Lock()
-	for _, rts := range meshRuntimeBy {
-		for _, tr := range rts {
-			if tr.TunnelID == t.TunnelKey && time.Now().Unix()-meshRuntimeSeen[tr.TunnelID] < 90 {
-				latency = tr.LatencyMs
-			}
-		}
+	var latency any
+	if l, ok := lat[t.TunnelKey]; ok {
+		latency = l
 	}
-	meshRuntimeMu.Unlock()
 	return map[string]any{
 		"id": t.ID, "tunnel_key": t.TunnelKey, "engine": t.Engine, "enabled": t.Enabled,
 		"local_server":     h.uiServerRef(t.LocalServerID),
@@ -73,8 +89,10 @@ func handleUITopologyDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	now := timeNowUnix()
 	verdicts := uiTunnelVerdicts()
+	lat := uiLatencyMap()
 	members, _ := h.TopologyMembers(topoID)
 	tunnels := mustListTunnels(h.Store, topoID)
+	pcts := h.uiResolvedPercents(topoID, tunnels) // once, not per row
 
 	iranRows, foreignRows := []map[string]any{}, []map[string]any{}
 	allRows := []map[string]any{}
@@ -99,7 +117,7 @@ func handleUITopologyDetail(w http.ResponseWriter, r *http.Request) {
 			if t.LocalServerID != sid && t.RemoteServerID != sid {
 				continue
 			}
-			row := h.uiTunnelRow(h.Store, topo, t, verdicts, now)
+			row := h.uiTunnelRow(h.Store, topo, t, verdicts, now, pcts, lat)
 			rows = append(rows, row)
 			// The flat `tunnels` list must hold each tunnel ONCE; a tunnel
 			// between two members matches both ends above (phase-11 UI
@@ -393,11 +411,6 @@ func handleUITunnelWeight(w http.ResponseWriter, r *http.Request) {
 		"status": "ok", "tunnel": key, "weight": weight,
 		"resolved_percent": pcts[t.ID],
 	})
-}
-
-// sortTunnelsByID keeps the row order stable for tests.
-func sortTunnelsByID(ts []store.Tunnel) {
-	sort.Slice(ts, func(i, j int) bool { return ts[i].ID < ts[j].ID })
 }
 
 var _ = time.Now
