@@ -136,6 +136,10 @@ type agentConn struct {
 	cmdMu     sync.Mutex
 	pending   map[string]chan agentCommandResult // command ID -> waiter
 	state     agentSessionState
+	// pendingRedelivered: the once-per-session re-delivery of a still-
+	// queued v2 pending document after the first post-hello heartbeat
+	// (ack-lost safety net; phase 13 TASK 1).
+	pendingRedelivered bool
 	// protoV is the negotiated protocol version (hello envelope V clamped
 	// to 1..2). v1 sessions run the frozen matrix flow untouched; v2 adds
 	// DesiredV2 delivery and StateReportV2 ingestion.
@@ -329,9 +333,15 @@ func (c *agentConn) run() {
 	c.recordEngineCatalog(&hello)
 
 	// Deliver whatever desired state was queued while the agent was offline:
-	// the v2 pending document first, then the frozen v1 matrix desired.
-	if d, ok := meshPendingDesiredV2(c.id); ok {
-		_ = c.sendVersioned(protocol.MsgDesired, d)
+	// the v2 pending document first (ONLY on a v2 session — a v1 envelope
+	// would feed a DesiredV2 document to the frozen v1 flow), then the
+	// frozen v1 matrix desired. The v2 pending clears ONLY on the agent's
+	// ack; if the ack is lost the first post-hello heartbeat re-delivers
+	// (phase 13 TASK 1).
+	if c.protoV >= protocol.ProtoVersionV2 {
+		if d, ok := meshPendingDesiredV2(c.id); ok {
+			_ = c.sendVersioned(protocol.MsgDesired, d)
+		}
 	}
 	if d := agentPendingDesired(c.id); d != nil {
 		_ = c.sendVersioned(agentMsgDesired, *d)
@@ -517,6 +527,18 @@ func (c *agentConn) handleHeartbeat(data json.RawMessage) {
 		var hb2 protocol.HeartbeatV2
 		if json.Unmarshal(data, &hb2) == nil && hb2.State != nil {
 			ingestStateReportV2(c.id, hb2.State)
+			// Phase 13 TASK 1: if a v2 pending document is still queued
+			// after the agent's first post-hello heartbeat, the hello-time
+			// delivery (or its ack) was lost — re-deliver once per
+			// session. Idempotent on the agent side (revision fencing +
+			// journal); no revision storm: the SAME revision re-sends
+			// only until its ack clears the pending row.
+			if !c.pendingRedelivered {
+				c.pendingRedelivered = true
+				if d, ok := meshPendingDesiredV2(c.id); ok {
+					_ = c.sendVersioned(protocol.MsgDesired, d)
+				}
+			}
 			if len(hb2.State.Matrix) > 0 {
 				// The v2 report keeps the v1 matrix block; feed the frozen
 				// legacy path so the existing dashboard keeps working.

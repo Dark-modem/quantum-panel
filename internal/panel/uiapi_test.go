@@ -117,16 +117,18 @@ func uiSeedTraffic(t *testing.T, s *store.Store, agIr, agFr string) {
 		}
 		tids[key] = tun.ID
 	}
-	now := time.Now().Unix()
-	dayStart := now - now%86400
-	base := dayStart + 600 // inside "today"
+	// Seed at 1/4, 1/2 and 3/4 of the ELAPSED part of "today": always in
+	// the past and inside [midnight, now] at ANY hour (a fixed-hours seed
+	// landed in the future right after UTC midnight — a test-time bomb).
+	dayStart := time.Now().Unix() - time.Now().Unix()%86400
+	elapsed := time.Now().Unix() - dayStart
 	steps := []struct {
 		at         int64
 		irRx, frRx uint64
 	}{
-		{base, 1000, 8000},
-		{base + 1800, 3000, 9000},
-		{base + 3600, 6000, 10000},
+		{dayStart + elapsed/4, 1000, 8000},
+		{dayStart + elapsed/2, 3000, 9000},
+		{dayStart + elapsed*3/4, 6000, 10000},
 	}
 	for _, st := range steps {
 		for _, key := range []string{"tl-a", "tl-b"} {
