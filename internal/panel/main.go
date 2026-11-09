@@ -613,7 +613,13 @@ func Main(args []string) int {
 	if len(args) > 0 {
 		switch args[0] {
 		case "--version", "-v", "version":
-			fmt.Println(panelVersion)
+			// 'version' prints the flat string; 'version --json' prints the
+			// full provenance stamp (phase 14 release integrity).
+			if len(args) > 1 && args[1] == "--json" {
+				fmt.Println(versionJSONString())
+			} else {
+				fmt.Println(panelVersion)
+			}
 			return 0
 		case "--help", "-h", "help":
 			fmt.Println("Usage: gre-panel [backup --out F --passphrase-file F | restore --in F --passphrase-file F [--force] | password <new-password> | info | version | tls [status|issue|renew|remove|ip|custom] | settings [show|2fa off|terminal on|off|idle N] | doctor [check|fix] | tls-proxy | pathtest | cluster [status|pool|member|join-code|add-hub|events|rules|reset] | firewall [detect|snapshot|plan|apply|teardown] | ports [list|check]]")
