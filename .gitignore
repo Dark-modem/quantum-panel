@@ -5,3 +5,5 @@ tests/.abuse*.sh
 # local e2e work dirs (binaries never belong in git)
 tests/.wiz-work/
 tests/.ui10-work/
+
+tests/.ui11-work/
