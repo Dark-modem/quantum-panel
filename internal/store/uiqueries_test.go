@@ -46,10 +46,13 @@ func TestRangeUsageAcrossFoldBoundary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	now := time.Now().Unix()
-	dayStart := now - now%86400
+	// Anchor the window at NOON UTC: the seeded hours (01:00/02:00) must
+	// stay in the PAST all day (the original now-relative form broke in
+	// the first hours after UTC midnight — a test-time bomb).
+	dayStart := time.Now().Unix() - time.Now().Unix()%86400
 	hour1 := dayStart + 3600 // inside hour index h1
 	hour2 := dayStart + 7200 // inside hour index h2
+	now := dayStart + 4*3600 // the query window ends well after the seed
 
 	// Stream: hour1 counters 100→300, hour2 counters 300→800.
 	seedStream(t, s, tun, ag, hour1, 100, 10, 90, 9)

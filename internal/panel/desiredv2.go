@@ -333,7 +333,16 @@ func compileAndPushAgent(s *store.Store, agentID string) (map[string]any, error)
 	if v := agentHubSessionVersion(agentID); v > 0 {
 		v2state.ProtoVersion = v
 	}
-	if v2state.ProtoVersion < 2 {
+	// Phase 13 TASK 1: an agent that has NEVER connected (last_seen == 0,
+	// proto_version still at its default) used to be refused here, which
+	// silently dropped offline pushes for fresh enrollments (the
+	// compat-matrix defect). Now: COMPILE + QUEUE — the pending document
+	// is delivered at hello if the agent negotiates v2, re-delivered
+	// after the first post-hello heartbeat if the ack was lost, and
+	// cleared ONLY on the ack (store.AckDesiredV2). A KNOWN v1 agent
+	// (connected with proto_version 1) still cannot take DesiredV2.
+	neverConnected := ag.LastSeen == 0 && agentHubSessionVersion(agentID) == 0
+	if v2state.ProtoVersion == 1 && !neverConnected {
 		return map[string]any{
 			"agent_id": agentID, "pushed": false,
 			"skip": "agent speaks protocol v1; DesiredV2 needs a v2 session (v1 agents keep the frozen matrix flow)",
@@ -342,6 +351,26 @@ func compileAndPushAgent(s *store.Store, agentID string) (map[string]any, error)
 	desired, skip, warnings, err := compileDesiredV2(s, ag)
 	if err != nil {
 		return nil, err
+	}
+	if neverConnected {
+		// Never connected: queue only (delivery happens at hello). The
+		// revision is assigned NOW — meshPendingDesiredV2 refuses
+		// revision-less documents, and the ack must match it.
+		desired.Revision = newMeshRevision()
+		doc, merr := json.Marshal(desired)
+		if merr != nil {
+			return nil, merr
+		}
+		if err := s.SetPendingDesiredV2(agentID, string(doc)); err != nil {
+			return nil, err
+		}
+		meshAudit(meshActor(nil), "mesh.desired.queued",
+			fmt.Sprintf(`{"agent":%q,"revision":%q,"tunnels":%d,"engines":%d}`,
+				agentID, desired.Revision, len(desired.Tunnels), len(desired.Engines)))
+		return map[string]any{"agent_id": agentID, "pushed": false, "queued": true,
+			"revision": desired.Revision,
+			"skip":     "agent has not connected yet; desired queued for its first session",
+			"warnings": warnings}, nil
 	}
 	if skip != "" {
 		return map[string]any{"agent_id": agentID, "pushed": false, "skip": skip, "warnings": warnings}, nil
