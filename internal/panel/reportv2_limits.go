@@ -25,6 +25,7 @@ package panel
 // honest side (honest agents never hit any cap).
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/Dark-modem/quantum-panel/internal/store"
@@ -130,6 +131,42 @@ func sanitizeReportEngines(rep *protocol.StateReportV2) []protocol.EngineStatusR
 			continue
 		}
 		out = append(out, es)
+	}
+	return out
+}
+
+// maxReportListening bounds the heartbeat's listening-port inventory (a
+// host with a few hundred sockets is normal; thousands is hostile).
+const maxReportListening = 4096
+
+// sanitizeReportListening caps + filters the ResourceReport.Listening
+// inventory into its store form: proto must be tcp/udp, ports 1-65535,
+// proc text capped. Duplicate (proto, port) rows collapse — the store's
+// snapshot is keyed on them.
+func sanitizeReportListening(rep *protocol.StateReportV2) []store.ListenRow {
+	if rep.Resources == nil || len(rep.Resources.Listening) == 0 {
+		return nil
+	}
+	listening := rep.Resources.Listening
+	if len(listening) > maxReportListening {
+		listening = listening[:maxReportListening]
+	}
+	out := make([]store.ListenRow, 0, len(listening))
+	seen := map[string]bool{}
+	for _, l := range listening {
+		proto := strings.ToLower(strings.TrimSpace(l.Proto))
+		if proto != "tcp" && proto != "udp" {
+			continue
+		}
+		if l.Port < 1 || l.Port > 65535 {
+			continue // nonsense numbers never enter the reservation set
+		}
+		key := proto + ":" + strconv.Itoa(l.Port)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, store.ListenRow{Proto: proto, Port: l.Port, Proc: capReportString(l.Proc, 128)})
 	}
 	return out
 }

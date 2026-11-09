@@ -64,6 +64,9 @@ type meshAlertEvent struct {
 	Text     string // human message (en; the UI translates the rule name)
 	Now      time.Time
 	Recovery bool // true = condition cleared
+	// UI is the structured fa/en view (phase 13 TASK 2) for the API
+	// view and the notifiers; nil for the phase-<13 rules.
+	UI map[string]any
 }
 
 type meshAlertState struct {
@@ -71,6 +74,7 @@ type meshAlertState struct {
 	lastSent time.Time
 	openedAt time.Time
 	lastText string
+	lastUI   map[string]any // the structured fa/en view of the last event
 }
 
 type meshAlertHistoryItem struct {
@@ -80,6 +84,8 @@ type meshAlertHistoryItem struct {
 	Sev      string `json:"sev"`
 	Text     string `json:"text"`
 	Recovery bool   `json:"recovery"`
+	// UI is the structured fa/en view (phase 13 rules attach it).
+	UI map[string]any `json:"ui,omitempty"`
 }
 
 // meshAlertEngine holds state; one instance per process.
@@ -92,9 +98,38 @@ type meshAlertEngine struct {
 
 	notifyMu  sync.Mutex
 	notifiers []meshAlertNotifier
+	// maintenance silences DELIVERY per target (agent/server id) until
+	// the deadline; rules still evaluate + record history (phase 13).
+	maintenance map[string]time.Time
 
 	stop    chan struct{}
 	stopped sync.Once
+}
+
+// SetMaintenance silences delivery for one target until the deadline
+// (phase 13 TASK 2); rules keep evaluating and recording.
+func (e *meshAlertEngine) SetMaintenance(target string, until time.Time) {
+	e.notifyMu.Lock()
+	if e.maintenance == nil {
+		e.maintenance = map[string]time.Time{}
+	}
+	e.maintenance[target] = until
+	e.notifyMu.Unlock()
+}
+
+// maintenanceActive: is the target silenced right now?
+func (e *meshAlertEngine) maintenanceActive(target string) bool {
+	e.notifyMu.Lock()
+	defer e.notifyMu.Unlock()
+	until, ok := e.maintenance[target]
+	if !ok {
+		return false
+	}
+	if time.Now().After(until) {
+		delete(e.maintenance, target)
+		return false
+	}
+	return true
 }
 
 // meshAlertNotifier is the pluggable delivery seam (tests fake it).
@@ -310,6 +345,7 @@ func (e *meshAlertEngine) evaluate(now time.Time) []meshAlertEvent {
 			})
 		}
 	}
+	evs = append(evs, e.evaluatePhase13(now)...)
 	return evs
 }
 
@@ -407,13 +443,20 @@ func (e *meshAlertEngine) dispatchLocked(ev meshAlertEvent, recovery bool) {
 	e.notifyMu.Lock()
 	ns := append([]meshAlertNotifier(nil), e.notifiers...)
 	e.notifyMu.Unlock()
-	for _, n := range ns {
-		_ = n.Send(ev) // synchronous: notifiers carry their own timeouts
+	maint := e.maintenanceActive(ev.Target) // rules still record; delivery silenced
+	if !maint {
+		for _, n := range ns {
+			_ = n.Send(ev) // synchronous: notifiers carry their own timeouts
+		}
 	}
 	e.history = append(e.history, meshAlertHistoryItem{
 		At: ev.Now.Unix(), Key: ev.Key, Rule: ev.Rule, Sev: ev.Sev,
-		Text: ev.Text, Recovery: recovery,
+		Text: ev.Text, Recovery: recovery, UI: ev.UI,
 	})
+	// Remember the structured view for the OPEN banner too.
+	if st := e.states[ev.Key]; st != nil {
+		st.lastUI = ev.UI
+	}
 	if len(e.history) > meshAlertMaxHistory {
 		e.history = e.history[len(e.history)-meshAlertMaxHistory:]
 	}
@@ -452,7 +495,7 @@ func (e *meshAlertEngine) currentAlertsView() (open []meshAlertHistoryItem, hist
 		}
 		open = append(open, meshAlertHistoryItem{
 			At: st.openedAt.Unix(), Key: key, Rule: rule,
-			Sev: "crit", Text: st.lastText,
+			Sev: "crit", Text: st.lastText, UI: st.lastUI,
 		})
 	}
 	history = append([]meshAlertHistoryItem(nil), e.history...)

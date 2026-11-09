@@ -1,8 +1,14 @@
 // reconcile.go — the desired-state reconciler for PasarGuard nodes.
 //
 // Desired: one node per (foreign server × Iran datacenter) pair, named
-// "quantum:<dc name>", address = the foreign server's address, usage
-// coefficient = the datacenter's price coefficient, connection grpc.
+// "quantum:<dc name>", address = the foreign server's address,
+// connection grpc.
+//
+// The upstream usage_coefficient is NOT part of the desired state (phase
+// 14 data-path decision): Quantum no longer reads, diffs or modifies it.
+// Nodes are provisioned with the neutral 1.0 (upstream requires > 0) and
+// whatever the operator sets afterwards is theirs to manage. The
+// datacenter price hint lives on in the store/billing DISPLAY only.
 //
 // The diff NEVER deletes: nodes Quantum no longer desires are reported as
 // drift (stale) and only a separate, explicit DeleteOrphans call removes
@@ -21,12 +27,15 @@ import (
 
 // DesiredNode is one node the panel wants to exist.
 type DesiredNode struct {
-	Name        string  // "quantum:<dc>"
-	Address     string  // foreign server address
-	Coefficient float64 // datacenter price coefficient
-	ServerCA    string  // the node's PEM cert (operator-supplied)
-	APIKey      string  // the node's API_KEY UUID
-	Port        int     // node gRPC port (default 62050)
+	Name    string // "quantum:<dc>"
+	Address string // foreign server address
+	// Coefficient is legacy surface: the panel no longer sets it (0 =
+	// not managed, provisions the neutral 1.0). Kept so hand-built
+	// callers of CreateNode through the reconciler keep compiling.
+	Coefficient float64
+	ServerCA    string // the node's PEM cert (operator-supplied)
+	APIKey      string // the node's API_KEY UUID
+	Port        int    // node gRPC port (default 62050)
 }
 
 // Action kinds.
@@ -106,18 +115,9 @@ func Diff(desired []DesiredNode, real []Node) *Plan {
 		case !ok:
 			plan.Actions = append(plan.Actions, PlanAction{
 				Action: ActionCreate, Name: d.Name,
-				CoeffNew: d.Coefficient,
-				Detail:   "node record does not exist",
+				Detail: "node record does not exist",
 			})
 			plan.Creates++
-			plan.Drift = true
-		case existing.UsageCoefficient != d.Coefficient:
-			plan.Actions = append(plan.Actions, PlanAction{
-				Action: ActionUpdate, Name: d.Name, NodeID: existing.ID,
-				CoeffWas: existing.UsageCoefficient, CoeffNew: d.Coefficient,
-				Detail: "coefficient drifted",
-			})
-			plan.Updates++
 			plan.Drift = true
 		case existing.Status == StatusError || existing.Status == StatusDisabled:
 			plan.Actions = append(plan.Actions, PlanAction{
@@ -129,7 +129,7 @@ func Diff(desired []DesiredNode, real []Node) *Plan {
 		default:
 			plan.Actions = append(plan.Actions, PlanAction{
 				Action: ActionOK, Name: d.Name, NodeID: existing.ID,
-				Detail: fmt.Sprintf("coefficient %.3f, status %s", existing.UsageCoefficient, existing.Status),
+				Detail: fmt.Sprintf("status %s", existing.Status),
 			})
 		}
 	}
@@ -198,17 +198,12 @@ func Apply(ctx context.Context, plan *Plan, desired []DesiredNode, ap Applier) [
 			}
 			out = append(out, PlanAction{Action: a.Action, Name: a.Name, Detail: "created"})
 		case ActionUpdate:
-			d, ok := byName[a.Name]
-			if !ok || a.NodeID == 0 {
-				out = append(out, PlanAction{Action: a.Action, Name: a.Name, Detail: "skipped (no desired row / no node id)"})
-				continue
-			}
-			coef := d.Coefficient
-			if _, err := ap.ModifyNode(ctx, a.NodeID, ModifyRequest{UsageCoefficient: &coef}); err != nil {
-				out = append(out, PlanAction{Action: a.Action, Name: a.Name, NodeID: a.NodeID, Detail: "FAILED: " + err.Error()})
-				continue
-			}
-			out = append(out, PlanAction{Action: a.Action, Name: a.Name, NodeID: a.NodeID, Detail: fmt.Sprintf("coefficient -> %.3f", coef)})
+			// Diff no longer emits updates (the coefficient left the data
+			// path and it was the only update trigger), so an update row
+			// here can only come from a hand-built plan — it passes
+			// through untouched rather than reviving the removed
+			// ModifyNode(usage_coefficient) call.
+			out = append(out, a)
 		case ActionReconnect:
 			if a.NodeID == 0 {
 				continue
@@ -219,7 +214,7 @@ func Apply(ctx context.Context, plan *Plan, desired []DesiredNode, ap Applier) [
 			}
 			out = append(out, PlanAction{Action: a.Action, Name: a.Name, NodeID: a.NodeID, Detail: "reconnect requested"})
 		default:
-			out = append(out, a) // ok/stale/foreign pass through untouched
+			out = append(out, a) // ok/stale/foreign/update pass through untouched
 		}
 	}
 	return out
@@ -263,12 +258,19 @@ func createRequestFor(d DesiredNode) CreateRequest {
 	if port == 0 {
 		port = DefaultNodePort
 	}
+	// Coefficient 0 = not managed (phase 14 data-path decision), but
+	// upstream refuses a non-positive usage_coefficient at create time,
+	// so provisioning uses the neutral 1.0 once and never revisits it.
+	coef := d.Coefficient
+	if coef <= 0 {
+		coef = 1.0
+	}
 	return CreateRequest{
 		Name:             d.Name,
 		Address:          d.Address,
 		Port:             port,
 		APIPort:          DefaultAPIPort,
-		UsageCoefficient: d.Coefficient,
+		UsageCoefficient: coef,
 		ConnectionType:   ConnectionTypeGRPC,
 		ServerCA:         d.ServerCA,
 		KeepAlive:        DefaultKeepAlive,

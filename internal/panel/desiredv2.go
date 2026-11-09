@@ -265,7 +265,13 @@ func compileForwardRule(s *store.Store, topoID int64, f store.ForwardRule) (*pro
 		gid = fmt.Sprintf("grp-%s-pool", topoName)
 	}
 	wire.TargetGroup = gid
-	wire.TargetPort = f.ListenPort // the foreign side serves the same port
+	// TargetPort carries the rule's explicit foreign-side port when the
+	// operator set one; 0 keeps the historical default (serve the same
+	// port as the listen side).
+	wire.TargetPort = f.TargetPort
+	if wire.TargetPort <= 0 {
+		wire.TargetPort = f.ListenPort
+	}
 	return wire, &protocol.TargetGroup{ID: gid, TopologyID: topoName, RemoteServer: remoteName}, nil
 }
 

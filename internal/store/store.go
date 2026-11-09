@@ -311,6 +311,41 @@ CREATE TABLE tunnel_events (
 CREATE INDEX idx_tunnel_events_tunnel ON tunnel_events(tunnel_id, at);
 CREATE INDEX idx_traffic_samples_at ON traffic_samples(at);
 `,
+	// 7: Phase 14 port inventory. Three additive pieces:
+	//   - forward_rules.target_port: the desired foreign-side port of a
+	//     forward rule (the wire protocol already carried it; 0 = same as
+	//     listen_port, which is what the compiler used to hardcode);
+	//   - port_allocations: the panel's own port ledger per server — what
+	//     the allocator reserved, for whom (owner_key), so create/update
+	//     flows cannot double-book a listen port;
+	//   - agent_listening: the LATEST listening-port inventory each agent
+	//     reported in its v2 heartbeat (ResourceReport.Listening was
+	//     received and discarded before). It feeds both the allocator's
+	//     reservation set and the topology port view. One row per
+	//     (agent, proto, port) — a replace-per-heartbeat snapshot, not a
+	//     history.
+	`
+ALTER TABLE forward_rules ADD COLUMN target_port INTEGER NOT NULL DEFAULT 0;
+CREATE TABLE port_allocations (
+  id INTEGER PRIMARY KEY,
+  server_id INTEGER NOT NULL REFERENCES servers(id),
+  port INTEGER NOT NULL,
+  proto TEXT NOT NULL DEFAULT 'tcp',
+  purpose TEXT NOT NULL DEFAULT '',
+  owner_key TEXT NOT NULL DEFAULT '',
+  allocated_at INTEGER NOT NULL,
+  UNIQUE(server_id, port)
+);
+CREATE INDEX idx_port_allocations_server ON port_allocations(server_id);
+CREATE TABLE agent_listening (
+  agent_id TEXT NOT NULL,
+  proto TEXT NOT NULL,
+  port INTEGER NOT NULL,
+  proc TEXT NOT NULL DEFAULT '',
+  seen_at INTEGER NOT NULL,
+  PRIMARY KEY(agent_id, proto, port)
+);
+`,
 }
 
 func (s *Store) migrate() error {

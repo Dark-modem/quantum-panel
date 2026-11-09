@@ -152,7 +152,8 @@ var uiErrCatalog = map[string]uiErrEntry{
 var uiDetailAllowed = map[string]bool{
 	"agent": true, "agent_name": true, "engine": true, "tunnel": true,
 	"tunnels": true, "topology": true, "server": true, "port": true,
-	"arch": true, "module": true, "op": true, "field": true,
+	"alternatives": true,
+	"arch":         true, "module": true, "op": true, "field": true,
 	"retry_after_s": true, "raw": true, "reason": true, "role": true,
 }
 

@@ -30,9 +30,12 @@ type ForwardRule struct {
 	ListenPort     int    `json:"listen_port"`
 	Proto          string `json:"proto"`
 	Target         string `json:"target,omitempty"`
-	Enabled        bool   `json:"enabled"`
-	Note           string `json:"note,omitempty"`
-	CreatedAt      int64  `json:"created_at"`
+	// TargetPort is the desired port on the foreign side; 0 = same as
+	// ListenPort (what the compiler assumed before the column existed).
+	TargetPort int    `json:"target_port,omitempty"`
+	Enabled    bool   `json:"enabled"`
+	Note       string `json:"note,omitempty"`
+	CreatedAt  int64  `json:"created_at"`
 }
 
 // AgentV2State is the per-agent v2 session state the compiler and the
@@ -344,6 +347,9 @@ func (s *Store) CreateForwardRule(f ForwardRule) (int64, error) {
 	if f.ListenPort < 1 || f.ListenPort > 65535 {
 		return 0, fmt.Errorf("listen_port out of range")
 	}
+	if f.TargetPort < 0 || f.TargetPort > 65535 {
+		return 0, fmt.Errorf("target_port out of range")
+	}
 	if f.Proto != "tcp" && f.Proto != "udp" {
 		return 0, fmt.Errorf("proto must be tcp or udp")
 	}
@@ -351,10 +357,10 @@ func (s *Store) CreateForwardRule(f ForwardRule) (int64, error) {
 		return 0, fmt.Errorf("note/target too long")
 	}
 	res, err := s.db.Exec(`INSERT INTO forward_rules
-		(topology_id, local_server_id, remote_server_id, tunnel_id, listen_port, proto, target, enabled, note, created_at)
-		VALUES (?,?,?,?,?,?,?,?,?,?)`,
+		(topology_id, local_server_id, remote_server_id, tunnel_id, listen_port, proto, target, target_port, enabled, note, created_at)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
 		f.TopologyID, f.LocalServerID, f.RemoteServerID, f.TunnelID,
-		f.ListenPort, f.Proto, f.Target, boolInt(f.Enabled), f.Note, time.Now().Unix())
+		f.ListenPort, f.Proto, f.Target, f.TargetPort, boolInt(f.Enabled), f.Note, time.Now().Unix())
 	if err != nil {
 		return 0, wrapFK(err)
 	}
@@ -363,9 +369,9 @@ func (s *Store) CreateForwardRule(f ForwardRule) (int64, error) {
 
 func (s *Store) GetForwardRule(id int64) (ForwardRule, error) {
 	var f ForwardRule
-	err := s.db.QueryRow(`SELECT id, topology_id, local_server_id, remote_server_id, tunnel_id, listen_port, proto, target, enabled, note, created_at
+	err := s.db.QueryRow(`SELECT id, topology_id, local_server_id, remote_server_id, tunnel_id, listen_port, proto, target, target_port, enabled, note, created_at
 		FROM forward_rules WHERE id = ?`, id).
-		Scan(&f.ID, &f.TopologyID, &f.LocalServerID, &f.RemoteServerID, &f.TunnelID, &f.ListenPort, &f.Proto, &f.Target, &f.Enabled, &f.Note, &f.CreatedAt)
+		Scan(&f.ID, &f.TopologyID, &f.LocalServerID, &f.RemoteServerID, &f.TunnelID, &f.ListenPort, &f.Proto, &f.Target, &f.TargetPort, &f.Enabled, &f.Note, &f.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return f, ErrNotFound
 	}
@@ -376,10 +382,10 @@ func (s *Store) ListForwardRules(topologyID int64) ([]ForwardRule, error) {
 	var rows *sql.Rows
 	var err error
 	if topologyID > 0 {
-		rows, err = s.db.Query(`SELECT id, topology_id, local_server_id, remote_server_id, tunnel_id, listen_port, proto, target, enabled, note, created_at
+		rows, err = s.db.Query(`SELECT id, topology_id, local_server_id, remote_server_id, tunnel_id, listen_port, proto, target, target_port, enabled, note, created_at
 			FROM forward_rules WHERE topology_id = ? ORDER BY id`, topologyID)
 	} else {
-		rows, err = s.db.Query(`SELECT id, topology_id, local_server_id, remote_server_id, tunnel_id, listen_port, proto, target, enabled, note, created_at
+		rows, err = s.db.Query(`SELECT id, topology_id, local_server_id, remote_server_id, tunnel_id, listen_port, proto, target, target_port, enabled, note, created_at
 			FROM forward_rules ORDER BY id`)
 	}
 	if err != nil {
@@ -389,7 +395,7 @@ func (s *Store) ListForwardRules(topologyID int64) ([]ForwardRule, error) {
 	var out []ForwardRule
 	for rows.Next() {
 		var f ForwardRule
-		if err := rows.Scan(&f.ID, &f.TopologyID, &f.LocalServerID, &f.RemoteServerID, &f.TunnelID, &f.ListenPort, &f.Proto, &f.Target, &f.Enabled, &f.Note, &f.CreatedAt); err != nil {
+		if err := rows.Scan(&f.ID, &f.TopologyID, &f.LocalServerID, &f.RemoteServerID, &f.TunnelID, &f.ListenPort, &f.Proto, &f.Target, &f.TargetPort, &f.Enabled, &f.Note, &f.CreatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, f)
@@ -401,9 +407,12 @@ func (s *Store) UpdateForwardRule(f ForwardRule) error {
 	if f.ListenPort < 1 || f.ListenPort > 65535 {
 		return fmt.Errorf("listen_port out of range")
 	}
-	res, err := s.db.Exec(`UPDATE forward_rules SET topology_id=?, local_server_id=?, remote_server_id=?, tunnel_id=?, listen_port=?, proto=?, target=?, enabled=?, note=?
+	if f.TargetPort < 0 || f.TargetPort > 65535 {
+		return fmt.Errorf("target_port out of range")
+	}
+	res, err := s.db.Exec(`UPDATE forward_rules SET topology_id=?, local_server_id=?, remote_server_id=?, tunnel_id=?, listen_port=?, proto=?, target=?, target_port=?, enabled=?, note=?
 		WHERE id = ?`,
-		f.TopologyID, f.LocalServerID, f.RemoteServerID, f.TunnelID, f.ListenPort, f.Proto, f.Target, boolInt(f.Enabled), f.Note, f.ID)
+		f.TopologyID, f.LocalServerID, f.RemoteServerID, f.TunnelID, f.ListenPort, f.Proto, f.Target, f.TargetPort, boolInt(f.Enabled), f.Note, f.ID)
 	if err != nil {
 		return wrapFK(err)
 	}
