@@ -255,11 +255,14 @@ func errorPageHTML(code int, ref string) string {
       ev.preventDefault();
       var u = document.getElementById('l-user').value;
       var p = document.getElementById('l-pass').value;
-      fetch(` + loginHref + `, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      fetch('` + loginHref + `', { method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: u, password: p }) })
         .then(function (r) {
-          if (!r.ok) throw new Error('نام کاربری یا گذرواژه نادرست است');
-          location.replace('` + meshHref + `');
+          return r.json().catch(function () { return {}; }).then(function (j) {
+            if (!r.ok) throw new Error(j.hint || j.error || 'نام کاربری یا گذرواژه نادرست است');
+            location.replace('` + meshHref + `');
+          });
         })
         .catch(function (e) { document.getElementById('l-err').textContent = e.message; });
     });

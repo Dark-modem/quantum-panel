@@ -70,7 +70,12 @@ func TestErrorPagesRenderForBrowserNavigations(t *testing.T) {
 			}
 			wants := []string{`dir="rtl"`, `lang="fa"`, `href="` + meshHref + `"`}
 			if code == http.StatusUnauthorized {
-				wants = append(wants, `id="lform"`, "/api/login", "ورود")
+				wants = append(wants, `id="lform"`, "/api/login", "ورود",
+					// The login fetch must carry a QUOTED url: an unquoted
+					// `/base/api/login` parses as a regex literal, the
+					// handler never binds and the form does a native GET
+					// submit that looks like a page refresh.
+					"fetch('"+strings.TrimSuffix(meshHref, "/mesh")+"/api/login'")
 			} else {
 				wants = append(wants, "بازگشت به داشبورد", `href="`+homeHref+`"`)
 			}
