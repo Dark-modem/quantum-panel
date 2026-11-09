@@ -123,7 +123,33 @@
       copied: 'Copied', del: 'Delete', add: 'Add', saved: 'Saved', deleted: 'Deleted',
       confirm_del: 'Delete "{n}"? This cannot be undone.', err_details: 'Technical details',
       what_happened: 'What happened', likely_cause: 'Likely cause', what_to_do: 'What to do',
-      th_created: 'Created'
+      th_created: 'Created', tunnel: 'Tunnel', pair_tunnels: 'Tunnels of this pair',
+      save: 'Save', eng_size: 'Size', pushed: 'Pushed',
+      ng_reports: 'Reports', ng_system: 'System',
+      nav_billing: 'Billing', nav_audit: 'Audit log', nav_selfcheck: 'Self check',
+      nav_clientcfg: 'Xray client config',
+      title_billing: 'Billing report', title_audit: 'Audit log', title_selfcheck: 'Self check',
+      title_clientconfig: 'Xray client configs',
+      bill_month: 'Jalali month', bill_load: 'Load report', bill_csv: 'Download CSV',
+      bill_billable_note: 'Billable download = wire bytes received on the Iran side.',
+      traffic_empty: 'No traffic recorded from the Iran datacenters yet. As soon as traffic flows, the chart and the table fill in here.',
+      bill_server: 'Server', bill_tunnel: 'Tunnel', bill_billable: 'Billable download', bill_payload_down: 'Payload download',
+      bill_overhead: 'Overhead', bill_hint: 'Price hint', bill_suggested: 'Suggested coefficient',
+      bill_quality: 'Data quality', bill_gaps: '{n} gap(s), longest {s}',
+      bill_offline: '{n} agent(s) offline', bill_clean: 'complete',
+      bill_none: 'No rows in this period.',
+      bill_note: 'Every number is a real byte; no coefficient is ever applied.',
+      audit_filter: 'Search action or detail…', audit_actor: 'Actor', audit_action: 'Action',
+      audit_at: 'Time', audit_detail: 'Detail', audit_export: 'Export CSV',
+      audit_none: 'No audit entries.', audit_limit: 'Latest {n} entries',
+      sc_run: 'Run again', sc_ok: 'All checks passed', sc_bad: 'Critical findings — act on them',
+      sc_sev: 'Severity', sc_title: 'Finding', sc_what: 'What', sc_fix: 'Fix', sc_objects: 'Objects',
+      sc_none: 'No findings — nothing to fix.',
+      cc_dc: 'Iran datacenter', cc_load: 'Build config', cc_copy: 'Copy JSON',
+      cc_download: 'Download JSON', cc_none: 'Choose a datacenter and build its client config.',
+      ports: 'Ports', ports_allocated: 'Allocated by panel', ports_reserved: 'Reserved',
+      ports_observed: 'Observed on the host', ports_empty: 'none',
+      ports_hint: 'Client-facing ports belong to forward rules; the panel allocates carrier ports and refuses conflicts.'
     },
     fa: {
       brand_sub: 'مش', nav_dash: 'داشبورد', nav_topo: 'توپولوژی‌ها', nav_agents: 'ایجنت‌ها',
@@ -226,7 +252,33 @@
       copied: 'کپی شد', del: 'حذف', add: 'افزودن', saved: 'ذخیره شد', deleted: 'حذف شد',
       confirm_del: '«{n}» حذف شود؟ بازگشت ندارد.', err_details: 'جزئیات فنی',
       what_happened: 'چه اتفاقی افتاد', likely_cause: 'علت احتمالی', what_to_do: 'چه کاری باید بکنید',
-      th_created: 'تاریخ ساخت'
+      th_created: 'تاریخ ساخت', pair_tunnels: 'تونل‌های این جفت', save: 'ذخیره',
+      eng_size: 'حجم', pushed: 'ارسال شد',
+      ng_reports: 'گزارش‌ها', ng_system: 'سیستم',
+      nav_billing: 'صورت‌حساب', nav_audit: 'گزارش رویدادها', nav_selfcheck: 'بررسی سلامت',
+      nav_clientcfg: 'کانفیگ کلاینت Xray',
+      title_billing: 'گزارش صورت‌حساب', title_audit: 'گزارش رویدادها', title_selfcheck: 'بررسی سلامت',
+      title_clientconfig: 'کانفیگ کلاینت Xray',
+      bill_month: 'ماه شمسی', bill_load: 'نمایش گزارش', bill_csv: 'دانلود CSV',
+      bill_billable_note: 'دانلود قابل‌قبض = بایت‌های wire دریافتی در سمت ایران.',
+      traffic_empty: 'هنوز ترافیکی از دیتاسنترهای ایران ثبت نشده؛ به‌محض عبور ترافیک، نمودار و جدول همین‌جا پر می‌شود.',
+      bill_server: 'سرور', bill_tunnel: 'تونل', bill_billable: 'دانلود قابل‌قبض', bill_payload_down: 'دانلود بار',
+      bill_overhead: 'سربار', bill_hint: 'ضریب راهنما', bill_suggested: 'ضریب پیشنهادی',
+      bill_quality: 'کیفیت داده', bill_gaps: '{n} شکاف، بلندترین {s}',
+      bill_offline: '{n} ایجنت آفلاین', bill_clean: 'کامل',
+      bill_none: 'در این بازه ردیفی نیست.',
+      bill_note: 'همهٔ اعداد بایت واقعی‌اند؛ هیچ ضریبی اعمال نمی‌شود.',
+      audit_filter: 'جستجو در اقدام یا جزئیات…', audit_actor: 'کاربر', audit_action: 'اقدام',
+      audit_at: 'زمان', audit_detail: 'جزئیات', audit_export: 'خروجی CSV',
+      audit_none: 'رویدادی ثبت نشده.', audit_limit: '{n} رویداد آخر',
+      sc_run: 'اجرای دوباره', sc_ok: 'همهٔ بررسی‌ها سالم', sc_bad: 'یافتهٔ بحرانی — رسیدگی کنید',
+      sc_sev: 'شدت', sc_title: 'یافته', sc_what: 'چه چیزی', sc_fix: 'راه رفع', sc_objects: 'اشیا',
+      sc_none: 'یافته‌ای نیست.',
+      cc_dc: 'دیتاسنتر ایران', cc_load: 'ساخت کانفیگ', cc_copy: 'کپی JSON',
+      cc_download: 'دانلود JSON', cc_none: 'یک دیتاسنتر انتخاب کنید تا کانفیگ کلاینتش ساخته شود.',
+      ports: 'پورت‌ها', ports_allocated: 'اختصاص‌دادهٔ پنل', ports_reserved: 'رزرو',
+      ports_observed: 'دیده‌شده روی هاست', ports_empty: 'هیچ',
+      ports_hint: 'پورت سمت کلاینت متعلق به قاعدهٔ فوروارد است؛ پنل پورت‌های حامل را اختصاص می‌دهد و تعارض را رد می‌کند.'
     }
   };
   function t(k) { return (T[LANG] && T[LANG][k]) || T.en[k] || k; }
@@ -405,10 +457,12 @@
 
   // ---- router (hash-based: #dash, #agents, #agent/{id}, #tunnel/{key}…) -----
   var PAGES = ['dash', 'topologies', 'agents', 'agent', 'tunnels', 'tunnel', 'engines',
-    'alerts', 'security', 'pasarguard', 'settings', 'notfound'];
+    'alerts', 'security', 'pasarguard', 'billing', 'audit', 'selfcheck', 'clientconfig',
+    'settings', 'notfound'];
   var NAV_FOR = { dash: 'dash', topologies: 'topologies', agents: 'agents', agent: 'agents',
     tunnels: 'tunnels', tunnel: 'tunnels', engines: 'engines', alerts: 'alerts',
-    security: 'security', pasarguard: 'pasarguard', settings: 'settings' };
+    security: 'security', pasarguard: 'pasarguard', billing: 'billing', audit: 'audit',
+    selfcheck: 'selfcheck', clientconfig: 'clientconfig', settings: 'settings' };
   var route = { page: 'dash', id: '' };
 
   function parseHash() {
@@ -455,6 +509,10 @@
     else if (route.page === 'tunnel') renderTunnelDetail(route.id);
     else if (route.page === 'engines') renderEngines();
     else if (route.page === 'alerts') renderAlerts();
+    else if (route.page === 'billing') renderBilling();
+    else if (route.page === 'audit') renderAudit();
+    else if (route.page === 'selfcheck') renderSelfcheck();
+    else if (route.page === 'clientconfig') renderClientConfig();
     else if (route.page === 'security') renderSecurity();
     else if (route.page === 'pasarguard') renderPG();
     else if (route.page === 'settings') renderSettings();
@@ -535,11 +593,17 @@
     var tu = c.tunnels;
     el.innerHTML =
       '<div class="kpis">' +
-      kpi('agents', num0(ag.online) + '<small>/' + num0(ag.online + ag.offline) + '</small>', t('k_agents'), ag.offline > 0 ? 'err' : 'ok') +
-      kpi('topologies', num0(c.topologies.total), t('k_topos'), '') +
-      kpi('tunnels', num0(tu.up) + '<small>/' + num0(tu.total) + '</small>', t('k_tunnels') + ' ' + t('t_up'),
+      kpi('agents', '<bdi dir="ltr">' + num0(ag.online) + '<small>/' + num0(ag.online + ag.offline) + '</small></bdi>', t('k_agents'), ag.offline > 0 ? 'err' : 'ok',
+        '<div class="ksub">' + esc(t('offline')) + ': <b>' + num0(ag.offline) + '</b></div>') +
+      kpi('', num0(c.datacenters.iran) + '<small>+' + num0(c.datacenters.foreign) + '</small>', t('k_dcs'), '',
+        '<div class="ksub">' + esc(t('iran_side')) + ': <b>' + num0(c.datacenters.iran) + '</b> · ' + esc(t('foreign_side')) + ': <b>' + num0(c.datacenters.foreign) + '</b></div>') +
+      kpi('', num0(c.servers.iran) + '<small>+' + num0(c.servers.foreign) + '</small>', t('k_servers'), '',
+        '<div class="ksub">' + esc(t('iran_side')) + ': <b>' + num0(c.servers.iran) + '</b> · ' + esc(t('foreign_side')) + ': <b>' + num0(c.servers.foreign) + '</b></div>') +
+      kpi('topologies', num0(c.topologies.total), t('k_topos'), '',
+        '<div class="ksub">' + esc(t('th_enabled')) + ': <b>' + num0(c.topologies.enabled) + '</b></div>') +
+      kpi('tunnels', '<bdi dir="ltr">' + num0(tu.up) + '<small>/' + num0(tu.total) + '</small></bdi>', t('k_tunnels') + ' ' + t('t_up'),
         tu.down > 0 ? 'err' : (tu.degraded > 0 ? 'warn' : 'ok'),
-        '<div class="ksub">' + esc(t('t_down')) + ': <b>' + num0(tu.down) + '</b> · ' + esc(t('t_degraded')) + ': <b>' + num0(tu.degraded) + '</b> · ' + esc(t('t_disabled')) + ': <b>' + num0(tu.disabled) + '</b></div>') +
+        '<div class="ksub"><b>' + num0(tu.down) + '</b> ' + esc(t('t_down')) + ' · <b>' + num0(tu.degraded) + '</b> ' + esc(t('t_degraded')) + ' · <b>' + num0(tu.disabled) + '</b> ' + esc(t('t_disabled')) + '</div>') +
       kpi('alerts', num0(overview.alerts.open), t('k_alerts'), overview.alerts.open > 0 ? 'warn' : 'ok') +
       kpi('pending', num0(overview.pending_confirmations), t('k_pending'), overview.pending_confirmations > 0 ? 'warn' : '') +
       kpiCert(overview.certificate) +
@@ -572,11 +636,13 @@
   function kpiCert(cert) {
     var kind = cert.state === 'valid' ? 'ok' : (cert.state === 'expiring' ? 'warn' : (cert.state === 'expired' ? 'err' : ''));
     var days = cert.days_left;
-    var lbl = cert.state === 'valid' ? t('cert_days').replace('{d}', days)
-      : cert.state === 'expired' ? t('cert_expired_d').replace('{d}', Math.abs(days))
-      : t('cert_' + (cert.state || 'unknown'));
+    var val = days == null ? '—' : num0(days) + (LANG === 'fa' ? ' روز' : 'd');
+    var exp = cert.expiry ? Date.parse(String(cert.expiry).replace(' ', 'T')) : NaN;
+    var sub = cert.state === 'unknown' || !cert.state ? t('cert_unknown')
+      : t('cert_' + cert.state) + (isNaN(exp) ? '' : ' · ' + fmtDate(exp / 1000));
     return '<button class="kpi ' + kind + '" data-go="#settings">' +
-      '<div class="kval">' + esc(lbl) + '</div><div class="klbl">' + esc(t('k_cert')) + '</div></button>';
+      '<div class="kval">' + esc(val) + '</div><div class="klbl">' + esc(t('k_cert')) + '</div>' +
+      '<div class="ksub">' + esc(sub) + '</div></button>';
   }
   function meter(pctv) {
     var cls = pctv >= 90 ? 'err' : (pctv >= 70 ? 'warn' : '');
@@ -605,7 +671,7 @@
     var box = document.getElementById('dc-traffic');
     var per = (overview.traffic && overview.traffic.per_datacenter) || [];
     if (!per.length) {
-      box.innerHTML = '<div class="empty">' + esc(t('k_traffic')) + ': 0</div>';
+      box.innerHTML = '<div class="empty">' + esc(t('traffic_empty')) + '</div>';
       return;
     }
     var blk = overview.traffic[trafficRange] || {};
@@ -637,7 +703,6 @@
       svg += '<text x="' + (labelW - 8) + '" y="' + (y + barH) + '" text-anchor="end">' + esc(d.name) + '</text>';
       svg += '<rect class="bar-dl" x="' + labelW + '" y="' + y + '" width="' + wdl + '" height="' + barH + '" rx="4"><title>' + bytes(d.billable_download_bytes) + '</title></rect>';
       svg += '<rect class="bar-ul" x="' + labelW + '" y="' + (y + barH + 3) + '" width="' + wul + '" height="' + barH + '" rx="4"><title>' + bytes(d.upload_bytes) + '</title></rect>';
-      svg += '<text x="' + Math.min(labelW + wdl + 6, W - 74) + '" y="' + (y + barH) + '">' + bytes(d.billable_download_bytes) + '</text>';
     });
     svg += '</svg>';
     return svg;
@@ -725,22 +790,23 @@
       return '<tr data-id="' + esc(a.id) + '" class="rowlink">' +
         '<td>' + statePill(a.status) + '</td>' +
         '<td><a href="#agent/' + esc(a.id) + '"><b>' + esc(a.name || a.id) + '</b></a><br><span class="muted mono">' + esc(a.id) + '</span></td>' +
-        '<td>' + esc(a.role) + '</td>' +
+        '<td class="hide-sm">' + esc(a.role) + '</td>' +
         '<td>' + esc(sv.datacenter || '—') + '</td>' +
-        '<td>' + (topos || '—') + '</td>' +
+        '<td class="hide-sm">' + (topos || '—') + '</td>' +
         '<td class="num">' + en + ' / ' + run + '</td>' +
         '<td class="num">' + pct(cpu) + '</td>' +
         '<td class="num">' + pct(mem) + '</td>' +
-        '<td class="muted">' + fmtDate(a.last_seen) + '</td></tr>';
+        '<td class="muted hide-sm">' + fmtDate(a.last_seen) + '</td></tr>';
     }).join('');
     el.innerHTML =
-      '<div class="row"><span class="muted">' + ags.length + ' × ' + esc(t('nav_agents')) + '</span><span class="spacer"></span>' +
+      '<div class="row"><input id="ag-search" type="search" placeholder="' + esc(t('search')) + '" style="max-width:240px">' +
+      '<span class="muted">' + ags.length + ' × ' + esc(t('nav_agents')) + '</span><span class="spacer"></span>' +
       '<a class="btn primary small" href="' + esc(base()) + 'mesh-wizard">' + esc(t('wizard_link')) + '</a></div>' +
       '<div class="tblwrap"><table id="agents-tbl"><thead><tr>' +
-      '<th>' + esc(t('th_state')) + '</th><th>' + esc(t('th_agent')) + '</th><th>' + esc(t('th_role')) + '</th>' +
-      '<th>' + esc(t('th_dc')) + '</th><th>' + esc(t('th_topos')) + '</th>' +
+      '<th>' + esc(t('th_state')) + '</th><th>' + esc(t('th_agent')) + '</th><th class="hide-sm">' + esc(t('th_role')) + '</th>' +
+      '<th>' + esc(t('th_dc')) + '</th><th class="hide-sm">' + esc(t('th_topos')) + '</th>' +
       '<th class="num">' + esc(t('th_engines')) + '</th><th class="num">' + esc(t('th_cpu')) + '</th>' +
-      '<th class="num">' + esc(t('th_mem')) + '</th><th>' + esc(t('th_seen')) + '</th></tr></thead>' +
+      '<th class="num">' + esc(t('th_mem')) + '</th><th class="hide-sm">' + esc(t('th_seen')) + '</th></tr></thead>' +
       '<tbody>' + rows + '</tbody></table></div>';
     wireTableTools('agents-tbl', el, ['th_agent', 'th_state', 'th_role', 'th_dc', 'th_cpu', 'th_mem', 'th_seen']);
   }
@@ -929,9 +995,11 @@
         kpi('', bytes(tr.upload_bytes), t('th_upload') + ' — ' + t('rng_today'), '') +
         '</div>' +
         '<div class="card"><h3>' + esc(t('map_title')) + '</h3><p class="muted">' + esc(t('map_hint')) + '</p><div id="mapbox"></div></div>' +
+        '<div id="ports"></div>' +
         '<div id="per-server"></div>';
       el.innerHTML = html;
       drawMapNew(d);
+      renderTopologyPorts(id);
       renderPerServer(d);
     }).catch(function (e) { showPageError(el, e, function () { renderTopologyDetail(id); }); });
   }
@@ -1589,6 +1657,308 @@
           ? '<div class="tblwrap"><table><thead><tr><th>node</th><th>server</th><th>PasarGuard</th><th>Panel</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
           : '<div class="empty">—</div>';
       }).catch(function (e) { toastErr(e); });
+  }
+
+  // ---- shared: authenticated file download -----------------------------------
+  function downloadFile(path, filename) {
+    return fetch(base() + 'api/ui/' + path, { headers: { 'X-CSRF-Token': csrfToken() } })
+      .then(function (r) {
+        if (!r.ok) {
+          return r.text().then(function (txt) {
+            var j = null; try { j = JSON.parse(txt); } catch (e) {}
+            var err = new Error((j && j.error) || ('HTTP ' + r.status));
+            err.ui = j && j.ui; err.status = r.status; throw err;
+          });
+        }
+        return r.blob();
+      })
+      .then(function (blob) {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = filename;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 5000);
+      });
+  }
+  // current Jalali year-month in Asia/Tehran (the billing endpoint's spec)
+  function currentJalaliMonth() {
+    try {
+      var parts = new Intl.DateTimeFormat('en-US-u-ca-persian-nu-latn',
+        { timeZone: 'Asia/Tehran', year: 'numeric', month: '2-digit' }).formatToParts(new Date());
+      var y = '', m = '';
+      parts.forEach(function (p) { if (p.type === 'year') y = p.value; if (p.type === 'month') m = p.value; });
+      if (y && m) return y + '-' + m;
+    } catch (e) { /* fall through */ }
+    return '';
+  }
+
+  // ---- billing report (GET /api/ui/reports/billing + CSV) --------------------
+  var billMonth = '';
+  function renderBilling() {
+    var el = document.getElementById('page-billing');
+    if (!billMonth) billMonth = currentJalaliMonth();
+    el.innerHTML =
+      '<div class="card"><div class="row">' +
+      '<div class="field" style="margin:0"><label for="bill-m">' + esc(t('bill_month')) + '</label>' +
+      '<input id="bill-m" value="' + esc(billMonth) + '" placeholder="1405-08" style="width:120px" inputmode="numeric"></div>' +
+      '<button class="act primary" id="bill-go">' + esc(t('bill_load')) + '</button>' +
+      '<span class="spacer"></span><button class="act" id="bill-csv">' + esc(t('bill_csv')) + '</button></div>' +
+      '<p class="muted">' + esc(t('bill_note')) + '</p></div><div id="bill-out">' + skeletons(4) + '</div>';
+    document.getElementById('bill-go').onclick = function () {
+      billMonth = document.getElementById('bill-m').value.trim();
+      loadBilling();
+    };
+    document.getElementById('bill-m').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { billMonth = this.value.trim(); loadBilling(); }
+    });
+    document.getElementById('bill-csv').onclick = function () {
+      downloadFile('reports/billing?month=' + encodeURIComponent(billMonth) + '&format=csv',
+        'billing-' + billMonth + '.csv').catch(function (e) { toastErr(e); });
+    };
+    loadBilling();
+  }
+  function billQuality(q) {
+    if (!q) return '<span class="pill ok">' + esc(t('bill_clean')) + '</span>';
+    var bits = [];
+    if (q.gaps) bits.push(t('bill_gaps').replace('{n}', q.gaps).replace('{s}', dur(q.longest_gap_s || 0)));
+    if (q.agents_offline) bits.push(t('bill_offline').replace('{n}', q.agents_offline));
+    if (q.unknown_counters) bits.push(t('td_na'));
+    return bits.length
+      ? '<span class="pill warn" title="' + esc(bits.join(' · ')) + '">' + esc(bits[0]) + '</span>'
+      : '<span class="pill ok">' + esc(t('bill_clean')) + '</span>';
+  }
+  function billTable(title, rows, head) {
+    return '<div class="card"><h3>' + esc(title) + '</h3>' +
+      (rows ? '<div class="tblwrap"><table><thead><tr>' + head + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+        : '<div class="empty">' + esc(t('bill_none')) + '</div>') + '</div>';
+  }
+  function loadBilling() {
+    var out = document.getElementById('bill-out');
+    if (!out) return;
+    api('GET', 'reports/billing?month=' + encodeURIComponent(billMonth)).then(function (r) {
+      var dcRows = (r.per_datacenter || []).map(function (d) {
+        var u = d.usage || {}, b = d.billable || {};
+        return '<tr><td><b>' + esc(d.name) + '</b></td>' +
+          '<td class="num">' + bytes(b.wire_rx) + '</td>' +
+          '<td class="num">' + bytes(u.wire_tx) + '</td>' +
+          '<td class="num">' + bytes(b.payload_rx) + '</td>' +
+          '<td class="num">' + (d.overhead_ratio != null ? num(d.overhead_ratio, 3) : '—') + '</td>' +
+          '<td class="num">' + (d.price_coefficient_hint != null ? num(d.price_coefficient_hint, 3) : '—') + '</td>' +
+          '<td class="num">' + (d.suggested_coefficient != null ? num(d.suggested_coefficient, 3) : '—') + '</td>' +
+          '<td>' + billQuality(d.quality) + '</td></tr>';
+      }).join('');
+      var svRows = (r.per_server || []).map(function (s) {
+        var u = s.usage || {}, b = s.billable || {};
+        return '<tr><td><b>' + esc(s.name) + '</b></td><td>' + esc(s.datacenter || '—') + '</td>' +
+          '<td class="num">' + bytes(b.wire_rx) + '</td>' +
+          '<td class="num">' + bytes(u.wire_tx) + '</td>' +
+          '<td class="num">' + bytes(b.payload_rx) + '</td>' +
+          '<td class="num">' + (s.overhead_ratio != null ? num(s.overhead_ratio, 3) : '—') + '</td>' +
+          '<td>' + billQuality(s.quality) + '</td></tr>';
+      }).join('');
+      var tnRows = (r.per_tunnel || []).map(function (x) {
+        var u = x.usage || {}, b = x.billable || {};
+        return '<tr><td class="mono trunc" style="max-width:200px" title="' + esc(x.tunnel_key) + '">' + esc(x.tunnel_key) + '</td>' +
+          '<td>' + esc(x.topology || '—') + '</td>' +
+          '<td>' + esc((x.local_server || '') + ' ↔ ' + (x.remote_server || '')) + '</td>' +
+          '<td>' + esc(x.engine || '—') + '</td>' +
+          '<td class="num">' + bytes(b.wire_rx) + '</td>' +
+          '<td class="num">' + bytes(b.payload_rx) + '</td>' +
+          '<td class="num">' + (x.overhead_ratio != null ? num(x.overhead_ratio, 3) : '—') + '</td>' +
+          '<td>' + billQuality(x.quality) + '</td></tr>';
+      }).join('');
+      var none = !(r.per_datacenter || []).length && !(r.per_server || []).length && !(r.per_tunnel || []).length;
+      if (none) {
+        out.innerHTML = '<div class="card"><div class="row"><span class="pill info"><bdi dir="ltr">' +
+          esc((r.from_jalali || '') + ' → ' + (r.to_jalali || '')) + '</bdi></span></div>' +
+          '<div class="empty">' + esc(t('bill_none')) + '</div></div>';
+        return;
+      }
+      out.innerHTML =
+        '<div class="card"><div class="row"><span class="pill info"><bdi dir="ltr">' +
+        esc((r.from_jalali || '') + ' → ' + (r.to_jalali || '')) + '</bdi></span>' +
+        '<span class="muted">' + esc(t('bill_billable_note')) + '</span></div>' +
+        '<p class="muted">' + esc(r.note || '') + '</p></div>' +
+        billTable(t('k_dcs'), dcRows,
+          '<th>' + esc(t('th_dc')) + '</th><th class="num">' + esc(t('bill_billable')) + '</th>' +
+          '<th class="num">' + esc(t('th_upload')) + '</th><th class="num">' + esc(t('bill_payload_down')) + '</th>' +
+          '<th class="num">' + esc(t('bill_overhead')) + '</th><th class="num">' + esc(t('bill_hint')) + '</th>' +
+          '<th class="num">' + esc(t('bill_suggested')) + '</th><th>' + esc(t('bill_quality')) + '</th>') +
+        billTable(t('k_servers'), svRows,
+          '<th>' + esc(t('bill_server')) + '</th><th>' + esc(t('th_dc')) + '</th>' +
+          '<th class="num">' + esc(t('bill_billable')) + '</th><th class="num">' + esc(t('th_upload')) + '</th>' +
+          '<th class="num">' + esc(t('bill_payload_down')) + '</th><th class="num">' + esc(t('bill_overhead')) + '</th>' +
+          '<th>' + esc(t('bill_quality')) + '</th>') +
+        billTable(t('bill_tunnel'), tnRows,
+          '<th>' + esc(t('tunnel')) + '</th><th>' + esc(t('th_topology')) + '</th><th>' + esc(t('th_peer')) + '</th>' +
+          '<th>' + esc(t('th_engine')) + '</th><th class="num">' + esc(t('bill_billable')) + '</th>' +
+          '<th class="num">' + esc(t('bill_payload_down')) + '</th><th class="num">' + esc(t('bill_overhead')) + '</th>' +
+          '<th>' + esc(t('bill_quality')) + '</th>');
+    }).catch(function (e) { showPageError(out, e, loadBilling); });
+  }
+
+  // ---- audit log (GET /api/ui/audit, CSV) -------------------------------------
+  function renderAudit() {
+    var el = document.getElementById('page-audit');
+    el.innerHTML = '<div class="card"><div class="row">' +
+      '<input id="au-q" type="search" placeholder="' + esc(t('audit_filter')) + '" style="min-width:200px;flex:1">' +
+      '<button class="act primary" id="au-go">' + esc(t('search')) + '</button>' +
+      '<span class="spacer"></span><button class="act" id="au-csv">' + esc(t('audit_export')) + '</button></div>' +
+      '<div class="muted" id="au-count"></div></div><div id="au-out">' + skeletons(4) + '</div>';
+    document.getElementById('au-go').onclick = loadAudit;
+    document.getElementById('au-q').addEventListener('keydown', function (e) { if (e.key === 'Enter') loadAudit(); });
+    document.getElementById('au-csv').onclick = function () {
+      downloadFile('audit?format=csv&q=' + encodeURIComponent(document.getElementById('au-q').value.trim()), 'audit.csv')
+        .catch(function (e) { toastErr(e); });
+    };
+    loadAudit();
+  }
+  function loadAudit() {
+    var out = document.getElementById('au-out');
+    if (!out) return;
+    var q = document.getElementById('au-q').value.trim();
+    api('GET', 'audit?limit=200&q=' + encodeURIComponent(q)).then(function (r) {
+      var rows = (r.entries || []).map(function (e) {
+        var det = e.detail ? JSON.stringify(e.detail) : '';
+        return '<tr><td class="muted">' + fmtDate(e.at) + '</td>' +
+          '<td><b>' + esc(e.actor || '—') + '</b></td>' +
+          '<td><span class="pill info">' + esc(e.action || '—') + '</span></td>' +
+          '<td class="mono trunc" dir="ltr" style="max-width:360px" title="' + esc(det) + '">' + esc(det || '—') + '</td></tr>';
+      }).join('');
+      document.getElementById('au-count').textContent = t('audit_limit').replace('{n}', (r.count || 0));
+      out.innerHTML = rows
+        ? '<div class="card"><div class="tblwrap"><table id="au-tbl"><thead><tr><th>' + esc(t('audit_at')) + '</th>' +
+          '<th>' + esc(t('audit_actor')) + '</th><th>' + esc(t('audit_action')) + '</th><th>' + esc(t('audit_detail')) + '</th></tr></thead>' +
+          '<tbody>' + rows + '</tbody></table></div></div>'
+        : '<div class="card"><div class="empty">' + esc(t('audit_none')) + '</div></div>';
+      wireTableTools('au-tbl', document.getElementById('page-audit'), ['audit_at', 'audit_actor', 'audit_action', 'audit_detail']);
+    }).catch(function (e) { showPageError(out, e, loadAudit); });
+  }
+
+  // ---- self check (GET /api/ui/selfcheck) --------------------------------------
+  function renderSelfcheck() {
+    var el = document.getElementById('page-selfcheck');
+    el.innerHTML = skeletons(4);
+    api('GET', 'selfcheck').then(function (r) {
+      var f = r.findings || [];
+      var rows = f.map(function (x) {
+        var sev = x.severity === 'critical' ? 'down' : (x.severity === 'warn' ? 'warn' : 'info');
+        return '<tr><td><span class="pill ' + sev + '">' + esc(x.severity) + '</span></td>' +
+          '<td><b>' + esc(x.title) + '</b><br><span class="muted mono">' + esc(x.id) + '</span></td>' +
+          '<td dir="ltr">' + esc(x.what) + '</td><td dir="ltr">' + esc(x.fix) + '</td>' +
+          '<td class="mono trunc" dir="ltr" style="max-width:180px" title="' + esc(x.objects || '') + '">' + esc(x.objects || '—') + '</td></tr>';
+      }).join('');
+      var when = r.at ? fmtDate(Date.parse(r.at) / 1000) : '—';
+      el.innerHTML = '<div class="card"><div class="row">' +
+        '<span class="pill ' + (r.ok ? 'ok' : 'down') + '">' + esc(r.ok ? t('sc_ok') : t('sc_bad')) + '</span>' +
+        '<span class="spacer"></span><span class="muted">' + esc(when) + '</span>' +
+        '<button class="act" id="sc-run">' + esc(t('sc_run')) + '</button></div>' +
+        (f.length
+          ? '<div class="tblwrap"><table><thead><tr><th>' + esc(t('sc_sev')) + '</th><th>' + esc(t('sc_title')) + '</th>' +
+            '<th>' + esc(t('sc_what')) + '</th><th>' + esc(t('sc_fix')) + '</th><th>' + esc(t('sc_objects')) + '</th></tr></thead>' +
+            '<tbody>' + rows + '</tbody></table></div>'
+          : '<div class="empty">' + esc(t('sc_none')) + '</div>') + '</div>';
+      document.getElementById('sc-run').onclick = renderSelfcheck;
+    }).catch(function (e) { showPageError(el, e, renderSelfcheck); });
+  }
+
+  // ---- Xray client config per Iran datacenter ---------------------------------
+  function renderClientConfig() {
+    var el = document.getElementById('page-clientconfig');
+    el.innerHTML = skeletons(3);
+    fetch(base() + 'api/mesh/overview', { headers: { 'X-CSRF-Token': csrfToken() } })
+      .then(function (r) { return r.json(); })
+      .then(function (ov) {
+        var dcs = (ov.datacenters || []).filter(function (d) { return d.kind !== 'foreign'; });
+        if (!dcs.length) {
+          el.innerHTML = '<div class="empty">' + esc(t('cc_none')) + '</div>';
+          return;
+        }
+        el.innerHTML = '<div class="card"><div class="row">' +
+          '<div class="field" style="margin:0"><label for="cc-dc">' + esc(t('cc_dc')) + '</label>' +
+          '<select id="cc-dc">' + dcs.map(function (d) {
+            return '<option value="' + d.id + '">' + esc(d.name) + '</option>';
+          }).join('') + '</select></div>' +
+          '<button class="act primary" id="cc-go">' + esc(t('cc_load')) + '</button>' +
+          '<span class="spacer"></span><button class="act" id="cc-copy" disabled>' + esc(t('cc_copy')) + '</button>' +
+          '<button class="act" id="cc-dl" disabled>' + esc(t('cc_download')) + '</button></div>' +
+          '<p class="muted">' + esc(t('cc_none')) + '</p><div id="cc-out"></div></div>';
+        var current = null;
+        function build() {
+          var id = document.getElementById('cc-dc').value;
+          if (!id) return;
+          api('GET', 'datacenters/' + encodeURIComponent(id) + '/client-config').then(function (cfg) {
+            current = cfg;
+            document.getElementById('cc-out').innerHTML = '<pre class="jsonpre">' + esc(JSON.stringify(cfg, null, 2)) + '</pre>';
+            document.getElementById('cc-copy').disabled = false;
+            document.getElementById('cc-dl').disabled = false;
+          }).catch(function (e) {
+            current = null;
+            var box = document.getElementById('cc-out');
+            box.innerHTML = '';
+            box.appendChild(uiErrCard(e, build));
+            document.getElementById('cc-copy').disabled = true;
+            document.getElementById('cc-dl').disabled = true;
+          });
+        }
+        document.getElementById('cc-go').onclick = build;
+        document.getElementById('cc-dc').addEventListener('change', build);
+        document.getElementById('cc-copy').onclick = function () {
+          if (!current) return;
+          navigator.clipboard.writeText(JSON.stringify(current, null, 2))
+            .then(function () { toast(t('copied'), 'ok'); })
+            .catch(function () { toast(t('cc_copy'), 'err'); });
+        };
+        document.getElementById('cc-dl').onclick = function () {
+          if (!current) return;
+          var blob = new Blob([JSON.stringify(current, null, 2)], { type: 'application/json' });
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a');
+          a.href = url; a.download = 'xray-client-' + document.getElementById('cc-dc').value + '.json';
+          document.body.appendChild(a); a.click(); a.remove();
+          setTimeout(function () { URL.revokeObjectURL(url); }, 5000);
+        };
+        // no auto-build: the first paint shows the hint, the operator picks a DC
+        // (an unconditional call would surface a 404 error card on arrival)
+      }).catch(function (e) { showPageError(el, e, renderClientConfig); });
+  }
+
+  // ---- topology ports (GET /api/ui/topologies/{id}/ports) ---------------------
+  function renderTopologyPorts(id) {
+    var box = document.getElementById('ports');
+    if (!box) return;
+    box.innerHTML = '<div class="card"><h3>' + esc(t('ports')) + '</h3>' + skeletons(2) + '</div>';
+    api('GET', 'topologies/' + id + '/ports').then(function (d) {
+      var rows = (d.servers || []).map(function (s) {
+        function chips(list, fmt, cls) {
+          if (!list || !list.length) return '<span class="muted">' + esc(t('ports_empty')) + '</span>';
+          return '<div class="portlist">' + list.map(function (x) {
+            return '<span class="pill ' + (cls || 'dim') + '" title="' + esc(fmt(x).tip) + '">' + esc(fmt(x).label) + '</span>';
+          }).join('') + '</div>';
+        }
+        var alloc = chips(s.allocated, function (a) {
+          return { label: a.port + '/' + a.proto, tip: (a.purpose || '') + (a.owner_key ? ' · ' + a.owner_key : '') };
+        });
+        var res = (s.reserved || []).length
+          ? '<div class="portlist">' + s.reserved.map(function (p) {
+            return '<span class="pill dim">' + esc(String(p)) + '</span>';
+          }).join('') + '</div>'
+          : '<span class="muted">' + esc(t('ports_empty')) + '</span>';
+        var obs = chips(s.observed, function (o) {
+          return { label: o.port + '/' + o.proto, tip: o.proc || '' };
+        }, 'info');
+        return '<tr><td><b>' + esc(s.name) + '</b></td><td>' + alloc + '</td><td>' + res + '</td><td>' + obs + '</td></tr>';
+      }).join('');
+      box.innerHTML = '<div class="card"><h3>' + esc(t('ports')) + '</h3>' +
+        '<p class="muted">' + esc(t('ports_hint')) + '</p>' +
+        (rows ? '<div class="tblwrap"><table><thead><tr><th>' + esc(t('bill_server')) + '</th>' +
+          '<th>' + esc(t('ports_allocated')) + '</th><th>' + esc(t('ports_reserved')) + '</th>' +
+          '<th>' + esc(t('ports_observed')) + '</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+          : '<div class="empty">' + esc(t('ports_empty')) + '</div>') + '</div>';
+    }).catch(function (e) {
+      box.innerHTML = '';
+      box.appendChild(uiErrCard(e, function () { renderTopologyPorts(id); }));
+    });
   }
 
   // ---- settings ----------------------------------------------------------------------
