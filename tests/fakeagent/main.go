@@ -36,6 +36,7 @@ var (
 	insecure    = flag.Bool("insecure", false, "skip TLS verification (wss to a self-signed demo panel)")
 	enginesSpec = flag.String("engines", "", "engine_status variety: engine=running|stopped|disabled[,...] (default: matrix only)")
 	tunnelEng   = flag.String("tunnel-engines", "", "per-tunnel engine overrides: id=engine[,...] (default matrix)")
+	identityF   = flag.String("identity-file", "", "cache the enrolled id/key here; reuse on restart (no re-enroll)")
 	cpumodel    = flag.String("cpu-model", "Fake Xeon", "reported CPU model")
 	cores       = flag.Int("cores", 4, "reported cpu cores")
 	memmb       = flag.Int("memmb", 4096, "reported mem_total_mb")
@@ -57,11 +58,29 @@ func wrap(v int, typ string, payload any) ([]byte, error) {
 	return json.Marshal(envelope{V: v, Type: typ, Data: data})
 }
 
-func main() {
-	flag.Parse()
-	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-	base := strings.TrimRight(*server, "/")
-	// enroll
+// agentIdentity is the enrolled credential pair (id + secret key).
+type agentIdentity struct {
+	ID  string `json:"id"`
+	Key string `json:"key"`
+}
+
+func loadIdentity() agentIdentity {
+	if *identityF == "" {
+		return agentIdentity{}
+	}
+	b, err := os.ReadFile(*identityF)
+	if err != nil {
+		return agentIdentity{}
+	}
+	var id agentIdentity
+	if json.Unmarshal(b, &id) != nil || id.ID == "" || id.Key == "" {
+		return agentIdentity{}
+	}
+	fmt.Println("identity reused:", id.ID)
+	return id
+}
+
+func doEnroll(base string) agentIdentity {
 	enrollURL := base + "/api/agent/enroll"
 	req, err := http.NewRequest("POST", enrollURL,
 		strings.NewReader(fmt.Sprintf(`{"name":%q,"hostname":%q,"os":"linux","arch":"amd64","caps":["matrix","v2"]}`,
@@ -79,16 +98,32 @@ func main() {
 	if err != nil {
 		log.Fatal("enroll: ", err)
 	}
-	var er struct {
-		ID  string `json:"id"`
-		Key string `json:"key"`
-	}
+	var er agentIdentity
 	_ = json.NewDecoder(resp.Body).Decode(&er)
 	resp.Body.Close()
 	if er.ID == "" {
 		log.Fatal("enroll failed (token consumed? pass a fresh token via -token and the panel's bootstrap enroll route)")
 	}
 	fmt.Println("enrolled:", er.ID)
+	return er
+}
+
+func main() {
+	flag.Parse()
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	base := strings.TrimRight(*server, "/")
+	// identity: reuse a cached enrollment when -identity-file is given (the
+	// live demo restarts its container; re-enrolling would mint NEW agent
+	// records every time — the panel enrolls are create-only).
+	er := loadIdentity()
+	if er.ID == "" {
+		er = doEnroll(base)
+		if *identityF != "" {
+			if b, err := json.Marshal(er); err == nil {
+				_ = os.WriteFile(*identityF, b, 0o600)
+			}
+		}
+	}
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
