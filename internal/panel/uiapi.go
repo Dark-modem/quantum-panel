@@ -51,6 +51,10 @@ func registerUIAPIRoutes(mux *http.ServeMux, base string) {
 	// Phase 12 TASK 4: the billing export (UI screen requests it via
 	// UI-API-REQUESTS.md; the CLI `quantum-panel report` shares the code).
 	mux.HandleFunc("GET "+base+"/api/ui/reports/billing", requireAuth(handleUIBillingReport))
+	// Phase 14 task 2: the Xray client-config preview for one iran
+	// datacenter (UI-API-REQUESTS.md) — the Reality fields come from the
+	// sealed reality_keys store (pgdcapi.go).
+	mux.HandleFunc("GET "+base+"/api/ui/datacenters/{id}/client-config", requireAuth(handleUIDCClientConfig))
 	mux.HandleFunc("GET "+base+"/api/ui/selfcheck", requireAuth(handleUISelfcheck))
 }
 

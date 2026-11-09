@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -28,7 +29,8 @@ const testUser = "quantum-admin"
 const testPass = "q-secret-9"
 
 // fakePanel is a minimal upstream-shaped panel: OAuth2 token endpoint,
-// node CRUD, reconnect and usage.
+// node CRUD, reconnect, usage, and (phase 14) the core-config + host
+// records the per-DC inbound reconciler drives.
 type fakePanel struct {
 	t           *testing.T
 	srv         *httptest.Server
@@ -36,11 +38,49 @@ type fakePanel struct {
 	nextID      int
 	tokenCalls  int
 	failNextGet int // make N GETs return 500 (retry test)
+
+	// Per-DC state: one default core (upstream ships core id 1) plus host
+	// records, with the counters the no-op/dry-run assertions read.
+	cores            map[int]*fakeCore
+	hosts            map[int]Host
+	hostOrder        []int
+	nextHostID       int
+	corePuts         int
+	hostCreates      int
+	hostModifies     int
+	hostDeletes      int
+	restartNodesLast string // raw query of the last core PUT
+}
+
+// fakeCore is the upstream core record (app/models/core.py CoreResponse:
+// id/name/type/config + the exclude/fallback tag sets).
+type fakeCore struct {
+	ID                   int            `json:"id"`
+	Name                 string         `json:"name"`
+	Type                 string         `json:"type"`
+	Config               map[string]any `json:"config"`
+	ExcludeInboundTags   []string       `json:"exclude_inbound_tags"`
+	FallbacksInboundTags []string       `json:"fallbacks_inbound_tags"`
 }
 
 func newFakePanel(t *testing.T) *fakePanel {
 	t.Helper()
 	f := &fakePanel{t: t, nodes: map[int]Node{}, nextID: 1}
+	// The upstream default core: one operator-owned inbound Quantum must
+	// never touch.
+	f.cores = map[int]*fakeCore{1: {
+		ID: 1, Name: "default-core", Type: "xray",
+		Config: map[string]any{"inbounds": []any{
+			map[string]any{
+				"tag": "INBOUND_0", "listen": "0.0.0.0", "port": 62050,
+				"protocol": "vless",
+				"settings": map[string]any{"clients": []any{}, "decryption": "none"},
+			},
+		}},
+		ExcludeInboundTags: []string{}, FallbacksInboundTags: []string{},
+	}}
+	f.hosts = map[int]Host{}
+	f.nextHostID = 1
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/admin/token", f.handleToken)
 	mux.HandleFunc("GET /api/nodes", f.handleList)
@@ -51,9 +91,160 @@ func newFakePanel(t *testing.T) *fakePanel {
 	mux.HandleFunc("DELETE /api/node/", f.handleDelete)
 	mux.HandleFunc("POST /api/node/{id}/reconnect", f.handleReconnect)
 	mux.HandleFunc("GET /api/node/usage", f.handleUsage)
+	// Core config (the Xray JSON lives INSIDE the core) + host records.
+	mux.HandleFunc("GET /api/core/{id}", f.handleCoreGet)
+	mux.HandleFunc("PUT /api/core/{id}", f.handleCorePut)
+	mux.HandleFunc("POST /api/host/", f.handleHostCreate)
+	mux.HandleFunc("GET /api/hosts", f.handleHostsList)
+	mux.HandleFunc("PUT /api/host/{id}", f.handleHostModify)
+	mux.HandleFunc("DELETE /api/host/{id}", f.handleHostDelete)
 	f.srv = httptest.NewServer(mux)
 	t.Cleanup(f.srv.Close)
 	return f
+}
+
+func (f *fakePanel) coreByID(r *http.Request) (*fakeCore, bool) {
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		return nil, false
+	}
+	c, ok := f.cores[id]
+	return c, ok
+}
+
+func (f *fakePanel) handleCoreGet(w http.ResponseWriter, r *http.Request) {
+	if !f.authed(r) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	c, ok := f.coreByID(r)
+	if !ok {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"detail":"Core config not found"}`))
+		return
+	}
+	_ = json.NewEncoder(w).Encode(c)
+}
+
+func (f *fakePanel) handleCorePut(w http.ResponseWriter, r *http.Request) {
+	if !f.authed(r) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	c, ok := f.coreByID(r)
+	if !ok {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"detail":"Core config not found"}`))
+		return
+	}
+	var body CoreModifyRequest
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Config == nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	f.corePuts++
+	f.restartNodesLast = r.URL.RawQuery
+	c.Name = body.Name
+	c.Type = body.Type
+	c.Config = body.Config
+	c.ExcludeInboundTags = body.ExcludeInboundTags
+	c.FallbacksInboundTags = body.FallbacksInboundTags
+	_ = json.NewEncoder(w).Encode(c)
+}
+
+func (f *fakePanel) handleHostCreate(w http.ResponseWriter, r *http.Request) {
+	if !f.authed(r) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	var req HostCreateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	h := Host{
+		ID: f.nextHostID, Remark: req.Remark, Address: req.Address,
+		InboundTag: req.InboundTag, Port: req.Port, SNI: req.SNI,
+		Security: req.Security,
+	}
+	if h.Security == "" {
+		h.Security = "inbound_default"
+	}
+	f.nextHostID++
+	f.hosts[h.ID] = h
+	f.hostOrder = append(f.hostOrder, h.ID)
+	f.hostCreates++
+	w.WriteHeader(http.StatusCreated)
+	_ = json.NewEncoder(w).Encode(h)
+}
+
+func (f *fakePanel) handleHostsList(w http.ResponseWriter, r *http.Request) {
+	if !f.authed(r) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	out := []Host{}
+	for _, id := range f.hostOrder {
+		out = append(out, f.hosts[id])
+	}
+	_ = json.NewEncoder(w).Encode(out)
+}
+
+func (f *fakePanel) handleHostModify(w http.ResponseWriter, r *http.Request) {
+	if !f.authed(r) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	h, ok := f.hosts[id]
+	if !ok {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"detail":"Host not found"}`))
+		return
+	}
+	var req HostCreateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	f.hostModifies++
+	h.Remark = req.Remark
+	h.Address = req.Address
+	h.InboundTag = req.InboundTag
+	h.Port = req.Port
+	h.SNI = req.SNI
+	h.Security = req.Security
+	f.hosts[id] = h
+	_ = json.NewEncoder(w).Encode(h)
+}
+
+func (f *fakePanel) handleHostDelete(w http.ResponseWriter, r *http.Request) {
+	if !f.authed(r) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	if _, ok := f.hosts[id]; !ok {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	delete(f.hosts, id)
+	for i, oid := range f.hostOrder {
+		if oid == id {
+			f.hostOrder = append(f.hostOrder[:i], f.hostOrder[i+1:]...)
+			break
+		}
+	}
+	f.hostDeletes++
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (f *fakePanel) handleToken(w http.ResponseWriter, r *http.Request) {

@@ -9,20 +9,42 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 )
 
-// pgFakeUpstream is a tiny PasarGuard panel fake (token + node list/create).
+// pgFakeUpstream is a tiny PasarGuard panel fake (token + node list/create,
+// plus the core-config + host records the per-DC endpoints drive).
 type pgFakeUpstream struct {
 	srv   *httptest.Server
 	nodes map[string]map[string]any
 	order []string
+
+	// Phase 14 per-DC state: the upstream default core (id 1) + host
+	// records, with the counters the dry-run/no-op assertions read.
+	cores            map[int]map[string]any
+	hosts            map[int]map[string]any
+	hostOrder        []int
+	corePuts         int
+	hostCreates      int
+	restartNodesLast string
 }
 
 func newPGFakeUpstream(t *testing.T) *pgFakeUpstream {
 	t.Helper()
 	f := &pgFakeUpstream{nodes: map[string]map[string]any{}}
+	f.cores = map[int]map[string]any{
+		1: map[string]any{
+			"id": 1, "name": "default-core", "type": "xray",
+			"config": map[string]any{"inbounds": []any{
+				map[string]any{"tag": "INBOUND_0", "listen": "0.0.0.0", "port": 62050, "protocol": "vless"},
+			}},
+			"exclude_inbound_tags":   []any{},
+			"fallbacks_inbound_tags": []any{},
+		},
+	}
+	f.hosts = map[int]map[string]any{}
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/admin/token", func(w http.ResponseWriter, r *http.Request) {
 		_ = r.ParseForm()
@@ -62,9 +84,160 @@ func newPGFakeUpstream(t *testing.T) *pgFakeUpstream {
 		w.WriteHeader(http.StatusCreated)
 		_ = json.NewEncoder(w).Encode(n)
 	})
+	// Per-DC records: node get (core resolution), core GET/PUT, host CRUD.
+	mux.HandleFunc("GET /api/node/{id}", f.pgNodeGet)
+	mux.HandleFunc("GET /api/core/{id}", f.pgCoreGet)
+	mux.HandleFunc("PUT /api/core/{id}", f.pgCorePut)
+	mux.HandleFunc("POST /api/host/", f.pgHostCreate)
+	mux.HandleFunc("GET /api/hosts", f.pgHostsList)
+	mux.HandleFunc("PUT /api/host/{id}", f.pgHostModify)
 	f.srv = httptest.NewServer(mux)
 	t.Cleanup(f.srv.Close)
 	return f
+}
+
+// seedNode drops a pre-provisioned upstream node record (the per-DC model
+// expects one node per foreign server to already exist).
+func (f *pgFakeUpstream) seedNode(id int, name string, coreConfigID int) {
+	f.nodes[name] = map[string]any{
+		"id": float64(id), "name": name, "address": "127.0.0.1",
+		"port": float64(62050), "api_port": float64(62051), "status": "connected",
+		"core_config_id": float64(coreConfigID),
+	}
+	f.order = append(f.order, name)
+}
+
+func (f *pgFakeUpstream) pgAuthed(r *http.Request) bool {
+	return r.Header.Get("Authorization") == "Bearer tok"
+}
+
+func (f *pgFakeUpstream) pgNodeGet(w http.ResponseWriter, r *http.Request) {
+	if !f.pgAuthed(r) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	var id float64
+	if _, err := fmt.Sscanf(r.PathValue("id"), "%f", &id); err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	for _, name := range f.order {
+		if nID, _ := f.nodes[name]["id"].(float64); nID == id {
+			_ = json.NewEncoder(w).Encode(f.nodes[name])
+			return
+		}
+	}
+	w.WriteHeader(http.StatusNotFound)
+	_, _ = w.Write([]byte(`{"detail":"Node not found"}`))
+}
+
+func (f *pgFakeUpstream) pgCoreGet(w http.ResponseWriter, r *http.Request) {
+	if !f.pgAuthed(r) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	core, ok := f.cores[id]
+	if !ok {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"detail":"Core config not found"}`))
+		return
+	}
+	_ = json.NewEncoder(w).Encode(core)
+}
+
+func (f *pgFakeUpstream) pgCorePut(w http.ResponseWriter, r *http.Request) {
+	if !f.pgAuthed(r) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	core, ok := f.cores[id]
+	if !ok {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	var body map[string]any
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	f.corePuts++
+	f.restartNodesLast = r.URL.RawQuery
+	for _, k := range []string{"name", "type", "config", "exclude_inbound_tags", "fallbacks_inbound_tags"} {
+		if v, ok := body[k]; ok {
+			core[k] = v
+		}
+	}
+	_ = json.NewEncoder(w).Encode(core)
+}
+
+func (f *pgFakeUpstream) pgHostCreate(w http.ResponseWriter, r *http.Request) {
+	if !f.pgAuthed(r) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	var body map[string]any
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	id := len(f.hostOrder) + 1
+	body["id"] = id
+	if _, ok := body["security"]; !ok {
+		body["security"] = "inbound_default"
+	}
+	f.hosts[id] = body
+	f.hostOrder = append(f.hostOrder, id)
+	f.hostCreates++
+	w.WriteHeader(http.StatusCreated)
+	_ = json.NewEncoder(w).Encode(body)
+}
+
+func (f *pgFakeUpstream) pgHostsList(w http.ResponseWriter, r *http.Request) {
+	if !f.pgAuthed(r) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	out := []map[string]any{}
+	for _, id := range f.hostOrder {
+		out = append(out, f.hosts[id])
+	}
+	_ = json.NewEncoder(w).Encode(out)
+}
+
+func (f *pgFakeUpstream) pgHostModify(w http.ResponseWriter, r *http.Request) {
+	if !f.pgAuthed(r) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	h, ok := f.hosts[id]
+	if !ok {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	var body map[string]any
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	for k, v := range body {
+		h[k] = v
+	}
+	_ = json.NewEncoder(w).Encode(h)
 }
 
 func TestPGConnectReconcileFlow(t *testing.T) {
