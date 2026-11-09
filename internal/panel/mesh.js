@@ -12,7 +12,7 @@
   var T = {
     en: {
       // nav + titles
-      brand_sub: 'mesh', nav_dash: 'Dashboard', nav_topo: 'Topologies', nav_agents: 'Agents',
+      brand_sub: 'panel', nav_dash: 'Dashboard', nav_topo: 'Topologies', nav_agents: 'Agents',
       nav_tunnels: 'Tunnels & weights', nav_engines: 'Engines', nav_alerts: 'Alerts',
       nav_security: 'Security', nav_pg: 'PasarGuard', nav_settings: 'Settings',
       nav_legacy: 'Advanced (legacy)', ng_mesh: 'Infrastructure', ng_ops: 'Operations',
@@ -152,7 +152,7 @@
       ports_hint: 'Client-facing ports belong to forward rules; the panel allocates carrier ports and refuses conflicts.'
     },
     fa: {
-      brand_sub: 'مش', nav_dash: 'داشبورد', nav_topo: 'توپولوژی‌ها', nav_agents: 'ایجنت‌ها',
+      brand_sub: 'پنل', nav_dash: 'داشبورد', nav_topo: 'توپولوژی‌ها', nav_agents: 'ایجنت‌ها',
       nav_tunnels: 'تونل‌ها و وزن‌ها', nav_engines: 'موتورها', nav_alerts: 'هشدارها',
       nav_security: 'امنیت', nav_pg: 'پاسارگارد', nav_settings: 'تنظیمات',
       nav_legacy: 'پیشرفته (نسخه قدیمی)', ng_mesh: 'زیرساخت', ng_ops: 'عملیات',

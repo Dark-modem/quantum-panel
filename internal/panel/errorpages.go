@@ -249,7 +249,7 @@ func errorPageHTML(code int, ref string) string {
       <div class="lerr" id="l-err"></div>
       <button class="home" type="submit">ورود</button>
     </form>
-    <a class="alt" href="` + meshHref + `">مدیریت مش (Mesh)</a>
+    <a class="alt" href="` + meshHref + `">پنل کوانتوم</a>
     <script>
     document.getElementById('lform').addEventListener('submit', function (ev) {
       ev.preventDefault();
@@ -266,7 +266,7 @@ func errorPageHTML(code int, ref string) string {
     </script>`
 		}
 		return `<a class="home" href="` + homeHref + `">بازگشت به داشبورد</a>
-    <a class="alt" href="` + meshHref + `">مدیریت مش (Mesh)</a>`
+    <a class="alt" href="` + meshHref + `">پنل کوانتوم</a>`
 	}() + `
     <div class="ref">` + ref + `</div>
   </main>
