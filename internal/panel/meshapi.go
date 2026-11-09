@@ -455,6 +455,14 @@ func handleMeshServerDelete(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, r, "E-IN-04", "")
 		return
 	}
+	h := uiStoreHandle{s}
+	if dep := h.serverDependencies(id); len(dep) > 0 {
+		if !requireConfirm(w, r, "server", fmt.Sprintf("%d", id),
+			dependencyReport{Resource: "server", Depend: dep, HasBlock: true,
+				Token: mintConfirmToken("server", fmt.Sprintf("%d", id))}) {
+			return
+		}
+	}
 	if err := s.DeleteServer(id); err != nil {
 		meshErr(w, r, err)
 		return
@@ -580,6 +588,14 @@ func handleMeshTopoDelete(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		writeAPIError(w, r, "E-IN-04", "")
 		return
+	}
+	h := uiStoreHandle{s}
+	if dep := h.topologyDependencies(id); len(dep) > 0 {
+		if !requireConfirm(w, r, "topology", fmt.Sprintf("%d", id),
+			dependencyReport{Resource: "topology", Depend: dep, HasBlock: true,
+				Token: mintConfirmToken("topology", fmt.Sprintf("%d", id))}) {
+			return
+		}
 	}
 	if err := s.DeleteTopology(id); err != nil {
 		meshErr(w, r, err)
@@ -801,6 +817,16 @@ func handleMeshTunnelDelete(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		writeAPIError(w, r, "E-IN-04", "")
 		return
+	}
+	if t, terr := s.GetTunnel(id); terr == nil {
+		h := uiStoreHandle{s}
+		if dep := h.tunnelDependencies(t); len(dep) > 0 {
+			if !requireConfirm(w, r, "tunnel", t.TunnelKey,
+				dependencyReport{Resource: "tunnel", Depend: dep, HasBlock: true,
+					Token: mintConfirmToken("tunnel", t.TunnelKey)}) {
+				return
+			}
+		}
 	}
 	if err := s.DeleteTunnel(id); err != nil {
 		meshErr(w, r, err)
