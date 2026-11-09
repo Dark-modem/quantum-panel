@@ -89,6 +89,10 @@ func registerPasarGuardRoutes(mux *http.ServeMux, base string) {
 	mux.HandleFunc("POST "+p+"/orphans", requireAuth(requireCSRF(handlePGOrphans)))
 	mux.HandleFunc("POST "+p+"/install-command", requireAuth(requireCSRF(handlePGInstallCommand)))
 	mux.HandleFunc("POST "+p+"/cert", requireAuth(requireCSRF(handlePGCert)))
+	// Phase 14 task 2: the per-datacenter inbound reconciler (pgdcapi.go;
+	// design 00-ADMIN/PASARGUARD-PER-DC-DESIGN.md).
+	mux.HandleFunc("GET "+p+"/dc/plan", requireAuth(handlePGDCPlan))
+	mux.HandleFunc("POST "+p+"/dc/apply", requireAuth(requireCSRF(handlePGDCApply)))
 }
 
 // handlePGConnect validates + stores the connection and runs a live test
@@ -232,6 +236,14 @@ func pgDesired(s *store.Store) ([]pasarguard.DesiredNode, []string, error) {
 }
 
 // handlePGReconcile is dry-run by default; apply requires confirm=yes.
+//
+// LEGACY: this is the node-per-(server×DC) reconciler — one PasarGuard
+// NODE per (foreign server × iran datacenter) pair. New installs use the
+// per-datacenter inbound family /api/mesh/pasarguard/dc/* (one node per
+// foreign server, one inbound+host per datacenter — see
+// 00-ADMIN/PASARGUARD-PER-DC-DESIGN.md). It keeps working unchanged for
+// existing installs; switching to per-dc makes the old per-DC nodes
+// stale here, removable only by an explicit orphans run.
 func handlePGReconcile(w http.ResponseWriter, r *http.Request) {
 	s := meshStoreOr503(w, r)
 	if s == nil {

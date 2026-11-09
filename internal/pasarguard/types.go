@@ -1,9 +1,11 @@
 // Package pasarguard is a small typed client for the PasarGuard panel
 // admin API (upstream studied at pasargurad-panel-5.2.1 and
 // pasargurad-node-0.5.3; see 00-ADMIN/PASARGUARD-INTEGRATION.md for the
-// endpoint contract). Scope: node records only — create/modify/delete/
-// list/reconnect and usage. Quantum never manages PasarGuard users,
-// hosts, groups or cores.
+// endpoint contract). Scope: node records — create/modify/delete/list/
+// reconnect and usage — plus the phase 14 per-datacenter inbounds
+// (dcinbound.go): core config reads/writes, host records and REALITY key
+// generation. Quantum never manages PasarGuard users, groups, or the
+// nodes' runtime statistics.
 //
 // Ground rules: the admin token is transparently re-acquired on 401
 // (upstream has no refresh endpoint); retries are exponential-backoff and

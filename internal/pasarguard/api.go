@@ -80,6 +80,72 @@ func (c *Client) ReconnectNode(ctx context.Context, id int) error {
 		map[string]any{}, nil)
 }
 
+// ---- core config + hosts (per-DC inbounds, phase 14 task 2) -----------------
+//
+// Paths verified against the 5.2.1 sources: the Xray JSON lives INSIDE the
+// core (app/routers/core.py — nodes reference it via core_config_id) and
+// hosts are global records mapping what clients see onto an inbound tag
+// (app/routers/host.py). Note the upstream quirks this client mirrors:
+// GET /api/hosts is a BARE ARRAY and the create route is POST /api/host/
+// (trailing slash — sent verbatim to dodge the 307 redirect).
+
+// GetCore returns one core-config record; the Xray JSON is in "config"
+// and the node-facing name/type/exclude/fallbacks ride along for the
+// applier's PUT round-trip.
+func (c *Client) GetCore(ctx context.Context, coreID int) (map[string]any, error) {
+	var out map[string]any
+	if err := c.do(ctx, http.MethodGet, "/api/core/"+strconv.Itoa(coreID), nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ModifyCore replaces the core config. restartNodes=true (always sent by
+// the reconciler) makes upstream restart every node referencing the core,
+// so the new inbounds go live without a separate reconnect round.
+func (c *Client) ModifyCore(ctx context.Context, coreID int, restartNodes bool, body CoreModifyRequest) error {
+	q := url.Values{}
+	q.Set("restart_nodes", strconv.FormatBool(restartNodes))
+	return c.do(ctx, http.MethodPut, "/api/core/"+strconv.Itoa(coreID)+"?"+q.Encode(), body, nil)
+}
+
+// CreateHost provisions one host record (upstream validates that
+// inbound_tag exists in one of the configured cores).
+func (c *Client) CreateHost(ctx context.Context, req HostCreateRequest) (*Host, error) {
+	var h Host
+	if err := c.do(ctx, http.MethodPost, "/api/host/", req, &h); err != nil {
+		return nil, err
+	}
+	return &h, nil
+}
+
+// ListHosts returns every host record (the panel's client-facing map).
+func (c *Client) ListHosts(ctx context.Context) ([]Host, error) {
+	var out []Host
+	if err := c.do(ctx, http.MethodGet, "/api/hosts", nil, &out); err != nil {
+		return nil, err
+	}
+	if out == nil {
+		out = []Host{}
+	}
+	return out, nil
+}
+
+// ModifyHost replaces one host record with the full desired document.
+func (c *Client) ModifyHost(ctx context.Context, id int, req HostCreateRequest) (*Host, error) {
+	var h Host
+	if err := c.do(ctx, http.MethodPut, "/api/host/"+strconv.Itoa(id), req, &h); err != nil {
+		return nil, err
+	}
+	return &h, nil
+}
+
+// DeleteHost removes one host record. NOT part of the reconciler's apply
+// path (which never deletes); it exists for explicit operator cleanup.
+func (c *Client) DeleteHost(ctx context.Context, id int) error {
+	return c.do(ctx, http.MethodDelete, "/api/host/"+strconv.Itoa(id), nil, nil)
+}
+
 // UsageRow is one node's aggregated uplink/downlink from the usage
 // endpoint (GET /api/node/usage with group_by_node=true).
 type UsageRow struct {
