@@ -212,6 +212,17 @@ func ingestUISections(s *store.Store, agentID string, rep *protocol.StateReportV
 	if err := s.UpsertTunnelProcBatch(procs); err != nil {
 		log.Printf("[mesh] proc batch: %v", err)
 	}
+	// Phase 14: the heartbeat's listening-port inventory used to be
+	// received and DISCARDED. It lands in agent_listening as a
+	// replace-per-heartbeat snapshot (the agent's authoritative "now"),
+	// feeding the port allocator's reservation set and the topology port
+	// view. Same best-effort rule: a UI-data failure never breaks the
+	// tunnel data path.
+	if rows := sanitizeReportListening(rep); len(rows) > 0 {
+		if err := s.UpsertAgentListening(agentID, rows, now); err != nil {
+			log.Printf("[mesh] listening snapshot: %v", err)
+		}
+	}
 }
 
 // recordTunnelEvents writes a tunnel_events row on every observed state

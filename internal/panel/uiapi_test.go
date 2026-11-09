@@ -30,6 +30,7 @@ func uiServer(t *testing.T) *httptest.Server {
 	registerMeshRoutes(mux, "")
 	registerUIAPIRoutes(mux, "")
 	registerGuardRoutes(mux, "")
+	registerMeshAlertRoutes(mux, "")
 	mux.HandleFunc("POST /api/agents/tokens", handleAgentTokenPost)
 	mux.HandleFunc("POST /api/agents/enroll", handleAgentEnroll)
 	mux.HandleFunc("GET /api/agent-ws", handleAgentWS)

@@ -373,7 +373,9 @@ func TestDiffAndApply(t *testing.T) {
 	}
 
 	// Coefficient drift on drak (by name — creation order is alphabetical)
-	// + a foreign node + a stale quantum node.
+	// + a foreign node + a stale quantum node. Phase 14 data-path decision:
+	// the coefficient is NO LONGER part of the desired state, so drift on
+	// it is invisible to the diff and Apply never touches it.
 	var drakID int
 	for _, n := range f.nodes {
 		if n.Name == "quantum:drak" {
@@ -396,20 +398,25 @@ func TestDiffAndApply(t *testing.T) {
 		t.Fatal(err)
 	}
 	plan2 := Diff(desired, real)
-	if plan2.Updates != 1 {
-		t.Fatalf("want exactly 1 update (coefficient drift): %+v", plan2)
+	if plan2.Updates != 0 {
+		t.Fatalf("coefficient drift must NOT produce an update (phase 14): %+v", plan2)
 	}
-	stale, foreign := 0, 0
+	stale, foreign, okRows := 0, 0, 0
 	for _, a := range plan2.Actions {
 		switch a.Action {
 		case ActionStale:
 			stale++
 		case ActionForeign:
 			foreign++
+		case ActionOK:
+			okRows++
 		}
 	}
-	if stale != 1 || foreign != 1 {
-		t.Fatalf("stale=%d foreign=%d, want 1/1: %+v", stale, foreign, plan2.Actions)
+	if stale != 1 || foreign != 1 || okRows != 2 {
+		t.Fatalf("stale=%d foreign=%d ok=%d, want 1/1/2: %+v", stale, foreign, okRows, plan2.Actions)
+	}
+	if !plan2.Drift {
+		t.Fatalf("stale node must still mark drift: %+v", plan2)
 	}
 	// Apply NEVER deletes: stale/foreign rows pass through untouched.
 	Apply(ctx, plan2, desired, c)
@@ -417,12 +424,11 @@ func TestDiffAndApply(t *testing.T) {
 		t.Fatalf("apply must not delete: %d nodes on the panel", len(f.nodes))
 	}
 
-	// Coefficient restore lands (drak's desired value back).
-	plan3 := Diff(desired, mustList(t, c))
-	Apply(ctx, plan3, desired, c)
+	// The operator's coefficient is THEIRS: Apply left the drifted value
+	// alone (no restore, no modify).
 	for _, n := range mustList(t, c) {
-		if n.Name == "quantum:drak" && n.UsageCoefficient != 1.5 {
-			t.Fatalf("coefficient restore failed: %+v", n)
+		if n.Name == "quantum:drak" && n.UsageCoefficient != 9.9 {
+			t.Fatalf("apply must not manage the upstream coefficient: %+v", n)
 		}
 	}
 

@@ -42,6 +42,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -865,13 +866,46 @@ func handleMeshForwardCreate(w http.ResponseWriter, r *http.Request) {
 		meshErr(w, r, fmt.Errorf("local server %d: %v", body.LocalServerID, err))
 		return
 	}
+	// Phase 14: the listen port is validated BEFORE the rule row exists —
+	// a port that is well-known, booked in the ledger, already used by
+	// another rule on this server, or observed listening on the agent
+	// would otherwise only explode as a failed bind on the agent. target_port
+	// passes through as given: 0 (= same as listen) is the valid default
+	// for group-backed rules, and an explicit value is the foreign-side
+	// override the compiler forwards.
+	reserved, err := reservedPortsFor(s, body.LocalServerID)
+	if err != nil {
+		meshErr(w, r, err)
+		return
+	}
+	if reserved[body.ListenPort] {
+		uiErrWrite(w, r, "E-ENGINE-PORT-CONFLICT",
+			map[string]any{"port": body.ListenPort, "alternatives": freePortSuggestions(s, body.LocalServerID, 3)},
+			fmt.Sprintf("listen port %d is taken on server %d", body.ListenPort, body.LocalServerID))
+		return
+	}
 	id, err := s.CreateForwardRule(body)
 	if err != nil {
 		meshErr(w, r, err)
 		return
 	}
+	// Record the allocation under the rule's owner key so the delete path
+	// releases it without remembering the port. The row IS the arbiter:
+	// a concurrent create that won the slot rolls this rule back instead
+	// of double-booking.
+	if aerr := s.AllocatePort(body.LocalServerID, body.ListenPort, body.Proto, "forward_rule", fmt.Sprintf("forward:%d", id)); aerr != nil {
+		_ = s.DeleteForwardRule(id)
+		if errors.Is(aerr, store.ErrPortTaken) {
+			uiErrWrite(w, r, "E-ENGINE-PORT-CONFLICT",
+				map[string]any{"port": body.ListenPort, "alternatives": freePortSuggestions(s, body.LocalServerID, 3)},
+				fmt.Sprintf("listen port %d was just taken on server %d", body.ListenPort, body.LocalServerID))
+			return
+		}
+		meshErr(w, r, aerr)
+		return
+	}
 	meshAudit(meshActor(r), "mesh.forward.create",
-		fmt.Sprintf(`{"id":%d,"listen_port":%d,"proto":%q}`, id, body.ListenPort, body.Proto))
+		fmt.Sprintf(`{"id":%d,"listen_port":%d,"target_port":%d,"proto":%q}`, id, body.ListenPort, body.TargetPort, body.Proto))
 	writeJSON(w, map[string]any{"id": id})
 }
 
@@ -925,9 +959,24 @@ func handleMeshForwardDelete(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, r, "E-IN-04", "")
 		return
 	}
+	// Read the rule first: the port release needs the server id (the
+	// allocation ledger is keyed per server, not globally).
+	f, err := s.GetForwardRule(id)
+	if err != nil {
+		meshErr(w, r, err)
+		return
+	}
 	if err := s.DeleteForwardRule(id); err != nil {
 		meshErr(w, r, err)
 		return
+	}
+	// Phase 14: free the port the create booked (release is a no-op for
+	// pre-ledger rules that never had an allocation row).
+	if err := s.ReleasePortOwner(f.LocalServerID, fmt.Sprintf("forward:%d", id)); err != nil {
+		// A stuck reservation is worse than none, but failing the delete
+		// over bookkeeping would strand the rule; report and move on.
+		noteStoreRetry()
+		log.Printf("[mesh] forward %d: release port allocation: %v", id, err)
 	}
 	meshAudit(meshActor(r), "mesh.forward.delete", fmt.Sprintf(`{"id":%d}`, id))
 	writeJSON(w, map[string]any{"ok": true})

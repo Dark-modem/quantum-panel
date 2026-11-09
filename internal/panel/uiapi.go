@@ -42,6 +42,10 @@ func registerUIAPIRoutes(mux *http.ServeMux, base string) {
 	mux.HandleFunc("POST "+base+"/api/ui/agents/{id}/engines/{engine}/disable", requireAuth(requireCSRF(handleUIEngineDisable)))
 	mux.HandleFunc("POST "+base+"/api/ui/agents/{id}/public-ip", requireAuth(requireCSRF(handleUIAgentPublicIP)))
 	mux.HandleFunc("GET "+base+"/api/ui/topologies/{id}", requireAuth(handleUITopologyDetail))
+	// Phase 14: per-member port view (ledger + reservations + what the
+	// agents actually observed) — the port-conflict workflow reads this
+	// before picking a listen port (UI-API-CONTRACT.md §2.11).
+	mux.HandleFunc("GET "+base+"/api/ui/topologies/{id}/ports", requireAuth(handleUITopologyPorts))
 	mux.HandleFunc("GET "+base+"/api/ui/tunnels/{key}", requireAuth(handleUITunnelDetail))
 	mux.HandleFunc("POST "+base+"/api/ui/topologies/{id}/tunnels/{key}/weight", requireAuth(requireCSRF(handleUITunnelWeight)))
 	// Phase 12 TASK 4: the billing export (UI screen requests it via

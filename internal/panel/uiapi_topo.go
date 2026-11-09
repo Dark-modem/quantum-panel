@@ -1,11 +1,13 @@
 package panel
 
 // uiapi_topo.go — topology detail, tunnel detail and the per-TUNNEL
-// weight endpoint (Phase 11 contract §2.8–2.10).
+// weight endpoint (Phase 11 contract §2.8–2.10) plus the phase-14
+// per-member PORT view (§2.11).
 
 import (
 	"encoding/json"
 	"net/http"
+	"sort"
 	"time"
 
 	"github.com/Dark-modem/quantum-panel/internal/store"
@@ -414,3 +416,79 @@ func handleUITunnelWeight(w http.ResponseWriter, r *http.Request) {
 }
 
 var _ = time.Now
+
+// ---- phase 14: topology port view (contract §2.11) ---------------------
+
+// handleUITopologyPorts is the per-member port view of one topology. For
+// every member server it answers three questions the port workflow asks:
+//   - allocated: what the panel's ledger holds (who owns each port);
+//   - reserved: the full "taken" set the allocator enforces (well-known
+//     ports, panel listeners, booked ledger rows, declared forward rules
+//     and any extra SSH ports) — the same set forward-create refuses;
+//   - observed: what the member's linked agent LAST reported listening
+//     (agent_listening; a server whose agent never reported simply shows
+//     an empty list, it is not an error).
+//
+// List output is stable (members by id, ports ascending) so the UI can
+// diff consecutive polls.
+func handleUITopologyPorts(w http.ResponseWriter, r *http.Request) {
+	h, ok := uiOpen(w, r)
+	if !ok {
+		return
+	}
+	topoID := atoiDefault(r.PathValue("id"), 0)
+	if _, err := h.GetTopology(topoID); err != nil {
+		uiErrWrite(w, r, "E-NOTFOUND", map[string]any{"topology": r.PathValue("id")}, "")
+		return
+	}
+	members, err := h.TopologyMembers(topoID)
+	if err != nil {
+		uiErrWrite(w, r, "E-STORE", map[string]any{"op": "topology members"}, err.Error())
+		return
+	}
+	// One join query for the whole topology, not per-member (the same N+1
+	// rule the phase-12 soak set for the detail views).
+	listening, err := h.ListAgentListening(members)
+	if err != nil {
+		uiErrWrite(w, r, "E-STORE", map[string]any{"op": "agent listening"}, err.Error())
+		return
+	}
+	servers := []map[string]any{}
+	for _, sid := range members {
+		sv, err := h.GetServer(sid)
+		if err != nil {
+			continue // stale member row (server deleted): skip, don't fail the view
+		}
+		allocs, err := h.ListPortAllocations(sid)
+		if err != nil {
+			uiErrWrite(w, r, "E-STORE", map[string]any{"op": "port allocations", "server": sid}, err.Error())
+			return
+		}
+		allocated := []map[string]any{}
+		for _, a := range allocs {
+			allocated = append(allocated, map[string]any{
+				"port": a.Port, "proto": a.Proto,
+				"purpose": a.Purpose, "owner_key": a.OwnerKey,
+			})
+		}
+		reservedSet, err := reservedPortsFor(h.Store, sid)
+		if err != nil {
+			uiErrWrite(w, r, "E-STORE", map[string]any{"op": "reserved ports", "server": sid}, err.Error())
+			return
+		}
+		reserved := make([]int, 0, len(reservedSet))
+		for p := range reservedSet {
+			reserved = append(reserved, p)
+		}
+		sort.Ints(reserved)
+		observed := []map[string]any{}
+		for _, l := range listening[sid] {
+			observed = append(observed, map[string]any{"proto": l.Proto, "port": l.Port, "proc": l.Proc})
+		}
+		servers = append(servers, map[string]any{
+			"server_id": sid, "name": sv.Name,
+			"allocated": allocated, "reserved": reserved, "observed": observed,
+		})
+	}
+	writeJSON(w, map[string]any{"topology_id": topoID, "servers": servers})
+}

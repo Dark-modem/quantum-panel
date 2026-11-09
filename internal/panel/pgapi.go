@@ -183,6 +183,10 @@ func handlePGStatus(w http.ResponseWriter, r *http.Request) {
 // pgDesired builds the desired node set from the store: every (foreign
 // server × iran datacenter). Pairs whose server has no address or whose
 // mapping lacks cert/api-key still appear — the plan annotates them.
+// The datacenter price coefficient is deliberately NOT carried here
+// (phase 14 decision): it left the product's data path, the reconciler
+// no longer manages the upstream usage_coefficient at all, and the
+// store's price hint remains billing-display only.
 func pgDesired(s *store.Store) ([]pasarguard.DesiredNode, []string, error) {
 	servers, err := s.ListServers()
 	if err != nil {
@@ -202,14 +206,9 @@ func pgDesired(s *store.Store) ([]pasarguard.DesiredNode, []string, error) {
 			if dc.Kind != "iran" {
 				continue
 			}
-			coef := dc.PriceCoefficient
-			if coef <= 0 {
-				coef = 1.0 // upstream requires > 0; an unset price hint must not block provisioning
-			}
 			d := pasarguard.DesiredNode{
-				Name:        pasarguard.DesiredName(dc.Name, sv.Name),
-				Address:     sv.Address,
-				Coefficient: coef,
+				Name:    pasarguard.DesiredName(dc.Name, sv.Name),
+				Address: sv.Address,
 			}
 			if m, err := s.GetPGNodeByPair(sv.ID, dc.ID); err == nil {
 				d.ServerCA = m.ServerCA
