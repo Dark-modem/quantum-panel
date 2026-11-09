@@ -1,0 +1,394 @@
+2026/11/09 15:32:26 INFO: Created missing directory /etc/frp
+2026/11/09 15:32:26 INFO: Created missing directory /etc/backhaul
+2026/11/09 15:32:26 listener ports finalized: HTTP 8000, TLS 7443, base path /ui (they now change only when you edit them explicitly)
+2026/11/09 15:32:26 gre-panel listening on 127.0.0.1:8000 under /ui
+2026/11/09 15:32:26 [CMD-ERROR] command "iptables" failed (exit -1): exec: "iptables": executable file not found in $PATH
+2026/11/09 15:32:26 [CMD-ERROR] command "iptables" failed (exit -1): exec: "iptables": executable file not found in $PATH
+2026/11/09 15:32:26 [CMD-ERROR] command "iptables" failed (exit -1): exec: "iptables": executable file not found in $PATH
+2026/11/09 15:32:26 [CMD-ERROR] command "iptables" failed (exit -1): exec: "iptables": executable file not found in $PATH
+2026/11/09 15:32:26 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:32:26 [CMD-ERROR] command "iptables" failed (exit -1): exec: "iptables": executable file not found in $PATH
+2026/11/09 15:32:26 [CMD-ERROR] command "iptables" failed (exit -1): exec: "iptables": executable file not found in $PATH
+2026/11/09 15:32:26 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:32:26 [CMD-ERROR] command "iptables" failed (exit -1): exec: "iptables": executable file not found in $PATH
+2026/11/09 15:32:26 [CMD-ERROR] command "iptables" failed (exit -1): exec: "iptables": executable file not found in $PATH
+2026/11/09 15:32:26 [CMD-ERROR] command "ip6tables" failed (exit -1): exec: "ip6tables": executable file not found in $PATH
+2026/11/09 15:32:26 [CMD-ERROR] command "ip6tables" failed (exit -1): exec: "ip6tables": executable file not found in $PATH
+2026/11/09 15:32:26 [CMD-ERROR] command "ip6tables" failed (exit -1): exec: "ip6tables": executable file not found in $PATH
+2026/11/09 15:32:26 [CMD-ERROR] command "ip6tables" failed (exit -1): exec: "ip6tables": executable file not found in $PATH
+2026/11/09 15:32:26 [CMD-ERROR] command "ip6tables" failed (exit -1): exec: "ip6tables": executable file not found in $PATH
+2026/11/09 15:32:26 [CMD-ERROR] command "iptables" failed (exit -1): exec: "iptables": executable file not found in $PATH
+2026/11/09 15:32:26 [CMD-ERROR] command "tc" failed (exit -1): exec: "tc": executable file not found in $PATH
+2026/11/09 15:32:26 [CMD-ERROR] command "iptables" failed (exit -1): exec: "iptables": executable file not found in $PATH
+2026/11/09 15:32:26 [CMD-ERROR] command "tc" failed (exit -1): exec: "tc": executable file not found in $PATH
+2026/11/09 15:32:26 [CMD-ERROR] command "tc" failed (exit -1): exec: "tc": executable file not found in $PATH
+2026/11/09 15:32:26 [CMD-ERROR] command "tc" failed (exit -1): exec: "tc": executable file not found in $PATH
+2026/11/09 15:32:26 [CMD-ERROR] command "iptables" failed (exit -1): exec: "iptables": executable file not found in $PATH
+2026/11/09 15:32:26 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:32:33 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:32:33 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:32:38 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:32:38 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:32:39 [AUDIT] [2026-11-09T15:32:39Z] EVENT=login_success user="admin" ip=127.0.0.1 authenticated successfully
+2026/11/09 15:32:39 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:32:39 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:32:39 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:32:39 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:32:39 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:32:39 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:32:39 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:32:39 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:32:39 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:32:39 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:32:39 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:32:39 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:32:39 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:32:39 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:32:39 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:32:39 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:32:39 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:32:39 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:32:39 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:32:39 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:32:40 [mesh] legacy import complete: agents=0 topologies=0 servers=0 tunnels=0
+2026/11/09 15:32:41 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:32:41 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:32:41 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:32:41 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:32:41 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:32:41 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:32:41 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:32:41 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:32:42 [AUDIT] [2026-11-09T15:32:42Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/datacenters status=200
+2026/11/09 15:32:42 [AUDIT] [2026-11-09T15:32:42Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/datacenters status=200
+2026/11/09 15:32:42 [AUDIT] [2026-11-09T15:32:42Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/datacenters status=200
+2026/11/09 15:32:42 [AUDIT] [2026-11-09T15:32:42Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/servers status=200
+2026/11/09 15:32:42 [AUDIT] [2026-11-09T15:32:42Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/servers status=200
+2026/11/09 15:32:42 [AUDIT] [2026-11-09T15:32:42Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/servers status=200
+2026/11/09 15:32:42 [AUDIT] [2026-11-09T15:32:42Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/servers status=200
+2026/11/09 15:32:42 [AUDIT] [2026-11-09T15:32:42Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/servers status=200
+2026/11/09 15:32:42 [AUDIT] [2026-11-09T15:32:42Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/servers status=200
+2026/11/09 15:32:42 [AUDIT] [2026-11-09T15:32:42Z] EVENT=agent_token_created user="admin" ip=127.0.0.1 role=iran prefix=enr_195d
+2026/11/09 15:32:42 [AUDIT] [2026-11-09T15:32:42Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/agents/tokens status=200
+2026/11/09 15:32:42 [AUDIT] [2026-11-09T15:32:42Z] EVENT=agent_enroll user="agt_57ef68890b7e" ip=127.0.0.1 role=iran
+2026/11/09 15:32:42 [agent-ws] agt_57ef68890b7e: upgrade OK (remote=127.0.0.1)
+2026/11/09 15:32:42 [agent-ws] agt_57ef68890b7e: session started, waiting for hello (timeout 5s)
+2026/11/09 15:32:42 [agent-ws] agt_57ef68890b7e: hello decoded (envV=2 typ=hello)
+2026/11/09 15:32:42 [agent-ws] agt_57ef68890b7e: hello OK, negotiating (envV=2)
+2026/11/09 15:32:42 [agent-ws] agt_57ef68890b7e: welcome sent (session v2)
+2026/11/09 15:32:43 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:32:43 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:32:43 [AUDIT] [2026-11-09T15:32:43Z] EVENT=agent_token_created user="admin" ip=127.0.0.1 role=iran prefix=enr_8358
+2026/11/09 15:32:43 [AUDIT] [2026-11-09T15:32:43Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/agents/tokens status=200
+2026/11/09 15:32:43 [AUDIT] [2026-11-09T15:32:43Z] EVENT=agent_enroll user="agt_19fe1bcc7231" ip=127.0.0.1 role=iran
+2026/11/09 15:32:43 [agent-ws] agt_19fe1bcc7231: upgrade OK (remote=127.0.0.1)
+2026/11/09 15:32:43 [agent-ws] agt_19fe1bcc7231: session started, waiting for hello (timeout 5s)
+2026/11/09 15:32:43 [agent-ws] agt_19fe1bcc7231: hello decoded (envV=2 typ=hello)
+2026/11/09 15:32:43 [agent-ws] agt_19fe1bcc7231: hello OK, negotiating (envV=2)
+2026/11/09 15:32:43 [agent-ws] agt_19fe1bcc7231: welcome sent (session v2)
+2026/11/09 15:32:45 [AUDIT] [2026-11-09T15:32:45Z] EVENT=agent_token_created user="admin" ip=127.0.0.1 role=iran prefix=enr_6bf3
+2026/11/09 15:32:45 [AUDIT] [2026-11-09T15:32:45Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/agents/tokens status=200
+2026/11/09 15:32:45 [AUDIT] [2026-11-09T15:32:45Z] EVENT=agent_enroll user="agt_2ac1e6e7af01" ip=127.0.0.1 role=iran
+2026/11/09 15:32:45 [agent-ws] agt_2ac1e6e7af01: upgrade OK (remote=127.0.0.1)
+2026/11/09 15:32:45 [agent-ws] agt_2ac1e6e7af01: session started, waiting for hello (timeout 5s)
+2026/11/09 15:32:45 [agent-ws] agt_2ac1e6e7af01: hello decoded (envV=2 typ=hello)
+2026/11/09 15:32:45 [agent-ws] agt_2ac1e6e7af01: hello OK, negotiating (envV=2)
+2026/11/09 15:32:45 [agent-ws] agt_2ac1e6e7af01: welcome sent (session v2)
+2026/11/09 15:32:46 [AUDIT] [2026-11-09T15:32:46Z] EVENT=agent_token_created user="admin" ip=127.0.0.1 role=iran prefix=enr_548e
+2026/11/09 15:32:46 [AUDIT] [2026-11-09T15:32:46Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/agents/tokens status=200
+2026/11/09 15:32:46 [AUDIT] [2026-11-09T15:32:46Z] EVENT=agent_enroll user="agt_dbb47af04248" ip=127.0.0.1 role=iran
+2026/11/09 15:32:46 [agent-ws] agt_dbb47af04248: upgrade OK (remote=127.0.0.1)
+2026/11/09 15:32:46 [agent-ws] agt_dbb47af04248: session started, waiting for hello (timeout 5s)
+2026/11/09 15:32:46 [agent-ws] agt_dbb47af04248: hello decoded (envV=2 typ=hello)
+2026/11/09 15:32:46 [agent-ws] agt_dbb47af04248: hello OK, negotiating (envV=2)
+2026/11/09 15:32:46 [agent-ws] agt_dbb47af04248: welcome sent (session v2)
+2026/11/09 15:32:48 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:32:48 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:32:53 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:32:53 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:32:55 [AUDIT] [2026-11-09T15:32:55Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/agents/agt_19fe1bcc7231/link status=200
+2026/11/09 15:32:55 [AUDIT] [2026-11-09T15:32:55Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/agents/agt_2ac1e6e7af01/link status=200
+2026/11/09 15:32:55 [AUDIT] [2026-11-09T15:32:55Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/agents/agt_57ef68890b7e/link status=200
+2026/11/09 15:32:55 [AUDIT] [2026-11-09T15:32:55Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/agents/agt_dbb47af04248/link status=200
+2026/11/09 15:32:57 [AUDIT] [2026-11-09T15:32:57Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/datacenters status=200
+2026/11/09 15:32:57 [AUDIT] [2026-11-09T15:32:57Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/datacenters status=200
+2026/11/09 15:32:58 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:32:58 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:32:58 [AUDIT] [2026-11-09T15:32:58Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/servers status=200
+2026/11/09 15:32:58 [AUDIT] [2026-11-09T15:32:58Z] EVENT=agent_token_created user="admin" ip=127.0.0.1 role=iran prefix=enr_ddf4
+2026/11/09 15:32:58 [AUDIT] [2026-11-09T15:32:58Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/agents/tokens status=200
+2026/11/09 15:32:59 [AUDIT] [2026-11-09T15:32:59Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/servers status=200
+2026/11/09 15:32:59 [AUDIT] [2026-11-09T15:32:59Z] EVENT=agent_token_created user="admin" ip=127.0.0.1 role=iran prefix=enr_6e57
+2026/11/09 15:32:59 [AUDIT] [2026-11-09T15:32:59Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/agents/tokens status=200
+2026/11/09 15:32:59 [AUDIT] [2026-11-09T15:32:59Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/servers status=200
+2026/11/09 15:32:59 [AUDIT] [2026-11-09T15:32:59Z] EVENT=agent_token_created user="admin" ip=127.0.0.1 role=iran prefix=enr_39e9
+2026/11/09 15:32:59 [AUDIT] [2026-11-09T15:32:59Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/agents/tokens status=200
+2026/11/09 15:33:00 [AUDIT] [2026-11-09T15:33:00Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/servers status=200
+2026/11/09 15:33:00 [AUDIT] [2026-11-09T15:33:00Z] EVENT=agent_token_created user="admin" ip=127.0.0.1 role=iran prefix=enr_2f16
+2026/11/09 15:33:00 [AUDIT] [2026-11-09T15:33:00Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/agents/tokens status=200
+2026/11/09 15:33:01 [AUDIT] [2026-11-09T15:33:01Z] EVENT=agent_enroll user="agt_98fbef826a8e" ip=127.0.0.1 role=iran
+2026/11/09 15:33:01 [AUDIT] [2026-11-09T15:33:01Z] EVENT=agent_enroll user="agt_ec4c3b4930c3" ip=127.0.0.1 role=iran
+2026/11/09 15:33:01 [agent-ws] agt_98fbef826a8e: upgrade OK (remote=127.0.0.1)
+2026/11/09 15:33:01 [agent-ws] agt_98fbef826a8e: session started, waiting for hello (timeout 5s)
+2026/11/09 15:33:01 [agent-ws] agt_98fbef826a8e: hello decoded (envV=2 typ=hello)
+2026/11/09 15:33:01 [agent-ws] agt_98fbef826a8e: hello OK, negotiating (envV=2)
+2026/11/09 15:33:01 [AUDIT] [2026-11-09T15:33:01Z] EVENT=agent_enroll user="agt_06f22d4d4759" ip=127.0.0.1 role=iran
+2026/11/09 15:33:01 [agent-ws] agt_ec4c3b4930c3: upgrade OK (remote=127.0.0.1)
+2026/11/09 15:33:01 [agent-ws] agt_ec4c3b4930c3: session started, waiting for hello (timeout 5s)
+2026/11/09 15:33:01 [agent-ws] agt_ec4c3b4930c3: hello decoded (envV=2 typ=hello)
+2026/11/09 15:33:01 [agent-ws] agt_ec4c3b4930c3: hello OK, negotiating (envV=2)
+2026/11/09 15:33:01 [agent-ws] agt_06f22d4d4759: upgrade OK (remote=127.0.0.1)
+2026/11/09 15:33:01 [agent-ws] agt_06f22d4d4759: session started, waiting for hello (timeout 5s)
+2026/11/09 15:33:01 [agent-ws] agt_06f22d4d4759: hello decoded (envV=2 typ=hello)
+2026/11/09 15:33:01 [agent-ws] agt_06f22d4d4759: hello OK, negotiating (envV=2)
+2026/11/09 15:33:01 [AUDIT] [2026-11-09T15:33:01Z] EVENT=agent_enroll user="agt_c341fc0ed56a" ip=127.0.0.1 role=iran
+2026/11/09 15:33:01 [agent-ws] agt_c341fc0ed56a: upgrade OK (remote=127.0.0.1)
+2026/11/09 15:33:01 [agent-ws] agt_c341fc0ed56a: session started, waiting for hello (timeout 5s)
+2026/11/09 15:33:01 [agent-ws] agt_c341fc0ed56a: hello decoded (envV=2 typ=hello)
+2026/11/09 15:33:01 [agent-ws] agt_c341fc0ed56a: hello OK, negotiating (envV=2)
+2026/11/09 15:33:01 [agent-ws] agt_98fbef826a8e: welcome sent (session v2)
+2026/11/09 15:33:01 [agent-ws] agt_c341fc0ed56a: welcome sent (session v2)
+2026/11/09 15:33:01 [agent-ws] agt_06f22d4d4759: welcome sent (session v2)
+2026/11/09 15:33:01 [agent-ws] agt_ec4c3b4930c3: welcome sent (session v2)
+2026/11/09 15:33:01 [AUDIT] [2026-11-09T15:33:01Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/agents/agt_98fbef826a8e/link status=200
+2026/11/09 15:33:01 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:01 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:01 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:01 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:02 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:02 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:02 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:02 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:02 [AUDIT] [2026-11-09T15:33:02Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/agents/agt_ec4c3b4930c3/link status=200
+2026/11/09 15:33:03 [AUDIT] [2026-11-09T15:33:03Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/agents/agt_06f22d4d4759/link status=200
+2026/11/09 15:33:03 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:03 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:03 [AUDIT] [2026-11-09T15:33:03Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/agents/agt_c341fc0ed56a/link status=200
+2026/11/09 15:33:08 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:08 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:10 [AUDIT] [2026-11-09T15:33:10Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/servers status=200
+2026/11/09 15:33:10 [AUDIT] [2026-11-09T15:33:10Z] EVENT=agent_token_created user="admin" ip=127.0.0.1 role=foreign prefix=enr_cb2e
+2026/11/09 15:33:10 [AUDIT] [2026-11-09T15:33:10Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/agents/tokens status=200
+2026/11/09 15:33:11 [AUDIT] [2026-11-09T15:33:11Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/servers status=200
+2026/11/09 15:33:11 [AUDIT] [2026-11-09T15:33:11Z] EVENT=agent_token_created user="admin" ip=127.0.0.1 role=foreign prefix=enr_f4c8
+2026/11/09 15:33:11 [AUDIT] [2026-11-09T15:33:11Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/agents/tokens status=200
+2026/11/09 15:33:13 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:13 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:18 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:18 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:22 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:22 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:22 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:22 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:22 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:22 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:22 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:22 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:23 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:23 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:24 [AUDIT] [2026-11-09T15:33:24Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/topologies/generate status=200
+2026/11/09 15:33:24 [AUDIT] [2026-11-09T15:33:24Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/1/tunnels/tun-wizard-2026-11-09-761-7-11-a-ir-0-0-a-hz-0-a/weight status=200
+2026/11/09 15:33:24 [AUDIT] [2026-11-09T15:33:24Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/1/tunnels/tun-wizard-2026-11-09-761-7-11-a-ir-0-0-a-hz-0-b/weight status=200
+2026/11/09 15:33:24 [AUDIT] [2026-11-09T15:33:24Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/1/tunnels/tun-wizard-2026-11-09-761-7-11-a-ir-0-0-a-hz-0-c/weight status=200
+2026/11/09 15:33:24 [AUDIT] [2026-11-09T15:33:24Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/topologies/generate status=200
+2026/11/09 15:33:24 [AUDIT] [2026-11-09T15:33:24Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/2/tunnels/tun-wizard-2026-11-09-761-7-12-a-ir-0-0-a-hz-1-a/weight status=200
+2026/11/09 15:33:24 [AUDIT] [2026-11-09T15:33:24Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/2/tunnels/tun-wizard-2026-11-09-761-7-12-a-ir-0-0-a-hz-1-b/weight status=200
+2026/11/09 15:33:24 [AUDIT] [2026-11-09T15:33:24Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/2/tunnels/tun-wizard-2026-11-09-761-7-12-a-ir-0-0-a-hz-1-c/weight status=200
+2026/11/09 15:33:24 [AUDIT] [2026-11-09T15:33:24Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/topologies/generate status=200
+2026/11/09 15:33:24 [AUDIT] [2026-11-09T15:33:24Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/3/tunnels/tun-wizard-2026-11-09-761-8-11-a-ir-0-1-a-hz-0-a/weight status=200
+2026/11/09 15:33:24 [AUDIT] [2026-11-09T15:33:24Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/3/tunnels/tun-wizard-2026-11-09-761-8-11-a-ir-0-1-a-hz-0-b/weight status=200
+2026/11/09 15:33:24 [AUDIT] [2026-11-09T15:33:24Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/3/tunnels/tun-wizard-2026-11-09-761-8-11-a-ir-0-1-a-hz-0-c/weight status=200
+2026/11/09 15:33:24 [AUDIT] [2026-11-09T15:33:24Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/topologies/generate status=200
+2026/11/09 15:33:24 [AUDIT] [2026-11-09T15:33:24Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/4/tunnels/tun-wizard-2026-11-09-761-8-12-a-ir-0-1-a-hz-1-a/weight status=200
+2026/11/09 15:33:24 [AUDIT] [2026-11-09T15:33:24Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/4/tunnels/tun-wizard-2026-11-09-761-8-12-a-ir-0-1-a-hz-1-b/weight status=200
+2026/11/09 15:33:24 [AUDIT] [2026-11-09T15:33:24Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/4/tunnels/tun-wizard-2026-11-09-761-8-12-a-ir-0-1-a-hz-1-c/weight status=200
+2026/11/09 15:33:24 [AUDIT] [2026-11-09T15:33:24Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/topologies/generate status=200
+2026/11/09 15:33:24 [AUDIT] [2026-11-09T15:33:24Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/5/tunnels/tun-wizard-2026-11-09-761-9-11-a-ir-1-0-a-hz-0-a/weight status=200
+2026/11/09 15:33:24 [AUDIT] [2026-11-09T15:33:24Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/5/tunnels/tun-wizard-2026-11-09-761-9-11-a-ir-1-0-a-hz-0-b/weight status=200
+2026/11/09 15:33:24 [AUDIT] [2026-11-09T15:33:24Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/5/tunnels/tun-wizard-2026-11-09-761-9-11-a-ir-1-0-a-hz-0-c/weight status=200
+2026/11/09 15:33:24 [AUDIT] [2026-11-09T15:33:24Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/topologies/generate status=200
+2026/11/09 15:33:24 [AUDIT] [2026-11-09T15:33:24Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/6/tunnels/tun-wizard-2026-11-09-761-9-12-a-ir-1-0-a-hz-1-a/weight status=200
+2026/11/09 15:33:24 [AUDIT] [2026-11-09T15:33:24Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/6/tunnels/tun-wizard-2026-11-09-761-9-12-a-ir-1-0-a-hz-1-b/weight status=200
+2026/11/09 15:33:24 [AUDIT] [2026-11-09T15:33:24Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/6/tunnels/tun-wizard-2026-11-09-761-9-12-a-ir-1-0-a-hz-1-c/weight status=200
+2026/11/09 15:33:24 [AUDIT] [2026-11-09T15:33:24Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/topologies/generate status=200
+2026/11/09 15:33:24 [AUDIT] [2026-11-09T15:33:24Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/7/tunnels/tun-wizard-2026-11-09-761-10-11-a-ir-1-1-a-hz-0-a/weight status=200
+2026/11/09 15:33:24 [AUDIT] [2026-11-09T15:33:24Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/7/tunnels/tun-wizard-2026-11-09-761-10-11-a-ir-1-1-a-hz-0-b/weight status=200
+2026/11/09 15:33:24 [AUDIT] [2026-11-09T15:33:24Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/7/tunnels/tun-wizard-2026-11-09-761-10-11-a-ir-1-1-a-hz-0-c/weight status=200
+2026/11/09 15:33:24 [AUDIT] [2026-11-09T15:33:24Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/topologies/generate status=200
+2026/11/09 15:33:24 [AUDIT] [2026-11-09T15:33:24Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/8/tunnels/tun-wizard-2026-11-09-761-10-12-a-ir-1-1-a-hz-1-a/weight status=200
+2026/11/09 15:33:24 [AUDIT] [2026-11-09T15:33:24Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/8/tunnels/tun-wizard-2026-11-09-761-10-12-a-ir-1-1-a-hz-1-b/weight status=200
+2026/11/09 15:33:24 [AUDIT] [2026-11-09T15:33:24Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/8/tunnels/tun-wizard-2026-11-09-761-10-12-a-ir-1-1-a-hz-1-c/weight status=200
+2026/11/09 15:33:28 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:28 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:28 [AUDIT] [2026-11-09T15:33:28Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/datacenters status=200
+2026/11/09 15:33:29 [AUDIT] [2026-11-09T15:33:29Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/datacenters status=200
+2026/11/09 15:33:29 [AUDIT] [2026-11-09T15:33:29Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/datacenters status=200
+2026/11/09 15:33:30 [AUDIT] [2026-11-09T15:33:30Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/servers status=200
+2026/11/09 15:33:30 [AUDIT] [2026-11-09T15:33:30Z] EVENT=agent_token_created user="admin" ip=127.0.0.1 role=iran prefix=enr_cf9c
+2026/11/09 15:33:30 [AUDIT] [2026-11-09T15:33:30Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/agents/tokens status=200
+2026/11/09 15:33:31 [AUDIT] [2026-11-09T15:33:31Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/servers status=200
+2026/11/09 15:33:31 [AUDIT] [2026-11-09T15:33:31Z] EVENT=agent_token_created user="admin" ip=127.0.0.1 role=iran prefix=enr_466e
+2026/11/09 15:33:31 [AUDIT] [2026-11-09T15:33:31Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/agents/tokens status=200
+2026/11/09 15:33:31 [AUDIT] [2026-11-09T15:33:31Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/servers status=200
+2026/11/09 15:33:31 [AUDIT] [2026-11-09T15:33:31Z] EVENT=agent_token_created user="admin" ip=127.0.0.1 role=iran prefix=enr_1e47
+2026/11/09 15:33:31 [AUDIT] [2026-11-09T15:33:31Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/agents/tokens status=200
+2026/11/09 15:33:32 [AUDIT] [2026-11-09T15:33:32Z] EVENT=agent_enroll user="agt_91671f54f89d" ip=127.0.0.1 role=iran
+2026/11/09 15:33:32 [AUDIT] [2026-11-09T15:33:32Z] EVENT=agent_enroll user="agt_1c843c838c39" ip=127.0.0.1 role=iran
+2026/11/09 15:33:32 [agent-ws] agt_91671f54f89d: upgrade OK (remote=127.0.0.1)
+2026/11/09 15:33:32 [agent-ws] agt_91671f54f89d: session started, waiting for hello (timeout 5s)
+2026/11/09 15:33:32 [agent-ws] agt_91671f54f89d: hello decoded (envV=2 typ=hello)
+2026/11/09 15:33:32 [agent-ws] agt_91671f54f89d: hello OK, negotiating (envV=2)
+2026/11/09 15:33:32 [agent-ws] agt_1c843c838c39: upgrade OK (remote=127.0.0.1)
+2026/11/09 15:33:32 [agent-ws] agt_1c843c838c39: session started, waiting for hello (timeout 5s)
+2026/11/09 15:33:32 [agent-ws] agt_1c843c838c39: hello decoded (envV=2 typ=hello)
+2026/11/09 15:33:32 [agent-ws] agt_1c843c838c39: hello OK, negotiating (envV=2)
+2026/11/09 15:33:32 [AUDIT] [2026-11-09T15:33:32Z] EVENT=agent_enroll user="agt_2a04a0cb2ffc" ip=127.0.0.1 role=iran
+2026/11/09 15:33:32 [agent-ws] agt_2a04a0cb2ffc: upgrade OK (remote=127.0.0.1)
+2026/11/09 15:33:32 [agent-ws] agt_2a04a0cb2ffc: session started, waiting for hello (timeout 5s)
+2026/11/09 15:33:32 [agent-ws] agt_2a04a0cb2ffc: hello decoded (envV=2 typ=hello)
+2026/11/09 15:33:32 [agent-ws] agt_2a04a0cb2ffc: hello OK, negotiating (envV=2)
+2026/11/09 15:33:32 [agent-ws] agt_1c843c838c39: welcome sent (session v2)
+2026/11/09 15:33:32 [agent-ws] agt_91671f54f89d: welcome sent (session v2)
+2026/11/09 15:33:32 [agent-ws] agt_2a04a0cb2ffc: welcome sent (session v2)
+2026/11/09 15:33:33 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:33 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:33 [AUDIT] [2026-11-09T15:33:33Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/agents/agt_1c843c838c39/link status=200
+2026/11/09 15:33:34 [AUDIT] [2026-11-09T15:33:34Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/agents/agt_91671f54f89d/link status=200
+2026/11/09 15:33:34 [AUDIT] [2026-11-09T15:33:34Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/agents/agt_2a04a0cb2ffc/link status=200
+2026/11/09 15:33:38 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:38 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:42 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:42 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:42 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:42 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:42 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:42 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:42 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:42 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:42 [AUDIT] [2026-11-09T15:33:42Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/servers status=200
+2026/11/09 15:33:42 [AUDIT] [2026-11-09T15:33:42Z] EVENT=agent_token_created user="admin" ip=127.0.0.1 role=foreign prefix=enr_4ea8
+2026/11/09 15:33:42 [AUDIT] [2026-11-09T15:33:42Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/agents/tokens status=200
+2026/11/09 15:33:42 [AUDIT] [2026-11-09T15:33:42Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/servers status=200
+2026/11/09 15:33:42 [AUDIT] [2026-11-09T15:33:42Z] EVENT=agent_token_created user="admin" ip=127.0.0.1 role=foreign prefix=enr_0cf8
+2026/11/09 15:33:42 [AUDIT] [2026-11-09T15:33:42Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/agents/tokens status=200
+2026/11/09 15:33:43 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:43 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:43 [AUDIT] [2026-11-09T15:33:43Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/servers status=200
+2026/11/09 15:33:43 [AUDIT] [2026-11-09T15:33:43Z] EVENT=agent_token_created user="admin" ip=127.0.0.1 role=foreign prefix=enr_5420
+2026/11/09 15:33:43 [AUDIT] [2026-11-09T15:33:43Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/agents/tokens status=200
+2026/11/09 15:33:43 [AUDIT] [2026-11-09T15:33:43Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/servers status=200
+2026/11/09 15:33:43 [AUDIT] [2026-11-09T15:33:43Z] EVENT=agent_token_created user="admin" ip=127.0.0.1 role=foreign prefix=enr_ffe4
+2026/11/09 15:33:43 [AUDIT] [2026-11-09T15:33:43Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/agents/tokens status=200
+2026/11/09 15:33:48 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:48 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:53 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:53 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:58 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:33:58 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:01 [AUDIT] [2026-11-09T15:34:01Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/topologies/generate status=200
+2026/11/09 15:34:01 [AUDIT] [2026-11-09T15:34:01Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/9/tunnels/tun-wizard-2026-11-09-726-13-16-b-ir-0-0-b-hz-0-a/weight status=200
+2026/11/09 15:34:01 [AUDIT] [2026-11-09T15:34:01Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/9/tunnels/tun-wizard-2026-11-09-726-13-16-b-ir-0-0-b-hz-0-b/weight status=200
+2026/11/09 15:34:01 [AUDIT] [2026-11-09T15:34:01Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/topologies/generate status=200
+2026/11/09 15:34:01 [AUDIT] [2026-11-09T15:34:01Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/10/tunnels/tun-wizard-2026-11-09-726-13-17-b-ir-0-0-b-hz-1-a/weight status=200
+2026/11/09 15:34:01 [AUDIT] [2026-11-09T15:34:01Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/10/tunnels/tun-wizard-2026-11-09-726-13-17-b-ir-0-0-b-hz-1-b/weight status=200
+2026/11/09 15:34:01 [AUDIT] [2026-11-09T15:34:01Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/topologies/generate status=200
+2026/11/09 15:34:01 [AUDIT] [2026-11-09T15:34:01Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/11/tunnels/tun-wizard-2026-11-09-726-13-18-b-ir-0-0-b-hz-2-a/weight status=200
+2026/11/09 15:34:01 [AUDIT] [2026-11-09T15:34:01Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/11/tunnels/tun-wizard-2026-11-09-726-13-18-b-ir-0-0-b-hz-2-b/weight status=200
+2026/11/09 15:34:01 [AUDIT] [2026-11-09T15:34:01Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/topologies/generate status=200
+2026/11/09 15:34:01 [AUDIT] [2026-11-09T15:34:01Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/12/tunnels/tun-wizard-2026-11-09-726-13-19-b-ir-0-0-b-hz-3-a/weight status=200
+2026/11/09 15:34:01 [AUDIT] [2026-11-09T15:34:01Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/12/tunnels/tun-wizard-2026-11-09-726-13-19-b-ir-0-0-b-hz-3-b/weight status=200
+2026/11/09 15:34:01 [AUDIT] [2026-11-09T15:34:01Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/topologies/generate status=200
+2026/11/09 15:34:01 [AUDIT] [2026-11-09T15:34:01Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/13/tunnels/tun-wizard-2026-11-09-726-14-16-b-ir-1-0-b-hz-0-a/weight status=200
+2026/11/09 15:34:01 [AUDIT] [2026-11-09T15:34:01Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/13/tunnels/tun-wizard-2026-11-09-726-14-16-b-ir-1-0-b-hz-0-b/weight status=200
+2026/11/09 15:34:01 [AUDIT] [2026-11-09T15:34:01Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/topologies/generate status=200
+2026/11/09 15:34:01 [AUDIT] [2026-11-09T15:34:01Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/14/tunnels/tun-wizard-2026-11-09-726-14-17-b-ir-1-0-b-hz-1-a/weight status=200
+2026/11/09 15:34:01 [AUDIT] [2026-11-09T15:34:01Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/14/tunnels/tun-wizard-2026-11-09-726-14-17-b-ir-1-0-b-hz-1-b/weight status=200
+2026/11/09 15:34:01 [AUDIT] [2026-11-09T15:34:01Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/topologies/generate status=200
+2026/11/09 15:34:01 [AUDIT] [2026-11-09T15:34:01Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/15/tunnels/tun-wizard-2026-11-09-726-14-18-b-ir-1-0-b-hz-2-a/weight status=200
+2026/11/09 15:34:01 [AUDIT] [2026-11-09T15:34:01Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/15/tunnels/tun-wizard-2026-11-09-726-14-18-b-ir-1-0-b-hz-2-b/weight status=200
+2026/11/09 15:34:01 [AUDIT] [2026-11-09T15:34:01Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/topologies/generate status=200
+2026/11/09 15:34:01 [AUDIT] [2026-11-09T15:34:01Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/16/tunnels/tun-wizard-2026-11-09-726-14-19-b-ir-1-0-b-hz-3-a/weight status=200
+2026/11/09 15:34:01 [AUDIT] [2026-11-09T15:34:01Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/16/tunnels/tun-wizard-2026-11-09-726-14-19-b-ir-1-0-b-hz-3-b/weight status=200
+2026/11/09 15:34:01 [AUDIT] [2026-11-09T15:34:01Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/topologies/generate status=200
+2026/11/09 15:34:01 [AUDIT] [2026-11-09T15:34:01Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/17/tunnels/tun-wizard-2026-11-09-726-15-16-b-ir-2-0-b-hz-0-a/weight status=200
+2026/11/09 15:34:01 [AUDIT] [2026-11-09T15:34:01Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/17/tunnels/tun-wizard-2026-11-09-726-15-16-b-ir-2-0-b-hz-0-b/weight status=200
+2026/11/09 15:34:01 [AUDIT] [2026-11-09T15:34:01Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/topologies/generate status=200
+2026/11/09 15:34:01 [AUDIT] [2026-11-09T15:34:01Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/18/tunnels/tun-wizard-2026-11-09-726-15-17-b-ir-2-0-b-hz-1-a/weight status=200
+2026/11/09 15:34:01 [AUDIT] [2026-11-09T15:34:01Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/18/tunnels/tun-wizard-2026-11-09-726-15-17-b-ir-2-0-b-hz-1-b/weight status=200
+2026/11/09 15:34:01 [AUDIT] [2026-11-09T15:34:01Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/topologies/generate status=200
+2026/11/09 15:34:01 [AUDIT] [2026-11-09T15:34:01Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/19/tunnels/tun-wizard-2026-11-09-726-15-18-b-ir-2-0-b-hz-2-a/weight status=200
+2026/11/09 15:34:01 [AUDIT] [2026-11-09T15:34:01Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/19/tunnels/tun-wizard-2026-11-09-726-15-18-b-ir-2-0-b-hz-2-b/weight status=200
+2026/11/09 15:34:01 [AUDIT] [2026-11-09T15:34:01Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/topologies/generate status=200
+2026/11/09 15:34:01 [AUDIT] [2026-11-09T15:34:01Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/20/tunnels/tun-wizard-2026-11-09-726-15-19-b-ir-2-0-b-hz-3-a/weight status=200
+2026/11/09 15:34:01 [AUDIT] [2026-11-09T15:34:01Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/20/tunnels/tun-wizard-2026-11-09-726-15-19-b-ir-2-0-b-hz-3-b/weight status=200
+2026/11/09 15:34:02 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:02 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:02 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:02 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:02 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:02 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:02 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:02 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:03 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:03 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:06 [AUDIT] [2026-11-09T15:34:06Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/1/tunnels/tun-wizard-2026-11-09-761-7-11-a-ir-0-0-a-hz-0-a/weight status=200
+2026/11/09 15:34:06 [AUDIT] [2026-11-09T15:34:06Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/1/tunnels/tun-wizard-2026-11-09-761-7-11-a-ir-0-0-a-hz-0-b/weight status=200
+2026/11/09 15:34:06 [AUDIT] [2026-11-09T15:34:06Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/topologies/1/tunnels/tun-wizard-2026-11-09-761-7-11-a-ir-0-0-a-hz-0-c/weight status=200
+2026/11/09 15:34:08 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:08 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:08 [AUDIT] [2026-11-09T15:34:08Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/agents/agt_06f22d4d4759/push status=200
+2026/11/09 15:34:13 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:13 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:18 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:18 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:22 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:22 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:22 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:22 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:22 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:22 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:22 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:22 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:23 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:23 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:25 [AUDIT] [2026-11-09T15:34:25Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/ui/agents/agt_06f22d4d4759/engines/matrix/disable status=400
+2026/11/09 15:34:28 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:28 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:33 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:33 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:38 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:38 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:41 [AUDIT] [2026-11-09T15:34:41Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/topologies/generate status=200
+2026/11/09 15:34:41 [AUDIT] [2026-11-09T15:34:41Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/mesh/topologies/generate status=200
+2026/11/09 15:34:41 [AUDIT] [2026-11-09T15:34:41Z] EVENT=agent_token_created user="admin" ip=127.0.0.1 role=iran prefix=enr_6e0c
+2026/11/09 15:34:41 [AUDIT] [2026-11-09T15:34:41Z] EVENT=api_mutation user="admin" ip=127.0.0.1 method=POST path=/ui/api/agents/tokens status=200
+2026/11/09 15:34:41 [AUDIT] [2026-11-09T15:34:41Z] EVENT=agent_enroll user="agt_4920f34bd23a" ip=127.0.0.1 role=iran
+2026/11/09 15:34:41 [agent-ws] agt_4920f34bd23a: upgrade OK (remote=127.0.0.1)
+2026/11/09 15:34:41 [agent-ws] agt_4920f34bd23a: session started, waiting for hello (timeout 5s)
+2026/11/09 15:34:41 [agent-ws] agt_4920f34bd23a: hello decoded (envV=2 typ=hello)
+2026/11/09 15:34:41 [agent-ws] agt_4920f34bd23a: hello OK, negotiating (envV=2)
+2026/11/09 15:34:41 [agent-ws] agt_4920f34bd23a: welcome sent (session v2)
+2026/11/09 15:34:42 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:42 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:42 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:42 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:42 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:42 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:42 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:42 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:43 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:43 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:48 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:48 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:53 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:53 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:58 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:34:58 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:35:02 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:35:02 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:35:02 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:35:02 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:35:02 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:35:02 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:35:02 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH
+2026/11/09 15:35:02 [CMD-ERROR] command "ip" failed (exit -1): exec: "ip": executable file not found in $PATH

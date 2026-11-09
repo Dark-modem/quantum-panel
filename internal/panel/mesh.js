@@ -449,7 +449,8 @@
     clearGlobalBanner();
     if (route.page === 'dash') renderDash();
     else if (route.page === 'topologies') route.id ? renderTopologyDetail(route.id) : renderTopologies();
-    else if (route.page === 'agents') route.id ? renderAgentDetail(route.id) : renderAgents();
+    else if (route.page === 'agents') renderAgents();
+    else if (route.page === 'agent') renderAgentDetail(route.id);
     else if (route.page === 'tunnels') renderTunnels();
     else if (route.page === 'tunnel') renderTunnelDetail(route.id);
     else if (route.page === 'engines') renderEngines();
@@ -745,16 +746,22 @@
   }
 
   // ---- agent detail (contract §2.4/2.5/2.6/2.7) --------------------------------
+  var renderSeq = {};
   function renderAgentDetail(id) {
     var el = document.getElementById('page-agent');
+    var mySeq = renderSeq['agent'] = (renderSeq['agent'] || 0) + 1;
     el.innerHTML = skeletons();
     Promise.all([
       api('GET', 'agents/' + id),
       api('GET', 'agents/' + id + '/engines'),
       api('GET', 'agents/' + id + '/topologies'),
     ]).then(function (rs) {
+      if (renderSeq['agent'] !== mySeq) return; // a newer render owns the page
       drawAgentDetail(el, id, rs[0], rs[1], rs[2]);
-    }).catch(function (e) { showPageError(el, e, function () { renderAgentDetail(id); }); });
+    }).catch(function (e) {
+      if (renderSeq['agent'] !== mySeq) return;
+      showPageError(el, e, function () { renderAgentDetail(id); });
+    });
   }
   function drawAgentDetail(el, id, det, eng, topos) {
     var a = det.agent;
@@ -829,7 +836,8 @@
               : (e.bytes_on_disk != null ? '<br><span class="muted">' + esc(t('bytes_disk').replace('{b}', bytes(e.bytes_on_disk))) + '</span>' : ''))
           : '<span class="pill dim">' + esc(t('not_installed')) + '</span>';
         var run = e.instances > 0 ? esc(t('running').replace('{n}', num0(e.instances))) : esc(t('stopped'));
-        var canBtn = e.engine === 'matrix' ? '' :
+        // every engine gets enable/disable (req 3) — matrix included
+        var canBtn = 
           '<button class="act small ' + (e.enabled ? 'danger' : 'primary') + '" data-eng="' + esc(e.engine) + '" data-on="' + (e.enabled ? '0' : '1') + '"' +
           (e.enabled ? '' : (e.can_enable === false ? ' disabled title="' + esc(e.block_reason || t('block_no_artifact')) + '"' : '')) + '>' +
           esc(e.enabled ? t('disable') : t('enable')) + '</button>';
@@ -873,14 +881,10 @@
   function renderTopologies() {
     var el = document.getElementById('page-topologies');
     el.innerHTML = skeletons();
-    api('GET', 'overview').then(function (ov) {
-      // the overview carries counts only; enumerate topologies via details
-      // is N calls — the list view reuses the mesh overview (light).
-      return api('GET', '../mesh/topologies').then(function (list) {
-        return { list: (list && list.topologies) || [], ov: ov };
-      });
-    }).catch(function () { return { list: [], ov: overview }; }).then(function (r) {
-      var topos = r.list;
+    api('GET', '../mesh/overview').then(function (ov) {
+      // the mesh overview's topoView rows carry members + tunnel_count
+      return ov.topologies || [];
+    }).then(function (topos) {
       if (!topos.length) {
         el.innerHTML = '<div class="empty">' + esc(t('map_empty')) + '</div>' +
           '<p><a class="btn primary" href="' + esc(base()) + 'mesh-wizard">' + esc(t('wizard_link')) + '</a></p>';
@@ -1060,8 +1064,8 @@
   function renderTunnels() {
     var el = document.getElementById('page-tunnels');
     el.innerHTML = skeletons();
-    api('GET', 'overview').then(function (ov) {
-      return Promise.resolve(overview ? (overview.topologies || []) : [])
+    api('GET', '../mesh/overview').then(function (ov) {
+      return ov.topologies || [];
     }).then(function (topos) {
       if (!topos.length) {
         el.innerHTML = '<div class="empty">' + esc(t('no_tunnels')) + '</div>' +
@@ -1082,10 +1086,12 @@
       loadWeights();
     });
   }
+  var wTunnels = [];
   function loadWeights() {
     var body = document.getElementById('wbody');
     if (!body) return;
     api('GET', 'topologies/' + weightsTopo).then(function (d) {
+      wTunnels = d.tunnels || [];
       var rows = (d.tunnels || []).map(function (tn) {
         return '<tr data-key="' + esc(tn.tunnel_key) + '">' +
           '<td class="mono trunc" style="max-width:230px" title="' + esc(tn.tunnel_key) + '">' + esc(tn.tunnel_key) + '</td>' +
@@ -1108,8 +1114,7 @@
       updateWSum(d.tunnels || []);
       body.querySelectorAll('input[data-key]').forEach(function (inp) {
         inp.addEventListener('input', function () {
-          var current = currentWeights();
-          updateWSum(current);
+          updateWSum(wTunnels);
         });
       });
       body.addEventListener('click', function (e) {
@@ -1186,10 +1191,15 @@
   var tunnelRange = '24h';
   function renderTunnelDetail(key) {
     var el = document.getElementById('page-tunnel');
+    var mySeq = renderSeq['tunnel'] = (renderSeq['tunnel'] || 0) + 1;
     el.innerHTML = skeletons();
     api('GET', 'tunnels/' + encodeURIComponent(key) + '?range=' + tunnelRange).then(function (d) {
+      if (renderSeq['tunnel'] !== mySeq) return;
       drawTunnelDetail(el, key, d);
-    }).catch(function (e) { showPageError(el, e, function () { renderTunnelDetail(key); }); });
+    }).catch(function (e) {
+      if (renderSeq['tunnel'] !== mySeq) return;
+      showPageError(el, e, function () { renderTunnelDetail(key); });
+    });
   }
   function drawTunnelDetail(el, key, d) {
     var tn = d.tunnel, now = d.now, tot = d.totals, rat = d.ratios, hist = d.history;
