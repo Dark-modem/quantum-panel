@@ -116,6 +116,10 @@ reconnect:
 		}
 		dead := make(chan struct{})
 		var wmu sync.Mutex // gorilla: one writer at a time
+		// engineEnabled mirrors the last desired state (phase-11: the UI's
+		// engine table reads the agent's own engine_status report — a real
+		// agent flips these when it applies the desired document).
+		engineEnabled := true
 		write := func(typ string, payload any) {
 			if b, err := wrap(2, typ, payload); err == nil {
 				wmu.Lock()
@@ -155,11 +159,27 @@ reconnect:
 				if json.Unmarshal(raw, &env) != nil {
 					continue
 				}
-				if env.Type == "desired" && *desiredOut != "" {
-					// e2e aid: persist the compiled desired document exactly
-					// as received (the panel's DesiredV2 for this agent).
-					if err := os.WriteFile(*desiredOut, env.Data, 0o644); err != nil {
-						log.Printf("desired-out: %v", err)
+				if env.Type == "desired" {
+					// APPLY the desired engine list into this agent's own
+					// engine_status report (the UI reads it back), and — for
+					// the e2e — persist the document exactly as received.
+					var dv struct {
+						Engines []struct {
+							Engine  string `json:"engine"`
+							Enabled *bool  `json:"enabled"`
+						} `json:"engines"`
+					}
+					if json.Unmarshal(env.Data, &dv) == nil {
+						for _, e := range dv.Engines {
+							if e.Engine == "matrix" && e.Enabled != nil {
+								engineEnabled = *e.Enabled
+							}
+						}
+					}
+					if *desiredOut != "" {
+						if err := os.WriteFile(*desiredOut, env.Data, 0o644); err != nil {
+							log.Printf("desired-out: %v", err)
+						}
 					}
 					continue
 				}
@@ -214,7 +234,7 @@ reconnect:
 				"proc":             proc,
 				"engine_status": []map[string]any{{
 					"engine": "matrix", "installed": true, "version": "fake-1.0",
-					"bytes_on_disk": uint64(0), "enabled": true,
+					"bytes_on_disk": uint64(0), "enabled": engineEnabled,
 					"instances": len(ids) - *downCount, "last_error": map[string]any(nil),
 				}},
 				"resources": map[string]any{

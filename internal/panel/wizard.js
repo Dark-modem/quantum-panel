@@ -191,7 +191,16 @@
           var rec = (Array.isArray(recs) ? recs : []).filter(function (a) { return a.name === name; })[0];
           if (rec && rec.status === 'online') {
             clearInterval(iv);
-            list.forEach(function (x) { if (x.name === name) { x.online = true; x.agentId = rec.id; } });
+            var me = null;
+            list.forEach(function (x) { if (x.name === name) { x.online = true; x.agentId = rec.id; me = x; } });
+            // link the fresh agent to the server it belongs to (the topology
+            // compiler and per-DC billing both key off this link)
+            if (me && me.id) {
+              fetch(base() + 'api/mesh/agents/' + rec.id + '/link', {
+                method: 'POST', headers: { 'X-CSRF-Token': csrfToken(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({ server_id: me.id })
+              }).catch(function () {});
+            }
             renderList(listKey, list);
           }
         }).catch(function () {});
@@ -401,6 +410,40 @@
           });
         });
       });
+    });
+    // K + engine-slot wiring (the .then above re-renders only the engine
+    // boxes; these inputs live outside them and must be re-wired per render)
+    el.querySelectorAll('[data-k]').forEach(function (inp) {
+      inp.onchange = function () {
+        var key = inp.dataset.k;
+        var k = Math.max(1, Math.min(26, parseInt(inp.value, 10) || 1));
+        var cur = S.pairs[key] || { engines: ['matrix'] };
+        var engines = [];
+        for (var i = 0; i < k; i++) engines.push(cur.engines[i] || (cur.engines[0] || 'matrix'));
+        S.pairs[key] = { k: k, engines: engines };
+        inp.value = k;
+        step4();
+      };
+    });
+    el.querySelectorAll('[data-slot]').forEach(function (sel) {
+      sel.onchange = function () {
+        var key = sel.dataset.slot;
+        var idx = parseInt(sel.dataset.slotidx, 10);
+        var cur = S.pairs[key] || { k: 1, engines: [] };
+        cur.engines[idx] = sel.value;
+        S.pairs[key] = cur;
+        var pc = document.querySelector('[data-params="' + key + '-' + idx + '"]');
+        if (pc) {
+          pc.innerHTML = paramFormHTML(sel.value, key + '-' + idx, S.params[key + '-' + idx]);
+          wireGenerators(pc);
+        }
+      };
+    });
+    el.querySelectorAll('[data-ep]').forEach(function (inp) {
+      inp.onchange = function () {
+        var m = inp.id.match(/^ep-(.+-d+)-/);
+        if (m) S.params[m[1]] = collectParams(m[1]);
+      };
     });
   }
 
