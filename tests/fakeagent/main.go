@@ -6,6 +6,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -22,16 +23,23 @@ import (
 )
 
 var (
-	server     = flag.String("server", "http://127.0.0.1:8000/ui", "panel base URL incl base path")
-	token      = flag.String("token", "", "enroll token")
-	name       = flag.String("name", "fake-agent", "agent name")
-	role       = flag.String("role", "iran", "role: iran|foreign")
-	tunnels    = flag.Int("tunnels", 3, "tunnels to report (synthetic ids unless -tunnel-ids)")
-	tunnelIDs  = flag.String("tunnel-ids", "", "comma-separated REAL tunnel ids to report (joins panel state)")
-	downCount  = flag.Int("down", 0, "report the first N tunnels as DOWN (varied health)")
-	traffic    = flag.Bool("traffic", true, "report wire/payload bytes")
-	interval   = flag.Duration("interval", 3*time.Second, "report interval")
-	desiredOut = flag.String("desired-out", "", "write every received desired document to this file (e2e: verify the compiled state)")
+	server      = flag.String("server", "http://127.0.0.1:8000/ui", "panel base URL incl base path")
+	token       = flag.String("token", "", "enroll token")
+	name        = flag.String("name", "fake-agent", "agent name")
+	role        = flag.String("role", "iran", "role: iran|foreign")
+	tunnels     = flag.Int("tunnels", 3, "tunnels to report (synthetic ids unless -tunnel-ids)")
+	tunnelIDs   = flag.String("tunnel-ids", "", "comma-separated REAL tunnel ids to report (joins panel state)")
+	downCount   = flag.Int("down", 0, "report the first N tunnels as DOWN (varied health)")
+	traffic     = flag.Bool("traffic", true, "report wire/payload bytes")
+	interval    = flag.Duration("interval", 3*time.Second, "report interval")
+	desiredOut  = flag.String("desired-out", "", "write every received desired document to this file (e2e: verify the compiled state)")
+	insecure    = flag.Bool("insecure", false, "skip TLS verification (wss to a self-signed demo panel)")
+	enginesSpec = flag.String("engines", "", "engine_status variety: engine=running|stopped|disabled[,...] (default: matrix only)")
+	tunnelEng   = flag.String("tunnel-engines", "", "per-tunnel engine overrides: id=engine[,...] (default matrix)")
+	cpumodel    = flag.String("cpu-model", "Fake Xeon", "reported CPU model")
+	cores       = flag.Int("cores", 4, "reported cpu cores")
+	memmb       = flag.Int("memmb", 4096, "reported mem_total_mb")
+	diskgb      = flag.Int("diskgb", 80, "reported disk_total_gb")
 )
 
 // envelope is the v2 wire shape (quantum-protocol Envelope).
@@ -63,7 +71,11 @@ func main() {
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Enroll-Token", *token)
-	resp, err := http.DefaultClient.Do(req)
+	client := http.DefaultClient
+	if *insecure {
+		client = &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}}
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		log.Fatal("enroll: ", err)
 	}
@@ -80,6 +92,30 @@ func main() {
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
+
+	// per-tunnel engine assignment (demo: mixed-engine topologies)
+	engOf := map[string]string{}
+	if *tunnelEng != "" {
+		for _, kv := range strings.Split(*tunnelEng, ",") {
+			kv = strings.TrimSpace(kv)
+			if i := strings.Index(kv, "="); i > 0 {
+				engOf[kv[:i]] = kv[i+1:]
+			}
+		}
+	}
+	// engine-status variety: engine=running|stopped|disabled
+	type engStat struct{ name, mode string }
+	var engStats []engStat
+	if *enginesSpec != "" {
+		for _, kv := range strings.Split(*enginesSpec, ",") {
+			kv = strings.TrimSpace(kv)
+			if i := strings.Index(kv, "="); i > 0 {
+				engStats = append(engStats, engStat{kv[:i], kv[i+1:]})
+			}
+		}
+	} else {
+		engStats = []engStat{{"matrix", "running"}}
+	}
 
 	ids := []string{}
 	if *tunnelIDs != "" {
@@ -104,7 +140,11 @@ reconnect:
 		hdr := http.Header{}
 		hdr.Set("X-Agent-Id", er.ID)
 		hdr.Set("X-Agent-Key", er.Key)
-		ws, _, err := websocket.DefaultDialer.Dial(wsURL, hdr)
+		dialer := websocket.DefaultDialer
+		if *insecure {
+			dialer = &websocket.Dialer{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
+		}
+		ws, _, err := dialer.Dial(wsURL, hdr)
 		if err != nil {
 			log.Printf("ws dial: %v (retry 2s)", err)
 			select {
@@ -131,7 +171,16 @@ reconnect:
 		hello := map[string]any{
 			"id": er.ID, "version": "fake-1.0", "hostname": *name,
 			"os": "linux", "arch": "amd64", "caps": []string{"matrix", "v2"},
-			"max_version": 2, "engine_catalog": []string{"matrix"},
+			"max_version": 2, "engine_catalog": func() []string {
+				cs := []string{}
+				for _, es := range engStats {
+					cs = append(cs, es.name)
+				}
+				if len(cs) == 0 {
+					cs = []string{"matrix"}
+				}
+				return cs
+			}(),
 		}
 		write("hello", hello)
 		go func() {
@@ -206,8 +255,12 @@ reconnect:
 			proc := make([]map[string]any, 0, len(ids))
 			for i, id := range ids {
 				up := i >= *downCount
+				eng, ok := engOf[id]
+				if !ok {
+					eng = "matrix"
+				}
 				t := map[string]any{
-					"tunnel_id": id, "engine": "matrix", "up": up,
+					"tunnel_id": id, "engine": eng, "up": up,
 					"wire_known": true, "payload_known": *traffic, "counters_known": true,
 					// v2 additive fields the new UI reads (contract §4)
 					"uptime_s": uint64(3600 + i*60),
@@ -232,16 +285,40 @@ reconnect:
 				"applied_revision": "1",
 				"tunnels":          rt,
 				"proc":             proc,
-				"engine_status": []map[string]any{{
-					"engine": "matrix", "installed": true, "version": "fake-1.0",
-					"bytes_on_disk": uint64(0), "enabled": engineEnabled,
-					"instances": len(ids) - *downCount, "last_error": map[string]any(nil),
-				}},
+				"engine_status": func() []map[string]any {
+					out := []map[string]any{}
+					for _, es := range engStats {
+						installed, enabled := true, false
+						instances := 0
+						switch es.mode {
+						case "running":
+							enabled = true
+							instances = len(ids) - *downCount
+						case "stopped":
+							enabled = true
+						case "disabled":
+						}
+						if es.name == "matrix" {
+							enabled = engineEnabled
+							if enabled {
+								instances = len(ids) - *downCount
+							} else {
+								instances = 0
+							}
+						}
+						out = append(out, map[string]any{
+							"engine": es.name, "installed": installed, "version": "fake-1.0",
+							"bytes_on_disk": uint64(9 << 20), "enabled": enabled,
+							"instances": instances, "last_error": map[string]any(nil),
+						})
+					}
+					return out
+				}(),
 				"resources": map[string]any{
-					"cpu_model": "Fake Xeon", "cpu_cores": 4,
+					"cpu_model": *cpumodel, "cpu_cores": *cores,
 					"cpu_percent": 8.0 + rng.Float64()*20, "load_avg_1": 0.4,
-					"mem_total_mb": 4096, "mem_used_mb": 1200 + uint64(rng.Intn(400)),
-					"disk_total_gb": 80, "disk_used_gb": 21, "uptime_s": 86400,
+					"mem_total_mb": *memmb, "mem_used_mb": uint64(*memmb)/3 + uint64(rng.Intn(400)),
+					"disk_total_gb": *diskgb, "disk_used_gb": *diskgb / 4, "uptime_s": 86400,
 				},
 			}
 			if *traffic && prx > 0 {
