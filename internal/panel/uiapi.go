@@ -47,6 +47,7 @@ func registerUIAPIRoutes(mux *http.ServeMux, base string) {
 	// Phase 12 TASK 4: the billing export (UI screen requests it via
 	// UI-API-REQUESTS.md; the CLI `quantum-panel report` shares the code).
 	mux.HandleFunc("GET "+base+"/api/ui/reports/billing", requireAuth(handleUIBillingReport))
+	mux.HandleFunc("GET "+base+"/api/ui/selfcheck", requireAuth(handleUISelfcheck))
 }
 
 // ---- shared helpers ---------------------------------------------------
