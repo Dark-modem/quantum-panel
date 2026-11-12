@@ -1257,7 +1257,7 @@
           : (st === 'run'
             ? '<button type="button" class="quantum-btn quantum-btn-secondary mtb-eng-btn" data-engtoggle="' + esc(en.engine || '') + '" data-engto="disable">' + MTB_ICO.stop + esc(L('engStop')) + '</button>'
             : '<button type="button" class="quantum-btn quantum-btn-primary mtb-eng-btn" data-engtoggle="' + esc(en.engine || '') + '" data-engto="enable">' + MTB_ICO.play + esc(L('engStart')) + '</button>');
-        return '<div class="mtb-eng-card' + (st === 'run' ? ' run' : '') + '">' +
+        return '<div class="mtb-eng-card' + (st === 'run' ? ' run' : '') + '" data-no-i18n>' +
           '<div class="mtb-eng-top"><span class="mtb-eng-logo e-' + esc(en.engine || '') + '">' + engLogo(en, disp) + '</span>' +
           '<span class="mtb-eng-id"><b>' + esc(disp) + '</b>' +
           (en.version ? '<span class="mtb-eng-ver">' + esc(L('engVersion')) + ': <bdi dir="ltr">' + esc(en.version) + '</bdi></span>'
