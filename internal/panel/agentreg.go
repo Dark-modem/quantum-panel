@@ -38,8 +38,9 @@ import (
 type agentRecord struct {
 	ID       string   `json:"id"` // "agt_" + 12 hex chars
 	Name     string   `json:"name"`
-	KeyHash  string   `json:"key_hash"`       // sha256 hex of the agent key
-	Role     string   `json:"role,omitempty"` // "iran"|"foreign" chosen at token creation
+	KeyHash  string   `json:"key_hash"`          // sha256 hex of the agent key
+	Role     string   `json:"role,omitempty"`    // "iran"|"foreign" chosen at token creation
+	Country  string   `json:"country,omitempty"` // ISO-3166 alpha-2 host country of a foreign agent
 	Caps     []string `json:"caps,omitempty"`
 	Version  string   `json:"version,omitempty"`
 	Hostname string   `json:"hostname,omitempty"`
@@ -89,6 +90,7 @@ type agentEnrollToken struct {
 	TokenHash   string `json:"token_hash"`
 	TokenPrefix string `json:"token_prefix"` // first 8 chars for UI display
 	Role        string `json:"role"`
+	Country     string `json:"country,omitempty"`
 	Label       string `json:"label,omitempty"`
 	CreatedAt   int64  `json:"created_at"`
 	ExpiresAt   int64  `json:"expires_at"`
@@ -368,6 +370,7 @@ func handleAgentEnroll(w http.ResponseWriter, r *http.Request) {
 		Name:      name,
 		KeyHash:   agentSha256Hex(key),
 		Role:      tok.Role,
+		Country:   tok.Country,
 		Caps:      agentValidCaps(body.Caps),
 		Version:   agentValidText(body.Version, 64),
 		Hostname:  agentValidText(body.Hostname, 255),
@@ -407,7 +410,7 @@ func meshMirrorAgentEnroll(rec agentRecord) {
 		return
 	}
 	if err := s.UpsertAgent(store.Agent{
-		ID: rec.ID, Name: rec.Name, Role: rec.Role, Status: rec.Status,
+		ID: rec.ID, Name: rec.Name, Role: rec.Role, Country: rec.Country, Status: rec.Status,
 		Version: rec.Version, Hostname: rec.Hostname, PublicIP: rec.PublicIP,
 	}); err != nil {
 		log.Printf("[mesh] cannot mirror agent enrollment for %s: %v", rec.ID, err)
@@ -421,6 +424,7 @@ func meshMirrorAgentEnroll(rec agentRecord) {
 func handleAgentTokenPost(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Role        string `json:"role"`
+		Country     string `json:"country"`
 		Label       string `json:"label"`
 		ExpiresDays int    `json:"expires_days"`
 	}
@@ -430,6 +434,16 @@ func handleAgentTokenPost(w http.ResponseWriter, r *http.Request) {
 	}
 	if body.Role != "iran" && body.Role != "foreign" {
 		agentPlainError(w, http.StatusBadRequest, "role must be iran or foreign")
+		return
+	}
+	// Country applies to foreign agents only: an upper-case ISO-3166
+	// alpha-2 code, or empty when unknown/iran.
+	country := strings.ToUpper(strings.TrimSpace(body.Country))
+	if body.Role == "iran" {
+		country = ""
+	}
+	if country != "" && (len(country) != 2 || country[0] < 'A' || country[0] > 'Z' || country[1] < 'A' || country[1] > 'Z') {
+		agentPlainError(w, http.StatusBadRequest, "country must be a 2-letter ISO code")
 		return
 	}
 	days := body.ExpiresDays
@@ -467,6 +481,7 @@ func handleAgentTokenPost(w http.ResponseWriter, r *http.Request) {
 		TokenHash:   agentSha256Hex(token),
 		TokenPrefix: token[:8],
 		Role:        body.Role,
+		Country:     country,
 		Label:       label,
 		CreatedAt:   now.Unix(),
 		ExpiresAt:   now.Add(time.Duration(days) * 24 * time.Hour).Unix(),
@@ -821,4 +836,46 @@ func agentHasCap(caps []string, cap string) bool {
 		}
 	}
 	return false
+}
+
+// agentRegistryRename renames one enrolled agent (UI rename action).
+func agentRegistryRename(id, name string) error {
+	agentRegMu.Lock()
+	defer agentRegMu.Unlock()
+	agents, tokens, err := agentRegistryLoad()
+	if err != nil {
+		return err
+	}
+	hit := false
+	for i := range agents {
+		if agents[i].ID == id {
+			agents[i].Name = name
+			hit = true
+		}
+	}
+	if !hit {
+		return agentErrUnknownAgent
+	}
+	return saveAgentRegistry(agents, tokens)
+}
+
+// agentRegistryDelete removes one enrolled agent entirely (UI delete action;
+// the running hub session for a live agent is dropped by the hub itself).
+func agentRegistryDelete(id string) error {
+	agentRegMu.Lock()
+	defer agentRegMu.Unlock()
+	agents, tokens, err := agentRegistryLoad()
+	if err != nil {
+		return err
+	}
+	var keep []agentRecord
+	for _, a := range agents {
+		if a.ID != id {
+			keep = append(keep, a)
+		}
+	}
+	if len(keep) == len(agents) {
+		return agentErrUnknownAgent
+	}
+	return saveAgentRegistry(keep, tokens)
 }

@@ -181,6 +181,9 @@ func ingestUISections(s *store.Store, agentID string, rep *protocol.StateReportV
 		}
 		_ = s.UpdateAgentResources(agentID, r.CPUCores, cpuPct, load,
 			memTotal, memUsed, diskTotal, diskUsed, uptime, capReportString(r.Virt, 64))
+		if r.CPUModel != "" {
+			_ = s.UpdateAgentCPUModel(agentID, capReportString(r.CPUModel, 160))
+		}
 	}
 	allowed, aerr := agentAllowedTunnels(s, agentID)
 	if aerr != nil {

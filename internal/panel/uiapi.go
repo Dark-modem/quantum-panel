@@ -31,6 +31,17 @@ var uiArtifactEngines = map[string]bool{
 	"gost": true, "rathole": true, "xray": true,
 }
 
+// uiKnownEngines is the full panel-known engine set. The agent engines
+// grid shows every one of them with its per-agent state — an engine the
+// agent never reported renders as «not installed» so the operator sees
+// what CAN be installed (install-first lifecycle).
+var uiKnownEngines = []string{
+	"backpack", "backhaul", "chisel", "dagger", "easytier", "frp", "gost",
+	"hysteria", "matrix", "midos", "narnia", "paqet", "pengo", "rathole",
+	"singbox", "tinc", "udp2raw", "waterwall", "wattunnel", "wireguard",
+	"wst", "xray",
+}
+
 func registerUIAPIRoutes(mux *http.ServeMux, base string) {
 	mux.HandleFunc("GET "+base+"/api/ui/session", requireAuth(handleUISession))
 	mux.HandleFunc("GET "+base+"/api/ui/overview", requireAuth(handleUIOverview))
@@ -41,6 +52,8 @@ func registerUIAPIRoutes(mux *http.ServeMux, base string) {
 	mux.HandleFunc("POST "+base+"/api/ui/agents/{id}/engines/{engine}/enable", requireAuth(requireCSRF(handleUIEngineEnable)))
 	mux.HandleFunc("POST "+base+"/api/ui/agents/{id}/engines/{engine}/disable", requireAuth(requireCSRF(handleUIEngineDisable)))
 	mux.HandleFunc("POST "+base+"/api/ui/agents/{id}/public-ip", requireAuth(requireCSRF(handleUIAgentPublicIP)))
+	mux.HandleFunc("POST "+base+"/api/ui/agents/{id}/rename", requireAuth(requireCSRF(handleUIAgentRename)))
+	mux.HandleFunc("DELETE "+base+"/api/ui/agents/{id}", requireAuth(requireCSRF(handleUIAgentDelete)))
 	mux.HandleFunc("GET "+base+"/api/ui/topologies/{id}", requireAuth(handleUITopologyDetail))
 	// Phase 14: per-member port view (ledger + reservations + what the
 	// agents actually observed) — the port-conflict workflow reads this
@@ -51,6 +64,7 @@ func registerUIAPIRoutes(mux *http.ServeMux, base string) {
 	// Phase 12 TASK 4: the billing export (UI screen requests it via
 	// UI-API-REQUESTS.md; the CLI `quantum-panel report` shares the code).
 	mux.HandleFunc("GET "+base+"/api/ui/reports/billing", requireAuth(handleUIBillingReport))
+	mux.HandleFunc("GET "+base+"/api/ui/traffic-series", requireAuth(handleUITrafficSeries))
 	// Phase 14 task 2: the Xray client-config preview for one iran
 	// datacenter (UI-API-REQUESTS.md) — the Reality fields come from the
 	// sealed reality_keys store (pgdcapi.go).
@@ -141,6 +155,9 @@ func (h uiStoreHandle) uiEngineList(ag store.Agent, v2Catalog []string) []map[st
 	}
 	for _, row := range rows {
 		add(row.Engine)
+	}
+	for _, eng := range uiKnownEngines {
+		add(eng)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i]["engine"].(string) < out[j]["engine"].(string) })
 	return out
@@ -399,6 +416,7 @@ func handleUIOverview(w http.ResponseWriter, r *http.Request) {
 	{
 		var n int
 		var cpuSum, cpuMaxV, memSum, memPctSum, memMaxV, diskSum, diskPctSum, diskMaxV float64
+		var coresSum, loadSum, memTotSum, diskTotSum, maxUp float64
 		memMax, diskMax, cpuMax := maxEntry{}, maxEntry{}, maxEntry{}
 		for _, a := range agents {
 			if a.MemTotalMB == 0 && a.CPUCores == 0 {
@@ -406,6 +424,13 @@ func handleUIOverview(w http.ResponseWriter, r *http.Request) {
 			}
 			n++
 			cpuSum += a.CPUPct
+			coresSum += float64(a.CPUCores)
+			loadSum += a.Load1
+			memTotSum += float64(a.MemTotalMB)
+			diskTotSum += a.DiskTotalGB
+			if a.UptimeS > int64(maxUp) {
+				maxUp = float64(a.UptimeS)
+			}
 			if a.CPUPct > cpuMaxV {
 				cpuMaxV, cpuMax = a.CPUPct, maxEntry{agent: a.ID, name: a.Name, value: a.CPUPct}
 			}
@@ -438,8 +463,16 @@ func handleUIOverview(w http.ResponseWriter, r *http.Request) {
 		res = map[string]any{
 			"agent_count": n,
 			"cpu_pct":     map[string]any{"sum": cpuSum, "avg": avg(cpuSum), "max": agentRef(cpuMax)},
-			"mem":         map[string]any{"sum_used_mb": memSum, "avg_pct": avg(memPctSum), "max": agentRef(memMax)},
-			"disk":        map[string]any{"sum_used_gb": diskSum, "avg_pct": avg(diskPctSum), "max": agentRef(diskMax)},
+			"mem":         map[string]any{"sum_used_mb": memSum, "sum_total_mb": memTotSum, "avg_pct": avg(memPctSum), "max": agentRef(memMax)},
+			"disk":        map[string]any{"sum_used_gb": diskSum, "sum_total_gb": diskTotSum, "avg_pct": avg(diskPctSum), "max": agentRef(diskMax)},
+			"cores_total": coresSum,
+			"avg_load1":   avg(loadSum),
+			"max_uptime_s": func() any {
+				if n == 0 {
+					return nil
+				}
+				return int64(maxUp)
+			}(),
 		}
 	}
 

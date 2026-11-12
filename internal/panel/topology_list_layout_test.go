@@ -26,7 +26,7 @@ func TestTopologyListSemanticTable(t *testing.T) {
 		t.Error("generated topology rows must remain inside the table body")
 	}
 	headers := regexp.MustCompile(`(?s)<th\b([^>]*)>(.*?)</th>`).FindAllStringSubmatch(table[1], -1)
-	want := []string{"Name", "Iran", "Foreign", "Tunnels", "Status", "Actions"}
+	want := []string{"#", "Name", "Iran", "Foreign", "Tunnels", "Status", "Actions"}
 	if len(headers) != len(want) {
 		t.Fatalf("got %d topology columns, want %d", len(headers), len(want))
 	}
@@ -35,9 +35,16 @@ func TestTopologyListSemanticTable(t *testing.T) {
 			t.Errorf("column %d must be a scoped %q header", i, want[i])
 		}
 	}
-	for _, id := range []string{"topologyListTable", "topologySearch", "topologyViewListBtn", "topologyViewGridBtn"} {
+	for _, id := range []string{"topologyListTable", "topologySearch"} {
 		if !strings.Contains(html, `id="`+id+`"`) {
 			t.Errorf("topology overview must keep %s on the list card", id)
+		}
+	}
+	// The list is the only topology view: the list/grid toggle that could turn
+	// rows into half-empty cards is gone for good.
+	for _, gone := range []string{"topologyViewListBtn", "topologyViewGridBtn"} {
+		if strings.Contains(html, gone) || strings.Contains(topologyListTestSource(t, "topology.js"), gone) {
+			t.Errorf("topology list must not keep the %s view toggle", gone)
 		}
 	}
 	if !strings.Contains(html, `id="topologyCountry"`) {
@@ -102,8 +109,6 @@ func TestTopologyListModernChrome(t *testing.T) {
 		{"pill action buttons", `\.topo-actions\s+\.quantum-btn\s*\{[^}]*border-radius\s*:\s*999px`},
 		{"red danger delete button", `\.topo-actions\s+\.topo-delete\s*\{[^}]*border\s*:\s*1px\s+solid\s+var\(--er\)`},
 		{"search box styling", `\.topo-search\s*\{[^}]*min-height\s*:`},
-		{"view toggle active state", `\.topo-view-toggle\s+button\[aria-pressed="true"\]`},
-		{"grid card mode", `\.topo-list-table\.topo-grid\s+\.topo-list-row\s*\{[^}]*border-radius\s*:\s*var\(--r-md\)`},
 		{"subtle row hover", `\.topo-list-row:hover\s*\{[^}]*background\s*:\s*var\(--sunk\)\s*;?\s*\}`},
 		{"first-load skeleton bars", `\.topo-list-skel\s+\.ent-skel\s*\{[^}]*width\s*:\s*100%`},
 	} {

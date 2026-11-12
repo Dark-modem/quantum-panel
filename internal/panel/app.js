@@ -41,14 +41,21 @@ function toastMsg(kind, title, sub) {
   const b = document.createElement('b'); b.textContent = title;
   const wrap = document.createElement('div'); wrap.className = 'ent-toast-body'; wrap.appendChild(b);
   if (sub) { const s = document.createElement('small'); s.textContent = sub; wrap.appendChild(s); }
-  const dot = document.createElement('i');
+  const icoBox = document.createElement('span');
+  icoBox.className = 'ent-toast-ico';
+  icoBox.innerHTML = {
+    ok: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.2l2.5 2.5 4.7-5"/></svg>',
+    err: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V13"/><path d="M12 16.5h.01"/></svg>',
+    warn: '<svg viewBox="0 0 24 24"><path d="M12 3l9.5 16h-19z"/><path d="M12 10v4"/><path d="M12 16.6h.01"/></svg>',
+    info: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M12 11.5V16"/></svg>'
+  }[kind] || '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M12 11.5V16"/></svg>';
   // the green life line drains as the toast ages; × dismisses it at once
   let gone = false;
   const dismiss = () => { if (gone) return; gone = true; el.style.opacity = '0'; el.style.transition = 'opacity .3s'; setTimeout(() => el.remove(), 320); };
   const bar = document.createElement('span'); bar.className = 'ent-toast-life'; bar.style.animationDuration = life + 'ms';
   const x = document.createElement('button'); x.type = 'button'; x.className = 'ent-toast-x'; x.setAttribute('aria-label', tr('', 'Dismiss')); x.textContent = '×';
   x.onclick = dismiss;
-  el.appendChild(dot); el.appendChild(wrap); el.appendChild(x); el.appendChild(bar);
+  el.appendChild(icoBox); el.appendChild(wrap); el.appendChild(x); el.appendChild(bar);
   box.appendChild(el);
   while (box.children.length > 4) box.firstChild.remove();
   setTimeout(dismiss, life);
@@ -267,8 +274,25 @@ function skel(n) {
   for (let i = 0; i < (n || 3); i++) s += '<div class="ent-skel u-h-14"></div>';
   return '<div class="u-grid u-gap-8">' + s + '</div>';
 }
+function topTitleSync(id) {
+  const h1 = document.querySelector('.topbar h1'); if (!h1) return;
+  const nid = id || ((location.hash.match(/t=([a-z]+)/) || [])[1]) || 'dashboard';
+  const ni = document.querySelector('.sidebar-nav .nav-item[data-tab="' + nid + '"]');
+  const lbl = ni ? (ni.querySelector('span[data-i18n]') || ni.querySelector('span:not([class*="badge"])')) : null;
+  if (nid === 'magt' && window.mtbAgtDetail) {
+    h1.innerHTML = '<span class="mtb-bc"><a href="#t=magt" data-bc-back class="mtb-bc-link"></a><span class="mtb-bc-sep"> \u2039 </span><span class="mtb-bc-cur"></span></span>';
+    h1.querySelector('.mtb-bc-link').textContent = lbl ? lbl.textContent : 'Agents';
+    h1.querySelector('.mtb-bc-cur').textContent = window.mtbAgtDetail;
+    return;
+  }
+  if (lbl) h1.textContent = lbl.textContent;
+}
+window.addEventListener('hashchange', function () { try { topTitleSync(); } catch (e) {} });
+window.topTitleSync = topTitleSync;
+window.addEventListener('load', function () { setTimeout(function () { try { topTitleSync(); } catch (e) {} }, 1800); });
 function goTab(name) {
   if (name === 'topology') name = 'tunnel';
+  if (name === 'mtopo') name = 'tunnel'; // the mesh topologies view was removed
   if (name === 'setup' && typeof topologyCurrent === 'function' && !topologyCurrent()) {
     goTab('tunnel');
     toastWarn(tr('', 'Create and configure a topology first'));
@@ -279,7 +303,7 @@ function goTab(name) {
   if (name === 'add-peer') { goTab('setup'); const c = $('setupAddPeerStep'); if (c && c.scrollIntoView) c.scrollIntoView({behavior: 'smooth', block: 'start'}); return; }
   // Bagher lives in Setup (create) and Tunnel (run) like every other tunnel.
   if (name === 'sshfwd' || name === 'bagher') { openBagherSetup(); return; }
-  ['dashboard','tunnel','agents','cluster','setup','xray','logs','perf','watchdog','doctor','benchmark','spoof','update','settings','terminal'].forEach(t => { const el = $('tab-'+t); if (el) el.hidden = t !== name; });
+  ['dashboard','tunnel','cluster','setup','xray','logs','perf','watchdog','doctor','benchmark','spoof','update','settings','terminal'].forEach(t => { const el = $('tab-'+t); if (el) el.hidden = t !== name; });
   const markTab = b => {
     const on = b.dataset.tab === name;
     b.classList.toggle('on', on);
@@ -290,13 +314,13 @@ function goTab(name) {
   const dr = $('drawerNav');
   if (dr) dr.querySelectorAll('[data-tab]').forEach(markTab);
   tabHashWrite(name);
+  topTitleSync(name);
   if (name === 'setup' || name === 'tunnel') { loadSSHFwd(); loadMatrix(); }
   if (name === 'cluster') {
     loadClusterStatus();
   }
   if (name === 'perf') loadPerf();
   if (name === 'tunnel') { if (typeof topologyReload === 'function') topologyReload(); loadCarrier(); loadFleet(); loadTunnelHealth(); loadLimits(); loadMatrix(); loadXray(true); }
-  if (name === 'agents') agentsLoad();
   if (name === 'dashboard') loadUsage();
   if (name === 'watchdog') loadWatchdog();
   if (name === 'doctor') loadDoctor();
@@ -393,7 +417,7 @@ $('menuBtn').onclick = drawerOpen;
 $('drawerX').onclick = drawerClose;
 $('drawerOv').onclick = drawerClose;
 document.addEventListener('keydown', e => { if (e.key === 'Escape') drawerClose(); });
-$('themeBtnM').onclick = () => setTheme(document.body.dataset.t === 'dark' ? 'light' : 'dark');
+if ($('themeBtnM')) $('themeBtnM').onclick = () => setTheme(document.body.dataset.t === 'dark' ? 'light' : 'dark');
 $('logoutBtnM').onclick = async () => { try { await api('/api/logout', {}); } catch(e){ /* logout best-effort: always fall through to login screen */ } showLogin(); };
 drawerSync();
 // theme (quantum-style: localStorage + data-t on html and body)
@@ -420,7 +444,7 @@ function setTheme(t, persist = true, repaint = persist) {
   // Canvas charts read theme colors when drawn; skip on first paint (I18N and the dashboard are not set up yet).
   if (repaint) { try { if (typeof refreshDash === 'function') refreshDash(); } catch(e) { /* dashboard not ready yet; polling repaints it */ } }
 }
-$('themeBtn').onclick = () => setTheme(document.body.dataset.t === 'dark' ? 'light' : 'dark');
+if ($('themeBtn')) $('themeBtn').onclick = () => setTheme(document.body.dataset.t === 'dark' ? 'light' : 'dark');
 // No saved choice: follow the system appearance, live, until the user picks one.
 function savedTheme() { try { return lsGet('gre_theme'); } catch(e) { return null; } }
 const sysLight = window.matchMedia ? matchMedia('(prefers-color-scheme: light)') : null;
@@ -437,7 +461,7 @@ const I18N = {
     topology_list_foreign: "Foreign",
     topology_list_state: "Status",
     topology_list_actions: "Actions",
-    topology_search_ph: "Search topologies…",
+    topology_search_ph: "Search topologies",
     topology_view_label: "View",
     topology_view_list: "List view",
     topology_view_grid: "Grid view",
@@ -452,6 +476,19 @@ const I18N = {
     agents_token_label_ph: "e.g. Tehran office",
     agents_token_expiry: "Expiry (days)",
     agents_token_create: "Create Enrollment Token",
+    agents_add: "Add agent",
+    agents_add_title: "Add an agent",
+    agents_add_hint: "Pick the role, create a one-time code, then run the command on the endpoint server. The agent shows up in the list by itself once it connects.",
+    agents_add_name: "Server name",
+    agents_add_name_ph: "e.g. Frankfurt edge",
+    agents_add_create: "Create code and command",
+    agents_add_code: "Enrollment code",
+    agents_add_script: "Install and enroll with the script",
+    agents_add_script_hint: "Run it as root on the endpoint server, in the directory that holds install-agent.sh.",
+    agents_add_enroll: "Already installed: enroll only",
+    agents_add_waiting: "Waiting for the agent to connect…",
+    agents_add_connected: "Agent connected",
+    agents_add_create_failed: "Could not create the code",
     agents_th_prefix: "Token",
     agents_th_role: "Role",
     agents_th_label: "Label",
@@ -459,6 +496,7 @@ const I18N = {
     agents_th_expires: "Expires",
     agents_th_actions: "Actions",
     agents_list_title: "Agents",
+    agents_page_sub: "Endpoint servers enrolled with a token. Open one, or pair two agents into a tunnel.",
     agents_refresh_aria: "Refresh agents",
     agents_list_hint: "Endpoint servers enrolled with a token. Online agents take Matrix desired state and relay commands; revoked agents can never connect again.",
     agents_tunnels_title: "Matrix Tunnels (Agents)",
@@ -487,6 +525,9 @@ const I18N = {
     agents_revoke: "Revoke",
     agents_close: "Close",
     topology_create: "Add topology",
+    topology_stat_pairs: "Server pairs",
+    topology_stat_tunnels: "Tunnels",
+    topology_stat_healthy: "Healthy",
     topology_hint: "A topology groups tunnels between two servers. Create the topology first, then add or attach tunnels.",
     topology_unassigned: "Unassigned tunnels",
     topology_preserve: "Existing tunnels keep running. Open a topology to attach them without recreating them.",
@@ -594,6 +635,23 @@ const I18N = {
     dash_server_usage: "Server Traffic Usage",
     dash_server_usage_hint: "Server-wide traffic history saved every minute and retained for seven days.",
     dash_server_system: "Server System",
+    dash_last_update: "Last update",
+    dash_health: "System health",
+    dash_uptime: "Uptime",
+    dash_cpu: "CPU",
+    dash_ram: "RAM",
+    dash_disk: "Disk",
+    dash_agents: "Agents status",
+    dash_view_all: "View all",
+    dash_tunnels: "Tunnels",
+    dash_conns: "Active connections",
+    dash_res: "Server resources",
+    dash_events: "Activity log",
+    dash_events_empty: "No events recorded yet.",
+    dash_notes: "Key notes",
+    dash_view_details: "View details",
+    dash_volume: "Server traffic volume",
+    dash_volume_sub: "Download and upload of the agent servers",
     dash_server_traffic_down: "Traffic collection is paused. The history below shows previously recorded server traffic.",
     dash_this_server: "This server",
     dash_unknown: "Unknown",
@@ -862,7 +920,7 @@ const I18N = {
     rsc_done: "Rescue enabled", rsc_removed: "Rescue removed", rsc_copied: "Copied",
     pal_open: "Search and commands", pal_search: "Search", pal_title: "Command palette", pal_ph: "Search pages and actions…",
     pal_nav: "navigate", pal_run: "run", pal_close: "close", pal_none: "Nothing matches", pal_go: "Go to", pal_act: "Actions", pal_look: "Appearance",
-    pal_refresh: "Refresh data", pal_theme: "Toggle dark / light theme", pal_lang: "Switch language", pal_stream: "Show / hide Live Activity Stream",
+    sec_mesh: "Mesh management", nav_mesh: "Mesh UI", dash_agent_traffic: "Agent servers traffic", dash_fleet_counts: "Agents & active tunnels", dash_irf_traffic: "Iran & foreign server traffic", chart_irf_sub: "Download and upload of the agent servers, hourly", dash_agt_conn: "Agent connections (Iran / Foreign)", dash_agt_conn_sub: "Live agent websocket connections to the panel, split Iran / Foreign — recorded from dashboard open", side_iran: "Iran", side_foreign: "Foreign", pal_refresh: "Refresh data", pal_theme: "Toggle dark / light theme", pal_lang: "Switch language", pal_stream: "Show / hide Live Activity Stream",
     pal_sidebar: "Collapse / expand sidebar", pal_density: "Toggle table density", pal_diag: "Run diagnostics", pal_logout: "Log out",
     pal_accent: "Accent colour",
     sb_collapse: "Collapse sidebar", sb_expand: "Expand sidebar",
@@ -1205,6 +1263,26 @@ function toggleLang() {
 
 if ($('langToggleBtn')) $('langToggleBtn').onclick = toggleLang;
 if ($('langToggleBtnM')) $('langToggleBtnM').onclick = toggleLang;
+// topbar language pill: the thumb slides to the active segment; the page
+// reloads on switch (setLanguage), so boot re-syncs the thumb via the
+// dir-attribute observer below.
+const langTop = $('langToggleTop');
+if (langTop) {
+  langTop.onclick = () => toggleLang();
+  const syncLangTop = function () {
+    const en = currentLang === 'en';
+    const rtl = document.documentElement.getAttribute('dir') === 'rtl';
+    const th = langTop.querySelector('.lt-thumb');
+    if (th) th.style.transform = en ? (rtl ? 'translateX(-100%)' : 'translateX(100%)') : 'translateX(0)';
+    const segs = langTop.querySelectorAll('.lt-seg');
+    if (segs[0]) segs[0].classList.toggle('on', !en);
+    if (segs[1]) segs[1].classList.toggle('on', en);
+    langTop.setAttribute('aria-label', en ? 'Switch to Persian' : 'Switch to English');
+  };
+  langTop._sync = syncLangTop;
+  syncLangTop();
+  new MutationObserver(syncLangTop).observe(document.documentElement, { attributes: true, attributeFilter: ['dir'] });
+}
 try { setLanguage(lsGet('quantum_lang') || 'en', true); } catch(e) { /* storage blocked: stay on default language */ }
 
 // Each value in its own <bdi> so "0.0 B/s" keeps its order inside a Persian line.
@@ -2171,8 +2249,6 @@ function applyLegacyVisibility(on) {
     const page = $('tab-' + t);
     if (page && !on) page.hidden = true;
   });
-  const note = document.getElementById('legacyNote');
-  if (note) note.classList.toggle('hidden', on);
   if (!on) {
     const cur = document.querySelector('.sidebar-nav [data-tab].on');
     if (cur && legacyTabs.includes(cur.dataset.tab)) goTab('dashboard');
@@ -7892,835 +7968,6 @@ async function runTunnelHealthClick() {
 })();
 
 
-// ---- Agents tab: endpoint agents, enrollment tokens, agent Matrix tunnels ----
-// Data lives in agents.json / agent_tunnels.json server-side; the UI polls
-// /api/agents and /api/agent-tunnels every 10s while the tab is visible.
-
-const AG_STATE_BADGE = {
-  provisioning: ['info', 'Provisioning'],
-  registering: ['warn', 'Registering'],
-  active: ['ok', 'Active'],
-  stopped: ['dim', 'Stopped'],
-  error: ['err', 'Error'],
-};
-const AG_STATUS_BADGE = {
-  online: ['ok', 'Online'],
-  offline: ['dim', 'Offline'],
-  revoked: ['err', 'Revoked'],
-};
-const AG_QUALITY_BADGE = {
-  good: ['ok', 'Good'],
-  fair: ['warn', 'Fair'],
-  poor: ['err', 'Poor'],
-  down: ['err', 'Down'],
-};
-
-let _agTokens = [];
-let _agAgents = [];
-let _agTunnels = [];
-let _agTimer = null;
-let _agDetailId = null;
-
-// agentBadge maps a lookup table entry to the standard badge chip markup.
-function agentBadge(map, key) {
-  const e = map[key] || ['dim', key || '—'];
-  return '<span class="badge ' + e[0] + '"><span class="dot"></span>' + esc(tr('', e[1])) + '</span>';
-}
-
-// agentAgo renders a unix-seconds timestamp as a short relative time.
-function agentAgo(ts) {
-  if (!ts) return '—';
-  const d = Math.max(0, Math.floor(Date.now() / 1000) - ts);
-  if (d < 60) return tr('', 'just now');
-  if (d < 3600) return docTpl('{0} min ago', [Math.round(d / 60)]);
-  if (d < 172800) return docTpl('{0} h ago', [Math.round(d / 3600)]);
-  return docTpl('{0} d ago', [Math.round(d / 86400)]);
-}
-
-// agentPortsParse turns "443, 8080 990" into [443, 8080, 990]: integers only,
-// 1-65535, duplicates dropped. Throws RangeError naming the bad token.
-function agentPortsParse(s) {
-  const out = [];
-  String(s || '').split(/[\s,;]+/).forEach(tok => {
-    if (!tok) return;
-    const n = Number(tok);
-    if (!Number.isInteger(n) || n < 1 || n > 65535) throw new RangeError(tok);
-    if (!out.includes(n)) out.push(n);
-  });
-  return out;
-}
-
-// agentAmplify renders the billable_amplification field. STRICT labeling: it
-// is a whole-server estimate, never a Matrix-specific or guaranteed number;
-// null renders as UNKNOWN, never as 0.
-function agentAmplify(traffic) {
-  const v = traffic ? traffic.billable_amplification : null;
-  const label = '<span class="ag-amp-note">' + esc(tr('', 'Server-wide estimate (whole server, not Matrix only)')) + '</span>';
-  if (v == null || !isFinite(v)) {
-    return '<span class="ag-amp-val">' + esc(tr('', 'UNKNOWN')) + '</span> — ' + label;
-  }
-  return '<span class="ag-amp-val">×' + esc((Math.round(v * 10) / 10).toString()) + '</span> — ' + label;
-}
-
-function agentsEmpty(msg) {
-  return '<div class="ent-empty"><span class="ent-empty-ic" aria-hidden="true">' + ST_ICO_EMPTY + '</span><b>' + esc(tr('', msg)) + '</b></div>';
-}
-
-// ---- data loading ----
-
-async function agentsRefresh(silent) {
-  const list = $('agAgentsList');
-  const tun = $('agTunnelsList');
-  if (!list && !tun) return;
-  try {
-    const [a, t] = await Promise.all([
-      api('/api/agents'),
-      api('/api/agent-tunnels').catch(() => null), // tunnels may be unwired; agents still render
-    ]);
-    _agAgents = (a && a.agents) || [];
-    _agTunnels = (t && t.tunnels) || [];
-    agentsRenderAgents();
-    agentsRenderTunnels();
-    if (_agDetailId) agentDetailRefreshSilent();
-  } catch (e) {
-    if (!silent && list) list.innerHTML = stateError(e.message, 'agents');
-  }
-  try {
-    _agTokens = (await api('/api/agents/tokens')).tokens || [];
-    agentsRenderTokens();
-  } catch (e) { /* token list is secondary; keep the last render */ }
-}
-
-// agentsLoad is the goTab entry point: full refresh + start the 10s poll.
-function agentsLoad() {
-  agentsRefresh(false);
-  agentsPollStart();
-}
-
-// agentsPollStart polls every 10s while the tab is visible (skips hidden
-// tabs and background windows, like the other poll loops in this file).
-function agentsPollStart() {
-  if (_agTimer) return;
-  _agTimer = setInterval(() => {
-    if (document.hidden) return;
-    const sec = $('tab-agents');
-    if (!sec || sec.hidden) return;
-    agentsRefresh(true);
-  }, 10000);
-}
-
-STATE_ACTIONS.agents = () => agentsRefresh(false);
-
-// ---- enrollment tokens ----
-
-function agentsRenderTokens() {
-  const body = $('agTokensBody');
-  if (!body) return;
-  if (!_agTokens.length) {
-    body.innerHTML = '<tr><td colspan="6">' + agentsEmpty('No enrollment tokens yet') + '</td></tr>';
-    return;
-  }
-  body.innerHTML = _agTokens.map(t => {
-    let status = ['dim', 'Unused'];
-    if (t.revoked) status = ['err', 'Revoked'];
-    else if (t.used_by) status = ['ok', 'Used'];
-    const canRevoke = !t.revoked;
-    return '<tr>' +
-      '<td class="u-mono" data-label="' + esc(tr('', 'Token')) + '">' + esc(t.prefix || '—') + '</td>' +
-      '<td data-label="' + esc(tr('', 'Role')) + '">' + esc(tr('', t.role === 'iran' ? 'Iran (hub)' : 'Foreign (node)')) + '</td>' +
-      '<td data-label="' + esc(tr('', 'Label')) + '">' + esc(t.label || '—') + '</td>' +
-      '<td data-label="' + esc(tr('', 'Status')) + '"><span class="badge ' + status[0] + '"><span class="dot"></span>' + esc(tr('', status[1])) + '</span></td>' +
-      '<td data-label="' + esc(tr('', 'Expires')) + '">' + esc(agentAgo(t.expires_at)) + '</td>' +
-      '<td data-label="' + esc(tr('', 'Actions')) + '">' +
-        (canRevoke
-          ? '<button type="button" class="quantum-btn quantum-btn-danger u-btn-xs" data-ag-token-revoke="' + esc(t.id) + '" aria-label="' + esc(tr('', 'Revoke token')) + '">' + esc(tr('', 'Revoke')) + '</button>'
-          : '<span class="u-hint-12">—</span>') +
-      '</td></tr>';
-  }).join('');
-}
-
-function agServerURL() {
-  return location.origin + (BASE || '');
-}
-
-function agentEnrollCommand(token) {
-  return 'gre-panel agent enroll --server ' + agServerURL() + ' --token ' + token;
-}
-
-async function agentTokenCreate() {
-  const role = ($('agTokenRole') || {}).value || 'iran';
-  const label = (($('agTokenLabel') || {}).value || '').trim();
-  const days = parseInt((($('agTokenDays') || {}).value || '7'), 10) || 7;
-  const btn = $('agTokenCreateBtn');
-  if (btn) btn.disabled = true;
-  try {
-    const res = await api('/api/agents/tokens', { role, label, expires_days: days });
-    $('agTokenValue').value = res.token || '';
-    $('agTokenCmd').value = agentEnrollCommand(res.token || '');
-    modalShow($('agTokenModal'), () => { agentsRefresh(true); });
-    agentsRefresh(true);
-  } catch (e) {
-    toastErr(tr('', 'Token creation failed'), e.message || e);
-  } finally {
-    if (btn) btn.disabled = false;
-  }
-}
-
-async function agentTokenRevoke(id) {
-  if (!await entConfirm(tr('', 'Revoke token?'), tr('', 'A revoked token can never enroll an agent, even if unused and unexpired.'), tr('', 'Revoke'))) return;
-  try {
-    await api('/api/agents/tokens/' + encodeURIComponent(id) + '/revoke', {});
-    toastOk(tr('', 'Token revoked'), '');
-    agentsRefresh(true);
-  } catch (e) {
-    toastErr(tr('', 'Revoke failed'), e.message || e);
-  }
-}
-
-// ---- agents list ----
-
-function agentsRenderAgents() {
-  const box = $('agAgentsList');
-  if (!box) return;
-  if (!_agAgents.length) {
-    box.innerHTML = agentsEmpty('No agents enrolled yet — create a token and run the command on the endpoint');
-    return;
-  }
-  const sel = agentSelGet();
-  const updBtn = $('agAgentsUpdateBtn');
-  if (updBtn) updBtn.hidden = sel.size === 0;
-  opsAgentOptions('fwAgentSel');
-  opsAgentOptions('noAgentSel');
-  box.innerHTML = _agAgents.map(a => {
-    const caps = a.caps || [];
-    const matrixCap = caps.includes('matrix');
-    return '<div class="ag-card' + (a.status === 'revoked' ? ' ag-card-revoked' : '') + '" >' +
-      '<div class="ag-card-head">' +
-        (a.status !== 'revoked' ? '<input type="checkbox" class="ag-sel" data-ag-sel="' + esc(a.id) + '" aria-label="' + esc(tr('', 'Select for update')) + '"' + (sel.has(a.id) ? ' checked' : '') + '>' : '') +
-        '<span class="ag-dot ag-dot-' + esc(a.status || 'offline') + '" role="img" aria-label="' + esc(tr('', AG_STATUS_BADGE[a.status] ? AG_STATUS_BADGE[a.status][1] : 'Offline')) + '"></span>' +
-        '<button type="button" class="ag-card-name" data-ag-open="' + esc(a.id) + '">' + esc(a.name || a.id) + '</button>' +
-        agentBadge(AG_STATUS_BADGE, a.status) +
-        (a.role ? '<span class="badge ' + (a.role === 'iran' ? 'info' : 'u-pill-violet') + '">' + esc(tr('', a.role === 'iran' ? 'Iran (hub)' : 'Foreign (node)')) + '</span>' : '') +
-        (a.has_pending_desired ? '<span class="badge warn" title="' + esc(tr('', 'A configuration change is queued for this agent and not applied yet')) + '">' + esc(tr('', 'Pending change')) + '</span>' : '') +
-        '<span class="u-ml-auto ag-card-meta">' +
-          (a.public_ip ? '<span class="u-mono">' + esc(a.public_ip) + '</span> · ' : '') +
-          esc(a.hostname || '') +
-          (a.version ? ' · ' + esc(a.version) : '') +
-        '</span>' +
-      '</div>' +
-      '<div class="ag-card-foot">' +
-        '<span class="u-hint-12">' + esc(tr('', 'Last seen')) + ' ' + esc(agentAgo(a.last_seen)) + '</span>' +
-        (matrixCap ? '<span class="badge info">matrix</span>' : '') +
-        '<span class="u-ml-auto u-flex u-gap-8">' +
-          '<button type="button" class="quantum-btn quantum-btn-secondary u-btn-xs" data-ag-open="' + esc(a.id) + '">' + esc(tr('', 'Details')) + '</button>' +
-          (a.status !== 'revoked' ? '<button type="button" class="quantum-btn quantum-btn-danger u-btn-xs" data-ag-revoke="' + esc(a.id) + '" aria-label="' + esc(tr('', 'Revoke agent')) + '">' + esc(tr('', 'Revoke')) + '</button>' : '') +
-        '</span>' +
-      '</div>' +
-    '</div>';
-  }).join('');
-}
-
-async function agentRevoke(id) {
-  const a = _agAgents.find(x => x.id === id) || { name: id };
-  if (!await entConfirm(tr('', 'Revoke agent?'), docTpl('{0} is disconnected immediately and can never connect again. Its tunnels must be removed separately.', [a.name || id]), tr('', 'Revoke'))) return;
-  try {
-    await api('/api/agents/' + encodeURIComponent(id) + '/revoke', {});
-    toastOk(tr('', 'Agent revoked'), a.name || id);
-    agentDetailClose();
-    agentsRefresh(true);
-  } catch (e) {
-    toastErr(tr('', 'Revoke failed'), e.message || e);
-  }
-}
-
-async function agentCommand(id, op, params, okTitle) {
-  try {
-    const res = await api('/api/agents/' + encodeURIComponent(id) + '/command', { op, params: params || {} });
-    if (res.ok === false) {
-      toastErr(tr('', 'Command failed'), res.error || '');
-      return res;
-    }
-    toastOk(okTitle || tr('', 'Command sent'), res.output ? String(res.output).slice(0, 120) : '');
-    return res;
-  } catch (e) {
-    toastErr(tr('', 'Command failed'), e.message || e);
-    return null;
-  }
-}
-
-// ---- agent updates (M2) ----
-
-function agentSelGet() {
-  if (!window._agSel) window._agSel = new Set();
-  return window._agSel;
-}
-
-function agentUpdateOpen(ids) {
-  if (!ids.length) { toastWarn(tr('', 'Nothing selected'), ''); return; }
-  const names = ids.map(id => { const a = _agAgents.find(x => x.id === id); return (a && (a.name || a.id)) || id; });
-  $('agUpdateTargets').textContent = names.join(', ');
-  const vers = Array.from(new Set(_agAgents.filter(a => ids.includes(a.id)).map(a => a.version).filter(Boolean)));
-  $('agUpdateVersion').value = vers.length === 1 ? vers[0] : '';
-  $('agUpdateUrl').value = window._agLastUpdateUrl || '';
-  $('agUpdateStart').dataset.ids = JSON.stringify(ids);
-  modalShow($('agUpdateModal'), () => {});
-}
-
-async function agentUpdateStart() {
-  const ids = JSON.parse(($('agUpdateStart').dataset.ids) || '[]');
-  const version = $('agUpdateVersion').value.trim();
-  const url = $('agUpdateUrl').value.trim();
-  if (!ids.length || !version || !url) { toastErr(tr('', 'Update failed'), tr('', 'Version and artifact URL are required')); return; }
-  window._agLastUpdateUrl = url;
-  let okN = 0, fail = [];
-  for (const id of ids) {
-    try {
-      const res = await api('/api/agents/' + encodeURIComponent(id) + '/update', { version, url });
-      if (res && res.status === 'started') { okN++; continue; }
-      fail.push(((_agAgents.find(x => x.id === id) || {}).name || id) + ': ' + ((res && res.error) || tr('', 'refused')));
-    } catch (e) {
-      fail.push(((_agAgents.find(x => x.id === id) || {}).name || id) + ': ' + (e.message || e));
-    }
-  }
-  modalHide($('agUpdateModal'));
-  if (okN) toastOk(tr('', 'Update started'), okN + '/' + ids.length + ' — ' + tr('', 'progress appears in the agent detail'));
-  if (fail.length) toastErr(tr('', 'Some updates were refused'), fail.join(' | '));
-  agentsLoad();
-}
-
-// ---- agent detail drawer ----
-
-function agentHealthChip(h) {
-  const q = (h && h.quality) || 'down';
-  const e = AG_QUALITY_BADGE[q] || ['dim', q];
-  const bits = [];
-  if (h && h.latency_ms != null) bits.push(Math.round(h.latency_ms) + ' ms');
-  if (h && h.jitter_ms != null) bits.push('±' + Math.round(h.jitter_ms) + ' ms');
-  if (h && h.loss_pct != null) bits.push(Math.round(h.loss_pct) + '%');
-  return '<span class="badge ' + e[0] + '"><span class="dot"></span>' + esc(tr('', e[1])) +
-    (bits.length ? ' <bdi data-no-i18n>· ' + esc(bits.join(' · ')) + '</bdi>' : '') + '</span>';
-}
-
-function agentDetailRow(k, v) {
-  return '<div class="dr"><span class="k">' + esc(k) + '</span><span>' + v + '</span></div>';
-}
-
-function agentDetailRender(d) {
-  const st = d.last_state || {};
-  const rate = d.traffic_rate || {};
-  let html = '';
-
-  // Live update progress (M2): phase badge + verdict.
-  const up = st.update_progress;
-  if (up) {
-    const phaseBadge = { requested: 'info', downloading: 'info', verifying: 'warn', swapped: 'warn', restarting: 'warn', completed: 'ok', failed: 'err' }[up.phase] || 'dim';
-    html += '<div class="ag-warn u-mt-8"><b>' + esc(tr('', 'Agent update')) + '</b>: <span class="badge ' + phaseBadge + '"><span class="dot"></span>' +
-      esc(tr('', up.phase)) + (up.version ? ' <bdi data-no-i18n>· ' + esc(up.version) + '</bdi>' : '') + '</span>' +
-      (up.error ? ' <span class="u-hint-12">' + esc(up.error) + '</span>' : '') + '</div>';
-  }
-
-  // Matrix instances: role/service/iface/mesh IP/peer pings.
-  html += '<p class="ent-sec-label">' + esc(tr('', 'Matrix instances')) + '</p>';
-  const mats = st.matrix || [];
-  if (!mats.length) {
-    html += '<p class="u-hint-12">' + esc(tr('', 'No Matrix instance applied on this agent')) + '</p>';
-  } else {
-    mats.forEach(m => {
-      html += '<div class="ag-inst">' +
-        '<div class="ag-card-head">' +
-          '<span class="u-mono">' + esc(m.instance || '—') + '</span>' +
-          '<span class="badge ' + (m.role === 'hub' ? 'info' : 'u-pill-violet') + '">' + esc(m.role === 'hub' ? tr('', 'Iran (hub)') : tr('', 'Foreign (node)')) + '</span>' +
-          (m.enabled ? '<span class="badge ok"><span class="dot"></span>' + esc(tr('', 'Enabled')) + '</span>' : '<span class="badge dim"><span class="dot"></span>' + esc(tr('', 'Disabled')) + '</span>') +
-          (m.service ? '' : '<span class="badge err"><span class="dot"></span>' + esc(tr('', 'Service down')) + '</span>') +
-          (m.registered ? '<span class="badge ok"><span class="dot"></span>' + esc(tr('', 'Registered')) + '</span>' : '<span class="badge warn"><span class="dot"></span>' + esc(tr('', 'Not registered')) + '</span>') +
-        '</div>' +
-        agentDetailRow(tr('', 'Interface'), '<span class="u-mono">' + esc(m.iface || '—') + '</span> ' + (m.iface_up ? '' : '<span class="badge err"><span class="dot"></span>' + esc(tr('', 'Down')) + '</span>')) +
-        agentDetailRow(tr('', 'Mesh IP'), '<span class="u-mono">' + esc(m.mesh_ip || '—') + '</span>') +
-        agentDetailRow(tr('', 'Mesh port'), '<span class="u-mono">' + esc(m.port ? String(m.port) : '—') + '</span>');
-      const peers = m.peers || [];
-      if (peers.length) {
-        html += agentDetailRow(tr('', 'Peers'), peers.map(p =>
-          '<span class="badge ' + (p.ok ? 'ok' : 'err') + '"><span class="dot"></span><bdi data-no-i18n>' + esc(p.name || p.ip || '?') +
-          (p.latency_ms != null ? ' · ' + Math.round(p.latency_ms) + ' ms' : '') + '</bdi></span>'
-        ).join(' '));
-      }
-      html += '</div>';
-    });
-  }
-
-  // Health windows per instance.
-  const healths = st.health || [];
-  if (healths.length) {
-    html += '<p class="ent-sec-label u-mt-16">' + esc(tr('', 'Health')) + '</p>';
-    healths.forEach(h => {
-      html += '<div class="dr"><span class="k"><span class="u-mono">' + esc(h.instance || '—') + '</span></span><span>' + agentHealthChip(h) + '</span></div>';
-    });
-  }
-
-  // Traffic rates per interface (human-readable).
-  const ifaces = Object.keys(rate);
-  if (ifaces.length) {
-    html += '<p class="ent-sec-label u-mt-16">' + esc(tr('', 'Traffic rates')) + '</p>';
-    ifaces.forEach(name => {
-      const r = rate[name] || {};
-      html += '<div class="dr"><span class="k"><span class="u-mono">' + esc(r.name || name) + '</span> <span class="u-hint-12">' + esc(r.kind || '') + '</span></span>' +
-        '<span>↓ <bdi data-no-i18n>' + esc(fmtRate(r.rx_bps)) + '</bdi> · ↑ <bdi data-no-i18n>' + esc(fmtRate(r.tx_bps)) + '</bdi></span></div>';
-    });
-  }
-
-  // Host resources + listening-port inventory (measured by the agent, M1).
-  const res = st.resources;
-  if (res) {
-    html += '<p class="ent-sec-label u-mt-16">' + esc(tr('', 'Host resources')) + '</p>';
-    const cpu = [];
-    if (res.cpu_model) cpu.push('<bdi data-no-i18n>' + esc(res.cpu_model) + '</bdi>');
-    cpu.push((res.cpu_cores || 0) + ' ' + esc(tr('', 'cores')));
-    if (res.cpu_percent != null) cpu.push(Math.round(res.cpu_percent) + '%');
-    html += agentDetailRow(tr('', 'CPU'), cpu.join(' · '));
-    if (res.mem_total_mb) html += agentDetailRow(tr('', 'Memory'), '<bdi data-no-i18n>' + res.mem_used_mb + ' / ' + res.mem_total_mb + ' MB</bdi>');
-    if (res.disk_total_gb) html += agentDetailRow(tr('', 'Disk'), '<bdi data-no-i18n>' + res.disk_used_gb + ' / ' + res.disk_total_gb + ' GB</bdi>');
-    const sys = [];
-    if (res.load_avg_1 != null) sys.push(esc(tr('', 'Load')) + ' <bdi data-no-i18n>' + res.load_avg_1.toFixed(2) + '</bdi>');
-    if (res.uptime_s) sys.push(esc(tr('', 'Uptime')) + ' <bdi data-no-i18n>' + esc(agentAgo(Math.floor(Date.now() / 1000) - res.uptime_s)) + '</bdi>');
-    if (res.virt) sys.push('<span class="u-mono">' + esc(res.virt) + '</span>');
-    if (sys.length) html += agentDetailRow(tr('', 'System'), sys.join(' · '));
-    const listening = res.listening || [];
-    if (listening.length) {
-      const chips = listening.slice(0, 12).map(l =>
-        '<span class="badge ' + (l.addr === '0.0.0.0' || l.addr === '::' || l.addr === '*' ? 'warn' : 'dim') + '"><bdi data-no-i18n>' +
-        esc(l.proto + ':' + l.port) + (l.proc ? ' · ' + esc(l.proc) : '') + '</bdi></span>'
-      ).join(' ');
-      html += agentDetailRow(tr('', 'Listening ports'), chips +
-        (listening.length > 12 ? ' <span class="u-hint-12">+' + (listening.length - 12) + '</span>' : ''));
-    }
-  }
-
-  // Node-detect info (read-only PasarGuard node signal).
-  const nd = st.node_detect;
-  if (nd && nd.detected) {
-    html += '<p class="ent-sec-label u-mt-16">' + esc(tr('', 'Node detected')) + '</p>' +
-      agentDetailRow(tr('', 'Kind'), esc(nd.kind || '—')) +
-      (nd.detail ? agentDetailRow(tr('', 'Detail'), esc(nd.detail)) : '');
-  }
-
-  // Pending desired / last ack / last error.
-  if (d.pending_desired) {
-    const p = d.pending_desired;
-    html += '<div class="ag-warn u-mt-16">' + esc(tr('', 'Pending change')) + ': ' + esc(p.action || '') + ' <span class="u-mono">' + esc(p.instance || '') + '</span></div>';
-  }
-  if (d.last_error) {
-    html += '<div class="ag-warn ag-warn-err u-mt-8">' + esc(tr('', 'Last error')) + ': ' + esc(d.last_error) + '</div>';
-  }
-  if (d.last_ack) {
-    html += '<div class="dr u-mt-8"><span class="k">' + esc(tr('', 'Last ack')) + '</span><span>' +
-      (d.last_ack.ok ? esc(tr('', 'Applied')) : esc(tr('', 'Failed'))) + ' · ' + esc(agentAgo(d.last_ack.at)) + '</span></div>';
-  }
-  $('agAgentBody').innerHTML = html;
-
-  const revoked = d.revoked || d.status === 'revoked';
-  $('agAgentRevoke').hidden = revoked;
-  $('agAgentPing').hidden = false;
-  const agup = $('agAgentUpdate');
-  agup.hidden = revoked;
-  agup.dataset.agId = d.id;
-  agup.dataset.agName = d.name || d.id;
-  $('agAgentPing').dataset.agId = d.id;
-  $('agAgentRevoke').dataset.agId = d.id;
-}
-
-async function agentDetailOpen(id) {
-  _agDetailId = id;
-  const a = _agAgents.find(x => x.id === id);
-  $('agAgentTitle').textContent = a ? (a.name || id) : id;
-  $('agAgentBody').innerHTML = skel(4);
-  modalShow($('agAgentModal'), () => { _agDetailId = null; });
-  await agentDetailRefreshSilent();
-}
-
-async function agentDetailRefreshSilent() {
-  const id = _agDetailId;
-  if (!id) return;
-  try {
-    const d = await api('/api/agents/' + encodeURIComponent(id));
-    if (_agDetailId === id) agentDetailRender(d);
-  } catch (e) { /* keep the skeleton on transient errors; the poll redraws */ }
-}
-
-function agentDetailClose() {
-  const ov = $('agAgentModal');
-  if (ov && !ov.hidden) modalHide(ov);
-  _agDetailId = null;
-}
-
-// Diagnostics ping: asks the agent for op diag.ping against a target the
-// operator types (default: the mesh peer).
-async function agentDiagPing() {
-  const id = ($('agAgentPing') || {}).dataset.agId;
-  if (!id) return;
-  const target = window.prompt(tr('', 'Ping target (IP or host)'), '');
-  if (target == null) return;
-  const res = await agentCommand(id, 'diag.ping', { target: target.trim() }, tr('', 'Ping sent'));
-  if (res && res.output) showActOut(tr('', 'Diagnostics Ping'), res.output);
-}
-
-// ---- typed ops: firewall/port + netopt tabs (real agent results) ----
-
-function opsAgentOptions(sel) {
-  const el = $(sel); if (!el) return;
-  const prev = el.value;
-  el.innerHTML = _agAgents.filter(a => a.status !== 'revoked')
-    .map(a => '<option value="' + esc(a.id) + '"' + (a.id === prev ? ' selected' : '') + '>' + esc((a.name || a.id) + ' (' + (a.arch || '?') + ')') + '</option>').join('');
-}
-
-async function opsRun(selId, op, payload, confirm) {
-  const body = { op, payload: payload || {} };
-  if (confirm) body.confirm = true;
-  return api('/api/agents/' + encodeURIComponent(selId) + '/op', body);
-}
-
-function opsRenderJSON(elId, obj) {
-  const el = $(elId); if (!el) return;
-  if (obj == null) { el.textContent = '—'; return; }
-  try { el.textContent = JSON.stringify(obj, null, 1); } catch (e) { el.textContent = String(obj); }
-}
-
-async function fwDetect() {
-  const id = ($('fwAgentSel') || {}).value; if (!id) return;
-  const out = $('fwOut'); if (out) out.textContent = '…';
-  try { const r = await opsRun(id, agentCmdFwDetect); opsRenderJSON('fwOut', r.ok ? r.result : { error: r.error }); }
-  catch (e) { opsRenderJSON('fwOut', { error: e.message || String(e) }); }
-}
-async function fwPorts() {
-  const id = ($('fwAgentSel') || {}).value; if (!id) return;
-  const out = $('fwPorts'); if (out) out.textContent = '…';
-  try {
-    const r = await opsRun(id, agentCmdPortList);
-    const res = r.ok ? r.result : { error: r.error };
-    const rows = (res && res.listeners) || res && res.ports || res;
-    if (Array.isArray(rows)) {
-      opsRenderJSON('fwPorts', rows.map(l => (l.proto || '?').toUpperCase().padEnd(4) + String(l.port).padStart(5) + '  ' + (l.addr || '') + (l.proc ? '  ' + l.proc : '')).join(' | ') || '(none)');
-    } else opsRenderJSON('fwPorts', res);
-  } catch (e) { opsRenderJSON('fwPorts', { error: e.message || String(e) }); }
-}
-async function noDetect() {
-  const id = ($('noAgentSel') || {}).value; if (!id) return;
-  const out = $('noOut'); if (out) out.textContent = '…';
-  try { const r = await opsRun(id, agentCmdNetDetect); opsRenderJSON('noOut', r.ok ? r.result : { error: r.error }); }
-  catch (e) { opsRenderJSON('noOut', { error: e.message || String(e) }); }
-}
-async function noStatus() {
-  const id = ($('noAgentSel') || {}).value; if (!id) return;
-  const out = $('noStatus'); if (out) out.textContent = '…';
-  try { const r = await opsRun(id, agentCmdNetStatus); opsRenderJSON('noStatus', r.ok ? r.result : { error: r.error }); }
-  catch (e) { opsRenderJSON('noStatus', { error: e.message || String(e) }); }
-}
-
-
-// ---- typed mutations: plan -> review -> confirm -> apply (firewall/netopt) ----
-// The agent returns the plan verbatim; the operator confirms; the same op is
-// resent with confirm=true. Results and failures render as returned.
-
-function opsMutate(selId, op, payload, outId, verb) {
-  const out = $(outId); if (out) out.textContent = '...';
-  return api('/api/agents/' + encodeURIComponent(selId) + '/op', { op: op, payload: payload })
-    .then(function (plan) {
-      const planTxt = JSON.stringify(plan.result || plan.error, null, 1);
-      if (!plan.ok) { opsRenderJSON(outId, { error: plan.error || 'plan refused' }); return; }
-      if (out) out.textContent = 'PLAN:\n' + planTxt + '\n\nConfirm to ' + (verb || 'apply') + '.';
-      return entConfirm(tr('', 'Apply ' + (verb || op) + '?'),
-        docTpl('The agent returned the plan above. Applying changes the endpoint firewall/tuning. Audit-logged.', []),
-        tr('', 'Apply')).then(function (yes) {
-          if (!yes) { if (out) out.textContent = 'PLAN (not applied):\n' + planTxt; return; }
-          return api('/api/agents/' + encodeURIComponent(selId) + '/op', { op: op, payload: payload, confirm: true })
-            .then(function (res) {
-              opsRenderJSON(outId, res.ok ? res.result : { error: res.error });
-              if (res.ok) toastOk(tr('', 'Applied'), op); else toastErr(tr('', 'Failed'), res.error || '');
-            });
-        });
-    })
-    .catch(function (e) { opsRenderJSON(outId, { error: e.message || String(e) }); });
-}
-
-function fwPlanApply() {
-  const id = ($('fwAgentSel') || {}).value; if (!id) return;
-  const owner = 'service:quantum-ui-' + id.slice(-4);
-  const addRaw = window.prompt(tr('', 'Ports to OPEN (proto:port, comma sep, e.g. tcp:8443,udp:8443)'), 'tcp:8443');
-  if (!addRaw) return;
-  const add = addRaw.split(',').map(function (x) { const p = x.trim().split(':'); return { proto: p[0], port: parseInt(p[1], 10), name: 'ui-' + p[1] }; }).filter(function (s) { return s.proto && s.port > 0; });
-  const removeRaw = window.prompt(tr('', 'Ports to CLOSE (same format, empty to skip)'), '');
-  const remove = (removeRaw || '').split(',').map(function (x) { const p = x.trim().split(':'); return { proto: p[0], port: parseInt(p[1], 10), name: 'ui-' + p[1] }; }).filter(function (s) { return s.proto && s.port > 0; });
-  if (!add.length && !remove.length) return;
-  return opsMutate(id, 'firewall.apply', { owner: owner, add: add, remove: remove }, 'fwOut', 'apply firewall changes');
-}
-async function fwTeardown() {
-  const id = ($('fwAgentSel') || {}).value; if (!id) return;
-  const owner = window.prompt(tr('', 'Owner to tear down (e.g. service:quantum-agent-ssh-alt)'), '');
-  if (!owner) return;
-  await opsMutate(id, 'firewall.teardown', { owner: owner }, 'fwOut', 'teardown');
-}
-function noPlanApply() {
-  const id = ($('noAgentSel') || {}).value; if (!id) return;
-  const profile = window.prompt(tr('', 'Profile (conservative | balanced | performance)'), 'conservative');
-  if (!profile) return;
-  return opsMutate(id, 'netopt.apply', { role: 'agent', profile: profile.trim(), justify: 'quantum-ui:operator' }, 'noOut', 'apply tuning');
-}
-async function noRollback() {
-  const id = ($('noAgentSel') || {}).value; if (!id) return;
-  await opsMutate(id, 'netopt.rollback', {}, 'noOut', 'rollback');
-}
-
-// ---- agent Matrix tunnels ----
-
-// Signature detail (UnsloP direction): the Hub——Node route drawn as one
-// instrument line, colored by the tunnel's real health. Data comes from the
-// orchestrator's health view — latency, jitter, loss and state feed the
-// segment color and the label; nothing is animated for its own sake.
-function agentRouteHealth(t) {
-  const h = t.health || {};
-  const q = h.quality || 'down';
-  const color = { good: 'var(--ok)', fair: 'var(--wr)', poor: 'var(--er)', down: 'var(--er)' }[q] || 'var(--mu)';
-  const label = { good: 'Route healthy', fair: 'Route fair', poor: 'Route degraded', down: 'Route down' }[q] || q;
-  const bits = [];
-  if (h.latency_ms != null) bits.push(Math.round(h.latency_ms) + ' ms');
-  if (h.jitter_ms != null) bits.push('±' + h.jitter_ms.toFixed(1) + ' ms');
-  if (h.loss_pct != null) bits.push(h.loss_pct.toFixed(1) + '%');
-  const hubName = (t.hub && (t.hub.agent_name || t.hub.agent_id)) || 'HUB';
-  const nodeName = (t.node && (t.node.agent_name || t.node.agent_id)) || 'NODE';
-  return '<div class="route-viz" role="img" aria-label="' + esc(tr('', label) + ' — ' + hubName + ' to ' + nodeName + (bits.length ? ', ' + bits.join(', ') : '')) + '">' +
-    '<span class="rv-end"><bdi data-no-i18n>' + esc(hubName) + '</bdi><i class="rv-node" style="background:' + color + '"></i></span>' +
-    '<span class="rv-line"><i class="rv-pulse" style="background:' + color + '"></i></span>' +
-    '<span class="rv-end"><i class="rv-node" style="background:' + color + '"></i><bdi data-no-i18n>' + esc(nodeName) + '</bdi></span>' +
-    '<span class="rv-meta" dir="ltr">' + esc(bits.join(' · ')) + '</span>' +
-    '<span class="badge ' + (q === 'good' ? 'ok' : q === 'down' ? 'err' : 'warn') + '"><span class="dot"></span>' + esc(tr('', label)) + '</span>' +
-  '</div>';
-}
-
-function agentsRenderTunnels() {
-  const box = $('agTunnelsList');
-  if (!box) return;
-  if (!_agTunnels.length) {
-    box.innerHTML = agentsEmpty('No agent tunnels yet — pair a hub agent with a node agent');
-    return;
-  }
-  box.innerHTML = _agTunnels.map(t => {
-    const badge = agentTunnelStateBadge(t.state);
-    const err = t.error ? ' title="' + esc(t.error) + '"' : '';
-    const endpointDot = ep => {
-      const on = ep && ep.online;
-      const name = (ep && (ep.agent_name || ep.agent_id)) || '?';
-      return '<span class="ag-dot ag-dot-' + (on ? 'online' : 'offline') + '" role="img" aria-label="' + esc(name + (on ? ' · online' : ' · offline')) + '"></span><bdi data-no-i18n>' + esc(name) + '</bdi>';
-    };
-    const health = t.health ? agentHealthChip(t.health) : '<span class="u-hint-12">' + esc(tr('', 'UNKNOWN')) + '</span>';
-    const ports = (t.ports || []).map(p => '<span class="ag-port u-mono">' + esc(String(p)) + '</span>').join(' ');
-    return '<div class="ag-tunnel">' +
-      '<div class="ag-card-head">' +
-        '<span class="ag-tunnel-name">' + esc(t.name || t.id) + '</span>' +
-        '<span class="badge ' + badge.cls + '"' + err + '><span class="dot"></span>' + esc(badge.label) + '</span>' +
-        '<span class="badge dim u-mono" data-no-i18n>' + esc(t.instance || '') + '</span>' +
-        '<span class="u-ml-auto ag-tunnel-eps"><span class="u-hint-12">HUB</span> ' + endpointDot(t.hub) + ' · <span class="u-hint-12">NODE</span> ' + endpointDot(t.node) + '</span>' +
-        agentRouteHealth(t) +
-      '</div>' +
-      '<div class="ag-card-foot ag-tunnel-foot">' +
-        '<span>' + health + '</span>' +
-        (ports ? '<span>' + ports + '</span>' : '') +
-        '<span class="u-ml-auto u-flex u-gap-8">' +
-          '<button type="button" class="quantum-btn quantum-btn-secondary u-btn-xs" data-ag-power="' + esc(t.id) + '" data-ag-power-on="' + (t.active ? '0' : '1') + '" aria-label="' + esc(t.active ? tr('', 'Power off') : tr('', 'Power on')) + '">' + esc(t.active ? tr('', 'Power off') : tr('', 'Power on')) + '</button>' +
-          '<button type="button" class="quantum-btn quantum-btn-secondary u-btn-xs" data-ag-restart="' + esc(t.id) + '" aria-label="' + esc(tr('', 'Restart tunnel')) + '">' + esc(tr('', 'Restart')) + '</button>' +
-          '<button type="button" class="quantum-btn quantum-btn-danger u-btn-xs" data-ag-del="' + esc(t.id) + '" aria-label="' + esc(tr('', 'Remove tunnel')) + '">' + esc(tr('', 'Remove')) + '</button>' +
-        '</span>' +
-      '</div>' +
-      (t.traffic ? '<div class="ag-tunnel-traffic">' + esc(tr('', 'Traffic')) + ': ' + agentAmplify(t.traffic) + '</div>' : '') +
-    '</div>';
-  }).join('');
-}
-
-function agentTunnelStateBadge(state) {
-  const e = AG_STATE_BADGE[state] || ['dim', state || '—'];
-  return { cls: e[0], label: tr('', e[1]) };
-}
-
-function agentTunnelModalOpen() {
-  const matrixAgents = _agAgents.filter(a => a.status !== 'revoked' && (a.caps || []).includes('matrix'));
-  const opts = matrixAgents.map(a => '<option value="' + esc(a.id) + '">' + esc((a.name || a.id) + ' (' + tr('', a.role === 'iran' ? 'Iran (hub)' : 'Foreign (node)') + ')') + '</option>').join('');
-  $('agTunnelHub').innerHTML = opts || '';
-  $('agTunnelNode').innerHTML = opts || '';
-  if (!matrixAgents.length) {
-    $('agTunnelErr').textContent = tr('', 'No agents with the matrix capability — enroll agents first');
-    $('agTunnelErr').classList.remove('hidden');
-  } else {
-    $('agTunnelErr').classList.add('hidden');
-  }
-  $('agTunnelName').value = '';
-  $('agTunnelPorts').value = '';
-  $('agTunnelMeshPort').value = '0';
-  $('agTunnelFamily').value = 'ipv4';
-  modalShow($('agTunnelModal'), () => {});
-}
-
-async function agentTunnelCreate() {
-  const err = $('agTunnelErr');
-  err.classList.add('hidden');
-  const fail = m => { err.textContent = m; err.classList.remove('hidden'); };
-  let ports;
-  try {
-    ports = agentPortsParse($('agTunnelPorts').value);
-  } catch (e) {
-    fail(tr('', 'Enter 1-20 valid ports (1-65535), separated by commas') + ': ' + e.message);
-    return;
-  }
-  if (ports.length < 1 || ports.length > 20) {
-    fail(tr('', 'Enter 1-20 valid ports (1-65535), separated by commas'));
-    return;
-  }
-  if (ports.includes(22)) {
-    fail(tr('', 'Port 22 cannot be forwarded (it carries the panel SSH)'));
-    return;
-  }
-  const hub = $('agTunnelHub').value, node = $('agTunnelNode').value;
-  if (!hub || !node) {
-    fail(tr('', 'No agents with the matrix capability — enroll agents first'));
-    return;
-  }
-  if (hub === node) {
-    fail(tr('', 'Hub and node must be different agents'));
-    return;
-  }
-  const body = {
-    name: $('agTunnelName').value.trim(),
-    hub_agent_id: hub,
-    node_agent_id: node,
-    family: $('agTunnelFamily').value,
-    port: parseInt($('agTunnelMeshPort').value, 10) || 0,
-    ports,
-  };
-  const btn = $('agTunnelSave');
-  if (btn) btn.disabled = true;
-  try {
-    await api('/api/agent-tunnels', body);
-    modalHide($('agTunnelModal'));
-    toastOk(tr('', 'Tunnel created'), tr('', 'Provisioning runs on both agents; the state updates here.'));
-    agentsRefresh(true);
-  } catch (e) {
-    fail(e.message || String(e));
-  } finally {
-    if (btn) btn.disabled = false;
-  }
-}
-
-async function agentTunnelPower(id, on) {
-  try {
-    await api('/api/agent-tunnels/' + encodeURIComponent(id) + '/power', { active: !!on });
-    toastOk(on ? tr('', 'Power on') : tr('', 'Power off'), '');
-    agentsRefresh(true);
-  } catch (e) {
-    toastErr(tr('', 'Command failed'), e.message || e);
-  }
-}
-
-async function agentTunnelRestart(id) {
-  try {
-    await api('/api/agent-tunnels/' + encodeURIComponent(id) + '/restart', {});
-    toastOk(tr('', 'Restart'), '');
-    agentsRefresh(true);
-  } catch (e) {
-    toastErr(tr('', 'Command failed'), e.message || e);
-  }
-}
-
-async function agentTunnelDelete(id) {
-  const t = _agTunnels.find(x => x.id === id) || { name: id };
-  if (!await entConfirm(tr('', 'Remove tunnel?'), docTpl('Both agents tear down their local Matrix instance {0}. Forwarded ports stop working.', [t.instance || t.name || id]), tr('', 'Remove'))) return;
-  try {
-    await api('/api/agent-tunnels/' + encodeURIComponent(id), {}, 'DELETE');
-    toastOk(tr('', 'Tunnel removed'), t.name || id);
-    agentsRefresh(true);
-  } catch (e) {
-    toastErr(tr('', 'Remove failed'), e.message || e);
-  }
-}
-
-// ---- wiring: one delegated click handler for all agent actions ----
-(function agentsWire() {
-  const tokenCreate = $('agTokenCreateBtn');
-  if (tokenCreate) tokenCreate.onclick = agentTokenCreate;
-  const tunnelCreate = $('agTunnelCreateBtn');
-  if (tunnelCreate) tunnelCreate.onclick = agentTunnelModalOpen;
-  const refresh = $('agRefreshBtn');
-  if (refresh) refresh.onclick = () => agentsRefresh(false);
-  const save = $('agTunnelSave');
-  if (save) save.onclick = agentTunnelCreate;
-  const cancel = $('agTunnelCancel');
-  if (cancel) cancel.onclick = () => modalHide($('agTunnelModal'));
-  const tX = $('agTunnelX');
-  if (tX) tX.onclick = () => modalHide($('agTunnelModal'));
-
-  const tokenDone = $('agTokenDone');
-  if (tokenDone) tokenDone.onclick = () => modalHide($('agTokenModal'));
-  const tokenX = $('agTokenX');
-  if (tokenX) tokenX.onclick = () => modalHide($('agTokenModal'));
-  const copyBtn = $('agTokenCopy');
-  if (copyBtn) copyBtn.onclick = () => copyAgentText($('agTokenValue').value);
-  const copyCmd = $('agTokenCmdCopy');
-  if (copyCmd) copyCmd.onclick = () => copyAgentText($('agTokenCmd').value);
-
-  const ax = $('agAgentX');
-  if (ax) ax.onclick = agentDetailClose;
-  const aclose = $('agAgentClose');
-  if (aclose) aclose.onclick = agentDetailClose;
-  const arevoke = $('agAgentRevoke');
-  if (arevoke) arevoke.onclick = () => agentRevoke((arevoke.dataset || {}).agId);
-  const aping = $('agAgentPing');
-  if (aping) aping.onclick = agentDiagPing;
-  const aup = $('agAgentUpdate');
-  if (aup) aup.onclick = () => agentUpdateOpen([(aup.dataset || {}).agId].filter(Boolean));
-  const us = $('agUpdateStart');
-  if (us) us.onclick = agentUpdateStart;
-  const uc = $('agUpdateCancel');
-  if (uc) uc.onclick = () => modalHide($('agUpdateModal'));
-  const ux = $('agUpdateX');
-  if (ux) ux.onclick = () => modalHide($('agUpdateModal'));
-  const usel = $('agAgentsUpdateBtn');
-  if (usel) usel.onclick = () => agentUpdateOpen(Array.from(agentSelGet()));
-  const fwb = $('fwDetectBtn'); if (fwb) fwb.onclick = () => { fwDetect(); fwPorts(); };
-  const nob = $('noDetectBtn'); if (nob) nob.onclick = () => { noDetect(); noStatus(); };
-  const fwa = $('fwApplyBtn'); if (fwa) fwa.onclick = fwPlanApply;
-  const fwt = $('fwTeardownBtn'); if (fwt) fwt.onclick = fwTeardown;
-  const npl = $('noPlanBtn'); if (npl) npl.onclick = noPlanApply;
-  const nrb = $('noRollbackBtn'); if (nrb) nrb.onclick = noRollback;
-
-  document.addEventListener('change', e => {
-    const cb = e.target && e.target.matches && e.target.matches('.ag-sel');
-    if (!cb) return;
-    const sel = agentSelGet();
-    if (e.target.checked) sel.add(e.target.dataset.agSel); else sel.delete(e.target.dataset.agSel);
-    const updBtn = $('agAgentsUpdateBtn');
-    if (updBtn) updBtn.hidden = sel.size === 0;
-  });
-
-  document.addEventListener('click', e => {
-    const b = e.target.closest;
-    if (!b) return;
-    const tok = e.target.closest('[data-ag-token-revoke]');
-    if (tok) { agentTokenRevoke(tok.dataset.agTokenRevoke); return; }
-    const rev = e.target.closest('[data-ag-revoke]');
-    if (rev) { agentRevoke(rev.dataset.agRevoke); return; }
-    const open = e.target.closest('[data-ag-open]');
-    if (open) { agentDetailOpen(open.dataset.agOpen); return; }
-    const pow = e.target.closest('[data-ag-power]');
-    if (pow) { agentTunnelPower(pow.dataset.agPower, pow.dataset.agPowerOn === '1'); return; }
-    const rst = e.target.closest('[data-ag-restart]');
-    if (rst) { agentTunnelRestart(rst.dataset.agRestart); return; }
-    const del = e.target.closest('[data-ag-del]');
-    if (del) { agentTunnelDelete(del.dataset.agDel); return; }
-  });
-})();
-
-function copyAgentText(text) {
-  (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject())
-    .then(() => toastOk(tr('', 'Copied ✓'), ''))
-    .catch(() => toastWarn(tr('', 'Copy failed'), text));
-}
-// ---- End agents tab ----
 
 // ---- Server usage and named topology attribution, retained for 7 days ----
 let usageTimer = null;
@@ -9216,6 +8463,8 @@ function rsSync() {
   if (b) { b.textContent = tr(hid ? 'rs_btn_show' : 'rs_btn_hide', hid ? 'Show' : 'Hide'); b.setAttribute('aria-pressed', hid ? 'false' : 'true'); }
 }
 function rsSet(hidden, silent) {
+  hidden = true; // demo review: the Live Activity Stream is removed from the UI
+
   document.documentElement.dataset.rs = hidden ? '0' : '1';
   try { localStorage.setItem('quantum_rs_hidden', hidden ? '1' : '0'); } catch (e) { /* storage blocked: choice lasts this session */ }
   rsSync();
@@ -9539,9 +8788,9 @@ function uiObserve(s) {
   const c = $('onbCard'); if (c) c.hidden = !empty || dismissed;
 }
 { const _rd = renderDoctor; renderDoctor = function (rep) { _rd(rep); try { navBadge('doctor', !rep || rep.configured === false ? 0 : ((rep.findings || []).filter(f => f.severity !== 'minor').length), rep && rep.rating === 'critical' ? 'err' : 'warn', 'badge_doctor'); } catch (e) { /* cosmetic */ } }; }
-$('onbGo').onclick = () => goTab('setup');
-function onbHide() { try { localStorage.setItem('quantum_onb_done', '1'); } catch (e) { /* session only */ } $('onbCard').hidden = true; }
-$('onbLater').onclick = onbHide; $('onbX').onclick = onbHide;
+{ const og = $('onbGo'); if (og) og.onclick = () => goTab('setup'); }
+function onbHide() { try { localStorage.setItem('quantum_onb_done', '1'); } catch (e) { /* session only */ } const oc = $('onbCard'); if (oc) oc.hidden = true; }
+{ const ol = $('onbLater'); if (ol) ol.onclick = onbHide; const ox = $('onbX'); if (ox) ox.onclick = onbHide; }
 
 // ---- sidebar collapse ----
 function sbIsCollapsed() { return document.documentElement.dataset.sb === '1'; }
@@ -9612,7 +8861,7 @@ function palItems() {
   it.push({ g: act, t: tr('pal_diag', 'Run diagnostics'), k: 'doctor health check diagnostics', run: () => { goTab('doctor'); loadDoctor(true); } });
   it.push({ g: act, t: tr('pal_stream', 'Show / hide Live Activity Stream'), k: 'stream logs live activity', run: () => rsSet(!rsIsHidden(), true) });
   it.push({ g: act, t: tr('pal_logout', 'Log out'), k: 'logout sign out exit', run: () => $('logoutBtn').click() });
-  it.push({ g: look, t: tr('pal_theme', 'Toggle dark / light theme'), k: 'theme dark light mode', run: () => $('themeBtn').click() });
+  it.push({ g: look, t: tr('pal_theme', 'Toggle dark / light theme'), k: 'theme dark light mode', run: () => { const b = $('themeBtnTop'); if (b) b.click(); } });
   it.push({ g: look, t: tr('pal_lang', 'Switch language'), k: 'language persian farsi english', run: () => toggleLang() });
   it.push({ g: look, t: tr('pal_sidebar', 'Collapse / expand sidebar'), k: 'sidebar menu collapse', run: () => sbSet(!sbIsCollapsed()) });
   it.push({ g: look, t: tr('pal_density', 'Toggle table density'), k: 'density compact comfortable table', run: () => densSet(document.documentElement.dataset.dens === 'compact' ? 'comfortable' : 'compact') });
@@ -12026,3 +11275,953 @@ function clRenderEvents(evs) {
 }
 
 window.loadClusterStatus = loadClusterStatus;
+
+// ==== review round 3: agent-server traffic + fleet counts + Iran/foreign chart ====
+// Self-contained: uses its own fetch (same-origin cookies), guards every element.
+(function () {
+  'use strict';
+  function $(id) { return document.getElementById(id); }
+  function fmtGB(n) {
+    if (!isFinite(n) || n < 0) n = 0;
+    var u = ['B', 'KB', 'MB', 'GB', 'TB'], i = 0;
+    while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+    return (i === 0 ? n.toFixed(0) : n.toFixed(1)) + ' ' + u[i];
+  }
+  function fmtRate(n) {
+    if (!isFinite(n) || n < 0) n = 0;
+    var u = ['B/s', 'KB/s', 'MB/s', 'GB/s'], i = 0;
+    while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+    return (i === 0 ? n.toFixed(0) : n.toFixed(1)) + ' ' + u[i];
+  }
+  async function jget(url) {
+    const r = await fetch(url, { headers: { 'X-CSRF-Token': (document.cookie.match(/(?:^|;\s*)gre_csrf=([^;]+)/) || [])[1] || '' } });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return JSON.parse(await r.text());
+  }
+  // ===== Dashboard redesign — real data only ============================
+  // Sources: api/status (panel host cpu/load/cores/mem/disk/uptime),
+  // api/ui/overview (fleet counts, tunnels, alerts-open), api/mesh/alerts
+  // (open + history), api/ui/traffic-series (chart), api/ui/agents (live
+  // connection split). Sparklines record from dashboard open — the panel
+  // keeps no host-metric history, so the cards say so via their titles.
+  var dashCss = document.createElement('style');
+  dashCss.textContent = [
+    '.dash-topbar{display:flex;align-items:center;gap:10px;margin:0 0 12px}',
+    '.dash-upd{display:inline-flex;align-items:center;gap:8px;color:var(--tx2);font-size:13px}',
+    '.dash-dot{width:8px;height:8px;border-radius:50%;background:var(--ok);display:inline-block;flex:none}',
+    '.dash-refresh svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}',
+    '.dash-refresh.spin svg{animation:dashSpin .8s linear infinite}',
+    '@keyframes dashSpin{to{transform:rotate(360deg)}}',
+    '.dkpi{grid-column:span 3;display:flex;flex-direction:column;gap:10px;min-width:0}',
+    '.dsum{grid-column:span 3;display:flex;flex-direction:column;gap:6px;min-width:0;padding:11px 14px}',
+    '.dsum .tc-header{margin-bottom:0}',
+    '.dkpi-k{color:var(--tx2);font-size:13px}',
+    '.dkpi-val{font-size:26px;font-weight:700;color:var(--tx);line-height:1.2;white-space:nowrap}',
+    '.dkpi-val.big{font-size:34px}',
+    '.dkpi-sub{color:var(--dim);font-size:12px;min-height:1em}',
+    '#dashGrid > .dkpi,#dashGrid > .dsum{position:relative;z-index:0;overflow:hidden;background:linear-gradient(150deg,color-mix(in srgb, var(--ac) 7%, var(--s1)) 0%,color-mix(in srgb, var(--ac) 3%, var(--s1)) 48%,color-mix(in srgb, var(--ac) 5%, var(--s1)) 100%) !important;border-color:color-mix(in srgb, var(--ac) 12%, var(--ln)) !important}',
+    '#dashGrid > .dkpi::before,#dashGrid > .dsum::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(70% 55% at 18% 112%, color-mix(in srgb, var(--ac) 18%, transparent) 0%, transparent 62%),radial-gradient(60% 48% at 68% 118%, color-mix(in srgb, var(--ac) 12%, transparent) 0%, transparent 58%)}',
+    '#dashGrid > .dkpi::after,#dashGrid > .dsum::after{content:"";position:absolute;width:90px;height:90px;border-radius:50%;top:-28px;inset-inline-start:-28px;z-index:-1;pointer-events:none;background:radial-gradient(circle at 35% 35%, color-mix(in srgb, var(--ac) 22%, transparent) 0%, color-mix(in srgb, var(--ac) 7%, transparent) 72%)}',
+    '.mc-head{display:flex;align-items:center;gap:8px}',
+    '.mtb-detail-head{display:flex;align-items:center;gap:12px;margin-bottom:10px}',
+    '.mtb-detail-name{font-size:19px;font-weight:700;color:var(--tx);transform:translateY(3px)}',
+    '.mtb-kv-k{color:var(--tx2);font-size:12.5px;width:130px}',
+    '.mtb-acts-row{display:flex;gap:6px}',
+    '.mtb-act{width:30px;height:30px;border-radius:8px;border:1px solid var(--ln);background:var(--sunk);display:inline-flex;align-items:center;justify-content:center;color:var(--tx2);cursor:pointer;padding:0;transition:color .2s ease,border-color .2s ease}',
+    '.mtb-act svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}',
+    '.mtb-act:hover{color:var(--ac);border-color:var(--ac-b30)}',
+    '.mtb-act-del:hover{color:var(--er);border-color:color-mix(in srgb, var(--er) 40%, transparent)}',
+    '.mtb-act-view{color:var(--tx)}',
+    '.mtb-act.mtb-act-view:hover{color:var(--tx);border-color:color-mix(in srgb, var(--tx) 40%, transparent)}',
+    '.mtb-act-edit{color:var(--ac)}',
+    '.mtb-act.mtb-act-edit:hover{color:var(--ac);background:color-mix(in srgb, var(--ac) 10%, transparent);border-color:var(--ac-b30)}',
+    '.mtb-act-upd{color:var(--ok)}',
+    '.mtb-act.mtb-act-upd:hover{color:var(--ok);background:color-mix(in srgb, var(--ok) 10%, transparent);border-color:color-mix(in srgb, var(--ok) 40%, transparent)}',
+    '.mtb-act-del{color:var(--er);background:color-mix(in srgb, var(--er) 9%, transparent);border-color:color-mix(in srgb, var(--er) 26%, transparent)}',
+    '.mtb-act.mtb-act-del:hover{color:var(--er);background:color-mix(in srgb, var(--er) 18%, transparent);border-color:color-mix(in srgb, var(--er) 45%, transparent)}',
+    '.mtb-aglink{cursor:pointer}',
+    '.mtb-aglink:hover{color:var(--ac)}',
+    '.mtb-detail-head .quantum-btn svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}',
+    '.mtb-dtl-head .quantum-btn svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}',
+    '.mtb-upd-btn{display:inline-flex;align-items:center;gap:6px}',
+    '.mtb-upd-line{display:flex;align-items:center;gap:10px;flex-wrap:wrap}',
+    '.mtb-upd-k{font-weight:600;color:var(--tx);font-size:13px}',
+    '.mtb-upd-err{color:var(--er);font-size:12.5px}',
+    '.mtb-detail-head .mtb-act{width:36px;height:36px}',
+    '.mtb-agent-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}',
+    '.mtb-form .mtb-agent-card{position:relative;display:flex;align-items:center;gap:10px;padding:12px;border-radius:10px;border:1px solid var(--ln);background:var(--sunk);cursor:pointer;transition:border-color .2s ease,background .2s ease}',
+    '.mtb-agent-card input{position:absolute;opacity:0;pointer-events:none}',
+    '.mtb-agent-card:hover{border-color:var(--ac-b30)}',
+    '.mtb-agent-card.on{border-color:var(--ac);background:color-mix(in srgb, var(--ac) 8%, var(--sunk))}',
+    '.mtb-agc-ico{width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;flex:none;color:var(--tx2)}',
+    '.mtb-agc-ico .mtb-glob svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}',
+    '.mtb-agc-tx{display:flex;flex-direction:column;gap:2px}',
+    '.mtb-agc-tx b{font-size:13px;color:var(--tx)}',
+    '.mtb-agc-tx i{font-style:normal;font-size:12.5px;color:var(--tx2)}',
+    '.mtb-chips{display:flex;gap:6px;flex-wrap:wrap}',
+    '.mtb-chip{padding:7px 14px;border-radius:999px;border:1px solid var(--ln);background:var(--sunk);color:var(--tx2);font-size:12.5px;cursor:pointer;transition:color .2s ease,border-color .2s ease}',
+    '.mtb-chip:hover{color:var(--ac);border-color:var(--ac-b30)}',
+    '.mtb-chip.on{color:var(--ac);border-color:var(--ac);background:color-mix(in srgb, var(--ac) 10%, transparent)}',
+    '.mtb-token-ok{display:flex;align-items:center;gap:8px;color:var(--ac);font-weight:600;font-size:13px;margin:0 0 12px;padding:10px 12px;border-radius:10px;border:1px solid color-mix(in srgb, var(--ac) 25%, transparent);background:color-mix(in srgb, var(--ac) 10%, transparent)}',
+    '.mtb-outbox{border:1px solid var(--ln);border-radius:12px;background:var(--sunk);overflow:hidden;margin-bottom:10px}',
+    '.mtb-outbox-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 12px;border-bottom:1px solid var(--ln);background:color-mix(in srgb, var(--tx) 3%, transparent)}',
+    '.mtb-outbox-head span{font-size:12.5px;color:var(--tx2)}',
+    '.mtb-outbox-body{padding:10px 12px}',
+    '.mtb-outbox-body code{display:block;direction:ltr;text-align:left;font-size:12.5px;line-height:1.7;color:var(--tx);word-break:break-word;white-space:pre-wrap}',
+    '.mtb-token-ok svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}',
+    '.mtb-cmd-row{display:flex;gap:8px;align-items:flex-start}',
+    '.mtb-cmd-row .mtb-token{flex:1}',
+    '.mtb-cdd{position:relative;display:inline-block;min-width:190px}',
+    '.mtb-cdd-btn{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;min-height:36px;padding:6px 12px;border-radius:10px;border:1px solid var(--ln);background:var(--sunk);color:var(--tx);font-size:13px;cursor:pointer;transition:border-color .2s ease}',
+    '.mtb-cdd-btn:hover{border-color:var(--ac-b30)}',
+    '.mtb-cdd-arrow svg{width:14px;height:14px;fill:none;stroke:var(--tx2);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}',
+    '.mtb-cdd-pop{position:absolute;top:calc(100% + 4px);inset-inline-start:0;min-width:100%;max-height:220px;overflow:auto;z-index:10;border-radius:10px;border:1px solid var(--ln);background:var(--s1);box-shadow:0 12px 40px rgba(0,0,0,.5);padding:4px}',
+    '.mtb-cdd-opt{display:flex;align-items:center;gap:10px;width:100%;height:28px;padding:0 10px;border:0;border-radius:7px;background:none;color:var(--tx);font-size:13px;line-height:28px;cursor:pointer;text-align:start}',
+    '.mtb-cdd-opt img{width:20px;height:14px;object-fit:cover;display:block;flex:none;border-radius:2px}',
+    '.mtb-kv-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px}',
+    '.mtb-kv-tile{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--ln);border-radius:10px;background:var(--sunk);padding:10px 12px}',
+    '.mtb-kv-k2{font-size:12.5px;color:var(--tx2)}',
+    '.mtb-kv-v2{font-size:13.5px;font-weight:600;color:color-mix(in srgb, var(--tx2) 80%, var(--bg));display:flex;align-items:center}',
+    '.mtb-rowlist{display:flex;flex-direction:column}',
+    '.mtb-topo-row{display:flex;align-items:center;gap:12px;padding:9px 4px;border-bottom:1px solid color-mix(in srgb, var(--ln) 55%, transparent)}',
+    '.mtb-topo-row:last-child{border-bottom:0}',
+    '.mtb-topo-row > b{font-size:13px;color:var(--tx)}',
+    '.mtb-topo-role{font-size:12.5px;color:var(--tx2)}',
+    '.mtb-topo-peers{margin-inline-start:auto;font-size:12.5px;color:var(--tx2)}',
+    '.mtb-eng-row{display:flex;align-items:center;gap:12px;padding:9px 4px;border-bottom:1px solid color-mix(in srgb, var(--ln) 55%, transparent)}',
+    '.mtb-eng-row:last-child{border-bottom:0}',
+    '.mtb-eng-row > b{font-size:13px;color:var(--tx)}',
+    '.mtb-eng-ver{margin-inline-start:auto;font-size:12.5px;color:var(--tx2)}',
+    '.mtb-body .dcard-title{display:inline-flex;align-items:center;gap:7px}',
+    '.mtb-body .dcard-title svg{width:15px;height:15px;fill:none;stroke:var(--ac);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}',
+    '.mtb-agstat{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}',
+    '.mtb-pager{display:flex;align-items:center;gap:6px;margin-top:10px;flex-wrap:wrap}',
+    '.mtb-pg-btn{min-width:28px;height:28px;padding:0 8px;border-radius:8px;border:1px solid var(--ln);background:var(--sunk);color:var(--tx2);font-size:12.5px;cursor:pointer;transition:color .2s ease,border-color .2s ease}',
+    '.mtb-pg-btn:hover:not(:disabled){color:var(--ac);border-color:var(--ac-b30)}',
+    '.mtb-pg-btn.on{color:var(--ac);border-color:var(--ac);background:color-mix(in srgb, var(--ac) 10%, transparent)}',
+    '.mtb-pg-btn:disabled{opacity:.45;cursor:default}',
+    '.mtb-pg-info{font-size:12.5px;color:var(--tx2);margin-inline-start:auto}',
+    '.mtb-tcbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}',
+    '.mtb-search{position:relative;display:flex;align-items:center;flex:1;min-width:180px;max-width:340px}',
+    '.mtb-search svg{position:absolute;inset-inline-start:10px;width:15px;height:15px;fill:none;stroke:var(--tx2);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}',
+    '.mtb-search .quantum-input{width:100%;padding-inline-start:32px}',
+    '.mtb-agcount{margin-inline-start:4px;flex:none}',
+    '.mtb-filters{display:flex;gap:6px;flex-wrap:wrap;margin-inline-start:auto;align-items:center}',
+    '.mtb-fcdd{min-width:0}',
+    '.mtb-fcdd .mtb-cdd-btn{min-height:32px;padding:4px 10px;gap:6px;font-size:12.5px}',
+    '.mtb-fcdd .mtb-cdd-btn.on{color:var(--ac);border-color:var(--ac-b30)}',
+    '.mtb-fcdd .mtb-cdd-pop{inset-inline-end:0;inset-inline-start:auto;min-width:150px;max-height:200px}',
+    '.mtb-fclear{width:28px;height:28px;border-radius:8px;border:1px solid var(--ln);background:var(--sunk);color:var(--tx2);cursor:pointer;font-size:13px;padding:0;flex:none}',
+    '.mtb-fclear:hover{color:var(--er);border-color:color-mix(in srgb, var(--er) 40%, transparent)}',
+    '.mtb-fico{display:inline-flex;color:var(--tx2);flex:none}',
+    '.mtb-bc{display:inline-flex;align-items:center;gap:8px}',
+    '.mtb-bc-link{color:var(--ac);text-decoration:none;font-weight:600;cursor:pointer}',
+    '.mtb-bc-link:hover{text-decoration:underline}',
+    '.mtb-bc-sep{color:var(--mu)}',
+    '.mtb-bc-cur{color:var(--tx)}',
+    '.mtb-fico svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}',
+    '.mtb-fbtn.on .mtb-fico{color:var(--ac)}',
+    '.mtb-optglob{display:inline-flex;color:var(--tx2)}',
+    '.mtb-optglob svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:block}',
+    '.mtb-cdd-opt .topo-flag-svg{flex:none}',
+    '.mtb-optico{display:inline-flex;color:var(--tx2)}',
+    '.mtb-optico svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:block}',
+    '.mtb-optico.ok{color:var(--ok)}',
+    '.mtb-optico.er{color:var(--er)}',
+    '.mtb-agfilter{position:relative;z-index:5}',
+    '.mtb-dtl-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap}',
+    '.mtb-dtl-id{display:flex;align-items:center;gap:10px}',
+    '.mtb-dtl-acts{display:flex;flex-direction:column;gap:6px}',
+    '.mtb-dtl-btns{display:flex;gap:8px;flex-wrap:wrap}',
+    '.mtb-dtl-meta{font-size:12px;color:color-mix(in srgb, var(--tx2) 78%, var(--bg))}',
+    '.mtb-dtl-idcol{display:flex;flex-direction:column;gap:3px}',
+    '.mtb-copyval{cursor:pointer;transition:color .15s}',
+    '.mtb-copyval:hover{color:var(--ac)}',
+    '.mtb-toasts{position:fixed;top:14px;inset-inline-start:14px;z-index:400;display:flex;flex-direction:column;gap:8px;pointer-events:none}',
+    '.mtb-toast{position:relative;pointer-events:auto;display:flex;align-items:center;gap:9px;min-width:250px;max-width:330px;background:var(--s1);border:1px solid color-mix(in srgb, var(--ac) 30%, transparent);border-radius:12px;padding:11px 14px 13px;box-shadow:0 14px 34px rgba(0,0,0,.5);opacity:0;transform:translateY(-8px);transition:opacity .22s ease,transform .22s ease;overflow:hidden}',
+    '.mtb-toast.in{opacity:1;transform:none}',
+    '.mtb-toast.out{opacity:0;transform:translateY(-6px)}',
+    '.mtb-toast-ico{width:26px;height:26px;border-radius:8px;background:color-mix(in srgb, var(--ok) 14%, transparent);color:var(--ok);display:inline-flex;align-items:center;justify-content:center;flex:none}',
+    '.mtb-toast-ico svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}',
+    '.mtb-toast-tx{flex:1;font-size:12.5px;color:var(--tx);line-height:1.5;word-break:break-word;padding-inline-end:10px}',
+    '.mtb-toast-x{flex:none;width:18px;height:18px;border:0;background:none;color:var(--tx2);cursor:pointer;font-size:14px;line-height:1;padding:0}',
+    '.mtb-toast-x:hover{color:var(--tx)}',
+    '.mtb-toast-bar{position:absolute;bottom:0;inset-inline-start:0;height:3px;width:100%;background:var(--ok);transform-origin:100% 50%;animation:mtbToastBar 3s linear forwards}',
+    '@keyframes mtbToastBar{from{transform:scaleX(1)}to{transform:scaleX(0)}}',
+    '.mtb-dtl-manage{display:flex;gap:6px;margin-inline-start:auto;flex-wrap:wrap}',
+    '.mtb-kv-ico{width:34px;height:34px;border-radius:9px;background:color-mix(in srgb, var(--ac) 12%, transparent);color:var(--ac);display:inline-flex;align-items:center;justify-content:center;flex:none}',
+    '.mtb-kv-ico svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}',
+    '.mtb-oslogo{display:block;width:21px;height:21px}',
+    '.mtb-oslogo svg{width:21px;height:21px;display:block}',
+    '.mtb-kv-tx{display:flex;flex-direction:column;gap:2px;min-width:0;align-items:flex-start}',
+    '.mtb-mt8{margin-top:8px}',
+    '.mtb-res-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px}',
+    '.mtb-res-tile{display:flex;align-items:center;gap:10px;border:1px solid var(--ln);border-radius:10px;background:var(--sunk);padding:10px 12px}',
+    '.mtb-res-ico{width:42px;height:42px;border-radius:11px;display:inline-flex;align-items:center;justify-content:center;flex:none;background:color-mix(in srgb, var(--ac) 12%, transparent);color:var(--ac)}',
+    '.mtb-res-ico.tone-violet{background:color-mix(in srgb, var(--dash-fo) 14%, transparent);color:var(--dash-fo)}',
+    '.mtb-res-ico.tone-ok{background:color-mix(in srgb, var(--ok) 14%, transparent);color:var(--ok)}',
+    '.mtb-res-ico.tone-info{background:color-mix(in srgb, var(--dash-ram) 14%, transparent);color:var(--dash-ram)}',
+    '.mtb-res-tile .mtb-res-ico svg{width:24px;height:24px;stroke-width:2}',
+    '.mtb-res-ico svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}',
+    '.mtb-res-tx{display:flex;flex-direction:column;gap:1px;flex:1;min-width:0}',
+    '.mtb-res-tx b{font-size:13px;color:var(--tx)}',
+    '.mtb-res-tx i{font-style:normal;font-size:19px;font-weight:700;color:var(--tx)}',
+    '.mtb-res-tx > span{font-size:12px;color:var(--tx2)}',
+    '.mtb-ring{width:52px;height:52px}',
+    '.mtb-ringwrap{position:relative;display:inline-flex;width:52px;height:52px;flex:none;align-items:center;justify-content:center}',
+    '.mtb-res-pct{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:700;color:var(--tx);font-variant-numeric:tabular-nums}',
+    '.mtb-ring-track{fill:none;stroke:color-mix(in srgb, var(--tx) 14%, transparent);stroke-width:3.5}',
+    '.mtb-ring-seg{fill:none;stroke-width:5}',
+    '.mtb-topo-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px}',
+    '.mtb-topo-tile{border:1px solid var(--ln);border-radius:12px;background:var(--sunk);padding:12px;display:flex;flex-direction:column;gap:10px}',
+    '.mtb-topo-head{display:flex;align-items:center;justify-content:space-between;gap:8px}',
+    '.mtb-topo-name{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:700;color:var(--tx);min-width:0}',
+    '.mtb-topo-chev{display:inline-flex;color:var(--ac);flex:none}',
+    '.mtb-topo-chev svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}',
+    '.mtb-topo-ord{font-size:12px;font-weight:600;padding:4px 12px;border-radius:999px;flex:none;white-space:nowrap}',
+    '.mtb-topo-ord.o0{background:color-mix(in srgb, var(--ac) 14%, transparent);color:var(--ac)}',
+    '.mtb-topo-ord.o1{background:color-mix(in srgb, var(--dash-fo) 14%, transparent);color:var(--dash-fo)}',
+    '.mtb-topo-ord.o2{background:color-mix(in srgb, var(--dash-disk) 14%, transparent);color:var(--dash-disk)}',
+    '.mtb-topo-count{display:inline-grid;place-items:center;min-width:24px;height:24px;padding:0 7px;margin-inline-start:8px;border-radius:999px;background:color-mix(in srgb, var(--ac) 16%, transparent);color:var(--ac);font-size:12.5px;font-weight:700;vertical-align:middle}',
+    '.mtb-topo-diagram{display:flex;align-items:center;padding:4px 0}',
+    '.mtb-topo-node{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:4px;border:1px solid color-mix(in srgb, var(--ac) 38%, transparent);border-radius:10px;background:color-mix(in srgb, var(--ac) 7%, transparent);padding:10px 8px}',
+    '.mtb-topo-node b{font-size:13px;color:var(--tx)}',
+    '.mtb-topo-nflag{display:inline-flex}',
+    '.mtb-topo-nflag .topo-flag-svg{width:27px;height:19px}',
+    '.mtb-topo-srv{font-size:12px;color:var(--tx2)}',
+    '.mtb-topo-wire{flex:.9;display:flex;align-items:center;min-width:44px}',
+    '.mtb-topo-wire>i{flex:1;height:2px;background:var(--ac);opacity:.5;border-radius:1px}',
+    '.mtb-topo-chain{position:relative;width:36px;height:36px;flex:none;border-radius:999px;display:grid;place-items:center;background:var(--ac);color:var(--ac-on);box-shadow:0 0 0 4px color-mix(in srgb, var(--ac) 16%, transparent)}',
+    '.mtb-topo-chain>svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}',
+    '.mtb-topo-okb{position:absolute;inset-inline-end:-3px;bottom:-3px;width:16px;height:16px;border-radius:999px;display:grid;place-items:center;background:var(--ok);color:var(--s1);box-shadow:0 0 0 2px var(--sunk)}',
+    '.mtb-topo-okb svg{width:9px;height:9px;fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}',
+    '.mtb-topo-foot{display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--ln);padding-top:9px}',
+    '.mtb-topo-mem{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--tx2)}',
+    '.mtb-topo-mem b{color:var(--tx);font-size:13.5px;font-weight:700}',
+    '.mtb-topo-mem svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}',
+    '.mtb-topo-state{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600}',
+    '.mtb-topo-state i{width:9px;height:9px;border-radius:999px;flex:none}',
+    '.mtb-topo-state.on{color:var(--ok)}',
+    '.mtb-topo-state.on i{background:var(--ok)}',
+    '.mtb-topo-state.off{color:var(--mu)}',
+    '.mtb-topo-state.off i{background:var(--mu)}',
+    '.mtb-topo-view{display:flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--ln);border-radius:9px;padding:8px 10px;font-size:12.5px;font-weight:600;color:var(--tx2);text-decoration:none;transition:border-color .2s ease,color .2s ease}',
+    '.mtb-topo-view:hover{border-color:var(--ac);color:var(--ac)}',
+    '.mtb-eng-filters{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}',
+    '.mtb-eng-chip{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--ln);border-radius:999px;background:var(--sunk);padding:5px 12px;font-size:12.5px;font-weight:600;color:var(--tx2);cursor:pointer;transition:border-color .2s,color .2s}',
+    '.mtb-eng-chip i{width:8px;height:8px;border-radius:999px;flex:none}',
+    '.mtb-eng-chip:hover{color:var(--tx)}',
+    '.mtb-eng-chip.on{border-color:color-mix(in srgb, var(--ac) 45%, transparent);color:var(--ac);background:color-mix(in srgb, var(--ac) 10%, transparent)}',
+    '.mtb-eng-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px}',
+    '.mtb-eng-card{border:1px solid var(--ln);border-radius:12px;background:var(--sunk);padding:12px;display:flex;flex-direction:column;gap:10px}',
+    '.mtb-eng-card.run{border-color:color-mix(in srgb, var(--ok) 45%, transparent);background:color-mix(in srgb, var(--ok) 6%, var(--sunk))}',
+    '.mtb-eng-top{display:flex;align-items:center;gap:10px;min-width:0}',
+    '.mtb-eng-logo{width:46px;height:46px;border-radius:999px;display:grid;place-items:center;flex:none;overflow:hidden}',
+    '.mtb-eng-logo img{width:100%;height:100%;object-fit:contain;display:block;border-radius:999px}',
+    '.mtb-eng-logo svg{width:34px;height:34px;display:block}',
+    '.mtb-eng-id{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}',
+    '.mtb-eng-ver{font-size:12px;color:var(--tx2)}',
+    '.mtb-eng-state{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;flex:none;white-space:nowrap}',
+    '.mtb-eng-state svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}',
+    '.mtb-eng-state i{width:8px;height:8px;border-radius:999px;background:currentColor}',
+    '.mtb-eng-state.run{background:color-mix(in srgb, var(--ok) 14%, transparent);color:var(--ok)}',
+    '.mtb-eng-state.stop{background:color-mix(in srgb, var(--er) 14%, transparent);color:var(--er)}',
+    '.mtb-eng-state.notinst{background:color-mix(in srgb, var(--mu) 14%, transparent);color:var(--tx2)}',
+    '.mtb-eng-btn{width:100%;min-height:34px;font-size:12.5px;display:inline-flex;align-items:center;justify-content:center;gap:7px}',
+    '.mtb-eng-btn svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}',
+    '.mtb-eng-err{font-size:12px;color:var(--er)}',
+    '.mtb-hero{min-height:420px;display:flex;align-items:center;justify-content:center;background:radial-gradient(620px 320px at 50% 0%, color-mix(in srgb, var(--ac) 7%, transparent), transparent 72%)}',
+    '.mtb-hero-in{display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center;padding:40px 20px;max-width:580px}',
+    '.mtb-hero-logo{width:110px;height:110px;border-radius:26px}',
+    '.mtb-hero-title{font-size:21px;font-weight:700;color:var(--tx);margin:4px 0 0}',
+    '.mtb-hero-desc{font-size:13px;color:var(--tx2);margin:0;line-height:1.9}',
+    '.mtb-hero-cta{margin-top:6px}',
+    '.mtb-hero-doc{margin-top:12px;display:flex;align-items:center;gap:10px;border:1px solid var(--ln);border-radius:12px;background:var(--sunk);padding:10px 14px;text-align:start}',
+    '.mtb-hero-doc-ico{width:32px;height:32px;border-radius:8px;background:color-mix(in srgb, var(--tx) 6%, transparent);color:var(--tx2);display:inline-flex;align-items:center;justify-content:center;flex:none}',
+    '.mtb-hero-doc-ico svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}',
+    '.mtb-hero-doc-tx{display:flex;flex-direction:column;gap:1px}',
+    '.mtb-hero-doc-tx b{font-size:12.5px;color:var(--tx)}',
+    '.mtb-hero-doc-tx span{font-size:12px;color:var(--tx2)}',
+    '.mtb-agintro .tc-header{margin-bottom:8px}',
+    '.mtb-agintro-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap}',
+    '.mtb-agintro-row .qs-hint{flex:1;min-width:220px;margin:0}',
+    '.mtb-agstatbig{display:flex;gap:20px}',
+    '.mtb-agstat-i{display:flex;align-items:center;gap:9px}',
+    '.mtb-agico{width:36px;height:36px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;flex:none}',
+    '.mtb-agico svg{width:19px;height:19px;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}',
+    '.mtb-agstat-i.ok .mtb-agico{background:color-mix(in srgb, var(--ok) 14%, transparent);color:var(--ok)}',
+    '.mtb-agstat-i.err .mtb-agico{background:color-mix(in srgb, var(--er) 14%, transparent);color:var(--er)}',
+    '.mtb-agstat-i.all .mtb-agico{background:color-mix(in srgb, var(--tx) 10%, transparent);color:var(--tx2)}',
+    '.mtb-agintro-row #mtbNewAgent{margin-inline-start:auto}',
+    '.mtb-agtx{display:flex;flex-direction:row;align-items:baseline;gap:6px}',
+    '.mtb-agtx b{font-size:20px;color:var(--tx);line-height:1.15}',
+    '.mtb-agtx span{font-size:12.5px;color:var(--tx2)}',
+    '.mtb-topocdd{display:inline-flex;min-width:0}',
+    '.mtb-topocdd .mtb-cdd-btn{min-height:26px;padding:3px 10px;gap:5px;font-size:12.5px;border-radius:999px;background:color-mix(in srgb, var(--ac) 12%, transparent);border-color:color-mix(in srgb, var(--ac) 30%, transparent);color:var(--ac)}',
+    '.mtb-topocdd .mtb-cdd-pop{inset-inline-end:0;inset-inline-start:auto;min-width:160px;max-height:180px}',
+    '.mtb-topoitem{cursor:default;font-size:12.5px;color:var(--tx)}',
+    '.mtb-topoitem:hover{background:none}',
+    '.mtb-pager2{justify-content:space-between}',
+    '.mtb-pg-size{display:flex;align-items:center;gap:10px}',
+    '.mtb-pg-size .mtb-cdd-btn{min-height:32px;padding:4px 12px;gap:6px;font-size:12.5px}',
+    '.mtb-pg-size .mtb-cdd-pop{inset-inline-start:0;inset-inline-end:auto;min-width:70px}',
+    '.mtb-pg-szlbl{font-size:12.5px;color:var(--tx2)}',
+    '.mtb-pg-nav{display:flex;align-items:center;gap:6px;flex-wrap:wrap}',
+    '.mtb-pg-navbtn{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 10px;border-radius:8px;border:0;background:none;color:var(--tx2);font-size:12.5px;cursor:pointer}',
+    '.mtb-pg-navbtn svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}',
+    '.mtb-pg-navbtn:hover:not(:disabled){color:var(--ac)}',
+    '.mtb-pg-navbtn:disabled{opacity:.45;cursor:default}',
+    '.mtb-pg-dots{color:var(--tx2);font-size:12.5px;padding:0 2px}',
+    '.mtb-th{display:inline-flex;align-items:center;gap:6px}',
+    '.mtb-th svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;opacity:.8}',
+    '.mtb-cdd-opt:hover{background:color-mix(in srgb, var(--ac) 12%, transparent)}',
+    '.mtb-cdd-opt.on{background:color-mix(in srgb, var(--ac) 16%, transparent);color:var(--ac)}',
+    '.mtb-cdd-opt img{border-radius:2px}',
+    '.mc-title{font-size:14px;font-weight:700;color:var(--tx)}',
+    '.mc-chev{color:var(--dim);font-size:14px}',
+    '.mc-chip{width:54px;height:54px;border-radius:16px;margin-inline-start:auto;box-shadow:0 0 18px color-mix(in srgb, currentColor 22%, transparent)}',
+    '.mc-main{display:flex;align-items:center;justify-content:space-between;gap:10px;flex:1;min-height:80px}',
+    '.mc-right{display:grid;gap:5px;justify-items:start}',
+    '.mc-val{font-size:20px;font-weight:700;color:var(--tx);line-height:1.15;white-space:nowrap}',
+    '.ring-wrap.mid{width:74px;height:74px}',
+    '.ring-wrap.mid .ring-val{font-size:14px}',
+    '.cx-badges{display:grid;gap:6px}',
+    '.cx-circ{display:flex;align-items:center;gap:6px;background:var(--sunk);border:1px solid var(--ln);border-radius:99px;padding:7px 12px;border-color:color-mix(in srgb, var(--dash-cpu) 30%, var(--ln))}',
+    '.cx-circ b{font-size:13px;font-weight:700;color:var(--dash-cpu);font-variant-numeric:tabular-nums}',
+    '.cx-circ i{font-style:normal;font-size:12px;color:var(--dash-cpu);opacity:.9}',
+    '.ring-wrap.mid .ring-track,.ring-wrap.mid .ring-seg{stroke-width:6}',
+    '.ring-wrap.mid .ring-seg{filter:drop-shadow(0 0 6px color-mix(in srgb, currentColor 40%, transparent))}',
+    '.dkpi-main{display:flex;align-items:center;gap:12px;min-height:44px}',
+    '.ring-wrap{position:relative;width:64px;height:64px;flex:none}',
+    '.ring-wrap.small{width:46px;height:46px}',
+    '.ring-wrap.small .ring-track,.ring-wrap.small .ring-seg{stroke-width:4.4}',
+    '.ring-wrap svg{width:100%;height:100%;transform:rotate(-90deg)}',
+    '.dkpi-val.dv-big{font-size:24px}',
+    '.badge-sub{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--tx2);background:var(--sunk);border:1px solid var(--ln);border-radius:99px;padding:2px 9px;width:fit-content;margin-top:4px}',
+    '.dkpi-main{justify-content:space-between}',
+    '.ring-wrap .ring-track{fill:none;stroke:color-mix(in srgb, var(--tx) 10%, transparent);stroke-width:5}',
+    '.ring-wrap .ring-seg{fill:none;stroke-width:5;stroke-linecap:round;transition:stroke-dasharray .6s var(--spring),stroke-dashoffset .6s var(--spring)}',
+    '.ring-val{position:absolute;inset:0;display:grid;place-content:center;font-weight:700;font-size:15px;color:var(--tx);white-space:nowrap}',
+    '.dkpi-ico{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;flex:none;transition:transform .25s var(--spring),box-shadow .25s ease}',
+    '.dkpi-ico svg{width:26px;height:26px}',
+    '.dkpi:hover .dkpi-ico{animation:icoGlow 1.4s ease-in-out infinite}',
+    '@keyframes icoGlow{0%,100%{box-shadow:0 0 0 3px color-mix(in srgb, currentColor 22%, transparent)}50%{box-shadow:0 0 0 8px color-mix(in srgb, currentColor 10%, transparent)}}',
+    '.dkpi-ico.ok{background:var(--ok-soft);color:var(--ok)}',
+    '.dkpi-ico.warn{background:var(--wr-soft);color:var(--wr)}',
+    '.dkpi-ico.err{background:color-mix(in srgb, var(--er) 14%, transparent);color:var(--er)}',
+    '.health-up{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--dim);margin-top:3px}',
+    '.hcard{--hcol:var(--ok);box-shadow:inset 0 18px 46px -22px color-mix(in srgb, var(--hcol) 42%, transparent)}',
+    '.hc-top{display:flex;justify-content:flex-end}',
+    '.hc-pill{display:inline-flex;align-items:center;gap:8px;background:var(--sunk);border:1px solid var(--ln);border-radius:99px;padding:6px 14px;font-size:12px;color:var(--tx2)}',
+    '.hc-dot{width:8px;height:8px;border-radius:50%;background:var(--hcol);box-shadow:0 0 8px color-mix(in srgb, var(--hcol) 60%, transparent)}',
+    '.hc-main{display:flex;align-items:center;justify-content:space-between;gap:12px;flex:1;min-height:74px}',
+    '.hc-ico{width:72px;height:72px;border-radius:50%;display:grid;place-items:center;flex:none;color:var(--hcol);background:color-mix(in srgb, var(--hcol) 10%, transparent);border:2px solid color-mix(in srgb, var(--hcol) 50%, transparent);box-shadow:0 0 22px color-mix(in srgb, var(--hcol) 30%, transparent),inset 0 0 16px color-mix(in srgb, var(--hcol) 18%, transparent)}',
+    '.hc-ico svg{width:34px;height:34px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}',
+    '.hc-val{font-size:32px;font-weight:700;color:var(--tx);line-height:1.15}',
+    '.hc-alerts{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--hcol);margin-top:4px}',
+    '.hc-pulse{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}',
+    '.hc-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid var(--ln);padding-top:10px;margin-top:10px}',
+    '.hc-up{gap:7px}',
+    '.hc-up-label{font-size:13px;font-weight:600;color:var(--tx2)}',
+    '.dcard-head{display:flex;align-items:center;gap:10px;background:var(--sunk);border:1px solid var(--ln);border-radius:12px;padding:8px 10px;margin-bottom:6px}',
+    '.dcard-head .dkpi-k,.dcard-head .tc-title,.dcard-title{margin:0;font-size:14px;font-weight:700;color:var(--tx)}',
+    '.hc-top.dcard-head{justify-content:flex-start}',
+    '.dkpi:hover .hc-top .ic-hpulse path{stroke-dasharray:22 20;animation:ekgFlow 1.4s linear infinite}',
+    '@keyframes ekgFlow{from{stroke-dashoffset:42}to{stroke-dashoffset:0}}',
+    '.hc-top .dkpi-chip{width:36px;height:36px;border-radius:10px;margin-inline-start:auto;color:var(--hcol);border-color:color-mix(in srgb, var(--hcol) 40%, transparent);background:color-mix(in srgb, var(--hcol) 10%, transparent)}',
+    '.hc-top .dkpi-chip svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}',
+    '.mc-head.dcard-head{margin-bottom:6px}',
+    '.hc-up .hu-ic{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}',
+    '.hc-link{color:var(--tx2);text-decoration:none;transition:color .2s ease,border-color .2s ease}',
+    '.hc-link:hover{color:var(--ac);border-color:var(--ac-b30)}',
+    '.hc-chev{color:var(--dim)}',
+    '.bell-wrap{position:relative}',
+    '.bell-badge{position:absolute;top:-7px;inset-inline-end:-7px;min-width:20px;height:20px;border-radius:99px;background:var(--wr);color:#fff;font-size:12px;font-weight:700;display:grid;place-items:center;padding:0 4px;line-height:1;border:1px solid var(--s1);pointer-events:none;z-index:2;box-shadow:0 2px 8px rgba(0,0,0,.35)}',
+    '.bell-badge.crit{background:var(--er)}',
+    '.bell-panel{position:absolute;top:46px;inset-inline-end:0;z-index:40;width:320px;background:var(--s1);border:1px solid var(--ln);border-radius:12px;padding:12px;box-shadow:0 12px 32px rgba(0,0,0,.4);display:grid;gap:8px}',
+    '.bell-panel[hidden]{display:none}',
+    '.bp-title{margin:0;font-size:13px;font-weight:600;color:var(--tx)}',
+    '.bell-panel .ev-rows{max-height:150px;overflow:auto}',
+    '.health-up .hu-ic{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}',
+    '.dkpi-ico svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}',
+    '.dkpi-head{display:flex;align-items:center;justify-content:space-between;gap:8px}',
+    '.dkpi-chip{width:42px;height:42px;border-radius:12px;background:var(--sunk);border:1px solid var(--ln);display:grid;place-items:center;flex:none;color:var(--tx);transition:transform .25s var(--spring),border-color .2s ease,box-shadow .2s ease,color .2s ease}',
+    '.dkpi:hover .dkpi-chip,.dsum:hover .dkpi-chip,.chart-card:hover .chart-chip{border-color:color-mix(in srgb, currentColor 35%, transparent);box-shadow:0 0 0 3px color-mix(in srgb, currentColor 20%, transparent)}',
+    '.dkpi:hover .cx-core,.dsum:hover .cx-core,.mtb-res-tile:hover .cx-core{animation:corePulse 1s ease-in-out infinite}',
+    '.dkpi:hover .cx-led,.dsum:hover .cx-led,.mtb-res-tile:hover .cx-led{animation:ledBlink 1.1s ease-in-out infinite}',
+    '.dkpi:hover .cx-led:nth-of-type(2),.dsum:hover .cx-led:nth-of-type(2),.mtb-res-tile:hover .cx-led:nth-of-type(2){animation-delay:.35s}',
+    '.dkpi:hover .cx-led:nth-of-type(3),.dsum:hover .cx-led:nth-of-type(3),.mtb-res-tile:hover .cx-led:nth-of-type(3){animation-delay:.7s}',
+    '.cx-led{fill:currentColor;stroke:none}',
+    '.dkpi:hover .cx-flow,.dsum:hover .cx-flow{stroke-dasharray:2.5 2.5;animation:dashFlow .9s linear infinite}',
+    '.dkpi:hover .cx-pulse,.dsum:hover .cx-pulse{animation:glyphPulse 1.2s ease-in-out infinite}',
+    '.dkpi:hover .cx-a-up,.dsum:hover .cx-a-up{animation:arrUp 1s ease-in-out infinite}',
+    '.dkpi:hover .cx-a-dn,.dsum:hover .cx-a-dn{animation:arrDn 1s ease-in-out infinite}',
+    '@keyframes corePulse{0%,100%{opacity:1}50%{opacity:.25}}',
+    '@keyframes ledBlink{0%,100%{opacity:1}50%{opacity:.15}}',
+    '@keyframes dashFlow{to{stroke-dashoffset:-5}}',
+    '@keyframes glyphPulse{0%,100%{opacity:1}50%{opacity:.4}}',
+    '@keyframes arrUp{0%,100%{translate:0 0}50%{translate:0 -1.5px}}',
+    '@keyframes arrDn{0%,100%{translate:0 0}50%{translate:0 1.5px}}',
+    '.dkpi-chip svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}',
+    '.dkpi-chip.ic-ok{color:var(--ok)}',
+    '.dkpi-chip.ic-ac{color:var(--ac)}',
+    '.dkpi-chip.ic-wr{color:var(--wr)}',
+    '.dkpi-spark{height:44px;margin-top:auto;min-width:0}',
+    '.dkpi-spark.wide{height:46px}',
+    '.dkpi-spark svg,.mtr-chart.mini svg{width:100%;display:block}',
+    '.dkpi-spark svg{height:44px}',
+    '.mtr-chart.mini{flex:1;min-height:52px}',
+    '.mtr-chart.mini svg{height:100%}',
+    '.dsum-body{display:flex;align-items:center;gap:12px;flex:1;min-height:0}',
+    '.donut-wrap{position:relative;width:74px;height:74px;flex:none}',
+    '.donut-wrap svg{width:100%;height:100%;transform:rotate(-90deg)}',
+    '.donut-wrap .dn-seg{fill:none;stroke-width:5;stroke-linecap:round;transition:stroke-dasharray .6s var(--spring),stroke-dashoffset .6s var(--spring)}',
+    '.donut-c{position:absolute;inset:0;display:grid;place-content:center;text-align:center}',
+    '.donut-c b{font-size:18px;color:var(--tx)}',
+    '.donut-c span{font-size:12px;color:var(--dim)}',
+    '.dsum-legend{display:grid;gap:6px;font-size:13px;color:var(--tx2)}',
+    '.dsum-legend .li{display:flex;align-items:center;gap:8px}',
+    '.dsum-legend .li i{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none}',
+    '.dsum-legend .li b{color:var(--tx)}',
+    '.li-dot{width:11px;height:11px;border-radius:3px;display:inline-block;flex:none;vertical-align:-1px}',
+    '.li-dot.c-ok{background:var(--ok)}',
+    '.li-dot.c-err{background:var(--er)}',
+    '.li-dot.c-ac{background:var(--ac)}',
+    '.li-dot.c-wr{background:var(--wr)}',
+    '.li-dot.c-fo{background:var(--dash-fo)}',
+    '.li-dot.c-dim{background:color-mix(in srgb, var(--tx) 35%, transparent)}',
+    '.ag-head{display:flex;align-items:center;gap:10px;background:var(--sunk);border:1px solid var(--ln);border-radius:12px;padding:8px 10px;text-decoration:none;margin-bottom:6px;transition:border-color .2s ease}',
+    '.ag-head:hover{border-color:var(--ac-b30)}',
+    '.ag-chip{width:46px;height:46px;border-radius:12px}',
+    '.ag-title{margin:0;font-size:15px;font-weight:700;color:var(--tx)}',
+    '.ag-chev{color:var(--dim);font-size:16px}',
+    '.ag-chip{margin-inline-start:auto}',
+    '.donut-wrap.big{width:150px;height:150px}',
+    '.donut-wrap.big svg{filter:drop-shadow(0 0 12px color-mix(in srgb, var(--ok) 26%, transparent))}',
+    '.donut-wrap.big .dn-seg{stroke-width:6.5}',
+    '.donut-wrap.big .donut-c b{font-size:22px;white-space:nowrap}',
+    '.donut-wrap.big .donut-c span{font-size:13px}',
+    '.ag-legend{display:grid;gap:10px;flex:1}',
+    '.ag-pill{display:flex;align-items:center;gap:10px;background:var(--sunk);border:1px solid var(--ln);border-radius:99px;padding:9px 14px}',
+    '.ag-pill b{margin-inline-start:auto;font-size:18px;color:var(--tx)}',
+    '.agcard:hover .ag-chip circle{animation:ledBlink 1.1s ease-in-out infinite}',
+    '.agcard:hover .ag-chip circle:nth-of-type(2){animation-delay:.4s}',
+    '.tun-box{display:grid;gap:8px;background:var(--sunk);border:1px solid var(--ln);border-radius:14px;padding:8px 10px;flex:1;align-content:center;min-width:0}',
+    '.tun-box .trow{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--tx2)}',
+    '.tun-box .trow b{margin-inline-start:auto;font-size:16px;color:var(--tx)}',
+    '.tun-count b{font-size:30px;font-weight:700;color:var(--tx);line-height:1.1}',
+    '.tun-count span{font-size:12px;color:var(--dim)}',
+    '.li-dot.ir{background:var(--ac)}',
+    ':root{--dash-fo:#a66bfa;--dash-cpu:#34d399;--dash-ram:#38bdf8;--dash-disk:#f59e0b}',
+    '.dkpi-chip.ic-cpu{color:var(--dash-cpu)}',
+    '.dkpi-chip.ic-ram{color:var(--dash-ram)}',
+    '.dkpi-chip.ic-disk{color:var(--dash-disk)}',
+    '.trf-grid .sw{width:10px;height:10px;border-radius:3px;display:inline-block}',
+    '.trf-grid .sw-ir{background:var(--ac)}',
+    '#trfTotals .kpi-val{font-size:16px}',
+    '#trfTotals .trf-side,#trfTotals .trf-k{font-size:12px}',
+    '#trfTotals .trf-grid{grid-template-columns:1fr;gap:8px;flex:1;align-content:center}',
+    '#trfTotals .trf-group{grid-template-columns:1fr auto;padding:9px 11px;row-gap:9px;column-gap:8px;align-items:center}',
+    '#trfTotals .trf-col{display:contents}',
+    '#trfTotals .kpi-val{justify-self:end}',
+    '.trf-grid .sw-fo{background:var(--dash-fo)}',
+    '.li-dot.fo{background:var(--dash-fo)}',
+    '.dsum-link{color:var(--ac);font-size:13px;text-decoration:none;margin-top:auto}',
+    '.conn-split{display:grid;grid-template-columns:1fr 1fr;gap:12px}',
+    '.conn-side{align-content:center}',
+    '.conn-side{display:grid;gap:4px;padding:10px 12px;border-radius:12px;background:var(--sunk)}',
+    '.conn-k{font-size:13px;color:var(--tx2)}',
+    '.res-rows{display:grid;gap:12px;flex:1;align-content:center}',
+    '.res-row{display:grid;grid-template-columns:44px 48px 1fr;align-items:center;gap:10px;font-size:13px}',
+    '.res-k{color:var(--tx2)}',
+    '.res-v{font-weight:600;color:var(--tx)}',
+    '.res-bar{height:8px;border-radius:99px;background:var(--sunk);overflow:hidden}',
+    '.res-bar i{display:block;height:100%;border-radius:99px;width:0;transition:width .5s ease,background .3s ease}',
+    '.ev-rows{display:grid;gap:10px;max-height:190px;overflow:auto;flex:1;align-content:start}',
+    '.ev-row{display:flex;gap:10px;align-items:flex-start;font-size:13px;color:var(--tx2)}',
+    '.ev-dot{width:8px;height:8px;border-radius:50%;margin-top:5px;flex:none;display:inline-block}',
+    '.ev-dot.ok{background:var(--ok)}.ev-dot.warn{background:var(--wr)}.ev-dot.err{background:var(--er)}.ev-dot.info{background:var(--ac)}',
+    '.ev-t{margin-inline-start:auto;color:var(--dim);font-size:12px;white-space:nowrap;direction:ltr}',
+    '.ev-empty{color:var(--dim);font-size:13px}',
+    '.chart-card{position:relative}',
+    '.chart-legend .lg-item{display:inline-flex;align-items:center;gap:6px;background:none;border:0;color:var(--tx2);cursor:pointer;font:inherit;padding:2px 6px;border-radius:8px}',
+    '.chart-legend .lg-item:hover{background:var(--sunk)}',
+    '.chart-legend .lg-item[aria-pressed="false"]{opacity:.35;text-decoration:line-through}',
+    '.sw-line{width:16px;height:0;border-top:2.5px solid var(--ac);border-radius:2px;display:inline-block}',
+    '.sw-line.fo{border-top-color:var(--dash-fo)}',
+    '.sw-line.dash{border-top-style:dashed}',
+    '.mtr-tip[hidden]{display:none}',
+    '.mtr-tip{position:absolute;z-index:5;pointer-events:none;background:var(--s1);border:1px solid var(--ln);border-radius:10px;padding:8px 12px;font-size:12px;color:var(--tx2);box-shadow:0 8px 24px rgba(0,0,0,.35);display:grid;gap:4px;min-width:170px}',
+    '.mtr-tip .tt{font-weight:600;color:var(--tx);direction:ltr;text-align:right}',
+    '.mtr-tip .tr2 b{color:var(--tx)}',
+    '.mtr-tip .tr2{display:flex;align-items:center;gap:8px;justify-content:space-between;white-space:nowrap}',
+    '.mtr-tip .tr2 b{color:var(--tx);direction:ltr}',
+    '.mtr-cross{stroke:var(--tx2);stroke-width:1;stroke-dasharray:3 3;opacity:.55}',
+    '@container dash (max-width:1100px){.dkpi{grid-column:span 6}.dsum{grid-column:span 6}}',
+    '@container dash (max-width:700px){.dkpi,.dsum{grid-column:1/-1}}'
+  ].join('\n');
+  document.head.appendChild(dashCss);
+
+  // ring gauge: percentage ring with the value inside (round cap, animated)
+  function drawRing(id, pct, colorVar) {
+    var host = $(id); if (!host) return;
+    var p = pct != null && isFinite(pct) ? Math.min(100, Math.max(0, pct)) : null;
+    var seg = '';
+    if (p != null) {
+      var len = Math.max(0.6, p - 1);
+      seg = '<circle class="ring-seg" cx="21" cy="21" r="15.9155" stroke="' + colorVar + '" stroke-linecap="round"' +
+        ' stroke-dasharray="' + len.toFixed(2) + ' ' + (100 - len).toFixed(2) + '"' +
+        ' stroke-dashoffset="-1"/>';
+    }
+    host.innerHTML = '<circle class="ring-track" cx="21" cy="21" r="15.9155"/>' + seg;
+  }
+  // monotone cubic interpolation (Fritsch–Carlson): smooth curves that can
+  // never overshoot — no fake dips below zero, per the data-integrity rules.
+  function monoPath(vals, xf, yf) {
+    var n = vals.length;
+    if (n < 3) {
+      var d = '';
+      for (var i = 0; i < n; i++) d += (i ? 'L' : 'M') + xf(i).toFixed(1) + ' ' + yf(vals[i]).toFixed(1);
+      return d;
+    }
+    var dx = [], m = [], t = [];
+    for (var i = 0; i < n - 1; i++) {
+      dx.push(xf(i + 1) - xf(i));
+      m.push((yf(vals[i + 1]) - yf(vals[i])) / (dx[i] || 1e-9));
+    }
+    t.push(m[0]);
+    for (var i = 1; i < n - 1; i++) t.push(m[i - 1] * m[i] <= 0 ? 0 : (m[i - 1] + m[i]) / 2);
+    t.push(m[n - 2]);
+    for (var i = 0; i < n - 1; i++) {
+      if (m[i] === 0) { t[i] = 0; t[i + 1] = 0; continue; }
+      var a = t[i] / m[i], b = t[i + 1] / m[i], q = a * a + b * b;
+      if (q > 9) { var k = 3 / Math.sqrt(q); t[i] = k * a * m[i]; t[i + 1] = k * b * m[i]; }
+    }
+    var d = 'M' + xf(0).toFixed(1) + ' ' + yf(vals[0]).toFixed(1);
+    for (var i = 0; i < n - 1; i++) {
+      d += 'C' + (xf(i) + dx[i] / 3).toFixed(1) + ' ' + (yf(vals[i]) + t[i] * dx[i] / 3).toFixed(1) +
+        ' ' + (xf(i + 1) - dx[i] / 3).toFixed(1) + ' ' + (yf(vals[i + 1]) - t[i + 1] * dx[i] / 3).toFixed(1) +
+        ' ' + xf(i + 1).toFixed(1) + ' ' + yf(vals[i + 1]).toFixed(1);
+    }
+    return d;
+  }
+  // compact value for the totals card (fits the label|value table columns)
+  function fmtTot(b) {
+    if (b == null) return '—';
+    if (b >= 1099511627776) return (b / 1099511627776).toFixed(1) + ' TB';
+    var gb = b / 1073741824;
+    if (gb >= 100) return Math.round(gb) + ' GB';
+    if (b >= 1073741824) return gb.toFixed(1) + ' GB';
+    return Math.round(b / 1048576) + ' MB';
+  }
+  function fmtClock(t) { var d = new Date(t * 1000); return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2) + ':' + ('0' + d.getSeconds()).slice(-2); }
+  function fmtHM(t) { var d = new Date(t * 1000); return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); }
+  function setTxt(id, v) { var el = $(id); if (el) el.textContent = v; }
+  var CHECK_SVG = '<svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>';
+  var WARN_SVG = '<svg viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>';
+  var LIVE_NOTE = tr('', 'Live — recorded from dashboard open');
+
+  // -- sparklines: sampled live from dashboard open (no host history API) --
+  var sysHist = { cpu: [], ram: [], disk: [], tun: [] };
+  var HKEY = 'quantum_dash_hist';
+  try {
+    var saved = JSON.parse(localStorage.getItem(HKEY) || 'null');
+    if (saved && saved.cpu) sysHist = saved;
+  } catch (e) { /* storage blocked: history just restarts */ }
+  function saveHist() { try { localStorage.setItem(HKEY, JSON.stringify(sysHist)); } catch (e) { /* private mode */ } }
+  function pushH(h, v) { h.push(v == null ? null : v); if (h.length > 90) h.shift(); }
+  function drawSpark(host, h, color, fixedMax) {
+    if (!host) return;
+    var vals = h.filter(function (v) { return v != null; });
+    if (!vals.length) { host.innerHTML = ''; return; }
+    var Wc = Math.round(host.getBoundingClientRect().width) || 160, Hc = 44;
+    var maxV = fixedMax || Math.max.apply(null, vals) * 1.15 || 1;
+    var n = h.length, step = Wc / Math.max(1, n - 1);
+    var runs = [], run = [];
+    for (var i = 0; i < n; i++) {
+      if (h[i] == null) { if (run.length) runs.push(run); run = []; continue; }
+      run.push({ x: i * step, y: Hc - 4 - (Math.min(h[i], maxV) / maxV) * (Hc - 8) });
+    }
+    if (run.length) runs.push(run);
+    var g = '';
+    runs.forEach(function (r) {
+      if (!r.length) return;
+      if (r.length === 1) {
+        // one sample so far: an honest flat line at the current level
+        r = [{ x: 0, y: r[0].y }, { x: Wc, y: r[0].y }];
+      }
+      var d = monoPath(r.map(function (p) { return p.y; }), function (i) { return r[i].x; }, function (yv) { return yv; });
+      var area = d + 'L' + r[r.length - 1].x.toFixed(1) + ' ' + Hc + 'L' + r[0].x.toFixed(1) + ' ' + Hc + 'Z';
+      g += '<path d="' + area + '" fill="' + color + '" opacity=".14"/>' +
+        '<path d="' + d + '" fill="none" stroke="' + color + '" stroke-width="1.8" stroke-linejoin="round"/>';
+    });
+    host.innerHTML = '<svg viewBox="0 0 ' + Wc + ' ' + Hc + '" preserveAspectRatio="none">' + g + '</svg>';
+  }
+
+  // -- agents donut (real online/offline split) --
+  // parts: [count, cssColor] pairs — rounded caps, soft gaps, transitions.
+  function drawDonutMulti(host, parts, segW) {
+    if (!host) return;
+    var C = 100, r = 15.9155, w = segW || 5, total = 0;
+    parts.forEach(function (p) { total += p[0]; });
+    var pad = parts.length > 1 ? 2.4 : 0;
+    var seg = '<circle cx="21" cy="21" r="' + r + '" fill="none" stroke="color-mix(in srgb, var(--tx) 10%, transparent)" stroke-width="' + w + '"/>';
+    if (total > 0) {
+      var acc = 0;
+      parts.forEach(function (pt) {
+        if (!pt[0]) return;
+        var frac = pt[0] / total;
+        var len = Math.max(0.5, C * frac - pad);
+        seg += '<circle class="dn-seg" cx="21" cy="21" r="' + r + '" stroke="' + pt[1] + '" stroke-linecap="round"' +
+          ' stroke-dasharray="' + len.toFixed(2) + ' ' + (C - len).toFixed(2) + '"' +
+          ' stroke-dashoffset="' + (-(acc * C + pad / 2)).toFixed(2) + '"/>';
+        acc += frac;
+      });
+    }
+    host.innerHTML = seg;
+  }
+  function drawDonut(host, on, off) {
+    drawDonutMulti(host, [[on, 'var(--ok)'], [off, 'var(--er)']]);
+  }
+
+  // -- alerts → notes + activity (real alert records only) --
+  function alertTitle(a) {
+    if (a && a.ui && a.ui.title) {
+      var fa = document.body.classList.contains('is-rtl');
+      return (fa ? a.ui.title.fa : a.ui.title.en) || a.text || a.rule || '';
+    }
+    return (a && (a.text || a.rule)) || '';
+  }
+  function renderBell(open, hist) {
+    var badge = $('bellBadge');
+    if (badge) {
+      var crit = open.some(function (a) { return a.sev === 'crit'; });
+      badge.hidden = open.length === 0;
+      badge.textContent = open.length > 9 ? '9+' : String(open.length);
+      badge.classList.toggle('crit', crit);
+    }
+    var list = $('bellList');
+    if (list) {
+      if (!open.length) {
+        list.innerHTML = '<div class="ev-row"><span class="ev-dot ok"></span><span>' + esc(tr('', 'No open alerts — all quiet.')) + '</span></div>';
+        return;
+      }
+      list.innerHTML = open.slice(0, 4).map(function (a) {
+        return '<div class="ev-row"><span class="ev-dot ' + (a.sev === 'crit' ? 'err' : 'warn') + '"></span><span>' + esc(alertTitle(a)) + '</span><span class="ev-t">' + esc(fmtHM(a.at)) + '</span></div>';
+      }).join('');
+    }
+    var hh = $('bellHist');
+    if (hh) {
+      if (!hist.length) { hh.innerHTML = '<div class="ev-empty">' + esc(tr('', 'No events recorded yet.')) + '</div>'; }
+      else {
+        hh.innerHTML = hist.slice(0, 4).map(function (a) {
+          var dot = a.recovery ? 'ok' : (a.sev === 'crit' ? 'err' : a.sev === 'warn' ? 'warn' : 'info');
+          return '<div class="ev-row"><span class="ev-dot ' + dot + '"></span><span>' + esc(alertTitle(a)) + '</span><span class="ev-t">' + esc(fmtHM(a.at)) + '</span></div>';
+        }).join('');
+      }
+    }
+  }
+
+  // -- main poll: one pass fills every card from live APIs --
+  async function refreshAll() {
+    var btn = $('dashRefreshBtn');
+    if (btn) btn.classList.add('spin');
+    try {
+      var ov = await jget('api/ui/overview');
+      var al = await jget('api/mesh/alerts').catch(function () { return {}; });
+      var agc = (ov.counts && ov.counts.agents) || {};
+      var tu = (ov.counts && ov.counts.tunnels) || {};
+      var open = (al && al.open) || [];
+      // Overall health = the panel's own alert engine verdict (it is the
+      // component whose job is to demand attention). Offline agents and down
+      // tunnels already surface on their own cards; an operator threshold
+      // for them lives in the alert rules, not in a hard-coded ratio here.
+      var critN = open.filter(function (a) { return a.sev === 'crit'; }).length;
+      var warnN = open.filter(function (a) { return a.sev === 'warn'; }).length;
+      var offN = agc.offline || 0, downN = tu.down || 0;
+      var healthy = open.length === 0;
+      var hcol = healthy ? 'var(--ok)' : critN ? 'var(--er)' : 'var(--wr)';
+      var hcard = $('kpiHealth');
+      if (hcard) hcard.style.setProperty('--hcol', hcol);
+      var hi = $('healthIco');
+      if (hi) hi.innerHTML = healthy ? CHECK_SVG : WARN_SVG;
+      setTxt('healthVal', healthy ? tr('', 'Healthy') : critN ? tr('', 'Critical') : tr('', 'Warning'));
+      setTxt('healthSub', healthy ? tr('', 'All services are normal')
+        : [critN ? critN + ' ' + tr('', 'critical alerts') : '',
+           warnN ? warnN + ' ' + tr('', 'open warnings') : ''].filter(Boolean).join(' · '));
+      // aggregate traffic today (billable iran side + wire remainder foreign)
+      var tf = (ov.traffic && ov.traffic.today) || {};
+      var irDl = tf.billable_download_bytes || 0, irUl = tf.upload_bytes || 0;
+      var allDl = tf.wire_rx_bytes || 0, allUl = tf.wire_tx_bytes || 0;
+      setTxt('trfIrDl', fmtTot(irDl)); setTxt('trfIrUl', fmtTot(irUl));
+      setTxt('trfFoDl', fmtTot(Math.max(0, allDl - irDl))); setTxt('trfFoUl', fmtTot(Math.max(0, allUl - irUl)));
+      // fleet metrics — real aggregates over the agents that report
+      // resources (a panel host is not an agent and reports none)
+      var res = ov.resources || {};
+      var cpur = res.cpu_pct || {}, memr = res.mem || {}, diskr = res.disk || {};
+      var cpu = cpur.avg != null ? parseFloat(cpur.avg) : null;
+      var ram = memr.avg_pct != null ? parseFloat(memr.avg_pct) : null;
+      var disk = diskr.avg_pct != null ? parseFloat(diskr.avg_pct) : null;
+      setTxt('cpuVal', cpu != null ? Math.round(cpu) + '%' : '—');
+      setTxt('cpuLoad', res.avg_load1 != null ? res.avg_load1.toFixed(2) : '—');
+      setTxt('cpuLoadLbl', tr('', 'load'));
+      setTxt('cpuCores', res.cores_total ? String(res.cores_total) : '—');
+      setTxt('cpuCoresLbl', tr('', 'cores'));
+      setTxt('ramVal', memr.sum_used_mb != null ? fmtTot(memr.sum_used_mb * 1048576) + ' / ' + fmtTot((memr.sum_total_mb || 0) * 1048576) : '—');
+      setTxt('ramBadge', ram != null ? Math.round(ram) + '%' : '—');
+      setTxt('diskVal', diskr.sum_used_gb != null ? fmtTot(diskr.sum_used_gb * 1073741824) + ' / ' + fmtTot((diskr.sum_total_gb || 0) * 1073741824) : '—');
+      setTxt('diskBadge', disk != null ? Math.round(disk) + '%' : '—');
+      pushH(sysHist.cpu, cpu); pushH(sysHist.ram, ram); pushH(sysHist.disk, disk);
+      saveHist();
+      drawRing('ringCpu', cpu, 'var(--dash-cpu)');
+      drawSpark($('sparkCpu'), sysHist.cpu, '#34d399', 100);
+      drawRing('ringRam', ram, 'var(--dash-ram)');
+      drawSpark($('sparkRam'), sysHist.ram, '#38bdf8', 100);
+      drawRing('ringDisk', disk, 'var(--dash-disk)');
+      drawSpark($('sparkDisk'), sysHist.disk, '#f59e0b', 100);
+      // agents summary
+      var onN = agc.online || 0, tot = onN + offN;
+      drawDonut($('agDonut'), onN, offN);
+      setTxt('agOnline', tot ? (onN + ' / ' + tot) : '—');
+      setTxt('agTotal', tr('', 'online'));
+      var lg = $('agLegend');
+      if (lg) lg.innerHTML =
+        '<span class="ag-pill"><i class="li-dot c-ok"></i>' + esc(tr('', 'online')) + '<b>' + onN + '</b></span>' +
+        '<span class="ag-pill"><i class="li-dot c-err"></i>' + esc(tr('', 'offline')) + '<b>' + offN + '</b></span>';
+      drawDonutMulti($('agDonut'), [[onN, 'var(--ok)'], [offN, 'var(--er)']], 6.5);
+      // tunnels: donut out of the TOTAL (active blue / inactive violet) —
+      // exactly like the agents card; no history series exists for tunnels,
+      // so there is no spark here.
+      setTxt('tunBig', (tu.up != null ? tu.up : '—') + ' / ' + (tu.total || 0));
+      setTxt('tunSub', tr('', 'active tunnels'));
+      setTxt('tunUpN', String(tu.up || 0));
+      setTxt('tunDownN', String((tu.total || 0) - (tu.up || 0)));
+      drawDonutMulti($('tunDonut'), [
+        [tu.up || 0, 'var(--ac)'],
+        [(tu.total || 0) - (tu.up || 0), 'var(--dash-fo)']
+      ], 6.5);
+      setTxt('healthUp', res.max_uptime_s ? fmtSecs(res.max_uptime_s) : '—');
+      // bell: live open-alert feed
+      renderBell(open, (al && al.history) || []);
+    } catch (e) { /* keep last good values; the poll continues */ }
+    if (btn) setTimeout(function () { btn.classList.remove('spin'); }, 600);
+  }
+
+  // -- main traffic chart: 4 series, fixed meaning — Iran blue / Foreign
+  // violet, download solid / upload dashed (mockup palette) --
+  var mtrRange = '24h';
+  var SERIES = [
+    { key: 'iran_dl', color: '#38bdf8', dash: null },
+    { key: 'iran_ul', color: '#38bdf8', dash: '7 5' },
+    { key: 'foreign_dl', color: '#a66bfa', dash: null },
+    { key: 'foreign_ul', color: '#a66bfa', dash: '7 5' }
+  ];
+  var mtrHidden = {}, mtrPoints = [];
+  function serLabel(key) {
+    var ir = tr('', 'Iran'), fo = tr('', 'Foreign'), dl = tr('', 'DL'), ul = tr('', 'UL');
+    return { iran_dl: ir + ' · ' + dl, iran_ul: ir + ' · ' + ul, foreign_dl: fo + ' · ' + dl, foreign_ul: fo + ' · ' + ul }[key] || key;
+  }
+  function renderMtr(host, points) {
+    if (!points.length) { host.innerHTML = '<div class="empty">—</div>'; return; }
+    var Wc = Math.round(host.getBoundingClientRect().width) || 900, Hc = 260, pad = { l: 46, r: 18, t: 12, b: 34 };
+    var vis = SERIES.filter(function (s) { return !mtrHidden[s.key]; });
+    var maxV = 1;
+    points.forEach(function (p) { vis.forEach(function (s) { if (p[s.key] > maxV) maxV = p[s.key]; }); });
+    function x(i) { return pad.l + (points.length === 1 ? 0 : i * (Wc - pad.l - pad.r) / (points.length - 1)); }
+    // volume is never negative: clamp at the axis so a bad row can't dip below 0
+    function y(v) { return Hc - pad.b - (Math.max(0, v) / maxV) * (Hc - pad.t - pad.b); }
+    var g = '';
+    for (var gi = 0; gi <= 3; gi++) {
+      var gy = pad.t + gi * (Hc - pad.t - pad.b) / 3;
+      g += '<line class="mtr-grid" x1="' + pad.l + '" y1="' + Math.round(gy) + '" x2="' + (Wc - pad.r) + '" y2="' + Math.round(gy) + '"/>';
+      g += '<text class="mtr-axis" x="' + (pad.l - 8) + '" y="' + (Math.round(gy) + 5) + '" text-anchor="end">' + fmtGB(maxV * (3 - gi) / 3) + '</text>';
+    }
+    vis.forEach(function (s) {
+      var vals = points.map(function (p) { return p[s.key]; });
+      var d = monoPath(vals, x, function (v) { return y(v); });
+      g += '<path d="' + d + '" fill="none" stroke="' + s.color + '" stroke-width="2"' + (s.dash ? ' stroke-dasharray="' + s.dash + '"' : '') + ' stroke-linejoin="round"/>';
+    });
+    var step = Math.ceil(points.length / 6);
+    points.forEach(function (p, i) {
+      if (i % step) return;
+      var dt = new Date(p.t * 1000);
+      var lx = Math.min(Math.max(x(i), pad.l + 6), Wc - pad.r - 26);
+      g += '<text class="mtr-axis" x="' + Math.round(lx) + '" y="' + (Hc - 10) + '" text-anchor="middle">' +
+        ('0' + dt.getHours()).slice(-2) + ':' + ('0' + dt.getMinutes()).slice(-2) + '</text>';
+    });
+    g += '<line id="mtrCross" class="mtr-cross" x1="0" y1="' + pad.t + '" x2="0" y2="' + (Hc - pad.b) + '" visibility="hidden"/>';
+    vis.forEach(function (s) {
+      g += '<circle id="mtrDot-' + s.key + '" r="3.5" fill="' + s.color + '" visibility="hidden"/>';
+    });
+    host.innerHTML = '<svg viewBox="0 0 ' + Wc + ' ' + Hc + '" width="' + Wc + '" height="' + Hc + '">' + g + '</svg>';
+    wireMtrTip(host, Wc, Hc, pad, vis, maxV, points);
+  }
+  function wireMtrTip(host, Wc, Hc, pad, vis, maxV, points) {
+    var card = $('chartCard'), tip = $('mtrTip');
+    if (!card || !tip) return;
+    var svg = host.querySelector('svg'); if (!svg) return;
+    var n = Math.max(1, points.length - 1);
+    host.onmousemove = function (ev) {
+      var r = svg.getBoundingClientRect();
+      var mx = ev.clientX - r.left;
+      var i = Math.round((mx - pad.l) / ((Wc - pad.l - pad.r) / n));
+      i = Math.max(0, Math.min(points.length - 1, i));
+      var p = points[i], px = (pad.l + i * (Wc - pad.l - pad.r) / n);
+      var cr = document.getElementById('mtrCross');
+      if (cr) { cr.setAttribute('x1', px); cr.setAttribute('x2', px); cr.setAttribute('visibility', 'visible'); }
+      vis.forEach(function (s) {
+        var d2 = document.getElementById('mtrDot-' + s.key);
+        if (d2) {
+          d2.setAttribute('cx', px);
+          d2.setAttribute('cy', (Hc - pad.b - (Math.min(p[s.key], maxV) / maxV) * (Hc - pad.t - pad.b)).toFixed(1));
+          d2.setAttribute('visibility', 'visible');
+        }
+      });
+      tip.innerHTML = '<div class="tt">' + esc(fmtHM(p.t)) + '</div>' + vis.map(function (s) {
+        return '<div class="tr2"><span><span class="ev-dot" style="display:inline-block;margin:0 4px;background:' + s.color + '"></span>' + esc(serLabel(s.key)) + '</span><b>' + esc(fmtGB(Math.max(0, p[s.key]))) + '</b></div>';
+      }).join('');
+      tip.hidden = false;
+      var cardR = card.getBoundingClientRect(), hostR = host.getBoundingClientRect();
+      var left = (hostR.left - cardR.left) + px + 14;
+      var tw = tip.offsetWidth || 170;
+      if (left + tw > cardR.width - 8) left = (hostR.left - cardR.left) + px - tw - 14;
+      tip.style.left = Math.max(6, left) + 'px';
+      tip.style.top = (hostR.top - cardR.top) + 12 + 'px';
+    };
+    host.onmouseleave = function () {
+      tip.hidden = true;
+      var cr = document.getElementById('mtrCross');
+      if (cr) cr.setAttribute('visibility', 'hidden');
+      vis.forEach(function (s) {
+        var d2 = document.getElementById('mtrDot-' + s.key);
+        if (d2) d2.setAttribute('visibility', 'hidden');
+      });
+    };
+  }
+  function mtrSub() {
+    var t = tr('', 'Download and upload volume in the last');
+    var unit = mtrRange === '24h' ? tr('', '24 hours') : mtrRange === '7d' ? tr('', '7 days') : tr('', '30 days');
+    return t + ' ' + unit;
+  }
+  async function loadMtr() {
+    var host = $('mtrChart'); if (!host) return;
+    try {
+      var d = await jget('api/ui/traffic-series?range=' + mtrRange);
+      mtrPoints = d.points || [];
+      renderMtr(host, mtrPoints);
+    } catch (e) { host.innerHTML = '<div class="empty">—</div>'; }
+  }
+  function mtrRedraw() {
+    var host = $('mtrChart');
+    if (host && mtrPoints.length) renderMtr(host, mtrPoints);
+  }
+  window.addEventListener('resize', mtrRedraw);
+  if (window.ResizeObserver) {
+    var mtrRO = new ResizeObserver(function () { mtrRedraw(); });
+    var mtrHost = $('mtrChart'); if (mtrHost) mtrRO.observe(mtrHost);
+  }
+  document.querySelectorAll('[data-mtr-range]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      mtrRange = btn.getAttribute('data-mtr-range');
+      document.querySelectorAll('[data-mtr-range]').forEach(function (b) { b.setAttribute('aria-pressed', b === btn ? 'true' : 'false'); });
+      setTxt('chartHint', mtrSub());
+      loadMtr();
+    });
+  });
+  document.querySelectorAll('[data-mtr-series]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var k = b.getAttribute('data-mtr-series');
+      mtrHidden[k] = !mtrHidden[k];
+      b.setAttribute('aria-pressed', mtrHidden[k] ? 'false' : 'true');
+      mtrRedraw();
+    });
+  });
+  var rb = $('dashRefreshBtn');
+  if (rb) rb.addEventListener('click', function () { refreshAll(); loadMtr(); });
+
+  // -- live connection split (sampled; the panel keeps no per-side history) --
+  var connHist = [];
+  function drawConn() {
+    var host = $('agtConnChart'); if (!host || !connHist.length) return;
+    var Wc = Math.round(host.getBoundingClientRect().width) || 300, Hc = 90, pad = { l: 26, r: 8, t: 8, b: 18 };
+    // bucket the live samples into ~14 groups → two rounded bars per group
+    var buckets = Math.min(14, connHist.length);
+    var per = Math.ceil(connHist.length / buckets);
+    var ir = [], fo = [], ts = [];
+    for (var i = 0; i < connHist.length; i += per) {
+      var a = 0, b = 0, last = connHist[Math.min(connHist.length - 1, i + per - 1)];
+      for (var j = i; j < Math.min(connHist.length, i + per); j++) {
+        a = Math.max(a, connHist[j].iran); b = Math.max(b, connHist[j].foreign);
+      }
+      ir.push(a); fo.push(b); ts.push(last.t);
+    }
+    var maxV = 2;
+    ir.forEach(function (v) { maxV = Math.max(maxV, v); });
+    fo.forEach(function (v) { maxV = Math.max(maxV, v); });
+    var plotW = Wc - pad.l - pad.r, bw = plotW / ir.length;
+    var barW = Math.max(3, Math.min(9, bw * 0.26));
+    function h(v) { return (v / maxV) * (Hc - pad.t - pad.b); }
+    var g = '';
+    for (var gi = 0; gi <= 2; gi++) {
+      var gy = pad.t + gi * (Hc - pad.t - pad.b) / 2;
+      g += '<line class="mtr-grid" x1="' + pad.l + '" y1="' + Math.round(gy) + '" x2="' + (Wc - pad.r) + '" y2="' + Math.round(gy) + '"/>';
+      g += '<text class="mtr-axis" x="' + (pad.l - 6) + '" y="' + (Math.round(gy) + 4) + '" text-anchor="end" font-size="9">' + Math.round(maxV * (2 - gi) / 2) + '</text>';
+    }
+    for (var i = 0; i < ir.length; i++) {
+      var xC = pad.l + bw * i + bw / 2, base = Hc - pad.b;
+      var hI = h(ir[i]), hF = h(fo[i]);
+      g += '<rect x="' + (xC - barW - 1).toFixed(1) + '" y="' + (base - hI).toFixed(1) + '" width="' + barW.toFixed(1) +
+        '" height="' + Math.max(1.5, hI).toFixed(1) + '" rx="1.5" fill="#38bdf8"/>';
+      g += '<rect x="' + (xC + 1).toFixed(1) + '" y="' + (base - hF).toFixed(1) + '" width="' + barW.toFixed(1) +
+        '" height="' + Math.max(1.5, hF).toFixed(1) + '" rx="1.5" fill="#a66bfa" opacity=".85"/>';
+    }
+    var step2 = Math.ceil(ir.length / 4);
+    for (var i = 0; i < ir.length; i += step2) {
+      var dt = new Date(ts[i] * 1000);
+      g += '<text class="mtr-axis" x="' + Math.round(pad.l + bw * i + bw / 2) + '" y="' + (Hc - 4) + '" text-anchor="middle" font-size="9">' +
+        ('0' + dt.getHours()).slice(-2) + ':' + ('0' + dt.getMinutes()).slice(-2) + '</text>';
+    }
+    host.innerHTML = '<svg viewBox="0 0 ' + Wc + ' ' + Hc + '" width="' + Wc + '" height="' + Hc + '">' + g + '</svg>';
+  }
+  async function sampleConns() {
+    try {
+      var ag = await jget('api/ui/agents');
+      var agents = ag.agents || [];
+      var iran = agents.filter(function (x) { return x.status === 'online' && x.role !== 'foreign'; }).length;
+      var foreign = agents.filter(function (x) { return x.status === 'online' && x.role === 'foreign'; }).length;
+      connHist.push({ t: Math.floor(Date.now() / 1000), iran: iran, foreign: foreign });
+      if (connHist.length > 360) connHist.shift();
+      setTxt('connIr', String(iran));
+      setTxt('connFo', String(foreign));
+      drawConn();
+    } catch (e) { /* silent */ }
+  }
+  ['sparkCpu', 'sparkRam', 'sparkDisk'].forEach(function (id) {
+    var el = $(id); if (el) el.title = LIVE_NOTE;
+  });
+  var cs = $('connSummary'); if (cs) cs.title = LIVE_NOTE;
+  // bell popover: open alerts next to the language pill
+  var bellWrap = $('bellWrap'), bellBtn = $('bellBtn'), bellPanel = $('bellPanel');
+  if (bellBtn && bellPanel) {
+    bellBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      bellPanel.hidden = !bellPanel.hidden;
+    });
+    document.addEventListener('click', function (e) {
+      if (!bellPanel.hidden && bellWrap && !bellWrap.contains(e.target)) bellPanel.hidden = true;
+    });
+  }
+  setTxt('chartHint', mtrSub());
+  refreshAll(); loadMtr();
+  setInterval(refreshAll, 10000);
+  sampleConns(); setInterval(sampleConns, 5000);
+  setInterval(loadMtr, 60000);
+  })();
+
+// sidebar brand: show the running version under the panel name (from the
+// asset tag this very script was served with).
+(function () {
+  var m = (document.querySelector('script[src*="app.js"]') || { src: '' }).src.match(/v=([^&]+)/);
+  var el = document.getElementById('sbVer');
+  if (el && m) el.textContent = '(v.' + m[1].replace(/^v/, '').replace(/-[0-9a-f]{8,}$/, '') + ')';
+})();

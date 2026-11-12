@@ -346,6 +346,21 @@ CREATE TABLE agent_listening (
   PRIMARY KEY(agent_id, proto, port)
 );
 `,
+	// 8: Agent hosting country (UI review round). The operator picks the
+	// country of a FOREIGN agent when minting its enrollment token; the
+	// agents table shows it next to the role. Additive column; empty =
+	// unknown or a pre-country agent.
+	`
+ALTER TABLE agents ADD COLUMN country TEXT NOT NULL DEFAULT '';
+`,
+	// 9: Agent CPU model (UI review round). The agent's resource report
+	// carries the CPU model string read from /proc/cpuinfo (its model
+	// name usually includes the "@ X.XXGHz" frequency); the agents
+	// detail page extracts the GHz from it. Additive column; empty =
+	// a pre-model report. New batch so it also applies to existing DBs.
+	`
+ALTER TABLE agents ADD COLUMN cpu_model TEXT NOT NULL DEFAULT '';
+`,
 }
 
 func (s *Store) migrate() error {

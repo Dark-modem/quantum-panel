@@ -179,7 +179,7 @@
       done: 'انجام شد', todo: 'باز است',
       th_agent: 'ایجنت', th_state: 'وضعیت', th_role: 'نقش', th_dc: 'دیتاسنتر',
       th_topos: 'توپولوژی‌ها', th_engines: 'موتورها (فعال/در حال اجرا)', th_cpu: 'پردازنده',
-      th_mem: 'حافظه', th_seen: 'آخرین حضور', online: 'برخط', offline: 'خارج از خط', revoked: 'باطل‌شده',
+      th_mem: 'حافظه', th_seen: 'آخرین حضور', online: 'برخط', offline: 'قطع', revoked: 'باطل‌شده',
       agent_info: 'اطلاعات ایجنت', agent_res: 'منابع', ver_lbl: 'نسخه', os_lbl: 'سیستم‌عامل',
       host_lbl: 'نام میزبان', arch_lbl: 'معماری', uptime_lbl: 'مدت کار', ip_lbl: 'IP عمومی',
       ip_ovr: '(دستی)', ip_save: 'ذخیره IP', ip_hint: 'خالی = تشخیص خودکار',

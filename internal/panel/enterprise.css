@@ -108,7 +108,12 @@ table.ent-tbl { width: 100%; border-collapse: collapse; font-size: var(--ent-tbl
   animation: entSlideIn .25s var(--spring) both;
 }
 @keyframes entSlideIn { from { opacity: 0; transform: translateY(8px); } }
-.ent-toast i { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex: none; background: var(--info); }
+.ent-toast-ico { width: 26px; height: 26px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; flex: none; margin-top: 2px; background: color-mix(in srgb, var(--info) 14%, transparent); color: var(--info); }
+.ent-toast.ok .ent-toast-ico { background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); }
+.ent-toast.err .ent-toast-ico { background: color-mix(in srgb, var(--er) 14%, transparent); color: var(--er); }
+.ent-toast.warn .ent-toast-ico { background: color-mix(in srgb, var(--wr) 14%, transparent); color: var(--wr); }
+.ent-toast.info .ent-toast-ico { background: color-mix(in srgb, var(--info) 14%, transparent); color: var(--info); }
+.ent-toast-ico svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin:round; }
 .ent-toast.ok i { background: var(--ok); } .ent-toast.err i { background: var(--er); }
 .ent-toast.warn i { background: var(--wr); } .ent-toast.info i { background: var(--info); }
 .ent-toast small { display: block; color: var(--dim); font-size: var(--fs-small); }
@@ -388,12 +393,12 @@ html[data-rs="0"] .right-sidebar { display:none; }
 
 /* ---- collapsible sidebar + alert badges ---- */
 .sb-toggle {
-  position:absolute; top:94px; inset-inline-end:-13px; z-index:3; width:26px; height:26px; display:grid; place-items:center;
-  border-radius:50%; border:1px solid var(--ln2); background:var(--s2); color:var(--mu); cursor:pointer; padding:0;
-  box-shadow:var(--lift-sm); transition:transform .25s var(--spring), color .15s, border-color .15s;
+  flex:none; width:30px; height:30px; border-radius:8px; border:0; background:none;
+  color:var(--mu); cursor:pointer; display:inline-flex; align-items:center; justify-content:center;
+  padding:0; transition:color .15s, background .15s;
 }
-.sb-toggle:hover { color:var(--tx); border-color:var(--ac-b35-ln2); }
-.sb-toggle svg { width:14px; height:14px; stroke-width:2.4; }
+.sb-toggle:hover { color:var(--ac); background:color-mix(in srgb, var(--ac) 10%, transparent); }
+.sb-toggle svg { width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
 .sb-toggle[aria-pressed="true"] svg { transform:scaleX(-1); }
 [dir="rtl"] .sb-toggle svg { transform:scaleX(-1); }
 [dir="rtl"] .sb-toggle[aria-pressed="true"] svg { transform:none; }
@@ -421,7 +426,6 @@ html[data-rs="0"] .right-sidebar { display:none; }
   html[data-sb="1"] .sidebar .sidebar-foot .sf-t { display:none; }
   html[data-sb="1"] .sidebar .sidebar-nav { padding-inline:8px; }
   html[data-sb="1"] .sidebar .sidebar-brand { padding-inline:6px; }
-  html[data-sb="1"] .sidebar .sb-toggle { top:94px; }
   html[data-sb="1"] .sidebar .nav-item.on::before { inset-inline-start:-8px; }
 }
 @media (max-width:760px) { .sb-toggle { display:none; } }
@@ -1204,18 +1208,20 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
    three tracks are pure fr (minmax(0,…) strips content-based minimums, the
    usual source of header/body drift); Tunnels and Actions are fixed so the
    header can never drift against a row. */
-.topo-list-head, .topo-list-row { display:grid; grid-template-columns:minmax(0,1.05fr) minmax(0,1.15fr) minmax(0,1.15fr) 64px 96px 56px; gap:14px; align-items:center; padding:14px 18px; }
+.topo-list-head, .topo-list-row { display:grid; grid-template-columns:40px minmax(0,1.05fr) minmax(0,1.15fr) minmax(0,1.15fr) 64px 96px 56px; gap:14px; align-items:center; padding:14px 18px; }
 .topo-list-head { background:var(--s2); border-bottom:1px solid var(--ln); }
 .topo-list-head th { min-width:0; padding:0; color:var(--mu); font-size:var(--fs-caption); font-weight:650; text-align:start; text-transform:uppercase; letter-spacing:.07em; }
+/* Persian is a joined script: letter-spacing and uppercase only break it. */
+[dir="rtl"] .topo-list-head th { letter-spacing:0; text-transform:none; }
 /* Tunnels count sits centred under its header; Actions hugs the end edge in
    both header and rows so LTR and RTL align the same way. The actions column
    is 8px narrower than the row's inset so the buttons tuck into the corner. */
-.topo-list-head th:nth-child(4) { text-align:center; white-space:nowrap; }
+.topo-list-head th:nth-child(5) { text-align:center; white-space:nowrap; }
 .topo-list-row .topo-cell-tunnels { text-align:center; }
-.topo-list-head th:nth-child(5) { text-align:center; }
-.topo-list-head th:nth-child(6) { text-align:end; }
-.topo-list-table:not(.topo-grid) .topo-list-head th:nth-child(6),
-.topo-list-table:not(.topo-grid) .topo-cell-actions { margin-inline-end:-8px; }
+.topo-list-head th:nth-child(6) { text-align:center; }
+.topo-list-head th:nth-child(7) { text-align:end; }
+.topo-list-head th:nth-child(7),
+.topo-cell-actions { margin-inline-end:-8px; }
 .topo-list-row { min-height:76px; border-bottom:1px solid var(--ln); transition:background .15s; cursor:pointer; }
 .topo-list-row:last-child { border-bottom:0; }
 .topo-list-row:hover { background:var(--sunk); }
@@ -1270,22 +1276,7 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 .topo-list-skel .u-grid { display:grid; gap:8px; width:100%; }
 .topo-list-skel .ent-skel { width:100%; height:14px; min-height:14px; }
 .topo-list-tools { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:14px; }
-.topo-search { flex:1 1 220px; max-width:380px; min-height:36px; }
-.topo-view-toggle { margin-inline-start:auto; flex:none; }
-.topo-view-toggle button { display:inline-flex; align-items:center; justify-content:center; width:34px; height:30px; padding:0; background:none; border:0; border-radius:8px; color:var(--mu); cursor:pointer; font:inherit; transition:background .15s, color .15s; }
-.topo-view-toggle button svg { width:17px; height:17px; }
-.topo-view-toggle button:hover { color:var(--tx); background:var(--s2); }
-.topo-view-toggle button[aria-pressed="true"] { color:var(--ac); background:var(--s2); }
-.topo-view-toggle button:focus-visible { outline:2px solid var(--ent-focus); outline-offset:2px; }
-.topo-list-table.topo-grid thead { display:none; }
-.topo-list-table.topo-grid tbody { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:12px; padding:12px; }
-.topo-list-table.topo-grid .topo-list-row { display:flex; flex-direction:column; align-items:stretch; gap:10px; min-height:0; padding:16px; border:1px solid var(--ln); border-radius:var(--r-md); background:var(--s2); }
-.topo-list-table.topo-grid .topo-list-row:hover { border-color:var(--ac); }
-.topo-list-table.topo-grid .topo-list-row td { display:block; }
-.topo-list-table.topo-grid .topo-list-row td::before { display:none; }
-/* card mode stacks the cells, so the count reads start-aligned like its peers */
-.topo-list-table.topo-grid .topo-cell-tunnels { text-align:start; }
-.topo-list-table.topo-grid .topo-actions { justify-content:flex-start; }
+.topo-search { flex:1 1 100%; max-width:none; min-height:36px; }
 .topo-settings { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin:16px 0; }
 /* Detail header actions: one joined pill group — power toggle (accent),
    Edit, and a danger Delete, each icon + label, hovers tint inside the pill. */
@@ -1362,14 +1353,11 @@ html[dir="rtl"] .topo-back .topo-back-ic { transform:scaleX(-1); }
   .topo-list-row td { display:grid; grid-template-columns:86px minmax(0,1fr); align-items:center; gap:12px; }
   .topo-list-row td::before { content:attr(data-label); color:var(--mu); font-size:var(--fs-caption); font-weight:600; overflow-wrap:anywhere; }
   .topo-list-row .topo-count { justify-self:start; }
+  .topo-list-row .topo-state-pill { justify-self:start; }
   .topo-actions { justify-content:flex-start; flex-wrap:wrap; }
   .topo-list-toolbar { gap:10px; }
   .topo-list-tools { margin-bottom:12px; }
-  .topo-view-toggle { margin-inline-start:0; }
-  .topo-list-table.topo-grid tbody { grid-template-columns:1fr; }
-  .topo-list-table.topo-grid .topo-list-row { display:block; }
-  .topo-list-table.topo-grid .topo-list-row td { display:grid; grid-template-columns:86px minmax(0,1fr); }
-  .topo-list-table.topo-grid .topo-list-row td::before { display:block; content:attr(data-label); }
+  .topo-list-tools { gap:8px; }
 }
 @media(max-width:800px) { .topo-settings{grid-template-columns:1fr;} }
 
@@ -1572,3 +1560,133 @@ html[dir="rtl"] .topo-back .topo-back-ic { transform:scaleX(-1); }
 
 /* Typed-op result panels (Firewall/Netopt tabs): quiet mono output. */
 .ops-out { background:var(--sunk); border:1px solid var(--ln); border-radius:var(--r-md); padding:12px 16px; font-size:var(--fs-caption); color:var(--tx2); white-space:pre-wrap; word-break:break-word; min-height:40px; max-height:280px; overflow:auto; }
+
+/* Row number, list subtitle and footer: the topology list reads like a ledger. */
+.topo-list-sub { margin:-4px 0 14px; color:var(--mu); font-size:var(--fs-small); }
+.topo-cell-no { color:var(--mu); font-variant-numeric:tabular-nums; font-size:var(--fs-caption); }
+.topo-list-foot { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 18px; border-top:1px solid var(--ln); color:var(--mu); font-size:var(--fs-caption); }
+.topo-list-foot-note { color:var(--mu); }
+
+/* The index is a desktop reading aid: cards carry the name instead. */
+@media(max-width:799px){ .topo-list-row .topo-cell-no { display:none !important; } }
+
+/* ---- Topology page shell v2 ---- */
+.topo-page { padding:0; overflow:hidden; }
+.topo-hero { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; padding:22px 22px 0; }
+.topo-hero-text { min-width:0; }
+.topo-hero-text .tc-title { margin:0; font-size:19px; font-weight:700; text-wrap:balance; }
+.topo-page .topo-list-sub { margin:6px 0 0; color:var(--mu); font-size:var(--fs-small); }
+.topo-hero-side { display:flex; align-items:center; gap:10px; }
+.topo-chip { min-width:30px; height:26px; padding:0 10px; display:inline-grid; place-items:center;
+  border-radius:999px; background:var(--ac-soft); color:var(--ac); font-size:var(--fs-caption);
+  font-weight:700; font-variant-numeric:tabular-nums; }
+.topo-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; padding:18px 22px 0; }
+.topo-stat { display:grid; gap:4px; padding:12px 14px; border:1px solid var(--ln);
+  border-radius:var(--r-md); background:var(--s2); }
+.topo-stat-k { color:var(--mu); font-size:var(--fs-caption); }
+.topo-stat-v { color:var(--tx); font-size:22px; line-height:1.1; font-weight:700; font-variant-numeric:tabular-nums; }
+.topo-list-tools { padding:16px 22px 12px; margin:0; }
+.topo-searchbox { position:relative; display:flex; align-items:center; width:100%; }
+.topo-search-ic { position:absolute; inset-inline-start:12px; width:16px; height:16px; fill:none;
+  stroke:var(--mu); stroke-width:1.9; stroke-linecap:round; pointer-events:none; }
+.topo-searchbox .topo-search { padding-inline-start:36px; }
+.topo-page .topo-list-wrap { margin:0 22px; }
+.topo-page .topo-list-foot { display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding:12px 22px 16px; margin:0; color:var(--mu); font-size:var(--fs-caption); }
+.topo-cell-no { color:var(--mu); font-size:var(--fs-caption); font-variant-numeric:tabular-nums; }
+.topo-name { font-size:14px; font-weight:650; }
+.topo-name::before { content:""; width:8px; height:8px; border-radius:2px; background:var(--ac);
+  opacity:.55; flex:none; }
+.topo-count { display:inline-grid; place-items:center; min-width:26px; height:24px; padding:0 8px;
+  border-radius:8px; background:var(--ac-soft); color:var(--ac); font-size:var(--fs-caption); font-weight:700; }
+.topo-list-empty .quantum-btn { margin-top:12px; }
+@media (max-width:799px) {
+  .topo-hero { padding:18px 16px 0; }
+  .topo-stats { gap:8px; padding:14px 16px 0; }
+  .topo-stat { padding:10px; }
+  .topo-stat-v { font-size:18px; }
+  .topo-list-tools { padding:14px 16px 10px; }
+  .topo-page .topo-list-wrap { margin:0 16px; }
+  .topo-page .topo-list-foot { padding:10px 16px 14px; }
+}
+
+/* ---- Topology page shell v3 ---- */
+.topo-stats { gap:12px; }
+.topo-stat { grid-template-columns:minmax(0,1fr); align-content:start; gap:6px; padding:14px 16px; }
+.topo-stat-v { font-size:26px; letter-spacing:0; }
+.topo-list-tools { display:flex; align-items:center; gap:12px; }
+.topo-searchbox { max-width:420px; }
+.topo-searchbox .topo-search { background:var(--s1); }
+.topo-name::before { content:none; }
+.topo-count { min-width:0; height:auto; padding:0; border-radius:0; background:none; }
+.topo-state-pill.st-none { color:var(--mu); border-color:var(--ln2); background:var(--s2); }
+.topo-list-head th { font-size:12px; color:var(--mu); }
+.topo-list-row { min-height:72px; }
+@media (max-width:799px) {
+  .topo-searchbox { max-width:none; }
+  .topo-stat-v { font-size:20px; }
+}
+
+/* ---- Topology page shell v4 ---- */
+.topo-title-row { display:flex; align-items:center; gap:10px; min-width:0; }
+.topo-title-row .tc-title { margin:0; }
+.topo-chip { height:22px; min-width:24px; padding:0 8px; font-size:12px; }
+.topo-stat { align-content:center; padding:12px 16px; gap:4px; }
+.topo-stat-v { font-size:24px; }
+.topo-list-head th { color:var(--tx2); font-weight:600; }
+.topo-list-head { background:var(--s2); }
+.topo-list-row:hover .topo-name { color:var(--ac); }
+.topo-list-row:hover .topo-cell-state .topo-state-pill { filter:brightness(1.06); }
+@media (max-width:799px) {
+  .topo-title-row { gap:8px; }
+  .topo-stat { padding:10px 12px; }
+  .topo-stat-k { font-size:12px; }
+}
+
+/* ---- Topology page shell v5 ---- */
+/* KPI tile: label at the reading start, the number parked at the far end so
+   the tile reads as one bar instead of a half-empty box. */
+.topo-stat { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 16px; }
+.topo-stat-k { order:1; }
+.topo-stat-v { order:2; font-size:24px; line-height:1; }
+.topo-list-tools { padding-block:16px 14px; }
+@media (max-width:799px) {
+  .topo-stat { padding:10px 12px; gap:8px; }
+  .topo-stat-v { font-size:19px; }
+}
+
+/* ---- Topology page shell v6 ---- */
+/* Label over number, both at the reading start: the pair stays visually
+   together instead of being pushed to opposite ends of a wide tile. */
+.topo-stat { display:grid; align-content:center; gap:2px; padding:12px 16px; }
+.topo-stat-k { order:0; }
+.topo-stat-v { order:0; font-size:24px; line-height:1.1; }
+.topo-list-tools { padding:12px 22px; }
+.topo-searchbox { max-width:380px; }
+@media (max-width:799px) {
+  .topo-stat { padding:10px 12px; gap:2px; }
+  .topo-stat-v { font-size:20px; }
+  .topo-list-tools { padding:12px 16px; }
+}
+
+/* Topology page shell v7: one-line status pills, a search field that does
+   not clip its text, and a KPI strip that fills its cards. */
+#tab-tunnel .topo-state-pill { white-space:nowrap; }
+#tab-tunnel .topo-stat { padding:12px 14px; gap:4px; }
+#tab-tunnel .topo-stat-v { font-size:24px; }
+#tab-tunnel .topo-searchbox { max-width:460px; }
+#tab-tunnel .topo-search { text-align:start; }
+
+/* Agents page header: the add-agent action sits at the top of the page, not
+   inside the list card, so it is visible before any scrolling. */
+#tab-agents .ag-hero { padding:0 2px 14px; }
+#tab-agents .ag-hero .topo-list-sub { margin-top:4px; }
+
+/* Dashboard charts: the SVG is drawn at its measured pixel width, so the axis
+   numbers are never upscaled into a blur. Labels come from classes so each
+   theme sets its own ink, and the geometry snaps to whole pixels. */
+#mtrChart svg, #agtConnChart svg { display:block; max-width:100%; }
+/* Vazirmatn's Latin digits render with a double edge inside an SVG at 12px;
+   the chart axis uses the system UI face, which stays crisp at 1:1. */
+#mtrChart .mtr-axis, #agtConnChart .mtr-axis { fill:var(--tx); font-size:12px; font-weight:600; font-variant-numeric:tabular-nums; letter-spacing:0; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
+.mtr-grid { stroke:var(--ln); }
