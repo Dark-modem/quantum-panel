@@ -56,13 +56,12 @@ func (h uiStoreHandle) uiTunnelRow(s *store.Store, topo store.Topology, t store.
 	if l, ok := lat[t.TunnelKey]; ok {
 		latency = l
 	}
-	return map[string]any{
+	row := map[string]any{
 		"id": t.ID, "tunnel_key": t.TunnelKey, "engine": t.Engine, "enabled": t.Enabled,
-		"local_server":     h.uiServerRef(t.LocalServerID),
-		"remote_server":    h.uiServerRef(t.RemoteServerID),
-		"state":            verdict,
-		"weight":           w,
-		"resolved_percent": pcts[t.ID],
+		"local_server":  h.uiServerRef(t.LocalServerID),
+		"remote_server": h.uiServerRef(t.RemoteServerID),
+		"state":         verdict,
+		"weight":        w,
 		"traffic_today": map[string]any{
 			"wire_rx_bytes":    usage.WireRx,
 			"wire_tx_bytes":    usage.WireTx,
@@ -71,6 +70,12 @@ func (h uiStoreHandle) uiTunnelRow(s *store.Store, topo store.Topology, t store.
 		},
 		"latency_ms": latency,
 	}
+	// Only connected tunnels carry weight — a dropped tunnel shows no
+	// resolved share and the survivors re-normalize without it.
+	if p := pcts[t.ID]; p > 0 {
+		row["resolved_percent"] = p
+	}
+	return row
 }
 
 func mustListTunnels(s *store.Store, topoID int64) []store.Tunnel {
@@ -90,11 +95,11 @@ func handleUITopologyDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	now := timeNowUnix()
-	verdicts := uiTunnelVerdicts()
+	verdicts := uiVerdictsFn()
 	lat := uiLatencyMap()
 	members, _ := h.TopologyMembers(topoID)
 	tunnels := mustListTunnels(h.Store, topoID)
-	pcts := h.uiResolvedPercents(topoID, tunnels) // once, not per row
+	pcts := h.uiResolvedPercents(topoID, tunnels, verdicts) // once, not per row
 
 	iranRows, foreignRows := []map[string]any{}, []map[string]any{}
 	allRows := []map[string]any{}
@@ -189,7 +194,7 @@ func handleUITunnelDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	now := timeNowUnix()
-	verdicts := uiTunnelVerdicts()
+	verdicts := uiVerdictsFn()
 
 	// NOW: state, proc metrics, rates, latency/loss, uptime.
 	state := "unknown"
@@ -408,7 +413,7 @@ func handleUITunnelWeight(w http.ResponseWriter, r *http.Request) {
 		uiErrWrite(w, r, "E-STORE", map[string]any{"op": "weight"}, err.Error())
 		return
 	}
-	pcts := h.uiResolvedPercents(topo.ID, mustListTunnels(h.Store, topo.ID))
+	pcts := h.uiResolvedPercents(topo.ID, mustListTunnels(h.Store, topo.ID), uiVerdictsFn())
 	writeJSON(w, map[string]any{
 		"status": "ok", "tunnel": key, "weight": weight,
 		"resolved_percent": pcts[t.ID],

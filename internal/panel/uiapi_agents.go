@@ -134,13 +134,13 @@ func handleUIAgentDetail(w http.ResponseWriter, r *http.Request) {
 	tunRows := []map[string]any{}
 	if ag.ServerID != 0 {
 		if allTopos, err := h.ListTopologies(); err == nil {
-			verdicts := uiTunnelVerdicts()
+			verdicts := uiVerdictsFn()
 			for _, tp := range allTopos {
 				tunnels, terr := h.ListTunnels(tp.ID)
 				if terr != nil {
 					continue
 				}
-				pcts := h.uiResolvedPercents(tp.ID, tunnels)
+				pcts := h.uiResolvedPercents(tp.ID, tunnels, verdicts)
 				lat := uiLatencyMap()
 				now := timeNowUnix()
 				for _, tn := range tunnels {
@@ -158,12 +158,18 @@ func handleUIAgentDetail(w http.ResponseWriter, r *http.Request) {
 					if uerr == nil {
 						todayBytes = usage.WireRx + usage.WireTx
 					}
-					tunRows = append(tunRows, map[string]any{
+					row := map[string]any{
 						"tunnel_key": tn.TunnelKey, "engine": tn.Engine, "topology": tp.Name,
 						"local": h.uiServerRef(tn.LocalServerID), "remote": h.uiServerRef(tn.RemoteServerID),
-						"state": state, "weight_pct": pcts[tn.ID], "latency_ms": lat[tn.TunnelKey],
+						"state": state, "latency_ms": lat[tn.TunnelKey],
 						"today_bytes": todayBytes,
-					})
+					}
+					// Only connected tunnels carry weight — a dropped tunnel
+					// shows «—» and its share flows to the surviving ones.
+					if p := pcts[tn.ID]; p > 0 {
+						row["weight_pct"] = p
+					}
+					tunRows = append(tunRows, row)
 				}
 			}
 		}
@@ -225,7 +231,7 @@ func (h uiStoreHandle) uiAgentTopologies(s *store.Store, ag store.Agent, withTun
 	if err != nil || len(members) == 0 {
 		return out
 	}
-	verdicts := uiTunnelVerdicts()
+	verdicts := uiVerdictsFn()
 	lat := uiLatencyMap()
 	now := timeNowUnix()
 	// serverID → agent country (the servers table carries no country; the
@@ -301,7 +307,7 @@ func (h uiStoreHandle) uiAgentTopologies(s *store.Store, ag store.Agent, withTun
 		if withTunnels {
 			tunnels, _ := h.ListTunnels(topoID)
 			rows := []map[string]any{}
-			pcts := h.uiResolvedPercents(topoID, tunnels)
+			pcts := h.uiResolvedPercents(topoID, tunnels, verdicts)
 			for _, t := range tunnels {
 				if t.LocalServerID != ag.ServerID && t.RemoteServerID != ag.ServerID {
 					continue

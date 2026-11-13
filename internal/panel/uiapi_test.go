@@ -340,6 +340,14 @@ func TestUITopologyDetailWeightsAndTraffic(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Runtime-aware weights: the tunnel-health verdicts gate who carries
+	// weight — stub both tunnels healthy for this test.
+	origVerdicts := uiVerdictsFn
+	uiVerdictsFn = func() map[string]string {
+		return map[string]string{"tl-a": "healthy", "tl-b": "healthy"}
+	}
+	t.Cleanup(func() { uiVerdictsFn = origVerdicts })
+
 	c := meshSession(t)
 	td := meshGetMap(t, c, srv, fmt.Sprintf("/api/ui/topologies/%d", topoID))
 	tunnels := td["tunnels"].([]any)

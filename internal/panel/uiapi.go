@@ -222,15 +222,29 @@ func uiTunnelVerdicts() map[string]string {
 	return out
 }
 
+// uiVerdictsFn is the verdicts source behind the runtime-aware weights;
+// tests stub it to place tunnels in a known up/down state.
+var uiVerdictsFn = uiTunnelVerdicts
+
 // uiResolvedPercents computes each tunnel's share of its balancing scope
 // (the topology's enabled tunnels per local server): weight / Σweights.
-func (h uiStoreHandle) uiResolvedPercents(topoID int64, tunnels []store.Tunnel) map[int64]float64 {
+func (h uiStoreHandle) uiResolvedPercents(topoID int64, tunnels []store.Tunnel, verdicts map[string]string) map[int64]float64 {
 	out := map[int64]float64{}
-	sums := map[int64]int{}      // localServerID -> Σweights (enabled tunnels)
+	sums := map[int64]int{}      // localServerID -> Σweights (tunnels that are UP right now)
 	weights := map[int64]int{}   // tunnelID -> weight
 	localOf := map[int64]int64{} // tunnelID -> local server
-	for _, t := range tunnels {
+	// Runtime-aware balancing: only tunnels that are actually connected
+	// carry weight. When one drops, its share flows to the surviving
+	// tunnels automatically (the sum recomputes without it).
+	up := func(t store.Tunnel) bool {
 		if !t.Enabled {
+			return false
+		}
+		v := verdicts[t.TunnelKey]
+		return v == "healthy" || v == "degraded"
+	}
+	for _, t := range tunnels {
+		if !up(t) {
 			continue
 		}
 		w, err := h.WeightFor(topoID, t.LocalServerID, t.RemoteServerID, t.ID)
@@ -245,8 +259,7 @@ func (h uiStoreHandle) uiResolvedPercents(topoID int64, tunnels []store.Tunnel) 
 	}
 	for id, w := range weights {
 		if w <= 0 || sums[localOf[id]] == 0 {
-			out[id] = 0 // excluded from balancing
-			continue
+			continue // excluded from balancing right now
 		}
 		out[id] = float64(w) / float64(sums[localOf[id]]) * 100
 	}
