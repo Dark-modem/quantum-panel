@@ -630,8 +630,13 @@
   html[dir="rtl"] .drawer.open { transform:none; }
   .drawer-head { display:flex; align-items:center; gap:10px; padding:16px; border-bottom:1px solid var(--ln); }
   .drawer-head .brand-name { font-weight:700; letter-spacing:.05em; color:var(--tx); }
-  .drawer-x { margin-inline-start:auto; border:0; background:transparent; color:var(--ac); font-size:22px; cursor:pointer; padding:4px 8px; border-radius:8px; transition:color .15s, background .15s; }
-  .drawer-x:hover { color:var(--ac); background:color-mix(in srgb, var(--ac) 12%, transparent); }
+  .drawer-x { margin-inline-start:auto; flex:none; width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center;
+    border:1px solid color-mix(in srgb, var(--ac) 30%, transparent); border-radius:10px;
+    background:color-mix(in srgb, var(--ac) 10%, transparent);
+    -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px);
+    color:var(--ac); font-size:19px; line-height:1; cursor:pointer; padding:0; transition:color .15s, background .15s, border-color .15s; }
+  .drawer-x:hover { background:color-mix(in srgb, var(--ac) 20%, transparent); border-color:color-mix(in srgb, var(--ac) 50%, transparent); }
+  .drawer-x:active { transform:scale(.94); }
   .drawer-nav { padding:12px; display:flex; flex-direction:column; gap:4px; flex:1; overflow-y:auto; }
   .drawer-nav .nav-sec { font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
     color:var(--mu); padding:10px 12px 4px; }
