@@ -1414,6 +1414,14 @@
   .lang-toggle:active { transform:scale(.95); }
   .lang-toggle:focus-visible { outline:2px solid var(--ac-out70); outline-offset:2px; }
   body[data-t="dark"] .lang-toggle { border-color:var(--ac-b30); }
+  @media (max-width:760px) {
+    /* one square, one label: the language you will switch TO */
+    .lang-toggle { width:38px; }
+    .lang-toggle .lt-thumb { display:none; }
+    .lang-toggle .lt-seg { width:100%; }
+    .lang-toggle .lt-seg.on { display:none; }
+    .lang-toggle .lt-seg:not(.on) { color:var(--ac); }
+  }
   .tt-sun, .tt-moon { transform-origin:12px 12px;
     transition:transform .45s cubic-bezier(.34,1.56,.64,1), opacity .25s ease; }
   /* dark (default): sun shown — it points at the theme you switch to, matching
