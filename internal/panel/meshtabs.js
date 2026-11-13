@@ -117,6 +117,7 @@
     agStName: ['نام', 'Name'], agStSide: ['سمت', 'Side'], agStTtl: ['زمان توکن', 'Token lifetime'],
     agWizNext: ['بعدی', 'Next'], agWizBack: ['قبلی', 'Back'],
     agNameReq: ['اسم ایجنت را وارد کنید', 'Enter the agent name'],
+    agActMore: ['عملیات', 'Actions'],
     agDaysU: ['روز', 'days'],
     agTokenOk: ['توکن ساخته شد — فقط یک بار قابل استفاده است', 'Token minted — valid for a single use'],
     agCopyCmd: ['کپی دستور', 'Copy command'],
@@ -946,6 +947,7 @@
     });
   }
   var agtView = { view: 'table' };
+  var agtActsOpen = '';
   var engFilter = 'all';
   // the ?v= asset tag app.js was served with (version + content hash) —
   // appended to engine brand icon URLs so icon updates bust browser caches.
@@ -1058,12 +1060,15 @@
         '<td>' + (a.version ? '<span class="mtb-ver"><bdi dir="ltr">' + esc(/^[0-9]/.test(a.version) ? 'v' + a.version : a.version) + '</bdi></span>' : '—') + '</td>' +
         '<td class="mono">' + esc(a.arch || '—') + '</td>' +
         '<td>' + agtTopoCell(a) + '</td>' +
-        '<td><div class="mtb-acts-row">' +
+        '<td><div class="mtb-acts-row' + (agtActsOpen === a.id ? ' open' : '') + '">' +
+        '<div class="mtb-acts-pop">' +
         '<button type="button" class="mtb-act mtb-act-view" data-agview="' + esc(a.id) + '" title="' + esc(L('agActView')) + '">' + MTB_ICO.eye + '</button>' +
         '<button type="button" class="mtb-act mtb-act-edit" data-agedit="' + esc(a.id) + '" title="' + esc(L('agActEdit')) + '">' + MTB_ICO.pen + '</button>' +
         '<button type="button" class="mtb-act mtb-act-upd" data-agupd="' + esc(a.id) + '" title="' + esc(L('agActUpd')) + '">' + MTB_ICO.upArrow + '</button>' +
         '<button type="button" class="mtb-act mtb-act-ref" data-agrefresh="' + esc(a.id) + '" title="' + esc(L('agRefresh')) + '">' + MTB_ICO.upd + '</button>' +
         '<button type="button" class="mtb-act mtb-act-del" data-agdel="' + esc(a.id) + '" title="' + esc(L('agActDel')) + '">' + MTB_ICO.trash + '</button>' +
+        '</div>' +
+        '<button type="button" class="mtb-act mtb-acts-kebab" data-actskebab title="' + esc(L('agActMore')) + '" aria-label="' + esc(L('agActMore')) + '"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="19" r="1.7"/></svg></button>' +
         '</div></td>';
       if (hasRes) {
         row += tdNum(r.cpu && r.cpu.percent != null ? pct(r.cpu.percent) : (r.cpu_pct != null ? pct(r.cpu_pct) : '—'));
@@ -1785,6 +1790,19 @@
   document.addEventListener('click', function (e) {
     var b = e.target && e.target.closest ? e.target.closest('#mtbNewAgent') : null;
     if (b) openAgentModal();
+  });
+  document.addEventListener('click', function (e) {
+    var kb = e.target && e.target.closest ? e.target.closest('[data-actskebab]') : null;
+    var keep = kb ? kb.closest('.mtb-acts-row') : null;
+    document.querySelectorAll('.mtb-acts-row.open').forEach(function (r) { if (r !== keep) r.classList.remove('open'); });
+    if (kb) {
+      var arow = kb.closest('.mtb-acts-row');
+      arow.classList.toggle('open');
+      var idEl = arow.querySelector('[data-agview]');
+      agtActsOpen = arow.classList.contains('open') && idEl ? idEl.getAttribute('data-agview') : '';
+    } else {
+      agtActsOpen = '';
+    }
   });
   document.addEventListener('click', function (e) {
     var v = e.target && e.target.closest ? e.target.closest('[data-agview],[data-agd]') : null;

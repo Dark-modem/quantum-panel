@@ -11363,6 +11363,14 @@ window.loadClusterStatus = loadClusterStatus;
     '.mtb-act.mtb-act-ref:hover{color:var(--ac);background:color-mix(in srgb, var(--ac) 10%, transparent);border-color:var(--ac-b30)}',
     '.mtb-act.mtb-act-busy svg{animation:mtbSpin .8s linear infinite}',
     '@keyframes mtbSpin{to{transform:rotate(360deg)}}',
+    '.mtb-acts-kebab{display:none;color:var(--tx2)}',
+    '.mtb-acts-kebab svg{width:16px;height:16px}',
+    '.mtb-acts-pop{display:contents}',
+    '@media (max-width:760px){.mtb-acts-row{position:relative}' +
+      '.mtb-acts-kebab{display:inline-flex}' +
+      '.mtb-acts-row.open .mtb-acts-kebab{color:var(--ac);border-color:var(--ac-b30)}' +
+      '.mtb-acts-pop{display:none;position:absolute;top:calc(100% + 6px);inset-inline-end:0;z-index:8;flex-direction:column;gap:6px;padding:8px;background:var(--sunk);border:1px solid var(--ln);border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.5)}' +
+      '.mtb-acts-row.open .mtb-acts-pop{display:flex}}',
     '.mtb-act-del{color:var(--er);background:color-mix(in srgb, var(--er) 9%, transparent);border-color:color-mix(in srgb, var(--er) 26%, transparent)}',
     '.mtb-act.mtb-act-del:hover{color:var(--er);background:color-mix(in srgb, var(--er) 18%, transparent);border-color:color-mix(in srgb, var(--er) 45%, transparent)}',
     '.mtb-aglink{cursor:pointer}',
