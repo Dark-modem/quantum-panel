@@ -285,7 +285,17 @@ function topTitleSync(id) {
     h1.querySelector('.mtb-bc-cur').textContent = window.mtbAgtDetail;
     return;
   }
-  if (lbl) h1.textContent = lbl.textContent;
+  if (!lbl) return;
+  // Keep the title text in its own span so the glass chip can ellipsize it
+  // instead of clipping mid-glyph on narrow topbars.
+  let span = h1.querySelector('.tb-title-txt');
+  if (!span) {
+    h1.textContent = '';
+    span = document.createElement('span');
+    span.className = 'tb-title-txt';
+    h1.appendChild(span);
+  }
+  span.textContent = lbl.textContent;
 }
 window.addEventListener('hashchange', function () { try { topTitleSync(); } catch (e) {} });
 window.topTitleSync = topTitleSync;
@@ -416,6 +426,13 @@ function drawerClose() {
 $('menuBtn').onclick = drawerOpen;
 $('drawerX').onclick = drawerClose;
 $('drawerOv').onclick = drawerClose;
+// Picking ANY tab in the mobile drawer closes it. The mesh tabs (agents,
+// tunnels, alerts, ...) are re-wired by meshtabs.js and no longer carry
+// drawerSync's per-node handler, so listen in the capture phase instead.
+document.addEventListener('click', e => {
+  const b = e.target && e.target.closest ? e.target.closest('#drawerNav [data-tab]') : null;
+  if (b && $('drawer').classList.contains('open')) drawerClose();
+}, true);
 document.addEventListener('keydown', e => { if (e.key === 'Escape') drawerClose(); });
 if ($('themeBtnM')) $('themeBtnM').onclick = () => setTheme(document.body.dataset.t === 'dark' ? 'light' : 'dark');
 $('logoutBtnM').onclick = async () => { try { await api('/api/logout', {}); } catch(e){ /* logout best-effort: always fall through to login screen */ } showLogin(); };

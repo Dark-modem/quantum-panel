@@ -754,6 +754,7 @@ func Main(args []string) int {
 	mux.HandleFunc("GET "+base+"/img/engines/rathole.png", serveAsset("img/engines/rathole.png", "image/png"))
 	mux.HandleFunc("GET "+base+"/img/engines/wstunnel.png", serveAsset("img/engines/wstunnel.png", "image/png"))
 	mux.HandleFunc("GET "+base+"/img/engines/tinc.png", serveAsset("img/engines/tinc.png", "image/png"))
+	mux.HandleFunc("GET "+base+"/img/engines/tinc.svg", serveAsset("img/engines/tinc.svg", "image/svg+xml"))
 	mux.HandleFunc("GET "+base+"/img/engines/hysteria.png", serveAsset("img/engines/hysteria.png", "image/png"))
 	mux.HandleFunc("GET "+base+"/img/engines/singbox.png", serveAsset("img/engines/singbox.png", "image/png"))
 	mux.HandleFunc("GET "+base+"/img/engines/singbox.svg", serveAsset("img/engines/singbox.svg", "image/svg+xml"))
@@ -1089,8 +1090,12 @@ var (
 func assetTag() string {
 	assetTagOnce.Do(func() {
 		h := sha256.New()
-		for _, f := range []string{"app.js", "i18n-fa.js", "tokens.css", "base.css", "enterprise.css",
-			"mesh.js", "quantum-mesh.css", "wizard.js"} {
+		// Every first-party asset that serveIndex tags with ?v= must be hashed
+		// here; otherwise edits to it keep the old tag and browsers serve the
+		// 24h-cached copy (meshtabs.js used to be missing: UI fixes looked
+		// absent until the cache expired).
+		for _, f := range []string{"app.js", "i18n-fa.js", "meshtabs.js", "topology.js", "tunnel_overview.js",
+			"matrix_edit.js", "tokens.css", "base.css", "enterprise.css", "mesh.js", "quantum-mesh.css", "wizard.js"} {
 			b, _ := panelFS.ReadFile(f)
 			h.Write(b)
 		}

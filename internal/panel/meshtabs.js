@@ -61,7 +61,7 @@
     topoCol: ['توپولوژی', 'Topology'],
     agActs: ['عملیات', 'Actions'], agActView: ['مشاهده', 'View'], agActEdit: ['ویرایش', 'Edit'], agActDel: ['حذف', 'Delete'],
     agBack: ['بازگشت', 'Back'], agInfoT: ['مشخصات ایجنت', 'Agent details'],
-    agTopoT: ['توپولوژی‌ها', 'Topologies'], agEngT: ['موتورهای ایجنت', 'Agent engines'], agNoEng: ['انجینی ثبت نشده', 'No engines'],
+    agTopoT: ['توپولوژی‌ها', 'Topologies'], agEngT: ['هسته‌های ایجنت', 'Agent engines'], agNoEng: ['انجینی ثبت نشده', 'No engines'],
     agNoTopo: ['عضو هیچ توپولوژی‌ای نیست', 'Not a member of any topology'], agPeers: ['هم‌تا', 'peers'],
     agEditT: ['ویرایش ایجنت', 'Edit agent'], agNameK: ['نام', 'Name'], agIPK: ['IP عمومی', 'Public IP'],
     agSave: ['ذخیره', 'Save'], agDelT: ['حذف ایجنت', 'Delete agent'],
@@ -77,7 +77,7 @@
     agPhRestarting: ['ری‌استارت', 'restarting'], agPhCompleted: ['کامل شد', 'completed'],
     agPhFailed: ['ناموفق', 'failed'],
     agTunT: ['تونل‌ها', 'Tunnels'], agNoTun: ['هیچ تونلی روی این سرور نیست', 'No tunnels on this server'],
-    agTunUp: ['برقرار', 'up'],
+    agTunUp: ['متصل', 'up'],
     agStatAll: ['کل', 'Total'], agStatOn: ['آنلاین', 'online'],     agStatOff: ['آفلاین', 'offline'],
     agPage: ['صفحه', 'Page'], agOf: ['از', 'of'],
     agSearchPh: ['جستوجوی ایجنت‌ها...', 'Search agents...'], agAllF: ['همه', 'All'],
@@ -96,6 +96,7 @@
     engStateRun: ['در حال اجرا', 'Running'], engStateStop: ['متوقف', 'Stopped'], engStateNot: ['نصب نشده', 'Not installed'],
     engInstall: ['نصب', 'Install'], engStart: ['اجرای', 'Start'], engStop: ['توقف', 'Stop'],
     engAll: ['همه', 'All'], engVersion: ['نسخه', 'Version'], engKernel: ['هسته‌ای — بدون نسخه', 'Kernel — no version'],
+    agTunName: ['تانل', 'Tunnel'],
     agDstSrv: ['سرور مقصد', 'Destination'], agMotor: ['موتور', 'Engine'], agWeight: ['وزن', 'Weight'],
     agToday: ['ظرفیت امروز', 'Today'], agLatency: ['تأخیر', 'Latency'], agViewDtl: ['مشاهده جزئیات', 'View details'],
     heroAgT: ['اولین ایجنت را وصل کن', 'Connect your first agent'],
@@ -1231,7 +1232,7 @@
         return 'stopped';
       };
       var engDisp = { matrix: 'Matrix', frp: 'FRP', backhaul: 'Backhaul', gost: 'Gost', xray: 'Xray', wireguard: 'WireGuard', wst: 'wstunnel', wstunnel: 'wstunnel', chisel: 'Chisel', rathole: 'Rathole', tinc: 'Tinc', backpack: 'BackPack', dagger: 'DaggerConnect', easytier: 'EasyTier', hysteria: 'Hysteria', midos: 'Midos', narnia: 'Narnia', paqet: 'Paqet', pengo: 'Pengo', singbox: 'sing-box', spoof: 'Spoof', udp2raw: 'udp2raw', waterwall: 'WaterWall', wattunnel: 'WatTunnel' };
-      var ENGINE_IMG = { gost: 'img/engines/gost.png', xray: 'img/engines/xray.svg', wireguard: 'img/engines/wireguard.png', rathole: 'img/engines/rathole.png', wst: 'img/engines/wstunnel.png', wstunnel: 'img/engines/wstunnel.png', tinc: 'img/engines/tinc.png', hysteria: 'img/engines/hysteria.png', singbox: 'img/engines/singbox.png', midos: 'img/engines/midos.png', dagger: 'img/engines/dagger.png', pengo: 'img/engines/pengo.png', backhaul: 'img/engines/backhaul.png', backpack: 'img/engines/backpack.png', narnia: 'img/engines/narnia.png', waterwall: 'img/engines/waterwall.png', wattunnel: 'img/engines/wattunnel.png', udp2raw: 'img/engines/udp2raw.png', paqet: 'img/engines/paqet.png', frp: 'img/engines/frp.png', easytier: 'img/engines/easytier.png', chisel: 'img/engines/chisel.png' };
+      var ENGINE_IMG = { gost: 'img/engines/gost.png', xray: 'img/engines/xray.svg', wireguard: 'img/engines/wireguard.png', rathole: 'img/engines/rathole.png', wst: 'img/engines/wstunnel.png', wstunnel: 'img/engines/wstunnel.png', tinc: 'img/engines/tinc.svg', hysteria: 'img/engines/hysteria.png', singbox: 'img/engines/singbox.png', midos: 'img/engines/midos.png', dagger: 'img/engines/dagger.png', pengo: 'img/engines/pengo.png', backhaul: 'img/engines/backhaul.png', backpack: 'img/engines/backpack.png', narnia: 'img/engines/narnia.png', waterwall: 'img/engines/waterwall.png', wattunnel: 'img/engines/wattunnel.png', udp2raw: 'img/engines/udp2raw.png', paqet: 'img/engines/paqet.png', frp: 'img/engines/frp.png', easytier: 'img/engines/easytier.png', chisel: 'img/engines/chisel.png' };
       var engImgQ = engImgTag ? '?v=' + engImgTag : '';
       var engImg = function (eng) { return ENGINE_IMG[eng] ? ENGINE_IMG[eng] + engImgQ : ''; };
       var engLogo = function (en, disp) {
@@ -1275,11 +1276,19 @@
 
       // tunnels table
       var tunRows = tuns.length ? tuns.map(function (tn) {
-        var b2 = tn.state === 'healthy' ? badge('ok', esc(L('agTunUp')), true) : (tn.state === 'down' ? badge('err', esc(L('st_down')), true) : (tn.state === 'disabled' ? badge('dim', esc(L('disabled')), true) : badge('dim', '\u2014')));
+        // Always a word, never a bare dash: up / down / disabled / unknown.
+        var b2 = tn.state === 'healthy' ? badge('ok', esc(L('agTunUp')), true) : (tn.state === 'down' ? badge('err', esc(L('st_down')), true) : (tn.state === 'disabled' ? badge('dim', esc(L('disabled')), true) : badge('dim', esc(L('st_unknown')), true)));
         var rem = (tn.remote && tn.remote.name) || '\u2014';
         var remDc = (tn.remote && tn.remote.datacenter) || '';
-        var lat = tn.latency_ms != null ? Math.round(tn.latency_ms) + ' ms' : '\u2014';
+        // A down tunnel reports latency 0; that is "no measurement", not a
+        // real RTT, so it must read as an em dash instead of "0 ms".
+        var latMs = tn.latency_ms;
+        var lat = (latMs != null && latMs > 0) ? (latMs < 1 ? '<1 ms' : Math.round(latMs) + ' ms') : '\u2014';
+        var tkey = tn.tunnel_key || '';
+        var tTopo = tn.topology || '';
         return '<tr>' +
+          '<td>' + (tkey ? '<b class="mono mtb-tun-key" dir="ltr" title="' + esc(tkey) + '">' + esc(tkey) + '</b>' : '\u2014') +
+            (tTopo ? '<br><span class="mtb-muted" style="font-size:.85em">' + esc(tTopo) + '</span>' : '') + '</td>' +
           '<td><b>' + esc(rem) + '</b>' + (remDc ? '<br><span class="mtb-muted" style="font-size:.85em">' + esc(remDc) + '</span>' : '') + '</td>' +
           '<td><span class="badge info">' + esc(tn.engine || '\u2014') + '</span></td>' +
           '<td>' + b2 + '</td>' +
@@ -1291,8 +1300,8 @@
       }).join('') : '';
       html += '<div class="tunnel-card"><div class="tc-header dcard-head"><p class="tc-title dcard-title">' + MTB_ICO.tun + esc(L('agTunT')) + '</p></div>' +
         '<div class="ent-tbl-wrap"><table class="ent-tbl"><thead><tr>' +
-        '<th>' + esc(L('agDstSrv')) + '</th><th>' + esc(L('agMotor')) + '</th><th>' + esc(L('stateCol')) + '</th><th>' + esc(L('agWeight')) + '</th><th>' + esc(L('agToday')) + '</th><th>' + esc(L('agLatency')) + '</th><th>' + esc(L('agActs')) + '</th>' +
-        '</tr></thead><tbody>' + (tunRows || '<tr><td colspan="7">' + entEmpty(L('agNoTun')) + '</td></tr>') + '</tbody></table></div></div>';
+        '<th>' + esc(L('agTunName')) + '</th><th>' + esc(L('agDstSrv')) + '</th><th>' + esc(L('agMotor')) + '</th><th>' + esc(L('stateCol')) + '</th><th>' + esc(L('agWeight')) + '</th><th>' + esc(L('agToday')) + '</th><th>' + esc(L('agLatency')) + '</th><th>' + esc(L('agActs')) + '</th>' +
+        '</tr></thead><tbody>' + (tunRows || '<tr><td colspan="8">' + entEmpty(L('agNoTun')) + '</td></tr>') + '</tbody></table></div></div>';
 
       setBody('magt', html); agtUpdProgress(id, my);
       try { var nh = '#t=magt&ag=' + encodeURIComponent(id); if (location.hash !== nh) history.replaceState(null, '', nh); } catch (e) { /* non-fatal */ }

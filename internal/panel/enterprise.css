@@ -1682,6 +1682,88 @@ html[dir="rtl"] .topo-back .topo-back-ic { transform:scaleX(-1); }
 #tab-agents .ag-hero { padding:0 2px 14px; }
 #tab-agents .ag-hero .topo-list-sub { margin-top:4px; }
 
+/* Agent detail head card on phones: name/status/last-contact on one side, the
+   four management buttons stacked one per row on the opposite side, instead
+   of wrapping into a 2x2 block under the name. */
+@media (max-width:700px) {
+  #tab-magt .mtb-dtl-head { flex-wrap:nowrap; align-items:center; gap:12px; }
+  /* Name, status and last contact stack in one column, centred against the
+     button stack, so the card has no lopsided empty area. */
+  #tab-magt .mtb-dtl-idcol { flex:1 1 auto; min-width:0; gap:6px; }
+  #tab-magt .mtb-dtl-id { flex-direction:column; align-items:flex-start; flex-wrap:nowrap; gap:5px; }
+  #tab-magt .mtb-detail-name { overflow-wrap:anywhere; }
+  #tab-magt .mtb-dtl-manage { flex:0 0 auto; flex-direction:column; flex-wrap:nowrap; align-items:stretch; gap:5px; }
+  #tab-magt .mtb-dtl-manage .quantum-btn { width:100%; justify-content:center; min-height:34px; padding-block:0; }
+  /* Engine filters: keep the four chips on one line instead of dropping the
+     last one under the row; compact them and allow a scroll if a locale
+     really needs more room. */
+  #tab-magt .mtb-eng-filters { flex-wrap:nowrap; gap:5px; overflow-x:auto; padding-bottom:2px; scrollbar-width:none; }
+  #tab-magt .mtb-eng-filters::-webkit-scrollbar { display:none; }
+  #tab-magt .mtb-eng-chip { flex:none; padding:4px 8px; font-size:12px; gap:5px; letter-spacing:-.01em; white-space:nowrap; }
+  #tab-magt .mtb-eng-chip i { width:7px; height:7px; }
+  /* Agent filters on phones: search on its own row, then a tidy 2x2 grid of
+     equal-width filter buttons instead of ragged intrinsic widths. */
+  #tab-magt .mtb-tcbar { gap:8px; }
+  #tab-magt .mtb-search { flex:1 1 100%; max-width:none; }
+  #tab-magt .mtb-filters { flex:1 1 100%; width:100%; margin-inline-start:0; display:grid;
+    grid-template-columns:repeat(2, minmax(0,1fr)); gap:8px; align-items:stretch; }
+  #tab-magt .mtb-filters .mtb-fcdd, #tab-magt .mtb-filters .mtb-fbtn { width:100%; min-width:0; }
+  #tab-magt .mtb-filters .mtb-fbtn { justify-content:flex-start; min-height:34px; }
+  #tab-magt .mtb-filters .mtb-cdd-cur { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #tab-magt .mtb-filters .mtb-fbtn .mtb-cdd-arrow { margin-inline-start:auto; flex:none; }
+  #tab-magt .mtb-filters .mtb-fclear { grid-column:1 / -1; justify-self:end; width:28px; }
+}
+
+/* Agent detail tunnel table: the tunnel key is the first column, so it must
+   truncate inside the cell instead of widening the whole table. */
+.ent-tbl .mtb-tun-key { display:inline-block; max-width:min(230px, 40vw); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; vertical-align:bottom; }
+
+/* Topbar page-title chip: every tab shows its name in a glass pill that is
+   vertically level with the 38px topbar controls, in LTR and RTL. */
+.topbar .tb-head { display:flex; align-items:center; gap:10px; min-width:0; flex:1 1 auto; overflow:hidden; }
+.topbar .acts { flex:0 0 auto; }
+.topbar h1.tb-title {
+  display:inline-flex; align-items:center;
+  gap:9px;
+  height:38px; max-width:100%; margin:0; padding:0 15px;
+  font-size:15px; font-weight:600; letter-spacing:-.01em; line-height:1;
+  color:var(--tx); white-space:nowrap; overflow:hidden;
+  border-radius:12px;
+  border:1px solid color-mix(in srgb, var(--tx) 14%, transparent);
+  background:linear-gradient(180deg,
+    color-mix(in srgb, var(--tx) 8%, transparent),
+    color-mix(in srgb, var(--tx) 2%, transparent));
+  box-shadow:var(--lift-sm), inset 0 1px 0 color-mix(in srgb, var(--tx) 13%, transparent);
+  -webkit-backdrop-filter:blur(14px) saturate(150%);
+  backdrop-filter:blur(14px) saturate(150%);
+  flex:none;
+}
+.topbar h1.tb-title::before {
+  content:''; width:7px; height:7px; border-radius:50%; flex:none;
+  background:var(--ac);
+  box-shadow:0 0 0 3px color-mix(in srgb, var(--ac) 16%, transparent);
+}
+.topbar .tb-title-txt { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.topbar h1.tb-title .mtb-bc { display:inline-flex; align-items:center; gap:7px; min-width:0; overflow:hidden; }
+/* Breadcrumb lives inside the chip: the parent is quiet, the current page is
+   the only strong word (the injected default made the parent an accent link). */
+.topbar .tb-title .mtb-bc-link { color:var(--mu); font-weight:500; }
+.topbar .tb-title .mtb-bc-link:hover { color:var(--ac); }
+.topbar .tb-title .mtb-bc-sep { color:var(--dim); font-weight:400; }
+.topbar .tb-title .mtb-bc-cur { min-width:0; overflow:hidden; text-overflow:ellipsis; }
+.topbar .tb-head .sub { margin:0; min-width:0; max-width:32vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+@media (max-width:799px) {
+  .topbar .tb-head .sub { display:none; }
+  .topbar h1.tb-title { height:34px; padding:0 12px; font-size:14px; }
+}
+@media (max-width:700px) {
+  /* Not enough room for two crumbs beside the controls: show the page name only. */
+  .topbar .tb-title .mtb-bc-link, .topbar .tb-title .mtb-bc-sep { display:none; }
+}
+@media (prefers-reduced-transparency:reduce) {
+  .topbar h1.tb-title { -webkit-backdrop-filter:none; backdrop-filter:none; }
+}
+
 /* Dashboard charts: the SVG is drawn at its measured pixel width, so the axis
    numbers are never upscaled into a blur. Labels come from classes so each
    theme sets its own ink, and the geometry snaps to whole pixels. */
