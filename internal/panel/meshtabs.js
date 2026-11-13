@@ -1001,6 +1001,7 @@
   }
   var agtView = { view: 'table' };
   var agtActsOpen = '';
+  var agtActsUp = false;
   var engFilter = 'all';
   // the ?v= asset tag app.js was served with (version + content hash) —
   // appended to engine brand icon URLs so icon updates bust browser caches.
@@ -1113,7 +1114,7 @@
         '<td>' + (a.version ? '<span class="mtb-ver"><bdi dir="ltr">' + esc(/^[0-9]/.test(a.version) ? 'v' + a.version : a.version) + '</bdi></span>' : '—') + '</td>' +
         '<td class="mono">' + esc(a.arch || '—') + '</td>' +
         '<td>' + agtTopoCell(a) + '</td>' +
-        '<td><div class="mtb-acts-row' + (agtActsOpen === a.id ? ' open' : '') + '">' +
+        '<td><div class="mtb-acts-row' + (agtActsOpen === a.id ? ' open' : '') + (agtActsOpen === a.id && agtActsUp ? ' up' : '') + '">' +
         '<div class="mtb-acts-pop">' +
         '<button type="button" class="mtb-act mtb-act-view" data-agview="' + esc(a.id) + '" title="' + esc(L('agActView')) + '">' + MTB_ICO.eye + '</button>' +
         '<button type="button" class="mtb-act mtb-act-edit" data-agedit="' + esc(a.id) + '" title="' + esc(L('agActEdit')) + '">' + MTB_ICO.pen + '</button>' +
@@ -1853,6 +1854,16 @@
       arow.classList.toggle('open');
       var idEl = arow.querySelector('[data-agview]');
       agtActsOpen = arow.classList.contains('open') && idEl ? idEl.getAttribute('data-agview') : '';
+      // not enough room below inside the wrap? open upward instead
+      agtActsUp = false;
+      if (agtActsOpen) {
+        var wrap = arow.closest('.ent-tbl-wrap') || (arow.closest('table') && arow.closest('table').parentElement) || null;
+        if (wrap) {
+          var rr2 = arow.getBoundingClientRect(), wr2 = wrap.getBoundingClientRect();
+          agtActsUp = (wr2.bottom - rr2.bottom) < 210;
+        }
+      }
+      arow.classList.toggle('up', agtActsOpen && agtActsUp);
     } else {
       agtActsOpen = '';
     }
