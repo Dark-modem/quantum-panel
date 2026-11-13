@@ -11585,6 +11585,13 @@ window.loadClusterStatus = loadClusterStatus;
     '.mtb-agres.cores .mtb-agico{background:color-mix(in srgb, var(--ac) 16%, transparent);color:var(--ac)}',
     '.mtb-agstat-i.all .mtb-agico{background:color-mix(in srgb, var(--tx) 10%, transparent);color:var(--tx2)}',
     '@media (min-width:761px){.mtb-agintro-row{justify-content:space-between}}',
+    '@media (max-width:760px){.mtb-agintro-row{flex-direction:row;flex-wrap:wrap;gap:10px;justify-content:center}' +
+      '.mtb-agintro-row .mtb-agdiv{display:none}' +
+      '.mtb-agintro-row #mtbNewAgent{flex:1 1 100%}' +
+      '.mtb-agintro-row .mtb-agres{flex:1 1 30%;min-width:0}' +
+      '.mtb-agintro-row .mtb-agres .mtb-agtx{flex-direction:column;align-items:flex-start;gap:1px}' +
+      '.mtb-agintro-row .mtb-agres .mtb-agtx b{font-size:16px}' +
+      '.mtb-agintro-row .mtb-agstatbig{flex:1 1 100%;justify-content:space-between}}',
     '.mtb-agtx{display:flex;flex-direction:row;align-items:baseline;gap:6px}',
     '.mtb-agtx b{font-size:20px;color:var(--tx);line-height:1.15}',
     '.mtb-agtx span{font-size:12.5px;color:var(--tx2)}',
