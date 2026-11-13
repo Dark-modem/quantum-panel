@@ -98,7 +98,7 @@
     engAll: ['همه', 'All'], engVersion: ['نسخه', 'Version'], engKernel: ['هسته‌ای — بدون نسخه', 'Kernel — no version'],
     agTunName: ['تانل', 'Tunnel'],
     agDstSrv: ['سرور مقصد', 'Destination'], agMotor: ['موتور', 'Engine'], agWeight: ['وزن', 'Weight'],
-    agToday: ['ظرفیت امروز', 'Today'], agLatency: ['تأخیر', 'Latency'], agViewDtl: ['مشاهده جزئیات', 'View details'],
+    agToday: ['ترافیک امروز', 'Today traffic'], agLatency: ['تأخیر', 'Latency'], agViewDtl: ['مشاهده جزئیات', 'View details'],
     heroAgT: ['اولین ایجنت را وصل کن', 'Connect your first agent'],
     heroAgD: ['دستور نصب را روی سرور جدید اجرا کن؛ ایجنت خودش ثبت‌نام می‌کند و همین‌جا ظاهر می‌شود.', 'Run the install command on a new server; the agent enrolls itself and appears here.'],
     heroTopoT: ['اولین توپولوژی را بساز', 'Build your first topology'],
