@@ -12042,7 +12042,6 @@ window.loadClusterStatus = loadClusterStatus;
       // exactly like the agents card; no history series exists for tunnels,
       // so there is no spark here.
       setTxt('tunBig', (tu.up != null ? tu.up : '—') + ' / ' + (tu.total || 0));
-      setTxt('tunSub', tr('', 'active tunnels'));
       setTxt('tunUpN', String(tu.up || 0));
       setTxt('tunDownN', String((tu.total || 0) - (tu.up || 0)));
       drawDonutMulti($('tunDonut'), [
