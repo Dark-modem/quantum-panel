@@ -11895,9 +11895,12 @@ window.loadClusterStatus = loadClusterStatus;
   // -- agents donut (real online/offline split) --
   // parts: [count, cssColor] pairs — rounded caps, soft gaps, transitions.
   function segLift(s2) {
+    // translate lengths here are SVG user units (viewBox 42), not screen px:
+    // ~3 units is a clean "came off the ring" slide. No scale — scaling an
+    // arc reads as the whole donut growing, which the operator rejected.
     var a2 = parseFloat(s2.dataset.mid) * Math.PI / 180;
-    s2.style.transform = 'translate(' + (Math.cos(a2) * 6).toFixed(2) + 'px,' + (Math.sin(a2) * 6).toFixed(2) + 'px) scale(1.05)';
-    s2.style.filter = 'drop-shadow(0 3px 5px rgba(0,0,0,.5)) brightness(1.1)';
+    s2.style.transform = 'translate(' + (Math.cos(a2) * 3).toFixed(2) + 'px,' + (Math.sin(a2) * 3).toFixed(2) + 'px)';
+    s2.style.filter = 'drop-shadow(0 2.5px 4px rgba(0,0,0,.45)) brightness(1.08)';
   }
   function drawDonutMulti(host, parts, segW) {
     if (!host) return;
