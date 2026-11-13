@@ -1725,8 +1725,8 @@ html[dir="rtl"] .topo-back .topo-back-ic { transform:scaleX(-1); }
    a single compact row (no wrap) that scrolls sideways if needed, instead
    of wrapping into uneven rows. */
 @media (max-width:1020px) {
-  .chart-legend { flex-wrap:nowrap; gap:5px; overflow-x:auto; padding-bottom:2px; scrollbar-width:none; }
-  .chart-legend .lg-item { padding:2px 4px; white-space:nowrap; flex:none; }
+  #mtrLegend { flex-wrap:nowrap; gap:5px; overflow-x:auto; padding-bottom:2px; scrollbar-width:none; }
+  #mtrLegend .lg-item { padding:2px 4px; white-space:nowrap; flex:0 0 auto; }
 }
 
 /* Agent detail tunnel table: the tunnel key is the first column, so it must
