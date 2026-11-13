@@ -96,6 +96,8 @@
     engStateRun: ['در حال اجرا', 'Running'], engStateStop: ['متوقف', 'Stopped'], engStateNot: ['نصب نشده', 'Not installed'],
     engInstall: ['نصب', 'Install'], engStart: ['اجرای', 'Start'], engStop: ['توقف', 'Stop'],
     engAll: ['همه', 'All'], engVersion: ['نسخه', 'Version'], engKernel: ['هسته‌ای — بدون نسخه', 'Kernel — no version'],
+    agSumDisk: ['مجموع دیسک', 'Total disk'], agSumRam: ['مجموع رم', 'Total RAM'],
+    agSumCores: ['مجموع هسته‌ها', 'Total cores'],
     agTunName: ['تانل', 'Tunnel'],
     agDstSrv: ['سرور مقصد', 'Destination'], agMotor: ['موتور', 'Engine'], agWeight: ['وزن', 'Weight'],
     agToday: ['ترافیک امروز', 'Today traffic'], agLatency: ['تأخیر', 'Latency'], agViewDtl: ['مشاهده جزئیات', 'View details'],
@@ -639,9 +641,26 @@
     }
     return '<div class="tunnel-card mtb-agintro">' +
       '<div class="mtb-agintro-row">' +
-      stats +
       '<button type="button" class="quantum-btn quantum-btn-primary" id="mtbNewAgent">' + esc(L('newAgent')) + '</button>' +
+      '<span class="mtb-agdiv"></span>' +
+      '<div class="mtb-agres disk"><span class="mtb-agico">' + MTB_ICO.drive + '</span><span class="mtb-agtx"><b id="agSumDisk">—</b><span>' + esc(L('agSumDisk')) + '</span></span></div>' +
+      '<div class="mtb-agres ram"><span class="mtb-agico">' + MTB_ICO.ramstick + '</span><span class="mtb-agtx"><b id="agSumRam">—</b><span>' + esc(L('agSumRam')) + '</span></span></div>' +
+      '<div class="mtb-agres cores"><span class="mtb-agico">' + MTB_ICO.chip + '</span><span class="mtb-agtx"><b id="agSumCores">—</b><span>' + esc(L('agSumCores')) + '</span></span></div>' +
+      '<span class="mtb-agdiv"></span>' +
+      stats +
       '</div></div>';
+  }
+  // Fleet resource totals for the intro strip: the overview endpoint
+  // aggregates every agent (server-cached, cheap) — disk/RAM/cores.
+  // Called after every renderAgt so the strip refills on rerenders.
+  function agSumFill() {
+    fetch('api/ui/overview').then(function (r) { return r.json(); }).then(function (ov) {
+      var rr = (ov.resources || {}), mem = rr.mem || {}, dk = rr.disk || {};
+      var set = function (id, v) { var el = document.getElementById(id); if (el && v != null) el.textContent = v; };
+      set('agSumDisk', dk.sum_total_gb != null ? bytes(dk.sum_total_gb * 1073741824) : null);
+      set('agSumRam', mem.sum_total_mb != null ? bytes(mem.sum_total_mb * 1048576) : null);
+      set('agSumCores', rr.cores_total != null ? num0(rr.cores_total) : null);
+    }).catch(function () {});
   }
   // Embedded 40px flag PNGs (flagcdn, public domain) — Chrome on Windows
   // renders regional-indicator emoji as bare letters, so real images win.
@@ -1026,6 +1045,7 @@
       });
       if (agtQuery) { si.focus(); try { si.setSelectionRange(agtQuery.length, agtQuery.length); } catch (e2) {} }
     }
+    agSumFill();
   }
 
   // ===========================================================================
