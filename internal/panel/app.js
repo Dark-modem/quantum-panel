@@ -11584,7 +11584,7 @@ window.loadClusterStatus = loadClusterStatus;
     '.mtb-agres.ram .mtb-agico{background:color-mix(in srgb, var(--ok) 16%, transparent);color:var(--ok)}',
     '.mtb-agres.cores .mtb-agico{background:color-mix(in srgb, var(--ac) 16%, transparent);color:var(--ac)}',
     '.mtb-agstat-i.all .mtb-agico{background:color-mix(in srgb, var(--tx) 10%, transparent);color:var(--tx2)}',
-    '.mtb-agintro-row .mtb-agstatbig{margin-inline-end:auto}',
+    '@media (min-width:761px){.mtb-agintro-row{justify-content:space-between}}',
     '.mtb-agtx{display:flex;flex-direction:row;align-items:baseline;gap:6px}',
     '.mtb-agtx b{font-size:20px;color:var(--tx);line-height:1.15}',
     '.mtb-agtx span{font-size:12.5px;color:var(--tx2)}',
