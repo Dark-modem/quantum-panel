@@ -535,6 +535,7 @@ func handleUIOverview(w http.ResponseWriter, r *http.Request) {
 			"tunnels":     tuCounts,
 		},
 		"resources": res,
+		"host":      hostStats(),
 		"traffic": map[string]any{
 			"today":          cachedBlock["today"],
 			"7d":             cachedBlock["7d"],

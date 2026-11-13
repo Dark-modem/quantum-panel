@@ -11977,19 +11977,23 @@ window.loadClusterStatus = loadClusterStatus;
       setTxt('trfFoDl', fmtTot(Math.max(0, allDl - irDl))); setTxt('trfFoUl', fmtTot(Math.max(0, allUl - irUl)));
       // fleet metrics — real aggregates over the agents that report
       // resources (a panel host is not an agent and reports none)
-      var res = ov.resources || {};
-      var cpur = res.cpu_pct || {}, memr = res.mem || {}, diskr = res.disk || {};
-      var cpu = cpur.avg != null ? parseFloat(cpur.avg) : null;
-      var ram = memr.avg_pct != null ? parseFloat(memr.avg_pct) : null;
-      var disk = diskr.avg_pct != null ? parseFloat(diskr.avg_pct) : null;
+      // KPI cards: the CENTRAL SERVER's own stats — the panel host reads
+      // /proc + statfs directly (it is not an agent, so the fleet sums do
+      // not apply here).
+      var host = ov.host || {};
+      var cpu = host.cpu_pct != null ? parseFloat(host.cpu_pct) : null;
+      var ram = host.mem_pct != null ? parseFloat(host.mem_pct) : null;
+      var disk = host.disk_pct != null ? parseFloat(host.disk_pct) : null;
       setTxt('cpuVal', cpu != null ? Math.round(cpu) + '%' : '—');
-      setTxt('cpuLoad', res.avg_load1 != null ? res.avg_load1.toFixed(2) : '—');
+      setTxt('cpuLoad', host.load != null ? String(host.load).split(' ')[0] : '—');
       setTxt('cpuLoadLbl', tr('', 'load'));
-      setTxt('cpuCores', res.cores_total ? String(res.cores_total) : '—');
+      setTxt('cpuCores', host.cores ? String(host.cores) : '—');
       setTxt('cpuCoresLbl', tr('', 'cores'));
-      setTxt('ramVal', memr.sum_used_mb != null ? fmtTot(memr.sum_used_mb * 1048576) + ' / ' + fmtTot((memr.sum_total_mb || 0) * 1048576) : '—');
+      setTxt('cpuFreq', host.freq_ghz != null ? String(host.freq_ghz) : '—');
+      setTxt('cpuFreqLbl', tr('', 'GHz'));
+      setTxt('ramVal', host.mem_used_mb != null ? fmtTot(host.mem_used_mb * 1048576) + ' / ' + fmtTot((host.mem_total_mb || 0) * 1048576) : '—');
       setTxt('ramBadge', ram != null ? Math.round(ram) + '%' : '—');
-      setTxt('diskVal', diskr.sum_used_gb != null ? fmtTot(diskr.sum_used_gb * 1073741824) + ' / ' + fmtTot((diskr.sum_total_gb || 0) * 1073741824) : '—');
+      setTxt('diskVal', host.disk_used_gb != null ? fmtTot(host.disk_used_gb * 1073741824) + ' / ' + fmtTot((host.disk_total_gb || 0) * 1073741824) : '—');
       setTxt('diskBadge', disk != null ? Math.round(disk) + '%' : '—');
       pushH(sysHist.cpu, cpu); pushH(sysHist.ram, ram); pushH(sysHist.disk, disk);
       saveHist();
