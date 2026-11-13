@@ -299,7 +299,8 @@ function topTitleSync(id) {
 }
 window.addEventListener('hashchange', function () { try { topTitleSync(); } catch (e) {} });
 window.topTitleSync = topTitleSync;
-window.addEventListener('load', function () { setTimeout(function () { try { topTitleSync(); } catch (e) {} }, 1800); });
+try { topTitleSync(); } catch (e) {} // sync now — no static «Quantum» flash
+window.addEventListener('load', function () { try { topTitleSync(); } catch (e) {} });
 function goTab(name) {
   if (name === 'topology') name = 'tunnel';
   if (name === 'mtopo') name = 'tunnel'; // the mesh topologies view was removed
@@ -11571,6 +11572,12 @@ window.loadClusterStatus = loadClusterStatus;
     '.mtb-agico svg{width:19px;height:19px;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}',
     '.mtb-agstat-i.ok .mtb-agico{background:color-mix(in srgb, var(--ok) 14%, transparent);color:var(--ok)}',
     '.mtb-agstat-i.err .mtb-agico{background:color-mix(in srgb, var(--er) 14%, transparent);color:var(--er)}',
+    '.mtb-agdiv{width:1px;align-self:stretch;background:var(--ln);margin:2px 4px}',
+    '.mtb-agres{display:flex;align-items:center;gap:9px}',
+    '.mtb-agres .mtb-agico{width:34px;height:34px;border-radius:9px}',
+    '.mtb-agres.disk .mtb-agico{background:color-mix(in srgb, var(--dash-fo) 16%, transparent);color:var(--dash-fo)}',
+    '.mtb-agres.ram .mtb-agico{background:color-mix(in srgb, var(--ok) 16%, transparent);color:var(--ok)}',
+    '.mtb-agres.cores .mtb-agico{background:color-mix(in srgb, var(--ac) 16%, transparent);color:var(--ac)}',
     '.mtb-agstat-i.all .mtb-agico{background:color-mix(in srgb, var(--tx) 10%, transparent);color:var(--tx2)}',
     '.mtb-agintro-row #mtbNewAgent{margin-inline-start:auto}',
     '.mtb-agtx{display:flex;flex-direction:row;align-items:baseline;gap:6px}',
