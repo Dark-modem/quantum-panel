@@ -1061,7 +1061,8 @@
         '<td><div class="mtb-acts-row">' +
         '<button type="button" class="mtb-act mtb-act-view" data-agview="' + esc(a.id) + '" title="' + esc(L('agActView')) + '">' + MTB_ICO.eye + '</button>' +
         '<button type="button" class="mtb-act mtb-act-edit" data-agedit="' + esc(a.id) + '" title="' + esc(L('agActEdit')) + '">' + MTB_ICO.pen + '</button>' +
-        '<button type="button" class="mtb-act mtb-act-upd" data-agupd="' + esc(a.id) + '" title="' + esc(L('agActUpd')) + '">' + MTB_ICO.upd + '</button>' +
+        '<button type="button" class="mtb-act mtb-act-upd" data-agupd="' + esc(a.id) + '" title="' + esc(L('agActUpd')) + '">' + MTB_ICO.upArrow + '</button>' +
+        '<button type="button" class="mtb-act mtb-act-ref" data-agrefresh="' + esc(a.id) + '" title="' + esc(L('agRefresh')) + '">' + MTB_ICO.upd + '</button>' +
         '<button type="button" class="mtb-act mtb-act-del" data-agdel="' + esc(a.id) + '" title="' + esc(L('agActDel')) + '">' + MTB_ICO.trash + '</button>' +
         '</div></td>';
       if (hasRes) {
@@ -1135,6 +1136,7 @@
     pen: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3l4 4L8 20l-5 1 1-5z"/></svg>',
     trash: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>',
     upd: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>',
+    upArrow: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V5"/><path d="M7.5 9.5L12 5l4.5 4.5"/><path d="M5 20h14"/></svg>',
     info: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M12 11.5V16"/></svg>',
     mesh: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="6" r="2.5"/><circle cx="19" cy="6" r="2.5"/><circle cx="12" cy="19" r="2.5"/><path d="M7.5 6h9M6.3 8l4.7 8.8M17.7 8l-4.7 8.8"/></svg>',
     tun: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16"/><path d="M16.5 8.5L20 12l-3.5 3.5"/><path d="M7.5 8.5L4 12l3.5 3.5"/></svg>',
@@ -1804,7 +1806,13 @@
     var bcb = e.target && e.target.closest ? e.target.closest('[data-bc-back]') : null;
     if (bcb) { agtView = { view: 'table' }; loadAgt(); return; }
     var arf = e.target && e.target.closest ? e.target.closest('[data-agrefresh]') : null;
-    if (arf) { renderAgtDetail(arf.getAttribute('data-agrefresh')); return; }
+    if (arf) {
+      var rid = arf.getAttribute('data-agrefresh');
+      arf.classList.add('mtb-act-busy');
+      setTimeout(function () { arf.classList.remove('mtb-act-busy'); }, 1000);
+      if (agtView && agtView.view === 'detail') renderAgtDetail(rid); else loadAgt();
+      return;
+    }
     var ef = e.target && e.target.closest ? e.target.closest('[data-engfilter]') : null;
     if (ef) {
       engFilter = ef.getAttribute('data-engfilter') || 'all';
