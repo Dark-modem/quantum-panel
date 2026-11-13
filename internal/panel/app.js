@@ -8813,10 +8813,13 @@ function onbHide() { try { localStorage.setItem('quantum_onb_done', '1'); } catc
 // ---- sidebar collapse ----
 function sbIsCollapsed() { return document.documentElement.dataset.sb === '1'; }
 function sbApply() {
-  const c = sbIsCollapsed(), b = $('sbToggle');
-  if (b) { b.setAttribute('aria-pressed', c ? 'true' : 'false'); const t = tr(c ? 'sb_expand' : 'sb_collapse', c ? 'Expand sidebar' : 'Collapse sidebar'); b.setAttribute('aria-label', t); b.title = t; }
-  // icon-only rows still need an accessible name + tooltip
-  document.querySelectorAll('#sideNav [data-tab]').forEach(n => {
+  const c = sbIsCollapsed();
+  ['sbToggle', 'sbToggleM'].forEach(id => {
+    const b = $(id);
+    if (b) { b.setAttribute('aria-pressed', c ? 'true' : 'false'); const t = tr(c ? 'sb_expand' : 'sb_collapse', c ? 'Expand sidebar' : 'Collapse sidebar'); b.setAttribute('aria-label', t); b.title = t; }
+  });
+  // icon-only rows still need an accessible name + tooltip (sidebar + drawer)
+  document.querySelectorAll('#sideNav [data-tab], #drawerNav [data-tab]').forEach(n => {
     const lab = n.querySelector('[data-i18n]'); const t = lab ? lab.textContent.trim() : '';
     if (c && t) { n.title = t; n.setAttribute('aria-label', t); } else { n.removeAttribute('title'); n.removeAttribute('aria-label'); }
   });
@@ -8827,6 +8830,7 @@ function sbSet(c) {
   sbApply();
 }
 $('sbToggle').onclick = () => sbSet(!sbIsCollapsed());
+{ const stm = $('sbToggleM'); if (stm) stm.onclick = () => sbSet(!sbIsCollapsed()); }
 sbApply();
 
 // ---- table density ----
@@ -12270,6 +12274,9 @@ window.loadClusterStatus = loadClusterStatus;
 // asset tag this very script was served with).
 (function () {
   var m = (document.querySelector('script[src*="app.js"]') || { src: '' }).src.match(/v=([^&]+)/);
+  var vTxt = m ? '(v.' + m[1].replace(/^v/, '').replace(/-[0-9a-f]{8,}$/, '') + ')' : '';
   var el = document.getElementById('sbVer');
-  if (el && m) el.textContent = '(v.' + m[1].replace(/^v/, '').replace(/-[0-9a-f]{8,}$/, '') + ')';
+  if (el && vTxt) el.textContent = vTxt;
+  var elM = document.getElementById('sbVerM');
+  if (elM && vTxt) elM.textContent = vTxt;
 })();
