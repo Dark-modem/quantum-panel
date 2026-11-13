@@ -11679,6 +11679,8 @@ window.loadClusterStatus = loadClusterStatus;
     '.dkpi:hover .cx-led,.dsum:hover .cx-led,.mtb-res-tile:hover .cx-led{animation:ledBlink 1.1s ease-in-out infinite}',
     '.dkpi:hover .cx-led:nth-of-type(2),.dsum:hover .cx-led:nth-of-type(2),.mtb-res-tile:hover .cx-led:nth-of-type(2){animation-delay:.35s}',
     '.dkpi:hover .cx-led:nth-of-type(3),.dsum:hover .cx-led:nth-of-type(3),.mtb-res-tile:hover .cx-led:nth-of-type(3){animation-delay:.7s}',
+    '.dn-seg{transition:transform .3s cubic-bezier(.16,1,.3,1)}',
+    '#tunSummary .li-dot.c-fo{background:var(--mu)}',
     '.cx-led{fill:currentColor;stroke:none}',
     '.dkpi:hover .cx-flow,.dsum:hover .cx-flow{stroke-dasharray:2.5 2.5;animation:dashFlow .9s linear infinite}',
     '.dkpi:hover .cx-pulse,.dsum:hover .cx-pulse{animation:glyphPulse 1.2s ease-in-out infinite}',
@@ -11900,13 +11902,28 @@ window.loadClusterStatus = loadClusterStatus;
         if (!pt[0]) return;
         var frac = pt[0] / total;
         var len = Math.max(0.5, C * frac - pad);
-        seg += '<circle class="dn-seg" cx="21" cy="21" r="' + r + '" stroke="' + pt[1] + '" stroke-linecap="round"' +
+        var mid = (acc * C + pad / 2 + len / 2) / C * 360;
+        seg += '<circle class="dn-seg" data-mid="' + mid.toFixed(1) + '" cx="21" cy="21" r="' + r + '" stroke="' + pt[1] + '" stroke-linecap="round"' +
           ' stroke-dasharray="' + len.toFixed(2) + ' ' + (C - len).toFixed(2) + '"' +
           ' stroke-dashoffset="' + (-(acc * C + pad / 2)).toFixed(2) + '"/>';
         acc += frac;
       });
     }
     host.innerHTML = seg;
+    // hover a segment -> it lifts off the ring along its own mid-angle
+    if (!host.__segPop) {
+      host.__segPop = true;
+      host.addEventListener('mouseover', function (e) {
+        var s2 = e.target.closest ? e.target.closest('.dn-seg') : null;
+        if (!s2 || !s2.dataset.mid) return;
+        var a2 = parseFloat(s2.dataset.mid) * Math.PI / 180;
+        s2.style.transform = 'translate(' + (Math.cos(a2) * 5).toFixed(2) + 'px,' + (Math.sin(a2) * 5).toFixed(2) + 'px)';
+      });
+      host.addEventListener('mouseout', function (e) {
+        var s2 = e.target.closest ? e.target.closest('.dn-seg') : null;
+        if (s2) s2.style.transform = '';
+      });
+    }
   }
   function drawDonut(host, on, off) {
     drawDonutMulti(host, [[on, 'var(--ok)'], [off, 'var(--er)']]);
@@ -12030,7 +12047,7 @@ window.loadClusterStatus = loadClusterStatus;
       setTxt('tunDownN', String((tu.total || 0) - (tu.up || 0)));
       drawDonutMulti($('tunDonut'), [
         [tu.up || 0, 'var(--ac)'],
-        [(tu.total || 0) - (tu.up || 0), 'var(--dash-fo)']
+        [(tu.total || 0) - (tu.up || 0), 'var(--mu)']
       ], 6.5);
       setTxt('healthUp', res.max_uptime_s ? fmtSecs(res.max_uptime_s) : '—');
       // bell: live open-alert feed
