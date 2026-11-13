@@ -11710,7 +11710,7 @@ window.loadClusterStatus = loadClusterStatus;
     '.donut-wrap{position:relative;width:74px;height:74px;flex:none}',
     '.donut-wrap svg{width:100%;height:100%;transform:rotate(-90deg)}',
     '.donut-wrap .dn-seg{fill:none;stroke-width:5;stroke-linecap:round;transition:stroke-dasharray .6s var(--spring),stroke-dashoffset .6s var(--spring)}',
-    '.donut-c{position:absolute;inset:0;display:grid;place-content:center;text-align:center}',
+    '.donut-c{position:absolute;inset:0;display:grid;place-content:center;text-align:center;pointer-events:none}',
     '.donut-c b{font-size:18px;color:var(--tx)}',
     '.donut-c span{font-size:12px;color:var(--dim)}',
     '.dsum-legend{display:grid;gap:6px;font-size:13px;color:var(--tx2)}',
@@ -11894,6 +11894,11 @@ window.loadClusterStatus = loadClusterStatus;
 
   // -- agents donut (real online/offline split) --
   // parts: [count, cssColor] pairs — rounded caps, soft gaps, transitions.
+  function segLift(s2) {
+    var a2 = parseFloat(s2.dataset.mid) * Math.PI / 180;
+    s2.style.transform = 'translate(' + (Math.cos(a2) * 6).toFixed(2) + 'px,' + (Math.sin(a2) * 6).toFixed(2) + 'px) scale(1.05)';
+    s2.style.filter = 'drop-shadow(0 3px 5px rgba(0,0,0,.5)) brightness(1.1)';
+  }
   function drawDonutMulti(host, parts, segW) {
     if (!host) return;
     var C = 100, r = 15.9155, w = segW || 5, total = 0;
@@ -11914,19 +11919,25 @@ window.loadClusterStatus = loadClusterStatus;
       });
     }
     host.innerHTML = seg;
-    // hover a segment -> it lifts off the ring along its own mid-angle
+    // hover a segment -> it lifts off the ring along its own mid-angle and
+    // STAYS lifted: resetting on segment-mouseout would fight the lift itself
+    // (the risen segment escapes the pointer, resets, re-enters, loops).
     if (!host.__segPop) {
       host.__segPop = true;
       host.addEventListener('mouseover', function (e) {
         var s2 = e.target.closest ? e.target.closest('.dn-seg') : null;
-        if (!s2 || !s2.dataset.mid) return;
-        var a2 = parseFloat(s2.dataset.mid) * Math.PI / 180;
-        s2.style.transform = 'translate(' + (Math.cos(a2) * 5).toFixed(2) + 'px,' + (Math.sin(a2) * 5).toFixed(2) + 'px)';
+        if (!s2 || !s2.dataset.mid || s2 === host.__liftEl) return;
+        if (host.__liftEl) { host.__liftEl.style.transform = ''; host.__liftEl.style.filter = ''; }
+        segLift(s2);
+        host.__liftEl = s2;
       });
-      host.addEventListener('mouseout', function (e) {
-        var s2 = e.target.closest ? e.target.closest('.dn-seg') : null;
-        if (s2) s2.style.transform = '';
+      host.addEventListener('mouseleave', function () {
+        if (host.__liftEl) { host.__liftEl.style.transform = ''; host.__liftEl.style.filter = ''; host.__liftEl = null; }
       });
+    } else if (host.__liftEl) {
+      // periodic re-render replaced the segment elements — re-apply the lift
+      var s3 = host.querySelector('.dn-seg[data-mid="' + host.__liftEl.dataset.mid + '"]');
+      if (s3) { segLift(s3); host.__liftEl = s3; } else host.__liftEl = null;
     }
   }
   function drawDonut(host, on, off) {
