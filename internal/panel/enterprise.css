@@ -425,7 +425,10 @@ html[data-rs="0"] .right-sidebar { display:none; }
   html[data-sb="1"] .sidebar .sidebar-foot .sf-ic { display:block; }
   html[data-sb="1"] .sidebar .sidebar-foot .sf-t { display:none; }
   html[data-sb="1"] .sidebar .sidebar-nav { padding-inline:8px; }
-  html[data-sb="1"] .sidebar .sidebar-brand { padding-inline:6px; }
+  html[data-sb="1"] .sidebar .sidebar-brand { padding-inline:6px; flex-direction:column; gap:8px; align-items:center; }
+  html[data-sb="1"] .sidebar .sb-brandgrp { flex:none; gap:0; justify-content:center; }
+  html[data-sb="1"] .sidebar .sb-brandtx { display:none; }
+  html[data-sb="1"] .sidebar .sb-toggle { margin-inline:auto; }
   html[data-sb="1"] .sidebar .nav-item.on::before { inset-inline-start:-8px; }
 }
 @media (max-width:760px) { .sb-toggle { display:none; } }
