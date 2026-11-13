@@ -679,7 +679,7 @@
     SG: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACgAAAAbCAMAAAA5zj1cAAAAPFBMVEXtKTnvRFL5srj3oajvPEryW2fuM0L////2k5vtKjr1hY30doH+6On2lJzzbXjwTlv6wcb7ztL82Nv/9/iW1qa7AAAAe0lEQVQ4y+3RORIDIQxE0Q9IaATMfv+7OnDgyINyu+NXqmo1TijOG3pSicB9DAWZwn6fAi3XCazDNoStPdx0HNRu12OHevRH2OxCSgWaPsJuA/DPD77BZCakkmrRSetimXQKeZtAv6wHl9nXrDUCA1uvSygrFswf/g58AZjBEs/aTMUHAAAAAElFTkSuQmCC",
     JP: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACgAAAAbCAMAAAA5zj1cAAAAOVBMVEW8AC3dfJPMPF7ILFHQTGvuvcjADzn////55urjkaXyzte9BTHqrbvDHEP++fr77/Hst8PmobHXZ4H4lhdsAAAAcUlEQVQ4y9XTuw6AIAyF4XKVclXf/2FNjDF0OMjgwj9/YWgLbZPRkjA4Zhc+YbB0Z8MYHp6efB7BmOgtRQyroQ6aCmEm0Q6hklBBqCXUEHoJPYRm9kUr4QkhS8gQttK70vBmHM1tRkyS/7me+Xtc+hdeTWcZDIhvaeAAAAAASUVORK5CYII="
   };
-  var COUNTRIES = {
+  var COUNTRIES_FA = {
     DE: "آلمان",
     FR: "فرانسه",
     NL: "هلند",
@@ -693,6 +693,21 @@
     SG: "سنگاپور",
     JP: "ژاپن"
   };
+  var COUNTRIES = {
+    DE: "Germany",
+    FR: "France",
+    NL: "Netherlands",
+    FI: "Finland",
+    GB: "United Kingdom",
+    US: "United States",
+    CA: "Canada",
+    TR: "Turkey",
+    AE: "UAE",
+    RU: "Russia",
+    SG: "Singapore",
+    JP: "Japan"
+  };
+  function CN(cc) { return (isFa() ? COUNTRIES_FA : COUNTRIES)[cc] || ''; }
   function flagImg(code) {
     var src = FLAGS[code];
     if (!src) return '';
@@ -703,7 +718,7 @@
   }
   function countryOpts() {
     return '<option value="">—</option>' + Object.keys(COUNTRIES).map(function (c) {
-      return '<option value="' + c + '">' + esc(COUNTRIES[c]) + '</option>';
+      return '<option value="' + c + '">' + esc(CN(c)) + '</option>';
     }).join('');
   }
   function agentRoleCell(a) {
@@ -713,7 +728,7 @@
     }
     if (role === 'foreign' || role.indexOf('خارج') === 0) {
       var cc = a.country ? String(a.country).toLowerCase() : '';
-      var c = COUNTRIES[a.country];
+      var c = CN(a.country);
       if (c) return '<span class="badge u-pill-violet">' + topologyFlagSvg(cc) + ' ' + esc(c) + '</span>';
       return '<span class="badge u-pill-violet">' + topologyFlagSvg(cc) + ' ' + esc(L('roleForeign')) + '</span>';
     }
@@ -755,7 +770,7 @@
       '<div class="mtb-cdd-pop" id="mtbCddPop" hidden>' +
       '<button type="button" class="mtb-cdd-opt" data-cc="">\u2014</button>' +
       Object.keys(COUNTRIES).map(function (cc) {
-        return '<button type="button" class="mtb-cdd-opt" data-cc="' + cc + '">' + flagImg(cc) + ' ' + esc(COUNTRIES[cc]) + '</button>';
+        return '<button type="button" class="mtb-cdd-opt" data-cc="' + cc + '">' + flagImg(cc) + ' ' + esc(CN(cc)) + '</button>';
       }).join('') +
       '</div></div>' +
       '<input type="hidden" id="mtbCountry" value=""></label>' +
@@ -810,7 +825,7 @@
     var cdd = document.getElementById('mtbCdd');
     function setCountry(cc) {
       cInp.value = cc;
-      cddCur.innerHTML = cc ? (flagImg(cc) + ' ' + esc(COUNTRIES[cc] || cc)) : '\u2014';
+      cddCur.innerHTML = cc ? (flagImg(cc) + ' ' + esc(CN(cc) || cc)) : '\u2014';
       cddPop.querySelectorAll('.mtb-cdd-opt').forEach(function (op) { op.classList.toggle('on', op.getAttribute('data-cc') === cc); });
       cddPop.hidden = true;
     }
@@ -1220,7 +1235,7 @@
         var node = function (side, fbServers) {
           var role = (side && side.role) || '';
           var cc = side && side.country ? String(side.country).toLowerCase() : '';
-          var lbl = role === 'iran' ? L('roleIran') : (cc && COUNTRIES[side.country] ? COUNTRIES[side.country] : L('roleForeign'));
+          var lbl = role === 'iran' ? L('roleIran') : (cc && CN(side.country) ? CN(side.country) : L('roleForeign'));
           return '<div class="mtb-topo-node"><span class="mtb-topo-nflag">' + topologyFlagSvg(cc) + '</span><b>' + esc(lbl) + '</b>' +
             '<span class="mtb-topo-srv">' + num0((side && side.servers) || fbServers) + ' ' + esc(L('topoSrv')) + '</span></div>';
         };
