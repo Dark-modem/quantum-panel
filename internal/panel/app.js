@@ -11614,6 +11614,7 @@ window.loadClusterStatus = loadClusterStatus;
     '.mtb-topoitem{cursor:default;font-size:12.5px;color:var(--tx)}',
     '.mtb-topoitem:hover{background:none}',
     '.mtb-pager2{justify-content:space-between}',
+    'html[dir="ltr"] .mtb-pg-navbtn svg{transform:scaleX(-1)}',
     '.mtb-pg-size{display:flex;align-items:center;gap:10px}',
     '.mtb-pg-size .mtb-cdd-btn{min-height:32px;padding:4px 12px;gap:6px;font-size:12.5px}',
     '.mtb-pg-size .mtb-cdd-pop{inset-inline-start:0;inset-inline-end:auto;min-width:70px}',
