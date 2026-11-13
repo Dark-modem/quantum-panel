@@ -755,6 +755,7 @@ func Main(args []string) int {
 	mux.HandleFunc("GET "+base+"/img/engines/wstunnel.png", serveAsset("img/engines/wstunnel.png", "image/png"))
 	mux.HandleFunc("GET "+base+"/img/engines/tinc.png", serveAsset("img/engines/tinc.png", "image/png"))
 	mux.HandleFunc("GET "+base+"/img/engines/hysteria.png", serveAsset("img/engines/hysteria.png", "image/png"))
+	mux.HandleFunc("GET "+base+"/img/engines/singbox.png", serveAsset("img/engines/singbox.png", "image/png"))
 	mux.HandleFunc("GET "+base+"/img/engines/singbox.svg", serveAsset("img/engines/singbox.svg", "image/svg+xml"))
 	mux.HandleFunc("GET "+base+"/img/engines/midos.png", serveAsset("img/engines/midos.png", "image/png"))
 	mux.HandleFunc("GET "+base+"/img/engines/dagger.png", serveAsset("img/engines/dagger.png", "image/png"))
