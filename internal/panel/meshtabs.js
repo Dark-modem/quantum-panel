@@ -1047,6 +1047,7 @@
     play: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z" fill="currentColor" stroke="none"/></svg>',
     stop: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="1.5" fill="currentColor" stroke="none"/></svg>',
     dl: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v10"/><path d="M8 9.5l4 4 4-4"/><path d="M5 19h14"/></svg>',
+    spoofmark: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2.8 10.6 C2.8 8.4 4.6 7 6.8 7.2 C8.5 7.35 10.4 8 12 8 C13.6 8 15.5 7.35 17.2 7.2 C19.4 7 21.2 8.4 21.2 10.6 C21.2 14.2 17.8 17.2 14.2 17.2 L9.8 17.2 C6.2 17.2 2.8 14.2 2.8 10.6 Z"/><ellipse cx="8" cy="11.6" rx="1.7" ry="1.15" fill="currentColor" stroke="none"/><ellipse cx="16" cy="11.6" rx="1.7" ry="1.15" fill="currentColor" stroke="none"/></svg>',
     qmark: '<svg viewBox="0 0 100 100" aria-hidden="true"><path d="M50 48 C42 38 26 32 12 42 C4 48 1 56 3 62 C6 60 12 54 20 55 C32 56 42 60 50 52 C58 60 68 56 80 55 C88 54 94 60 97 62 C99 56 96 48 88 42 C74 32 58 38 50 48 Z" fill="#38bdf8"/></svg>',
     frole: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
     act: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>',
@@ -1236,6 +1237,7 @@
       var engLogo = function (en, disp) {
         var img = engImg(en.engine);
         if (img) return '<img src="' + img + '" alt="' + esc(disp) + '" draggable="false">';
+        if (en.engine === 'spoof') return MTB_ICO.spoofmark;
         // default: the panel's own mark for engines without brand art
         return MTB_ICO.qmark;
       };
