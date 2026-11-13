@@ -649,7 +649,7 @@
       '<span class="mtb-agdiv"></span>' +
       '<div class="mtb-agres disk"><span class="mtb-agico">' + MTB_ICO.drive + '</span><span class="mtb-agtx"><b id="agSumDisk">—</b><span>' + esc(L('agSumDisk')) + '</span></span></div>' +
       '<div class="mtb-agres ram"><span class="mtb-agico">' + MTB_ICO.ramstick + '</span><span class="mtb-agtx"><b id="agSumRam">—</b><span>' + esc(L('agSumRam')) + '</span></span></div>' +
-      '<div class="mtb-agres cores"><span class="mtb-agico">' + MTB_ICO.chip + '</span><span class="mtb-agtx"><b id="agSumCores">—</b><span>' + esc(L('agSumCores')) + '</span></span></div>' +
+      '<div class="mtb-agres cores"><span class="mtb-agico">' + MTB_ICO.cpuchip + '</span><span class="mtb-agtx"><b id="agSumCores">—</b><span>' + esc(L('agSumCores')) + '</span></span></div>' +
       '<span class="mtb-agdiv"></span>' +
       stats +
       '</div></div>';
