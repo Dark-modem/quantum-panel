@@ -11496,6 +11496,7 @@ window.loadClusterStatus = loadClusterStatus;
     '.mtb-topo-name{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:700;color:var(--tx);min-width:0}',
     '.mtb-topo-chev{display:inline-flex;color:var(--ac);flex:none}',
     '.mtb-topo-chev svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}',
+    'html[dir="ltr"] .mtb-topo-chev svg{transform:scaleX(-1)}',
     '.mtb-topo-ord{font-size:12px;font-weight:600;padding:4px 12px;border-radius:999px;flex:none;white-space:nowrap}',
     '.mtb-topo-ord.o0{background:color-mix(in srgb, var(--ac) 14%, transparent);color:var(--ac)}',
     '.mtb-topo-ord.o1{background:color-mix(in srgb, var(--dash-fo) 14%, transparent);color:var(--dash-fo)}',
