@@ -1731,6 +1731,11 @@ html[dir="rtl"] .topo-back .topo-back-ic { transform:scaleX(-1); }
   #mtrLegend .lg-item { padding:2px 4px; white-space:nowrap; flex:0 0 auto; }
 }
 
+@media (max-width:700px) {
+  /* The system-health card leads the dashboard on phones. */
+  #kpiHealth { order:-1; }
+}
+
 /* Agent detail tunnel table: the tunnel key is the first column, so it must
    truncate inside the cell instead of widening the whole table. */
 .ent-tbl .mtb-tun-key { display:inline-block; max-width:min(230px, 40vw); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; vertical-align:bottom; }
