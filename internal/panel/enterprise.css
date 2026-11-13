@@ -1714,6 +1714,14 @@ html[dir="rtl"] .topo-back .topo-back-ic { transform:scaleX(-1); }
   #tab-magt .mtb-filters .mtb-fclear { grid-column:1 / -1; justify-self:end; width:28px; }
 }
 
+/* Dashboard chart legend on phones: the four series stay on ONE level —
+   a single compact row (no wrap) that scrolls sideways if needed, instead
+   of wrapping into uneven rows. */
+@media (max-width:700px) {
+  .chart-legend { flex-wrap:nowrap; gap:5px; overflow-x:auto; padding-bottom:2px; scrollbar-width:none; }
+  .chart-legend .lg-item { padding:2px 4px; white-space:nowrap; flex:none; }
+}
+
 /* Agent detail tunnel table: the tunnel key is the first column, so it must
    truncate inside the cell instead of widening the whole table. */
 .ent-tbl .mtb-tun-key { display:inline-block; max-width:min(230px, 40vw); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; vertical-align:bottom; }
