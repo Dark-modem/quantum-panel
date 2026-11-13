@@ -38,8 +38,8 @@ var uiArtifactEngines = map[string]bool{
 var uiKnownEngines = []string{
 	"backpack", "backhaul", "chisel", "dagger", "easytier", "frp", "gost",
 	"hysteria", "matrix", "midos", "narnia", "paqet", "pengo", "rathole",
-	"singbox", "tinc", "udp2raw", "waterwall", "wattunnel", "wireguard",
-	"wst", "xray",
+	"singbox", "spoof", "tinc", "udp2raw", "waterwall", "wattunnel",
+	"wireguard", "wst", "xray",
 }
 
 func registerUIAPIRoutes(mux *http.ServeMux, base string) {
