@@ -118,6 +118,7 @@
     agWizNext: ['بعدی', 'Next'], agWizBack: ['قبلی', 'Back'],
     agNameReq: ['اسم ایجنت را وارد کنید', 'Enter the agent name'],
     agActMore: ['عملیات', 'Actions'],
+    agTtlHint: ['توکن بعد از این روزها منقضی می‌شود؛ پیش‌فرض ۳۶۵ روز است.', 'The token expires after this many days — 365 by default.'],
     agDaysU: ['روز', 'days'],
     agTokenOk: ['توکن ساخته شد — فقط یک بار قابل استفاده است', 'Token minted — valid for a single use'],
     agCopyCmd: ['کپی دستور', 'Copy command'],
@@ -742,6 +743,8 @@
     var old = document.getElementById('mtbAgentModal');
     if (old) old.remove();
     var GLOBE = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.7 2.7 4 5.8 4 9s-1.3 6.3-4 9c-2.7-2.7-4-5.8-4-9s1.3-6.3 4-9z"/></svg>';
+    var PLUS = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
+    var USER = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 19a6.5 6.5 0 0 1 13 0"/></svg>';
     var CHECK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>';
     var chips = [30, 90, 180, 365].map(function (d) {
       return '<button type="button" class="mtb-chip' + (d === 365 ? ' on' : '') + '" data-days="' + d + '">' + num0(d) + ' ' + esc(L('agDaysU')) + '</button>';
@@ -750,9 +753,8 @@
     ov.id = 'mtbAgentModal';
     ov.className = 'mtb-modal-ov';
     ov.innerHTML = '<div class="mtb-modal" role="dialog" aria-modal="true">' +
-      '<div class="tc-header"><p class="tc-title">' + esc(L('newAgent')) + '</p>' +
+      '<div class="tc-header"><div class="mtb-wiz-hero"><span class="mtb-wiz-plus">' + PLUS + '</span><div class="mtb-wiz-hero-tx"><p class="tc-title">' + esc(L('newAgent')) + '</p><p class="qs-hint">' + esc(L('agNewSub')) + '</p></div></div>' +
       '<button type="button" class="mtb-x" data-mtb-close>\u00d7</button></div>' +
-      '<p class="qs-hint">' + esc(L('agNewSub')) + '</p>' +
       '<div class="mtb-wiz" id="mtbWiz">' +
       '<div class="mtb-wstep on" data-st="1"><span class="mtb-wstep-dot">1</span><span class="mtb-wstep-lbl">' + esc(L('agStName')) + '</span></div>' +
       '<span class="mtb-wline"></span>' +
@@ -762,8 +764,10 @@
       '</div>' +
       '<div class="mtb-form" id="mtbAgentForm">' +
       '<div class="mtb-wpage" data-pg="1">' +
+      '<div class="mtb-field"><span class="mtb-field-ico">' + USER + '</span>' +
       '<input id="mtbAgentLabel" class="quantum-input" placeholder="' + esc(L('agNamePh')) + '" dir="ltr" aria-label="' + esc(L('agentLabel')) + '">' +
-      '<p class="qs-hint">' + esc(L('agNameHint')) + '</p>' +
+      '<span class="mtb-field-ok" id="mtbNameOk" hidden>' + CHECK + '</span></div>' +
+      '<div class="mtb-tip-row"><button type="button" class="mtb-tip-i" data-tipopen data-tip="' + esc(L('agNameHint')) + '" aria-label="' + esc(L('agNameHint')) + '">!</button></div>' +
       '</div>' +
       '<div class="mtb-wpage" data-pg="2" hidden>' +
       '<span class="mtb-fl">' + esc(L('agentRole')) + '</span>' +
@@ -790,13 +794,14 @@
       '<input type="hidden" id="mtbCountry" value=""></label>' +
       '</div>' +
       '<div class="mtb-wpage" data-pg="3" hidden>' +
+      '<div class="mtb-tip-row"><button type="button" class="mtb-tip-i" data-tipopen data-tip="' + esc(L('agTtlHint')) + '" aria-label="' + esc(L('agTtlHint')) + '">!</button></div>' +
       '<label>' + esc(L('agentExpiry')) + ' <input id="mtbExpiry" type="number" min="1" max="3650" value="365" class="quantum-input" style="width:120px" dir="ltr"></label>' +
       '<div class="mtb-chips">' + chips + '</div>' +
       '</div>' +
       '<p class="qs-hint mtb-formmsg" data-mtb-msg></p>' +
       '<div class="mtb-acts" id="mtbWizFoot">' +
       '<button type="button" class="quantum-btn quantum-btn-secondary" id="mtbWizBack" hidden>' + esc(L('agWizBack')) + '</button>' +
-      '<button type="button" class="quantum-btn quantum-btn-primary" id="mtbWizNext">' + esc(L('agWizNext')) + '</button>' +
+      '<button type="button" class="quantum-btn quantum-btn-primary mtb-wiz-next" id="mtbWizNext">' + esc(L('agWizNext')) + ' <svg class="mtb-wiz-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>' +
       '<button type="button" class="quantum-btn quantum-btn-primary" id="mtbMint" hidden>' + esc(L('mint')) + '</button>' +
       '<button type="button" class="quantum-btn quantum-btn-secondary" data-mtb-close>' + esc(L('cancel')) + '</button></div>' +
       '</div>' +
@@ -834,6 +839,7 @@
         var csel = document.getElementById('mtbCountry');
         fl.innerHTML = (foreign && csel && csel.value) ? flagImg(csel.value) : '';
       }
+      if (typeof wizSave === 'function') wizSave();
     }
     ov.querySelectorAll('input[name="mtbRole"]').forEach(function (r) {
       r.addEventListener('change', syncRole);
@@ -848,6 +854,7 @@
       cddCur.innerHTML = cc ? (flagImg(cc) + ' ' + esc(CN(cc) || cc)) : '\u2014';
       cddPop.querySelectorAll('.mtb-cdd-opt').forEach(function (op) { op.classList.toggle('on', op.getAttribute('data-cc') === cc); });
       cddPop.hidden = true;
+      if (typeof wizSave === 'function') wizSave();
     }
     cddBtn.addEventListener('click', function (e) { e.stopPropagation(); cddPop.hidden = !cddPop.hidden; });
     cddPop.addEventListener('click', function (e) {
@@ -859,12 +866,14 @@
       ch.addEventListener('click', function () {
         document.getElementById('mtbExpiry').value = ch.getAttribute('data-days');
         ov.querySelectorAll('.mtb-chip').forEach(function (c2) { c2.classList.toggle('on', c2 === ch); });
+        if (typeof wizSave === 'function') wizSave();
       });
     });
     document.getElementById('mtbExpiry').addEventListener('input', function () {
       var v = parseInt(this.value, 10);
       ov.querySelectorAll('.mtb-chip').forEach(function (c2) { c2.classList.toggle('on', parseInt(c2.getAttribute('data-days'), 10) === v); });
     });
+    if (typeof wizSave === 'function') { /* wired below after wizSave exists */ }
     var wizStep = 1;
     function wizSync() {
       ov.querySelectorAll('.mtb-wpage').forEach(function (p) { p.hidden = parseInt(p.getAttribute('data-pg'), 10) !== wizStep; });
@@ -897,17 +906,60 @@
       ov.querySelector('[data-mtb-msg]').textContent = '';
       wizStep = Math.min(3, wizStep + 1);
       wizSync();
+      if (typeof wizSave === 'function') wizSave();
     }
     document.getElementById('mtbWizNext').addEventListener('click', wizNext);
     document.getElementById('mtbWizBack').addEventListener('click', function () {
       wizStep = Math.max(1, wizStep - 1);
       ov.querySelector('[data-mtb-msg]').textContent = '';
       wizSync();
+      if (typeof wizSave === 'function') wizSave();
     });
     document.getElementById('mtbAgentLabel').addEventListener('keydown', function (e) {
       if (e.key === 'Enter') { e.preventDefault(); wizNext(); }
     });
+    var WKEY = 'quantum_agwiz';
+    function wizSave() {
+      try {
+        localStorage.setItem(WKEY, JSON.stringify({
+          s: wizStep,
+          n: document.getElementById('mtbAgentLabel').value,
+          r: (ov.querySelector('input[name="mtbRole"]:checked') || {}).value || 'iran',
+          c: (document.getElementById('mtbCountry') || {}).value || '',
+          d: document.getElementById('mtbExpiry').value
+        }));
+      } catch (err) { /* storage blocked */ }
+    }
+    function wizLoad() { try { return JSON.parse(localStorage.getItem(WKEY) || 'null'); } catch (err) { return null; } }
+    function wizClear() { try { localStorage.removeItem(WKEY); } catch (err) { /* storage blocked */ } }
+    function nameOk() {
+      var ok = document.getElementById('mtbNameOk');
+      if (ok) ok.hidden = document.getElementById('mtbAgentLabel').value.trim().length < 2;
+    }
+    document.getElementById('mtbAgentLabel').addEventListener('input', function () { nameOk(); wizSave(); });
+    document.getElementById('mtbExpiry').addEventListener('input', wizSave);
+    ov.addEventListener('click', function (e) {
+      var t2 = e.target && e.target.closest ? e.target.closest('[data-tipopen]') : null;
+      if (t2) t2.classList.toggle('tipopen');
+      else ov.querySelectorAll('.mtb-tip-i.tipopen').forEach(function (x) { x.classList.remove('tipopen'); });
+    });
     wizSync();
+    var saved = wizLoad();
+    if (saved) {
+      if (saved.n) document.getElementById('mtbAgentLabel').value = saved.n;
+      if (saved.r === 'foreign' || saved.r === 'iran') {
+        var rr = ov.querySelector('input[name="mtbRole"][value="' + saved.r + '"]');
+        if (rr) { rr.checked = true; syncRole(); }
+      }
+      if (saved.c) setCountry(saved.c);
+      if (saved.d) {
+        document.getElementById('mtbExpiry').value = saved.d;
+        ov.querySelectorAll('.mtb-chip').forEach(function (c2) { c2.classList.toggle('on', parseInt(c2.getAttribute('data-days'), 10) === parseInt(saved.d, 10)); });
+      }
+      if (saved.s >= 1 && saved.s <= 3) wizStep = saved.s;
+      nameOk();
+      wizSync();
+    }
     var origin = location.origin;
     var base = (document.documentElement.getAttribute('data-base') || '/ui');
     var panelUrl = origin + base;
@@ -926,6 +978,7 @@
         document.getElementById('mtbAgentForm').style.display = 'none';
         ov.querySelectorAll('.mtb-wstep').forEach(function (st2) { st2.classList.remove('on'); st2.classList.add('done'); st2.querySelector('.mtb-wstep-dot').innerHTML = CHECK; });
         ov.querySelectorAll('.mtb-wline').forEach(function (ln) { ln.classList.add('fill'); });
+        wizClear();
         var outd = document.getElementById('mtbTokenOut');
         outd.style.display = 'block';
         document.getElementById('mtbTokenVal').textContent = tok;
