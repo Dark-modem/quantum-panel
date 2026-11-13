@@ -114,6 +114,9 @@
     agRoleForeignD: ['سرور خارج — کشور را انتخاب کنید', 'Foreign server — pick the country'],
     agNameHint: ['اسم قابل تشخیص بگذارید؛ بعداً از صفحه مدیریت ایجنت قابل تغییر است.', 'Pick a recognizable name; you can rename it later on the agent page.'],
     agNamePh: ['تهران-۳', 'tehran-3'],
+    agStName: ['نام', 'Name'], agStSide: ['سمت', 'Side'], agStTtl: ['زمان توکن', 'Token lifetime'],
+    agWizNext: ['بعدی', 'Next'], agWizBack: ['قبلی', 'Back'],
+    agNameReq: ['اسم ایجنت را وارد کنید', 'Enter the agent name'],
     agDaysU: ['روز', 'days'],
     agTokenOk: ['توکن ساخته شد — فقط یک بار قابل استفاده است', 'Token minted — valid for a single use'],
     agCopyCmd: ['کپی دستور', 'Copy command'],
@@ -749,9 +752,19 @@
       '<div class="tc-header"><p class="tc-title">' + esc(L('newAgent')) + '</p>' +
       '<button type="button" class="mtb-x" data-mtb-close>\u00d7</button></div>' +
       '<p class="qs-hint">' + esc(L('agNewSub')) + '</p>' +
+      '<div class="mtb-wiz" id="mtbWiz">' +
+      '<div class="mtb-wstep on" data-st="1"><span class="mtb-wstep-dot">1</span><span class="mtb-wstep-lbl">' + esc(L('agStName')) + '</span></div>' +
+      '<span class="mtb-wline"></span>' +
+      '<div class="mtb-wstep" data-st="2"><span class="mtb-wstep-dot">2</span><span class="mtb-wstep-lbl">' + esc(L('agStSide')) + '</span></div>' +
+      '<span class="mtb-wline"></span>' +
+      '<div class="mtb-wstep" data-st="3"><span class="mtb-wstep-dot">3</span><span class="mtb-wstep-lbl">' + esc(L('agStTtl')) + '</span></div>' +
+      '</div>' +
       '<div class="mtb-form" id="mtbAgentForm">' +
+      '<div class="mtb-wpage" data-pg="1">' +
       '<input id="mtbAgentLabel" class="quantum-input" placeholder="' + esc(L('agNamePh')) + '" dir="ltr" aria-label="' + esc(L('agentLabel')) + '">' +
       '<p class="qs-hint">' + esc(L('agNameHint')) + '</p>' +
+      '</div>' +
+      '<div class="mtb-wpage" data-pg="2" hidden>' +
       '<span class="mtb-fl">' + esc(L('agentRole')) + '</span>' +
       '<div class="mtb-agent-cards">' +
       '<label class="mtb-agent-card on"><input type="radio" name="mtbRole" value="iran" checked>' +
@@ -774,10 +787,16 @@
       }).join('') +
       '</div></div>' +
       '<input type="hidden" id="mtbCountry" value=""></label>' +
+      '</div>' +
+      '<div class="mtb-wpage" data-pg="3" hidden>' +
       '<label>' + esc(L('agentExpiry')) + ' <input id="mtbExpiry" type="number" min="1" max="3650" value="365" class="quantum-input" style="width:120px" dir="ltr"></label>' +
       '<div class="mtb-chips">' + chips + '</div>' +
+      '</div>' +
       '<p class="qs-hint mtb-formmsg" data-mtb-msg></p>' +
-      '<div class="mtb-acts"><button type="button" class="quantum-btn quantum-btn-primary" id="mtbMint">' + esc(L('mint')) + '</button>' +
+      '<div class="mtb-acts" id="mtbWizFoot">' +
+      '<button type="button" class="quantum-btn quantum-btn-secondary" id="mtbWizBack" hidden>' + esc(L('agWizBack')) + '</button>' +
+      '<button type="button" class="quantum-btn quantum-btn-primary" id="mtbWizNext">' + esc(L('agWizNext')) + '</button>' +
+      '<button type="button" class="quantum-btn quantum-btn-primary" id="mtbMint" hidden>' + esc(L('mint')) + '</button>' +
       '<button type="button" class="quantum-btn quantum-btn-secondary" data-mtb-close>' + esc(L('cancel')) + '</button></div>' +
       '</div>' +
       '<div id="mtbTokenOut" style="display:none">' +
@@ -845,6 +864,49 @@
       var v = parseInt(this.value, 10);
       ov.querySelectorAll('.mtb-chip').forEach(function (c2) { c2.classList.toggle('on', parseInt(c2.getAttribute('data-days'), 10) === v); });
     });
+    var wizStep = 1;
+    function wizSync() {
+      ov.querySelectorAll('.mtb-wpage').forEach(function (p) { p.hidden = parseInt(p.getAttribute('data-pg'), 10) !== wizStep; });
+      ov.querySelectorAll('.mtb-wstep').forEach(function (st2) {
+        var n2 = parseInt(st2.getAttribute('data-st'), 10);
+        st2.classList.toggle('on', n2 === wizStep);
+        st2.classList.toggle('done', n2 < wizStep);
+        st2.querySelector('.mtb-wstep-dot').innerHTML = n2 < wizStep ? CHECK : String(n2);
+      });
+      ov.querySelectorAll('.mtb-wline').forEach(function (ln, i2) { ln.classList.toggle('fill', i2 < wizStep - 1); });
+      document.getElementById('mtbWizBack').hidden = wizStep === 1;
+      document.getElementById('mtbWizNext').hidden = wizStep === 3;
+      document.getElementById('mtbMint').hidden = wizStep !== 3;
+      var pg = ov.querySelector('.mtb-wpage:not([hidden])');
+      if (pg) { var f = pg.querySelector('input:not([type=hidden])'); if (f) f.focus(); }
+    }
+    function wizNext() {
+      if (wizStep === 1 && !document.getElementById('mtbAgentLabel').value.trim()) {
+        ov.querySelector('[data-mtb-msg]').textContent = L('agNameReq');
+        document.getElementById('mtbAgentLabel').focus();
+        return;
+      }
+      if (wizStep === 2) {
+        var foreign2 = (ov.querySelector('input[name="mtbRole"]:checked') || {}).value === 'foreign';
+        if (foreign2 && !((document.getElementById('mtbCountry') || {}).value)) {
+          ov.querySelector('[data-mtb-msg]').textContent = L('pickCountry');
+          return;
+        }
+      }
+      ov.querySelector('[data-mtb-msg]').textContent = '';
+      wizStep = Math.min(3, wizStep + 1);
+      wizSync();
+    }
+    document.getElementById('mtbWizNext').addEventListener('click', wizNext);
+    document.getElementById('mtbWizBack').addEventListener('click', function () {
+      wizStep = Math.max(1, wizStep - 1);
+      ov.querySelector('[data-mtb-msg]').textContent = '';
+      wizSync();
+    });
+    document.getElementById('mtbAgentLabel').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); wizNext(); }
+    });
+    wizSync();
     var origin = location.origin;
     var base = (document.documentElement.getAttribute('data-base') || '/ui');
     var panelUrl = origin + base;
@@ -861,6 +923,8 @@
         var tok = (r && (r.token || (r.data && r.data.token))) || '';
         if (!tok) { ov.querySelector('[data-mtb-msg]').textContent = 'no token in response'; return; }
         document.getElementById('mtbAgentForm').style.display = 'none';
+        ov.querySelectorAll('.mtb-wstep').forEach(function (st2) { st2.classList.remove('on'); st2.classList.add('done'); st2.querySelector('.mtb-wstep-dot').innerHTML = CHECK; });
+        ov.querySelectorAll('.mtb-wline').forEach(function (ln) { ln.classList.add('fill'); });
         var outd = document.getElementById('mtbTokenOut');
         outd.style.display = 'block';
         document.getElementById('mtbTokenVal').textContent = tok;

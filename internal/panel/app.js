@@ -11593,6 +11593,18 @@ window.loadClusterStatus = loadClusterStatus;
       '.mtb-agintro-row .mtb-agres .mtb-agtx{flex-direction:column;align-items:flex-start;gap:1px}' +
       '.mtb-agintro-row .mtb-agres .mtb-agtx b{font-size:16px}' +
       '.mtb-agintro-row .mtb-agstat-i{min-width:0}}',
+    '.mtb-wiz{display:flex;align-items:center;gap:10px;margin:2px 0 16px}',
+    '.mtb-wstep{display:flex;align-items:center;gap:8px;flex:1;min-width:0}',
+    '.mtb-wstep-dot{width:30px;height:30px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;flex:none;font-size:13px;font-weight:700;color:var(--tx2);background:color-mix(in srgb, var(--tx) 8%, transparent);border:1px solid var(--ln);transition:background .25s, color .25s, border-color .25s, box-shadow .25s}',
+    '.mtb-wstep-dot svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}',
+    '.mtb-wstep-lbl{font-size:12.5px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color .25s}',
+    '.mtb-wstep.on .mtb-wstep-dot{color:var(--ac-on);background:var(--ac);border-color:var(--ac);box-shadow:0 0 0 4px color-mix(in srgb, var(--ac) 22%, transparent)}',
+    '.mtb-wstep.on .mtb-wstep-lbl{color:var(--tx);font-weight:700}',
+    '.mtb-wstep.done .mtb-wstep-dot{color:var(--ac);background:color-mix(in srgb, var(--ac) 16%, transparent);border-color:color-mix(in srgb, var(--ac) 45%, transparent)}',
+    '.mtb-wline{flex:none;width:34px;height:2px;border-radius:2px;background:var(--ln);transition:background .3s}',
+    '.mtb-wline.fill{background:linear-gradient(90deg, var(--ac), color-mix(in srgb, var(--ac) 55%, transparent))}',
+    '.mtb-wpage{animation:mtbWizIn .3s var(--spring)}',
+    '@keyframes mtbWizIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}',
     '.mtb-agtx{display:flex;flex-direction:row;align-items:baseline;gap:6px}',
     '.mtb-agtx b{font-size:20px;color:var(--tx);line-height:1.15}',
     '.mtb-agtx span{font-size:12.5px;color:var(--tx2)}',
