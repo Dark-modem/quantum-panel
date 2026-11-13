@@ -85,17 +85,11 @@
     cursor:pointer; text-align:start; width:100%; transition:background .15s,color .15s,transform .15s var(--spring); }
   .nav-item svg { width:17px; height:17px; flex:none;
     transition:transform .25s var(--spring), color .2s ease, filter .25s ease; }
-  .nav-item:hover svg { transform:scale(1.15);
-    color:var(--ac); animation:navGlow 2.2s ease-in-out 1.6s infinite; }
-  /* the glyph draws itself in slowly, then the glow breathes */
-  .nav-item:hover svg :is(path, circle, rect, polygon, line, polyline) {
-    stroke-dasharray: 160;
-    animation: navIconDraw 1.6s ease-in-out both;
-  }
-  @keyframes navIconDraw { from { stroke-dashoffset: 160; } to { stroke-dashoffset: 0; } }
-  @keyframes navGlow {
-    0%,100% { filter: drop-shadow(0 0 2px var(--ac-b35-ln2)); }
-    50% { filter: drop-shadow(0 0 8px var(--ac-b35-ln2)); }
+  .nav-item:hover svg { color:var(--ac); animation:navBob .35s ease-out; }
+  @keyframes navBob {
+    0% { transform:translateY(0); }
+    45% { transform:translateY(-2.5px); }
+    100% { transform:translateY(0); }
   }
   .nav-item:hover { background:var(--sunk); color:var(--tx2); transform:translateX(2px); }
   .nav-item.on { background:var(--ac-soft); color:var(--tx);
@@ -897,7 +891,6 @@
   }
   .sidebar-nav .nav-item:hover svg, .sidebar-nav .nav-item.on svg {
     stroke: var(--ac);
-    transform: scale(1.1);
   }
 
   /* Right Sidebar */
