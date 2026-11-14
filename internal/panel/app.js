@@ -11645,8 +11645,6 @@ window.loadClusterStatus = loadClusterStatus;
     '.mtb-tip-i{position:relative;width:20px;height:20px;border-radius:50%;border:1px solid color-mix(in srgb, var(--ac) 45%, transparent);background:color-mix(in srgb, var(--ac) 12%, transparent);color:var(--ac);font-size:12px;font-weight:700;cursor:help;display:inline-flex;align-items:center;justify-content:center;padding:0}',
     '.mtb-tip-i::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 8px);inset-inline-start:0;z-index:9;width:max-content;max-width:280px;background:var(--s1, #12161f);border:1px solid color-mix(in srgb, var(--ac) 30%, var(--ln));border-radius:10px;padding:8px 10px;font-size:12px;font-weight:400;line-height:1.5;color:var(--tx);text-align:start;white-space:normal;opacity:0;pointer-events:none;transform:translateY(4px);transition:opacity .2s,transform .2s;box-shadow:0 10px 24px rgba(0,0,0,.4)}',
     '.mtb-tip-i:hover::after,.mtb-tip-i.tipopen::after{opacity:1;transform:none}',
-    '.mtb-wiz-next svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}',
-    'html[dir="rtl"] .mtb-wiz-next svg{transform:scaleX(-1)}',
     '.mtb-tip-infield{position:absolute;inset-inline-end:40px;top:50%;transform:translateY(-50%)}',
     '.mtb-hint-row{display:none}',
     '.mtb-tip-infield::after{inset-inline-start:auto;inset-inline-end:0;bottom:auto;top:calc(100% + 10px);transform:translateY(-4px)}',
