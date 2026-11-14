@@ -1678,7 +1678,7 @@
     ov.innerHTML = '<div class="mtb-modal mtb-del-modal" role="dialog" aria-modal="true">' +
       '<div class="tc-header"><div class="mtb-del-hero"><span class="mtb-del-badge">' + TRASH + '</span><p class="tc-title">' + esc(L('agDelT')) + '</p></div>' +
       '<button type="button" class="mtb-x" data-mtb-close>×</button></div>' +
-      '<p class="qs-hint mtb-del-warn"><span class="mtb-del-warn-i"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3L2 20h20L12 3z"/><path d="M12 10v4"/><path d="M12 17h.01"/></svg></span>' + esc(L('agDelQ')) + '</p>' +
+      '<p class="qs-hint mtb-del-warn"><span class="mtb-del-warn-i"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" stroke="none" d="M10.27 3.86a2 2 0 0 1 3.46 0l7 12.13A2 2 0 0 1 19 19H5a2 2 0 0 1-1.73-3.01l7-12.13z"/><path d="M12 9v4.5" fill="none" stroke="#12161f" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="16.6" r="1.3" fill="#12161f" stroke="none"/></svg></span>' + esc(L('agDelQ')) + '</p>' +
       '<div class="mtb-del-panel">' +
         '<div class="mtb-del-idcol"><p class="mtb-del-k">' + esc(L('agentLabel')) + ':</p>' +
         '<div class="mtb-del-nmrow"><b class="mtb-del-name" dir="ltr">' + esc(agName || '—') + '</b>' +

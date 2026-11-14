@@ -11677,7 +11677,7 @@ window.loadClusterStatus = loadClusterStatus;
     '.mtb-del-modal .qs-hint{white-space:normal;color:var(--tx);font-size:13px;line-height:1.6}',
     '.mtb-del-warn{display:flex;align-items:center;gap:12px;color:var(--tx);margin:2px 0 14px}',
     '.mtb-del-warn-i{width:44px;height:44px;flex:none;border-radius:12px;border:1px solid color-mix(in srgb, var(--er) 35%, transparent);background:color-mix(in srgb, var(--er) 10%, transparent);color:var(--er);display:inline-flex;align-items:center;justify-content:center}',
-    '.mtb-del-warn-i svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}',
+    '.mtb-del-warn-i svg{width:20px;height:20px;display:block}',
     '.mtb-del-type{display:flex;align-items:center;gap:9px;color:var(--tx)}',
     '.mtb-del-type-i{width:20px;height:20px;flex:none;color:var(--ac);display:inline-flex;margin-top:1px}',
     '.mtb-del-type-i svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}',
