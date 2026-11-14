@@ -11642,14 +11642,24 @@ window.loadClusterStatus = loadClusterStatus;
     '.mtb-wiz-next svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}',
     'html[dir="rtl"] .mtb-wiz-next svg{transform:scaleX(-1)}',
     '.mtb-tip-infield{position:absolute;inset-inline-end:40px;top:50%;transform:translateY(-50%)}',
+    '.mtb-hint-row{display:none}',
     '.mtb-tip-infield::after{inset-inline-start:auto;inset-inline-end:0}',
-    '@media (max-width:760px){.mtb-wiz{gap:5px;margin-bottom:14px}' +
-      '.mtb-wstep{flex:1 1 0;flex-direction:column;gap:5px;min-width:0}' +
-      '.mtb-wstep-lbl{font-size:10px;text-align:center;white-space:normal;width:100%;line-height:1.25}' +
-      '.mtb-wline{flex:1;min-width:8px;align-self:flex-start;margin-top:15px}' +
-      '.mtb-wiz-hero{gap:10px}' +
-      '.mtb-wiz-plus{width:36px;height:36px}' +
-      '.mtb-wiz-plus svg{width:16px;height:16px}}',
+    '@media (max-width:760px){.mtb-wiz{gap:8px;margin-bottom:18px}' +
+      '.mtb-wstep{flex:1 1 0;flex-direction:column;gap:9px;min-width:0}' +
+      '.mtb-wstep-dot{width:44px;height:44px;font-size:17px}' +
+      '.mtb-wstep.on .mtb-wstep-dot{box-shadow:0 0 0 6px color-mix(in srgb, var(--ac) 25%, transparent),0 0 24px color-mix(in srgb, var(--ac) 55%, transparent)}' +
+      '.mtb-wstep-lbl{font-size:13px;font-weight:600;text-align:center;white-space:normal;width:100%;line-height:1.25}' +
+      '.mtb-wline{flex:1;min-width:14px;align-self:flex-start;margin-top:20px}' +
+      '.mtb-field .quantum-input{height:58px;font-size:16px;border-radius:18px}' +
+      '.mtb-field-ico{inset-inline-start:16px}' +
+      '.mtb-tip-infield{inset-inline-end:16px}' +
+      '.mtb-field-ok{inset-inline-end:44px}' +
+      '.mtb-hint-row{display:flex;align-items:center;gap:10px;margin-top:12px}' +
+      '.mtb-hint-ico{width:22px;height:22px;border-radius:50%;border:1px solid color-mix(in srgb, var(--ac) 45%, transparent);background:color-mix(in srgb, var(--ac) 10%, transparent);color:var(--ac);display:inline-flex;align-items:center;justify-content:center;flex:none}' +
+      '.mtb-hint-ico svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}' +
+      '.mtb-hint-tx{font-size:12.5px;color:var(--tx2);line-height:1.45}' +
+      '.mtb-acts .quantum-btn{min-height:50px;border-radius:14px;font-size:15px;padding-inline:24px}' +
+      '.mtb-modal .mtb-x{width:34px;height:34px;border:1px solid var(--ln);border-radius:10px;display:inline-flex;align-items:center;justify-content:center;background:transparent}}',
     '#mtbAgentModal .mtb-modal{width:min(640px,92vw)}',
     '.tc-header .mtb-wiz-hero{flex-wrap:nowrap;align-items:center}',
     '.mtb-agtx{display:flex;flex-direction:row;align-items:baseline;gap:6px}',
