@@ -132,6 +132,16 @@ func handleUIAgentDetail(w http.ResponseWriter, r *http.Request) {
 
 	// Tunnels terminating on this agent's server (compact rows, live state).
 	tunRows := []map[string]any{}
+	// serverID -> agent country (the servers table carries no country; the
+	// agent enrolled against it does) — feeds the destination flag cell.
+	tnCountry := map[int64]string{}
+	if ags, aerr := h.ListAgents(); aerr == nil {
+		for _, a2 := range ags {
+			if a2.ServerID != 0 {
+				tnCountry[a2.ServerID] = a2.Country
+			}
+		}
+	}
 	if ag.ServerID != 0 {
 		if allTopos, err := h.ListTopologies(); err == nil {
 			verdicts := uiVerdictsFn()
@@ -161,6 +171,7 @@ func handleUIAgentDetail(w http.ResponseWriter, r *http.Request) {
 					row := map[string]any{
 						"tunnel_key": tn.TunnelKey, "engine": tn.Engine, "topology": tp.Name,
 						"local": h.uiServerRef(tn.LocalServerID), "remote": h.uiServerRef(tn.RemoteServerID),
+						"country": tnCountry[tn.RemoteServerID],
 						"state": state, "latency_ms": lat[tn.TunnelKey],
 						"today_bytes": todayBytes,
 					}
@@ -237,7 +248,7 @@ func (h uiStoreHandle) uiAgentTopologies(s *store.Store, ag store.Agent, withTun
 	// serverID → agent country (the servers table carries no country; the
 	// agent enrolled against it does). Feeds the per-side diagram summary.
 	agentCountry := map[int64]string{}
-	if ags, aerr := s.ListAgents(); aerr == nil {
+	if ags, aerr := h.ListAgents(); aerr == nil {
 		for _, a2 := range ags {
 			if a2.ServerID != 0 {
 				agentCountry[a2.ServerID] = a2.Country

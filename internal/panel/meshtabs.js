@@ -1472,8 +1472,7 @@
         var b2 = tn.state === 'healthy' ? badge('ok', esc(L('agTunUp')), true) : (tn.state === 'down' ? badge('err', esc(L('st_down')), true) : (tn.state === 'disabled' ? badge('dim', esc(L('disabled')), true) : badge('dim', esc(L('st_unknown')), true)));
         var rem = (tn.remote && tn.remote.name) || '\u2014';
         var remDc = (tn.remote && tn.remote.datacenter) || '';
-        var remAg = (cache.magt || []).find(function (a) { return a.server && a.server.name === tn.remote.name; }) || null;
-        var remCc = remAg && remAg.country ? String(remAg.country).toLowerCase() : '';
+        var remCc = tn.country ? String(tn.country).toLowerCase() : '';
         var engName2 = engDisp[tn.engine] || tn.engine || '\u2014';
         // A down tunnel reports latency 0; that is "no measurement", not a
         // real RTT, so it must read as an em dash instead of "0 ms".
