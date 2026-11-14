@@ -766,8 +766,8 @@
       '<div class="mtb-wpage" data-pg="1">' +
       '<div class="mtb-field"><span class="mtb-field-ico">' + USER + '</span>' +
       '<input id="mtbAgentLabel" class="quantum-input" placeholder="' + esc(L('agNamePh')) + '" dir="ltr" aria-label="' + esc(L('agentLabel')) + '">' +
-      '<span class="mtb-field-ok" id="mtbNameOk" hidden>' + CHECK + '</span></div>' +
-      '<div class="mtb-tip-row"><button type="button" class="mtb-tip-i" data-tipopen data-tip="' + esc(L('agNameHint')) + '" aria-label="' + esc(L('agNameHint')) + '">!</button></div>' +
+      '<span class="mtb-field-ok" id="mtbNameOk" hidden>' + CHECK + '</span>' +
+      '<button type="button" class="mtb-tip-i mtb-tip-infield" data-tipopen data-tip="' + esc(L('agNameHint')) + '" aria-label="' + esc(L('agNameHint')) + '">!</button></div>' +
       '</div>' +
       '<div class="mtb-wpage" data-pg="2" hidden>' +
       '<span class="mtb-fl">' + esc(L('agentRole')) + '</span>' +
