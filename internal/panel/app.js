@@ -11657,10 +11657,7 @@ window.loadClusterStatus = loadClusterStatus;
       '.mtb-field-ico{inset-inline-start:16px}' +
       '.mtb-tip-infield{inset-inline-end:16px}' +
       '.mtb-field-ok{inset-inline-end:44px}' +
-      '.mtb-hint-row{display:flex;align-items:center;gap:10px;margin-top:12px}' +
-      '.mtb-hint-ico{width:22px;height:22px;border-radius:50%;border:1px solid color-mix(in srgb, var(--ac) 45%, transparent);background:color-mix(in srgb, var(--ac) 10%, transparent);color:var(--ac);display:inline-flex;align-items:center;justify-content:center;flex:none}' +
-      '.mtb-hint-ico svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}' +
-      '.mtb-hint-tx{font-size:12.5px;color:var(--tx2);line-height:1.45}' +
+
       '.mtb-acts .quantum-btn{min-height:50px;border-radius:14px;font-size:15px;padding-inline:24px}' +
       '.mtb-modal .mtb-x{width:34px;height:34px;border:1px solid var(--ln);border-radius:10px;display:inline-flex;align-items:center;justify-content:center;background:transparent}}',
     '#mtbAgentModal .mtb-modal{width:min(640px,92vw)}',
