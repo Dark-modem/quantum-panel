@@ -65,6 +65,9 @@
     agNoTopo: ['عضو هیچ توپولوژی‌ای نیست', 'Not a member of any topology'], agPeers: ['هم‌تا', 'peers'],
     agEditT: ['ویرایش ایجنت', 'Edit agent'], agNameK: ['نام', 'Name'], agIPK: ['IP عمومی', 'Public IP'],
     agSave: ['ذخیره', 'Save'], agDelT: ['حذف ایجنت', 'Delete agent'],
+    agDelConfirm: ['برای تأیید حذف، اسم ایجنت را بنویس:', 'To confirm, type the agent name:'],
+    agDelPh: ['اسم ایجنت', 'agent name'],
+    agDelNo: ['اسم ایجنت را دقیق بنویس تا دکمه حذف فعال شود', 'Type the exact agent name to enable Delete'],
     agDelQ: ['ایجنت و دسترسی‌اش کامل حذف شود؟', 'Remove the agent and its credentials completely?'],
     agVer: ['نسخه', 'Version'], agOS: ['سیستم‌عامل', 'OS'], agLastSeen: ['آخرین حضور', 'Last seen'],
     agActUpd: ['آپدیت', 'Update'],
@@ -384,7 +387,8 @@
     '@keyframes mtbOvIn { from { opacity:0; } to { opacity:1; } }',
     '@keyframes mtbModalIn { from { opacity:0; transform:scale(.97) translateY(4px); } to { opacity:1; transform:none; } }',
     '.mtb-modal { width:min(520px, 92vw); max-height:86vh; overflow:auto; background:var(--s1, #12161f); color:var(--tx, #e6e9ef); border:1px solid var(--ln, rgba(148,163,184,.25)); border-radius:16px; padding:16px 18px; box-shadow:0 18px 60px rgba(0,0,0,.5); }',
-    '.mtb-x { background:none; border:0; color:var(--mu, #94a3b8); font-size:20px; cursor:pointer; float:inline-end; }',
+    '.mtb-x { background:color-mix(in srgb, var(--ac) 8%, transparent); border:1px solid color-mix(in srgb, var(--ac) 45%, transparent); color:var(--ac); font-size:17px; cursor:pointer; float:inline-end; width:34px; height:34px; border-radius:10px; display:inline-flex; align-items:center; justify-content:center; -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); transition:background .15s, border-color .15s; }',
+    '.mtb-x:hover { background:color-mix(in srgb, var(--ac) 16%, transparent); border-color:var(--ac); }',
     '.mtb-form { display:flex; flex-direction:column; gap:10px; margin-top:8px; }',
     '.mtb-form label { font-size:13px; color:var(--tx2, #cbd5e1); display:block; }',
     '.mtb-checks { display:flex; flex-wrap:wrap; gap:8px 14px; }',
@@ -1575,13 +1579,27 @@
       '<div class="tc-header"><p class="tc-title">' + esc(L('agDelT')) + '</p>' +
       '<button type="button" class="mtb-x" data-mtb-close>×</button></div>' +
       '<p class="qs-hint">' + esc(L('agDelQ')) + '</p>' +
-      '<div class="mtb-acts"><button type="button" class="quantum-btn quantum-btn-danger" id="mtbAgDelGo">' + esc(L('agActDel')) + '</button>' +
+      '<p class="qs-hint">' + esc(L('agDelConfirm')) + '</p>' +
+      '<input id="mtbAgDelName" class="quantum-input" placeholder="' + esc(L('agDelPh')) + '" dir="ltr" autocomplete="off" spellcheck="false" aria-label="' + esc(L('agDelPh')) + '">' +
+      '<p class="qs-hint mtb-formmsg" data-mtb-msg></p>' +
+      '<div class="mtb-acts"><button type="button" class="quantum-btn quantum-btn-danger" id="mtbAgDelGo" disabled>' + esc(L('agActDel')) + '</button>' +
       '<button type="button" class="quantum-btn quantum-btn-secondary" data-mtb-close>' + esc(L('cancel')) + '</button></div>' +
       '</div>';
     document.body.appendChild(ov);
     ov.querySelectorAll('[data-mtb-close]').forEach(function (b) { b.addEventListener('click', function () { ov.remove(); }); });
     ov.addEventListener('click', function (e) { if (e.target === ov) ov.remove(); });
-    ov.querySelector('#mtbAgDelGo').addEventListener('click', function () {
+    var agRow = (cache.magt || []).find(function (x) { return x.id === id; }) || {};
+    var agName = agRow.name || '';
+    var delInp = ov.querySelector('#mtbAgDelName');
+    var delGo = ov.querySelector('#mtbAgDelGo');
+    var delMsg = ov.querySelector('[data-mtb-msg]');
+    delInp.addEventListener('input', function () {
+      var ok = agName !== '' && delInp.value.trim() === agName;
+      delGo.disabled = !ok;
+      delMsg.textContent = (!ok && delInp.value.trim()) ? L('agDelNo') : '';
+    });
+    delGo.addEventListener('click', function () {
+      if (delGo.disabled) return;
       apiSend('DELETE', 'api/ui/agents/' + encodeURIComponent(id)).then(function () {
         ov.remove(); agtView = { view: 'table' }; renderAgt();
       }).catch(function () { ov.remove(); });
