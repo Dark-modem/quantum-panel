@@ -68,7 +68,9 @@
     agDelConfirm: ['برای تأیید حذف، اسم ایجنت را بنویس:', 'To confirm, type the agent name:'],
     agDelPh: ['اسم ایجنت', 'agent name'],
     agDelNo: ['اسم ایجنت را دقیق بنویس تا دکمه حذف فعال شود', 'Type the exact agent name to enable Delete'],
-    agDelQ: ['ایجنت و دسترسی‌اش کامل حذف شود؟', 'Remove the agent and its credentials completely?'],
+    agDelQ: ['آیا از حذف این ایجنت اطمینان دارید؟', 'Are you sure you want to delete this agent?'],
+    agDelWarn2: ['این عملیات غیرقابل بازگشت است و تمام اطلاعات مربوط به این ایجنت حذف خواهد شد.', 'This action is irreversible and everything belonging to this agent will be removed.'],
+    agCopied: ['کپی شد!', 'Copied!'],
     agVer: ['نسخه', 'Version'], agOS: ['سیستم‌عامل', 'OS'], agLastSeen: ['آخرین حضور', 'Last seen'],
     agActUpd: ['آپدیت', 'Update'],
     agUpdT: ['آپدیت ایجنت', 'Update agent'], agUpdVer: ['نسخه هدف', 'Target version'],
@@ -1573,33 +1575,47 @@
     }).catch(function () {});
   }
   function agtDel(id) {
+    var row = (cache.magt || []).find(function (x) { return x.id === id; }) || {};
+    var agName = row.name || '';
+    var on = row.status === 'online';
+    var TRASH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>';
+    var COPY = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a1 1 0 0 1 1-1h9"/></svg>';
+    var XSM = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+    var CHK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>';
     var ov = document.createElement('div');
     ov.className = 'mtb-modal-ov';
-    ov.innerHTML = '<div class="mtb-modal" role="dialog" aria-modal="true">' +
-      '<div class="tc-header"><p class="tc-title">' + esc(L('agDelT')) + '</p>' +
+    ov.innerHTML = '<div class="mtb-modal mtb-del-modal" role="dialog" aria-modal="true">' +
+      '<div class="tc-header"><div class="mtb-del-hero"><span class="mtb-del-badge">' + TRASH + '</span><p class="tc-title">' + esc(L('agDelT')) + '</p></div>' +
       '<button type="button" class="mtb-x" data-mtb-close>×</button></div>' +
       '<p class="qs-hint">' + esc(L('agDelQ')) + '</p>' +
-      '<p class="qs-hint">' + esc(L('agDelConfirm')) + '</p>' +
-      '<input id="mtbAgDelName" class="quantum-input" placeholder="' + esc(L('agDelPh')) + '" dir="ltr" autocomplete="off" spellcheck="false" aria-label="' + esc(L('agDelPh')) + '">' +
-      '<p class="qs-hint mtb-formmsg" data-mtb-msg></p>' +
-      '<div class="mtb-acts"><button type="button" class="quantum-btn quantum-btn-danger" id="mtbAgDelGo" disabled>' + esc(L('agActDel')) + '</button>' +
-      '<button type="button" class="quantum-btn quantum-btn-secondary" data-mtb-close>' + esc(L('cancel')) + '</button></div>' +
+      '<p class="qs-hint">' + esc(L('agDelWarn2')) + '</p>' +
+      '<div class="mtb-del-panel">' +
+        '<div class="mtb-del-idcol"><p class="mtb-del-k">' + esc(L('agentLabel')) + ':</p>' +
+        '<div class="mtb-del-nmrow"><b class="mtb-del-name" dir="ltr">' + esc(agName || '—') + '</b>' +
+        (row.status ? '<span class="badge ' + (on ? 'ok' : 'err') + '"><span class="dot"></span>' + esc(L(on ? 'agStatOn' : 'agStatOff')) + '</span>' : '') +
+        '</div></div>' +
+        '<button type="button" class="mtb-del-copy" id="mtbDelCopy" title="' + esc(L('copy')) + '">' + COPY + '</button>' +
+      '</div>' +
+      '<div class="mtb-acts"><button type="button" class="quantum-btn quantum-btn-secondary" data-mtb-close>' + esc(L('cancel')) + ' ' + XSM + '</button>' +
+      '<button type="button" class="quantum-btn quantum-btn-danger" id="mtbAgDelGo">' + TRASH + ' ' + esc(L('agActDel')) + '</button></div>' +
+      '<div class="mtb-copied-tip" id="mtbCopiedTip" hidden>' + CHK + ' ' + esc(L('agCopied')) + '</div>' +
       '</div>';
     document.body.appendChild(ov);
     ov.querySelectorAll('[data-mtb-close]').forEach(function (b) { b.addEventListener('click', function () { ov.remove(); }); });
     ov.addEventListener('click', function (e) { if (e.target === ov) ov.remove(); });
-    var agRow = (cache.magt || []).find(function (x) { return x.id === id; }) || {};
-    var agName = agRow.name || '';
-    var delInp = ov.querySelector('#mtbAgDelName');
-    var delGo = ov.querySelector('#mtbAgDelGo');
-    var delMsg = ov.querySelector('[data-mtb-msg]');
-    delInp.addEventListener('input', function () {
-      var ok = agName !== '' && delInp.value.trim() === agName;
-      delGo.disabled = !ok;
-      delMsg.textContent = (!ok && delInp.value.trim()) ? L('agDelNo') : '';
+    var copyBtn = ov.querySelector('#mtbDelCopy');
+    var copTip = ov.querySelector('#mtbCopiedTip');
+    copyBtn.addEventListener('click', function () {
+      navigator.clipboard.writeText(agName).catch(function () { /* clipboard blocked */ });
+      var rb = copyBtn.getBoundingClientRect();
+      copTip.style.top = Math.max(6, rb.top - 44) + 'px';
+      copTip.style.insetInlineStart = 'auto';
+      copTip.style.left = Math.max(6, rb.left - 8) + 'px';
+      copTip.hidden = false;
+      clearTimeout(copTip._t);
+      copTip._t = setTimeout(function () { copTip.hidden = true; }, 1600);
     });
-    delGo.addEventListener('click', function () {
-      if (delGo.disabled) return;
+    ov.querySelector('#mtbAgDelGo').addEventListener('click', function () {
       apiSend('DELETE', 'api/ui/agents/' + encodeURIComponent(id)).then(function () {
         ov.remove(); agtView = { view: 'table' }; renderAgt();
       }).catch(function () { ov.remove(); });
