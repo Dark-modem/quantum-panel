@@ -88,6 +88,7 @@
     agAllRoles: ['همه نقش‌ها', 'All roles'], agAllStates: ['همه وضعیت‌ها', 'All statuses'],
     agAllArchs: ['همه معماری‌ها', 'All architectures'], agAllTopos: ['همه توپولوژی‌ها', 'All topologies'],
     agRefresh: ['تازه‌سازی وضعیت', 'Refresh status'], agUpdBtn: ['به‌روزرسانی ایجنت', 'Update agent'],
+    agRefreshed: ['وضعیت ایجنت تازه‌سازی شد', 'Agent status refreshed'],
     agDc: ['دیتاسنتر', 'Datacenter'], agResT: ['منابع سرور', 'Server resources'], agCores: ['هسته', 'cores'],
     agMembers: ['تعداد اعضا', 'Members'], agViewTopo: ['مشاهده توپولوژی', 'View topology'],
     topoRelH: ['توپولوژی‌های مرتبط', 'Related topologies'], topoSrv: ['سرور', 'servers'],
@@ -1893,6 +1894,7 @@
       var rid = arf.getAttribute('data-agrefresh');
       arf.classList.add('mtb-act-busy');
       setTimeout(function () { arf.classList.remove('mtb-act-busy'); }, 1000);
+      mtbToast(L('agRefreshed'));
       if (agtView && agtView.view === 'detail') renderAgtDetail(rid); else loadAgt();
       return;
     }
