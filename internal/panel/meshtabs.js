@@ -134,7 +134,7 @@
     back: ['بازگشت', 'Back'], detailHint: ['برای جزئیات کلیک کنید', 'Click for details'],
     newTopo: ['+ توپولوژی جدید', '+ New topology'], topoName: ['نام', 'Name'],
     newAgent: ['+ افزودن ایجنت', '+ Add agent'], agentRole: ['نقش سرور', 'Server role'],
-    agentLabel: ['نام/برچسب', 'Name / label'], agentExpiry: ['اعتبار توکن (روز)', 'Token validity (days)'],
+    agentLabel: ['نام ایجنت', 'Agent name'], agentExpiry: ['اعتبار توکن (روز)', 'Token validity (days)'],
     mint: ['ساخت توکن', 'Mint token'], agentToken: ['توکن ثبت (یک‌بار مصرف)', 'Enrollment token (single-use)'],
     installCmd: ['دستور نصب روی سرور جدید', 'Install command for the new server'],
     copy: ['کپی', 'Copy'], copied: ['کپی شد', 'Copied'],
