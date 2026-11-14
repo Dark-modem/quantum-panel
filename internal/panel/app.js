@@ -11610,14 +11610,17 @@ window.loadClusterStatus = loadClusterStatus;
       '.mtb-agintro-row .mtb-agres .mtb-agtx b{font-size:16px}' +
       '.mtb-agintro-row .mtb-agstat-i{min-width:0}}',
     '.mtb-wiz{display:flex;align-items:center;gap:10px;margin:14px 0 18px}',
-    '.mtb-wstep{display:flex;align-items:center;gap:8px;flex:1;min-width:0}',
-    '.mtb-wstep-dot{width:30px;height:30px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;flex:none;font-size:13px;font-weight:700;color:var(--tx2);background:color-mix(in srgb, var(--tx) 8%, transparent);border:1px solid var(--ln);transition:background .25s, color .25s, border-color .25s, box-shadow .25s}',
+    '.mtb-wstep{display:flex;align-items:center;gap:9px;min-width:0;justify-content:center;padding:9px 16px;border-radius:999px;border:1px solid var(--ln);background:color-mix(in srgb, var(--tx) 5%, transparent);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);transition:background .25s, border-color .25s, box-shadow .25s}',
+    '.mtb-wstep-dot{width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;flex:none;font-size:13px;font-weight:700;color:var(--tx2);background:color-mix(in srgb, var(--tx) 8%, transparent);border:1px solid var(--ln);transition:background .25s, color .25s, border-color .25s, box-shadow .25s}',
     '.mtb-wstep-dot svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}',
     '.mtb-wstep-lbl{font-size:12.5px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color .25s}',
     '.mtb-wstep.on .mtb-wstep-dot{color:var(--ac-on);background:var(--ac);border-color:var(--ac);box-shadow:0 0 0 4px color-mix(in srgb, var(--ac) 22%, transparent)}',
     '.mtb-wstep.on .mtb-wstep-lbl{color:var(--tx);font-weight:700}',
     '.mtb-wstep.done .mtb-wstep-dot{color:var(--ac);background:color-mix(in srgb, var(--ac) 16%, transparent);border-color:color-mix(in srgb, var(--ac) 45%, transparent)}',
-    '.mtb-wline{flex:none;width:34px;height:2px;border-radius:2px;background:var(--ln);transition:background .3s}',
+    '.mtb-wstep.on{border-color:color-mix(in srgb, var(--ac) 55%, transparent);background:color-mix(in srgb, var(--ac) 14%, transparent);box-shadow:0 0 22px color-mix(in srgb, var(--ac) 26%, transparent)}',
+    '.mtb-wstep.done{border-color:color-mix(in srgb, var(--ac) 28%, transparent);background:color-mix(in srgb, var(--ac) 7%, transparent)}',
+    '.mtb-wstep.done .mtb-wstep-lbl{color:var(--tx)}',
+    '.mtb-wline{flex:none;width:26px;height:2px;border-radius:2px;background:var(--ln);transition:background .3s}',
     '.mtb-wline.fill{background:linear-gradient(90deg, var(--ac), color-mix(in srgb, var(--ac) 55%, transparent))}',
     '.mtb-wpage{animation:mtbWizIn .3s var(--spring)}',
     '@keyframes mtbWizIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}',
@@ -11628,10 +11631,10 @@ window.loadClusterStatus = loadClusterStatus;
     '.mtb-wiz-hero-tx .tc-title{margin:0}',
     '.mtb-wiz-hero-tx .qs-hint{margin:2px 0 0;white-space:normal}',
     '.mtb-wstep{flex:none}',
-    '.mtb-wline{flex:1;width:auto;min-width:18px}',
-    '.mtb-wstep-dot{width:34px;height:34px;font-size:14px}',
-    '.mtb-wstep-lbl{font-size:14px}',
-    '.mtb-wstep.on .mtb-wstep-dot{box-shadow:0 0 0 5px color-mix(in srgb, var(--ac) 25%, transparent),0 0 18px color-mix(in srgb, var(--ac) 50%, transparent)}',
+    '.mtb-wline{flex:1;width:auto;min-width:12px}',
+    '.mtb-wstep-dot{width:26px;height:26px;font-size:12.5px}',
+    '.mtb-wstep-lbl{font-size:13px}',
+    '.mtb-wstep.on .mtb-wstep-dot{box-shadow:0 0 10px color-mix(in srgb, var(--ac) 55%, transparent)}',
     '.mtb-field{position:relative;display:flex;align-items:center}',
     '.mtb-field .quantum-input{width:100%;height:52px;padding-inline-start:44px;padding-inline-end:44px;font-size:15px;border-radius:14px}',
     '.mtb-field-ico{position:absolute;inset-inline-start:14px;width:20px;height:20px;color:var(--tx2);pointer-events:none;display:inline-flex}',
@@ -11649,11 +11652,12 @@ window.loadClusterStatus = loadClusterStatus;
     '.mtb-tip-infield::after{inset-inline-start:auto;inset-inline-end:0;bottom:auto;top:calc(100% + 10px);transform:translateY(-4px)}',
     '.mtb-tip-infield:hover::after,.mtb-tip-infield.tipopen::after{transform:none}',
     '@media (max-width:760px){.mtb-wiz{gap:8px;margin:12px 0 18px}' +
-      '.mtb-wstep{flex:1 1 0;flex-direction:column;gap:9px;min-width:0}' +
-      '.mtb-wstep-dot{width:44px;height:44px;font-size:17px}' +
-      '.mtb-wstep.on .mtb-wstep-dot{box-shadow:0 0 0 6px color-mix(in srgb, var(--ac) 25%, transparent),0 0 24px color-mix(in srgb, var(--ac) 55%, transparent)}' +
-      '.mtb-wstep-lbl{font-size:13px;font-weight:600;text-align:center;white-space:normal;width:100%;line-height:1.25}' +
-      '.mtb-wline{flex:1;min-width:14px;align-self:flex-start;margin-top:20px}' +
+      '.mtb-wstep{gap:6px;padding:7px 10px;min-width:0}' +
+      '.mtb-wstep-dot{width:22px;height:22px;font-size:11px}' +
+      '.mtb-wstep-dot svg{width:11px;height:11px}' +
+      '.mtb-wstep.on .mtb-wstep-dot{box-shadow:0 0 10px color-mix(in srgb, var(--ac) 55%, transparent)}' +
+      '.mtb-wstep-lbl{font-size:11px}' +
+      '.mtb-wline{flex:1;min-width:6px}' +
       '.mtb-field .quantum-input{height:58px;font-size:16px;border-radius:18px}' +
       '.mtb-field-ico{inset-inline-start:16px}' +
       '.mtb-tip-infield{inset-inline-end:16px}' +
