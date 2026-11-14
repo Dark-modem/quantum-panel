@@ -11670,7 +11670,7 @@ window.loadClusterStatus = loadClusterStatus;
     '.mtb-del-hero{display:flex;align-items:center;gap:12px;flex:1;min-width:0}',
     '.mtb-del-badge{width:44px;height:44px;border-radius:12px;border:1px solid color-mix(in srgb, var(--er) 50%, transparent);background:color-mix(in srgb, var(--er) 12%, transparent);color:var(--er);display:inline-flex;align-items:center;justify-content:center;flex:none}',
     '.mtb-del-badge svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}',
-    '.mtb-del-modal .qs-hint{white-space:normal}',
+    '.mtb-del-modal .qs-hint{white-space:normal;color:var(--tx);font-size:13px;line-height:1.6}',
     '.mtb-del-panel{display:flex;align-items:center;gap:12px;border:1px solid var(--ln);border-radius:14px;background:color-mix(in srgb, var(--tx) 4%, transparent);padding:14px 16px;margin:4px 0 8px}',
     '.mtb-del-idcol{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}',
     '.mtb-del-k{margin:0;font-size:12px;color:var(--tx2)}',
