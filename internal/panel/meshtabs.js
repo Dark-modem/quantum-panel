@@ -753,7 +753,7 @@
     ov.id = 'mtbAgentModal';
     ov.className = 'mtb-modal-ov';
     ov.innerHTML = '<div class="mtb-modal" role="dialog" aria-modal="true">' +
-      '<div class="tc-header"><div class="mtb-wiz-hero"><span class="mtb-wiz-plus">' + PLUS + '</span><div class="mtb-wiz-hero-tx"><p class="tc-title">' + esc(L('newAgent')) + '</p><p class="qs-hint">' + esc(L('agNewSub')) + '</p></div></div>' +
+      '<div class="tc-header"><div class="mtb-wiz-hero"><span class="mtb-wiz-plus">' + PLUS + '</span><div class="mtb-wiz-hero-tx"><p class="tc-title">' + esc(L('newAgent')) + '</p></div></div>' +
       '<button type="button" class="mtb-x" data-mtb-close>\u00d7</button></div>' +
       '<div class="mtb-wiz" id="mtbWiz">' +
       '<div class="mtb-wstep on" data-st="1"><span class="mtb-wstep-dot">1</span><span class="mtb-wstep-lbl">' + esc(L('agStName')) + '</span></div>' +
