@@ -88,6 +88,7 @@
     agAllRoles: ['همه نقش‌ها', 'All roles'], agAllStates: ['همه وضعیت‌ها', 'All statuses'],
     agAllArchs: ['همه معماری‌ها', 'All architectures'], agAllTopos: ['همه توپولوژی‌ها', 'All topologies'],
     agRefresh: ['تازه‌سازی وضعیت', 'Refresh status'], agUpdBtn: ['به‌روزرسانی ایجنت', 'Update agent'],
+    agBackList: ['بازگشت به لیست ایجنت‌ها', 'Back to agents list'],
     agRefreshed: ['وضعیت ایجنت تازه‌سازی شد', 'Agent status refreshed'],
     agDc: ['دیتاسنتر', 'Datacenter'], agResT: ['منابع سرور', 'Server resources'], agCores: ['هسته', 'cores'],
     agMembers: ['تعداد اعضا', 'Members'], agViewTopo: ['مشاهده توپولوژی', 'View topology'],
@@ -1307,6 +1308,7 @@
         '<button type="button" class="quantum-btn quantum-btn-secondary" data-agrefresh="' + esc(id) + '">' + MTB_ICO.upd + ' ' + esc(L('agRefresh')) + '</button>' +
         '<button type="button" class="quantum-btn quantum-btn-secondary" data-agedit="' + esc(id) + '">' + MTB_ICO.pen + ' ' + esc(L('agActEdit')) + '</button>' +
         '<button type="button" class="quantum-btn quantum-btn-danger" data-agdel="' + esc(id) + '">' + MTB_ICO.trash + ' ' + esc(L('agActDel')) + '</button>' +
+        '<button type="button" class="quantum-btn mtb-backbtn" data-agback><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg> ' + esc(L('agBackList')) + '</button>' +
         '</div></div></div>';
 
       // info tiles
