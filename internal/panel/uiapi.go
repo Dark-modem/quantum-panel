@@ -36,7 +36,7 @@ var uiArtifactEngines = map[string]bool{
 // agent never reported renders as «not installed» so the operator sees
 // what CAN be installed (install-first lifecycle).
 var uiKnownEngines = []string{
-	"aestun", "backpack", "backhaul", "chisel", "dagger", "easytier", "frp", "gost",
+	"aestun", "rakhsh", "backpack", "backhaul", "chisel", "dagger", "easytier", "frp", "gost",
 	"hysteria", "matrix", "midos", "narnia", "paqet", "pengo", "rathole",
 	"singbox", "spoof", "tinc", "udp2raw", "waterwall", "wattunnel",
 	"wireguard", "wst", "xray",

@@ -50,6 +50,16 @@ type engineParamTemplate struct {
 // catalog's params_schema takes precedence when it carries fields).
 var engineParamTemplates = map[string][]engineParamField{
 
+	"rakhsh": {
+		{JSON: "version", LabelEn: "Release version", LabelFa: "نسخه", Kind: "string", Default: "v0.1.0", Required: true},
+		{JSON: "artifact", LabelEn: "Artifact name template", LabelFa: "قالب نام فایل", Kind: "string", Default: "rakhsh-{version}-x86_64-unknown-linux-musl", Required: true},
+		{JSON: "token", LabelEn: "Pre-shared key", LabelFa: "کلید مشترک (psk)", Kind: "secret", Generator: "secret32", Required: true, Hint: "generated in the browser; same value both ends"},
+		{JSON: "carrier", LabelEn: "Carrier", LabelFa: "حامل", Kind: "string", Default: "tcp", Hint: "tcp / tls / ws / quic / arq-udp"},
+		{JSON: "remote_identity", LabelEn: "Remote identity", LabelFa: "هویت مقصد", Kind: "string", Required: true},
+		{JSON: "remote_addr", LabelEn: "Foreign host", LabelFa: "هاست خارج", Kind: "string", Required: true},
+		{JSON: "remote_port", LabelEn: "Remote port", LabelFa: "پورت مقصد", Kind: "number", Default: "443", Required: true},
+		{JSON: "lanes", LabelEn: "Tunnel lanes", LabelFa: "لاین‌های تونل", Kind: "number", Default: "4"},
+	},
 	"aestun": {
 		{JSON: "version", LabelEn: "Artifact version", LabelFa: "نسخه", Kind: "string", Default: "1.0.0", Required: true},
 		{JSON: "artifact", LabelEn: "Artifact name template", LabelFa: "قالب نام فایل", Kind: "string", Default: "aestun-{version}-linux-{arch}.tar.gz", Required: true},
