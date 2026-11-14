@@ -11366,6 +11366,7 @@ window.loadClusterStatus = loadClusterStatus;
     '.mtb-backbtn{color:var(--ac);background:color-mix(in srgb, var(--ac) 10%, transparent);border:1px solid color-mix(in srgb, var(--ac) 38%, transparent);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);box-shadow:0 0 14px color-mix(in srgb, var(--ac) 22%, transparent)}',
     '.mtb-backbtn:hover{color:var(--ac);background:color-mix(in srgb, var(--ac) 18%, transparent);border-color:color-mix(in srgb, var(--ac) 60%, transparent);box-shadow:0 0 18px color-mix(in srgb, var(--ac) 35%, transparent)}',
     '.mtb-backbtn svg{width:15px;height:15px}',
+    'html[dir="ltr"] .mtb-backbtn svg{transform:scaleX(-1)}',
     '.mtb-acts-kebab{display:none;color:var(--tx2)}',
     '.mtb-acts-kebab svg{width:16px;height:16px}',
     '.mtb-acts-pop{display:contents}',
