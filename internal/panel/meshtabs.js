@@ -71,7 +71,8 @@
     agDelConfirm: ['برای تأیید حذف، اسم ایجنت را بنویس:', 'To confirm, type the agent name:'],
     agDelPh: ['اسم ایجنت', 'agent name'],
     agDelNo: ['اسم ایجنت را دقیق بنویس تا دکمه حذف فعال شود', 'Type the exact agent name to enable Delete'],
-    agDelQ: ['آیا از حذف این ایجنت اطمینان دارید؟', 'Are you sure you want to delete this agent?'],
+    agDelQ: ['این عملیات قابل بازگشت نیست. برای ادامه، نام ایجنت را دقیقاً وارد کنید.', 'This action cannot be undone. To continue, enter the agent name exactly.'],
+    agDelEnable: ['برای فعال شدن حذف، نام ایجنت را دقیق وارد کنید.', 'Enter the exact agent name to enable Delete'],
     agDelWarn2: ['این عملیات غیرقابل بازگشت است و تمام اطلاعات مربوط به این ایجنت حذف خواهد شد.', 'This action is irreversible and everything belonging to this agent will be removed.'],
     agCopied: ['کپی شد!', 'Copied!'],
     agVer: ['نسخه', 'Version'], agOS: ['سیستم‌عامل', 'OS'], agLastSeen: ['آخرین حضور', 'Last seen'],
@@ -1210,7 +1211,7 @@
     upArrow: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V5"/><path d="M7.5 9.5L12 5l4.5 4.5"/><path d="M5 20h14"/></svg>',
     info: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M12 11.5V16"/></svg>',
     mesh: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="6" r="2.5"/><circle cx="19" cy="6" r="2.5"/><circle cx="12" cy="19" r="2.5"/><path d="M7.5 6h9M6.3 8l4.7 8.8M17.7 8l-4.7 8.8"/></svg>',
-    tun: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16"/><path d="M16.5 8.5L20 12l-3.5 3.5"/><path d="M7.5 8.5L4 12l3.5 3.5"/></svg>',
+    tun: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16"/><path d="M8.5 7.5L12 4l3.5 3.5"/><path d="M8.5 16.5L12 20l3.5-3.5"/></svg>',
     okc: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.2l2.5 2.5 4.7-5"/></svg>',
     alerc: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V13"/><path d="M12 16.5h.01"/></svg>',
     chevL: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>',
@@ -1408,7 +1409,7 @@
       var ENGINE_IMG = { gost: 'img/engines/gost.png', xray: 'img/engines/xray.svg', wireguard: 'img/engines/wireguard.png', rathole: 'img/engines/rathole.png', wst: 'img/engines/wstunnel.png', wstunnel: 'img/engines/wstunnel.png', tinc: 'img/engines/tinc.svg', hysteria: 'img/engines/hysteria.png', singbox: 'img/engines/singbox.png', midos: 'img/engines/midos.png', dagger: 'img/engines/dagger.png', pengo: 'img/engines/pengo.png', backhaul: 'img/engines/backhaul.png', backpack: 'img/engines/backpack.png', narnia: 'img/engines/narnia.png', waterwall: 'img/engines/waterwall.png', wattunnel: 'img/engines/wattunnel.png', udp2raw: 'img/engines/udp2raw.png', paqet: 'img/engines/paqet.png', frp: 'img/engines/frp.png', easytier: 'img/engines/easytier.png', chisel: 'img/engines/chisel.png' };
       var engImgQ = engImgTag ? '?v=' + engImgTag : '';
       var DSTH = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="7" rx="1.5"/><rect x="3" y="13" width="18" height="7" rx="1.5"/><path d="M7 7.5h.01M7 16.5h.01"/></svg>';
-      var CPUTH = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/><rect x="10" y="10" width="4" height="4"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/></svg>';
+      var CPUTH = MTB_ICO.gear;
       var engImg = function (eng) { return ENGINE_IMG[eng] ? ENGINE_IMG[eng] + engImgQ : ''; };
       var engLogo = function (en, disp) {
         var img = engImg(en.engine);
@@ -1673,8 +1674,7 @@
     ov.innerHTML = '<div class="mtb-modal mtb-del-modal" role="dialog" aria-modal="true">' +
       '<div class="tc-header"><div class="mtb-del-hero"><span class="mtb-del-badge">' + TRASH + '</span><p class="tc-title">' + esc(L('agDelT')) + '</p></div>' +
       '<button type="button" class="mtb-x" data-mtb-close>×</button></div>' +
-      '<p class="qs-hint">' + esc(L('agDelQ')) + '</p>' +
-      '<p class="qs-hint">' + esc(L('agDelWarn2')) + '</p>' +
+      '<p class="qs-hint mtb-del-warn"><span class="mtb-del-warn-i"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3L2 20h20L12 3z"/><path d="M12 10v4"/><path d="M12 17h.01"/></svg></span>' + esc(L('agDelQ')) + '</p>' +
       '<div class="mtb-del-panel">' +
         '<div class="mtb-del-idcol"><p class="mtb-del-k">' + esc(L('agentLabel')) + ':</p>' +
         '<div class="mtb-del-nmrow"><b class="mtb-del-name" dir="ltr">' + esc(agName || '—') + '</b>' +
@@ -1685,7 +1685,8 @@
       '<p class="qs-hint">' + esc(L('agDelConfirm')) + '</p>' +
       '<input id="mtbAgDelName" class="quantum-input" placeholder="' + esc(L('agDelPh')) + '" dir="ltr" autocomplete="off" spellcheck="false" aria-label="' + esc(L('agDelPh')) + '">' +
       '<p class="qs-hint mtb-formmsg" data-mtb-msg></p>' +
-      '<div class="mtb-acts"><button type="button" class="quantum-btn quantum-btn-secondary" data-mtb-close>' + esc(L('cancel')) + ' ' + XSM + '</button>' +
+      '<div class="mtb-acts"><span class="mtb-del-foot-hint"><span class="mtb-del-foot-hint-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M12 11.5V16"/></svg></span>' + esc(L('agDelEnable')) + '</span>' +
+      '<button type="button" class="quantum-btn quantum-btn-secondary" data-mtb-close>' + esc(L('cancel')) + ' ' + XSM + '</button>' +
       '<button type="button" class="quantum-btn quantum-btn-danger" id="mtbAgDelGo" disabled>' + TRASH + ' ' + esc(L('agActDel')) + '</button></div>' +
       '</div>';
     document.body.appendChild(ov);
