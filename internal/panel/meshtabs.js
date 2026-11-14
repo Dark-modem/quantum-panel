@@ -1014,6 +1014,7 @@
   var agtActsOpen = '';
   var agtActsUp = false;
   var engFilter = 'all';
+  var tunFilter = 'all';
   // the ?v= asset tag app.js was served with (version + content hash) —
   // appended to engine brand icon URLs so icon updates bust browser caches.
   var engImgTag = ((document.querySelector('script[src*="app.js"]') || { src: '' }).src.match(/v=([^&]+)/) || ['', ''])[1];
@@ -1422,6 +1423,13 @@
         { k: 'stopped', lbl: L('engStateStop'), dot: 'var(--er)' },
         { k: 'notinst', lbl: L('engStateNot'), dot: 'var(--mu)' }
       ];
+      var tunChips = [
+        { k: 'all', lbl: L('engAll'), dot: 'var(--ac)' },
+        { k: 'healthy', lbl: L('agTunUp'), dot: 'var(--ok)' },
+        { k: 'down', lbl: L('st_down'), dot: 'var(--er)' },
+        { k: 'disabled', lbl: L('disabled'), dot: 'var(--mu)' },
+        { k: 'unknown', lbl: L('st_unknown'), dot: 'var(--mu)' }
+      ];
       var engShown = engs.filter(function (en) { return engFilter === 'all' || engState(en) === engFilter; });
       var engCards = engShown.length ? engShown.map(function (en) {
         var st = engState(en);
@@ -1445,11 +1453,15 @@
       var engChipHtml = '<div class="mtb-eng-filters">' + engChips.map(function (c) {
         return '<button type="button" class="mtb-eng-chip' + (engFilter === c.k ? ' on' : '') + '" data-engfilter="' + c.k + '"><i style="background:' + c.dot + '"></i>' + esc(c.lbl) + '</button>';
       }).join('') + '</div>';
+      var tunChipHtml = '<div class="mtb-eng-filters">' + tunChips.map(function (c) {
+        return '<button type="button" class="mtb-eng-chip' + (tunFilter === c.k ? ' on' : '') + '" data-tunfilter="' + c.k + '"><i style="background:' + c.dot + '"></i>' + esc(c.lbl) + '</button>';
+      }).join('') + '</div>';
       html += '<div class="tunnel-card"><div class="tc-header dcard-head"><p class="tc-title dcard-title">' + MTB_ICO.gear + esc(L('agEngT')) + '</p></div>' +
         engChipHtml + '<div class="mtb-eng-tiles">' + engCards + '</div></div>';
 
       // tunnels table
-      var tunRows = tuns.length ? tuns.map(function (tn) {
+      var tunShown = tuns.filter(function (tn) { return tunFilter === 'all' || tn.state === tunFilter; });
+      var tunRows = tunShown.length ? tunShown.map(function (tn) {
         // Always a word, never a bare dash: up / down / disabled / unknown.
         var b2 = tn.state === 'healthy' ? badge('ok', esc(L('agTunUp')), true) : (tn.state === 'down' ? badge('err', esc(L('st_down')), true) : (tn.state === 'disabled' ? badge('dim', esc(L('disabled')), true) : badge('dim', esc(L('st_unknown')), true)));
         var rem = (tn.remote && tn.remote.name) || '\u2014';
@@ -1460,7 +1472,8 @@
         // A down tunnel reports latency 0; that is "no measurement", not a
         // real RTT, so it must read as an em dash instead of "0 ms".
         var latMs = tn.latency_ms;
-        var lat = (latMs != null && latMs > 0) ? (latMs < 1 ? '<1 ms' : Math.round(latMs) + ' ms') : '\u2014';
+        var latCls = (latMs == null || latMs <= 0) ? 'na' : (latMs < 80 ? 'ok' : (latMs < 200 ? 'warn' : 'bad'));
+        var lat = (latMs != null && latMs > 0) ? '<span class="mtb-lat ' + latCls + '">' + (latMs < 1 ? '&lt;1 ms' : Math.round(latMs) + ' ms') + '</span>' : '\u2014';
         var tkey = tn.tunnel_key || '';
         var tTopo = tn.topology || '';
         return '<tr>' +
@@ -1477,11 +1490,12 @@
           '</tr>';
       }).join('') : '';
       html += '<div class="tunnel-card"><div class="tc-header dcard-head"><p class="tc-title dcard-title">' + MTB_ICO.tun + esc(L('agTunT')) + '</p></div>' +
+        tunChipHtml +
         '<div class="ent-tbl-wrap"><table class="ent-tbl"><thead><tr>' +
         '<th><span class="mtb-th">' + MTB_ICO.tun + esc(L('agTunName')) + '</span></th>' +
         '<th><span class="mtb-th">' + DSTH + esc(L('agDstSrv')) + '</span></th>' +
         '<th><span class="mtb-th">' + CPUTH + esc(L('agMotor')) + '</span></th><th>' + esc(L('stateCol')) + '</th><th>' + esc(L('agWeight')) + '</th><th>' + esc(L('agToday')) + '</th><th>' + esc(L('agLatency')) + '</th><th>' + esc(L('agActs')) + '</th>' +
-        '</tr></thead><tbody>' + (tunRows || '<tr><td colspan="8">' + entEmpty(L('agNoTun')) + '</td></tr>') + '</tbody></table></div></div>';
+        '</tr></thead><tbody>' + (tunRows || '<tr><td colspan="8">' + entEmpty(tunFilter === 'all' ? L('agNoTun') : L('engStateStop') + ' — ' + L('st_unknown')) + '</td></tr>') + '</tbody></table></div></div>';
 
       setBody('magt', html); agtUpdProgress(id, my);
       try { var nh = '#t=magt&ag=' + encodeURIComponent(id); if (location.hash !== nh) history.replaceState(null, '', nh); } catch (e) { /* non-fatal */ }
@@ -2016,6 +2030,12 @@
     var ef = e.target && e.target.closest ? e.target.closest('[data-engfilter]') : null;
     if (ef) {
       engFilter = ef.getAttribute('data-engfilter') || 'all';
+      renderAgtDetail(agtView.id);
+      return;
+    }
+    var tf = e.target && e.target.closest ? e.target.closest('[data-tunfilter]') : null;
+    if (tf) {
+      tunFilter = tf.getAttribute('data-tunfilter') || 'all';
       renderAgtDetail(agtView.id);
       return;
     }

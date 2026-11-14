@@ -11547,6 +11547,10 @@ window.loadClusterStatus = loadClusterStatus;
     '.mtb-topo-view{display:flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--ln);border-radius:9px;padding:8px 10px;font-size:12.5px;font-weight:600;color:var(--tx2);text-decoration:none;transition:border-color .2s ease,color .2s ease}',
     '.mtb-topo-view:hover{border-color:var(--ac);color:var(--ac)}',
     '.mtb-eng-filters{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}',
+    '.mtb-lat.ok{color:var(--ok);font-weight:700}',
+    '.mtb-lat.warn{color:var(--wr, #eab308);font-weight:700}',
+    '.mtb-lat.bad{color:var(--er);font-weight:700}',
+    '.mtb-lat.na{color:var(--tx2)}',
     '.mtb-eng-chip{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--ln);border-radius:999px;background:var(--sunk);padding:5px 12px;font-size:12.5px;font-weight:600;color:var(--tx2);cursor:pointer;transition:border-color .2s,color .2s}',
     '.mtb-eng-chip i{width:8px;height:8px;border-radius:999px;flex:none}',
     '.mtb-eng-chip:hover{color:var(--tx)}',
@@ -12112,6 +12116,7 @@ window.loadClusterStatus = loadClusterStatus;
   }
 
   // -- main poll: one pass fills every card from live APIs --
+  var trfPrev = null;
   async function refreshAll() {
     var btn = $('dashRefreshBtn');
     if (btn) btn.classList.add('spin');
@@ -12142,8 +12147,22 @@ window.loadClusterStatus = loadClusterStatus;
       var tf = (ov.traffic && ov.traffic.today) || {};
       var irDl = tf.billable_download_bytes || 0, irUl = tf.upload_bytes || 0;
       var allDl = tf.wire_rx_bytes || 0, allUl = tf.wire_tx_bytes || 0;
-      setTxt('trfIrDl', fmtTot(irDl)); setTxt('trfIrUl', fmtTot(irUl));
-      setTxt('trfFoDl', fmtTot(Math.max(0, allDl - irDl))); setTxt('trfFoUl', fmtTot(Math.max(0, allUl - irUl)));
+      // the card reads as "ترافیک لحظه‌ای": show per-second rates from the
+      // counter delta between two polls instead of cumulative totals
+      var now = Date.now();
+      var rate = function (cur, prev) {
+        if (!prev) return null;
+        var dt = (now - prev.t) / 1000;
+        if (dt <= 0 || cur < prev.v) return null;
+        return (cur - prev.v) / dt;
+      };
+      var rIrDl = rate(irDl, trfPrev && trfPrev.irDl), rIrUl = rate(irUl, trfPrev && trfPrev.irUl);
+      var rFoDl = rate(allDl - irDl, trfPrev && trfPrev.foDl), rFoUl = rate(allUl - irUl, trfPrev && trfPrev.foUl);
+      trfPrev = { t: now, irDl: irDl, irUl: irUl, foDl: allDl - irDl, foUl: allUl - irUl };
+      setTxt('trfIrDl', rIrDl == null ? NA : fmtRate(rIrDl));
+      setTxt('trfIrUl', rIrUl == null ? NA : fmtRate(rIrUl));
+      setTxt('trfFoDl', rFoDl == null ? NA : fmtRate(rFoDl));
+      setTxt('trfFoUl', rFoUl == null ? NA : fmtRate(rFoUl));
       // fleet metrics — real aggregates over the agents that report
       // resources (a panel host is not an agent and reports none)
       // KPI cards: the CENTRAL SERVER's own stats — the panel host reads
