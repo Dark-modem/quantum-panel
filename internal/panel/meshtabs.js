@@ -1410,6 +1410,11 @@
       var engImgQ = engImgTag ? '?v=' + engImgTag : '';
       var DSTH = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="7" rx="1.5"/><rect x="3" y="13" width="18" height="7" rx="1.5"/><path d="M7 7.5h.01M7 16.5h.01"/></svg>';
       var CPUTH = MTB_ICO.gear;
+      var STTH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg>';
+      var WTH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6a3 3 0 0 1 6 0"/><path d="M6.5 6h11l2.5 12h-16l2.5-12z"/></svg>';
+      var TODAYTH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="M8 11l4 4 4-4"/><path d="M4 21h16"/></svg>';
+      var LATTH = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
+      var ACTTH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>';
       var engImg = function (eng) { return ENGINE_IMG[eng] ? ENGINE_IMG[eng] + engImgQ : ''; };
       var engLogo = function (en, disp) {
         var img = engImg(en.engine);
@@ -1495,7 +1500,7 @@
         '<div class="ent-tbl-wrap"><table class="ent-tbl"><thead><tr>' +
         '<th><span class="mtb-th">' + MTB_ICO.tun + esc(L('agTunName')) + '</span></th>' +
         '<th><span class="mtb-th">' + DSTH + esc(L('agDstSrv')) + '</span></th>' +
-        '<th><span class="mtb-th">' + CPUTH + esc(L('agMotor')) + '</span></th><th>' + esc(L('stateCol')) + '</th><th>' + esc(L('agWeight')) + '</th><th>' + esc(L('agToday')) + '</th><th>' + esc(L('agLatency')) + '</th><th>' + esc(L('agActs')) + '</th>' +
+        '<th><span class="mtb-th">' + CPUTH + esc(L('agMotor')) + '</span></th><th><span class="mtb-th">' + STTH + esc(L('stateCol')) + '</span></th><th><span class="mtb-th">' + WTH + esc(L('agWeight')) + '</span></th><th><span class="mtb-th">' + TODAYTH + esc(L('agToday')) + '</span></th><th><span class="mtb-th">' + LATTH + esc(L('agLatency')) + '</span></th><th><span class="mtb-th">' + ACTTH + esc(L('agActs')) + '</span></th>' +
         '</tr></thead><tbody>' + (tunRows || '<tr><td colspan="8">' + entEmpty(tunFilter === 'all' ? L('agNoTun') : L('engStateStop') + ' — ' + L('st_unknown')) + '</td></tr>') + '</tbody></table></div></div>';
 
       setBody('magt', html); agtUpdProgress(id, my);
