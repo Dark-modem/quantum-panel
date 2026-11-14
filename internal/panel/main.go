@@ -763,6 +763,7 @@ func Main(args []string) int {
 	mux.HandleFunc("GET "+base+"/img/engines/pengo.png", serveAsset("img/engines/pengo.png", "image/png"))
 	mux.HandleFunc("GET "+base+"/img/engines/backhaul.png", serveAsset("img/engines/backhaul.png", "image/png"))
 	mux.HandleFunc("GET "+base+"/img/engines/backpack.png", serveAsset("img/engines/backpack.png", "image/png"))
+	mux.HandleFunc("GET "+base+"/img/engines/aestun.png", serveAsset("img/engines/aestun.png", "image/png"))
 	mux.HandleFunc("GET "+base+"/img/engines/narnia.png", serveAsset("img/engines/narnia.png", "image/png"))
 	mux.HandleFunc("GET "+base+"/img/engines/waterwall.png", serveAsset("img/engines/waterwall.png", "image/png"))
 	mux.HandleFunc("GET "+base+"/img/engines/wattunnel.png", serveAsset("img/engines/wattunnel.png", "image/png"))
