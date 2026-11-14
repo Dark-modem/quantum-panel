@@ -37,7 +37,9 @@
   try {
     var a = lsGet('quantum_accent');
     if (a && /^[a-z]+$/.test(a)) document.documentElement.dataset.acc = a;
-    document.documentElement.dataset.rs = lsGet('quantum_rs_hidden') === '1' ? '0' : '1';
+    // The activity stream is a wide-screen developer aid; start closed and let
+    // the operator open it from Logs / the Ctrl-K palette (the choice persists).
+    document.documentElement.dataset.rs = lsGet('quantum_rs_hidden') === '0' ? '1' : '0';
     if (lsGet('quantum_sb') === '1') document.documentElement.dataset.sb = '1';
     if (lsGet('quantum_dens') === 'compact') document.documentElement.dataset.dens = 'compact';
   } catch (e) { /* storage blocked: defaults */ }

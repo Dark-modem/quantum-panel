@@ -2171,8 +2171,10 @@ function applyLegacyVisibility(on) {
     const page = $('tab-' + t);
     if (page && !on) page.hidden = true;
   });
+  // legacyNote was a page-wide English memo explaining a developer flag; it is
+  // noise for the operator (and sits above every page), so it never renders.
   const note = document.getElementById('legacyNote');
-  if (note) note.classList.toggle('hidden', on);
+  if (note) note.classList.add('hidden');
   if (!on) {
     const cur = document.querySelector('.sidebar-nav [data-tab].on');
     if (cur && legacyTabs.includes(cur.dataset.tab)) goTab('dashboard');
