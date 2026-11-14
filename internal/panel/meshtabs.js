@@ -1114,7 +1114,7 @@
         '<td>' + (a.version ? '<span class="mtb-ver"><bdi dir="ltr">' + esc(/^[0-9]/.test(a.version) ? 'v' + a.version : a.version) + '</bdi></span>' : '—') + '</td>' +
         '<td class="mono">' + esc(a.arch || '—') + '</td>' +
         '<td>' + agtTopoCell(a) + '</td>' +
-        '<td><div class="mtb-acts-row' + (agtActsOpen === a.id ? ' open' : '') + (agtActsOpen === a.id && agtActsUp ? ' up' : '') + '">' +
+        '<td><div class="mtb-acts-row' + (agtActsOpen === a.id ? ' open' : '') + (agtActsOpen === a.id && agtActsUp ? ' mtb-acts-up' : '') + '">' +
         '<div class="mtb-acts-pop">' +
         '<button type="button" class="mtb-act mtb-act-view" data-agview="' + esc(a.id) + '" title="' + esc(L('agActView')) + '">' + MTB_ICO.eye + '</button>' +
         '<button type="button" class="mtb-act mtb-act-edit" data-agedit="' + esc(a.id) + '" title="' + esc(L('agActEdit')) + '">' + MTB_ICO.pen + '</button>' +
@@ -1863,7 +1863,7 @@
           agtActsUp = (wr2.bottom - rr2.bottom) < 210;
         }
       }
-      arow.classList.toggle('up', agtActsOpen && agtActsUp);
+      arow.classList.toggle('mtb-acts-up', agtActsOpen && agtActsUp);
     } else {
       agtActsOpen = '';
     }
