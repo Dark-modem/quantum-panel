@@ -109,7 +109,7 @@
     agSumDisk: ['مجموع دیسک', 'Total disk'], agSumRam: ['مجموع رم', 'Total RAM'],
     agSumCores: ['مجموع هسته‌ها', 'Total cores'],
     agTunName: ['تانل', 'Tunnel'],
-    agDstSrv: ['سرور مقصد', 'Destination'], agMotor: ['موتور', 'Engine'], agWeight: ['وزن', 'Weight'],
+    agDstSrv: ['سرور مقصد', 'Destination'], agMotor: ['هسته', 'Engine'], agWeight: ['وزن', 'Weight'],
     agToday: ['ترافیک امروز', 'Today traffic'], agLatency: ['تأخیر', 'Latency'], agViewDtl: ['مشاهده جزئیات', 'View details'],
     heroAgT: ['اولین ایجنت را وصل کن', 'Connect your first agent'],
     heroAgD: ['دستور نصب را روی سرور جدید اجرا کن؛ ایجنت خودش ثبت‌نام می‌کند و همین‌جا ظاهر می‌شود.', 'Run the install command on a new server; the agent enrolls itself and appears here.'],
@@ -1406,6 +1406,8 @@
       var engDisp = { matrix: 'Matrix', frp: 'FRP', backhaul: 'Backhaul', gost: 'Gost', xray: 'Xray', wireguard: 'WireGuard', wst: 'wstunnel', wstunnel: 'wstunnel', chisel: 'Chisel', rathole: 'Rathole', tinc: 'Tinc', backpack: 'BackPack', dagger: 'DaggerConnect', easytier: 'EasyTier', hysteria: 'Hysteria', midos: 'Midos', narnia: 'Narnia', paqet: 'Paqet', pengo: 'Pengo', singbox: 'sing-box', spoof: 'Spoof', udp2raw: 'udp2raw', waterwall: 'WaterWall', wattunnel: 'WatTunnel' };
       var ENGINE_IMG = { gost: 'img/engines/gost.png', xray: 'img/engines/xray.svg', wireguard: 'img/engines/wireguard.png', rathole: 'img/engines/rathole.png', wst: 'img/engines/wstunnel.png', wstunnel: 'img/engines/wstunnel.png', tinc: 'img/engines/tinc.svg', hysteria: 'img/engines/hysteria.png', singbox: 'img/engines/singbox.png', midos: 'img/engines/midos.png', dagger: 'img/engines/dagger.png', pengo: 'img/engines/pengo.png', backhaul: 'img/engines/backhaul.png', backpack: 'img/engines/backpack.png', narnia: 'img/engines/narnia.png', waterwall: 'img/engines/waterwall.png', wattunnel: 'img/engines/wattunnel.png', udp2raw: 'img/engines/udp2raw.png', paqet: 'img/engines/paqet.png', frp: 'img/engines/frp.png', easytier: 'img/engines/easytier.png', chisel: 'img/engines/chisel.png' };
       var engImgQ = engImgTag ? '?v=' + engImgTag : '';
+      var DSTH = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="7" rx="1.5"/><rect x="3" y="13" width="18" height="7" rx="1.5"/><path d="M7 7.5h.01M7 16.5h.01"/></svg>';
+      var CPUTH = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/><rect x="10" y="10" width="4" height="4"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/></svg>';
       var engImg = function (eng) { return ENGINE_IMG[eng] ? ENGINE_IMG[eng] + engImgQ : ''; };
       var engLogo = function (en, disp) {
         var img = engImg(en.engine);
@@ -1452,6 +1454,9 @@
         var b2 = tn.state === 'healthy' ? badge('ok', esc(L('agTunUp')), true) : (tn.state === 'down' ? badge('err', esc(L('st_down')), true) : (tn.state === 'disabled' ? badge('dim', esc(L('disabled')), true) : badge('dim', esc(L('st_unknown')), true)));
         var rem = (tn.remote && tn.remote.name) || '\u2014';
         var remDc = (tn.remote && tn.remote.datacenter) || '';
+        var remAg = (cache.magt || []).find(function (a) { return a.server && a.server.name === tn.remote.name; }) || null;
+        var remCc = remAg && remAg.country ? String(remAg.country).toLowerCase() : '';
+        var engName2 = engDisp[tn.engine] || tn.engine || '\u2014';
         // A down tunnel reports latency 0; that is "no measurement", not a
         // real RTT, so it must read as an em dash instead of "0 ms".
         var latMs = tn.latency_ms;
@@ -1461,8 +1466,9 @@
         return '<tr>' +
           '<td>' + (tkey ? '<b class="mono mtb-tun-key" dir="ltr" title="' + esc(tkey) + '">' + esc(tkey) + '</b>' : '\u2014') +
             (tTopo ? '<br><span class="mtb-muted" style="font-size:.85em">' + esc(tTopo) + '</span>' : '') + '</td>' +
-          '<td><b>' + esc(rem) + '</b>' + (remDc ? '<br><span class="mtb-muted" style="font-size:.85em">' + esc(remDc) + '</span>' : '') + '</td>' +
-          '<td><span class="badge info">' + esc(tn.engine || '\u2014') + '</span></td>' +
+          '<td><div class="mtb-dest"><span class="mtb-dest-flag">' + (remCc ? topologyFlagSvg(remCc) : '') + '</span><div class="mtb-dest-tx"><b>' + esc(rem) + '</b>' +
+            ((remDc || remCc) ? '<span class="mtb-muted" style="font-size:.85em">' + esc(remDc) + (remDc && remCc ? ' \u00b7 ' : '') + esc(remCc ? CN(remCc) : '') + '</span>' : '') + '</div></div></td>' +
+          '<td><span class="badge info mtb-eng-badge">' + engLogo({ engine: tn.engine }, engName2) + ' ' + esc(engName2) + '</span></td>' +
           '<td>' + b2 + '</td>' +
           '<td>' + (tn.weight_pct != null ? (Math.round(tn.weight_pct * 10) / 10) + '%' : '\u2014') + '</td>' +
           '<td>' + (tn.today_bytes ? esc(bytes(tn.today_bytes)) : '\u2014') + '</td>' +
@@ -1472,7 +1478,9 @@
       }).join('') : '';
       html += '<div class="tunnel-card"><div class="tc-header dcard-head"><p class="tc-title dcard-title">' + MTB_ICO.tun + esc(L('agTunT')) + '</p></div>' +
         '<div class="ent-tbl-wrap"><table class="ent-tbl"><thead><tr>' +
-        '<th>' + esc(L('agTunName')) + '</th><th>' + esc(L('agDstSrv')) + '</th><th>' + esc(L('agMotor')) + '</th><th>' + esc(L('stateCol')) + '</th><th>' + esc(L('agWeight')) + '</th><th>' + esc(L('agToday')) + '</th><th>' + esc(L('agLatency')) + '</th><th>' + esc(L('agActs')) + '</th>' +
+        '<th><span class="mtb-th">' + MTB_ICO.tun + esc(L('agTunName')) + '</span></th>' +
+        '<th><span class="mtb-th">' + DSTH + esc(L('agDstSrv')) + '</span></th>' +
+        '<th><span class="mtb-th">' + CPUTH + esc(L('agMotor')) + '</span></th><th>' + esc(L('stateCol')) + '</th><th>' + esc(L('agWeight')) + '</th><th>' + esc(L('agToday')) + '</th><th>' + esc(L('agLatency')) + '</th><th>' + esc(L('agActs')) + '</th>' +
         '</tr></thead><tbody>' + (tunRows || '<tr><td colspan="8">' + entEmpty(L('agNoTun')) + '</td></tr>') + '</tbody></table></div></div>';
 
       setBody('magt', html); agtUpdProgress(id, my);
