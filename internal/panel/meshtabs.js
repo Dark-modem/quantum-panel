@@ -1133,7 +1133,7 @@
         '<button type="button" class="mtb-act mtb-act-edit" data-agedit="' + esc(a.id) + '" title="' + esc(L('agActEdit')) + '">' + MTB_ICO.pen + '</button>' +
         '<button type="button" class="mtb-act mtb-act-upd" data-agupd="' + esc(a.id) + '" title="' + esc(L('agActUpd')) + '">' + MTB_ICO.upArrow + '</button>' +
         '<button type="button" class="mtb-act mtb-act-ref" data-agrefresh="' + esc(a.id) + '" title="' + esc(L('agRefresh')) + '">' + MTB_ICO.upd + '</button>' +
-        '<button type="button" class="mtb-act mtb-act-del" data-agdel="' + esc(a.id) + '" title="' + esc(L('agActDel')) + '">' + MTB_ICO.trash + '</button>' +
+        '<button type="button" class="mtb-act mtb-act-del" data-agdel="' + esc(a.id) + '" data-agdelname="' + esc(a.name || '') + '" title="' + esc(L('agActDel')) + '">' + MTB_ICO.trash + '</button>' +
         '</div>' +
         '<button type="button" class="mtb-act mtb-acts-kebab" data-actskebab title="' + esc(L('agActMore')) + '" aria-label="' + esc(L('agActMore')) + '"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="19" r="1.7"/></svg></button>' +
         '</div></td>';
@@ -1317,7 +1317,7 @@
         '<button type="button" class="quantum-btn quantum-btn-primary" data-agupd="' + esc(id) + '">' + MTB_ICO.upgrade + ' ' + esc(L('agUpdBtn')) + '</button>' +
         '<button type="button" class="quantum-btn quantum-btn-secondary" data-agrefresh="' + esc(id) + '">' + MTB_ICO.upd + ' ' + esc(L('agRefresh')) + '</button>' +
         '<button type="button" class="quantum-btn quantum-btn-secondary" data-agedit="' + esc(id) + '">' + MTB_ICO.pen + ' ' + esc(L('agActEdit')) + '</button>' +
-        '<button type="button" class="quantum-btn quantum-btn-danger" data-agdel="' + esc(id) + '">' + MTB_ICO.trash + ' ' + esc(L('agActDel')) + '</button>' +
+        '<button type="button" class="quantum-btn quantum-btn-danger" data-agdel="' + esc(id) + '" data-agdelname="' + esc(ag.name || '') + '" title="' + esc(L('agActDel')) + '">' + MTB_ICO.trash + ' ' + esc(L('agActDel')) + '</button>' +
         '<button type="button" class="quantum-btn mtb-backbtn" data-agback>' + esc(L('agBackList')) + ' <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg></button>' +
         '</div></div></div>';
 
@@ -1665,9 +1665,9 @@
       edSync();
     }).catch(function () {});
   }
-  function agtDel(id) {
+  function agtDel(id, hintName) {
     var row = (cache.magt || []).find(function (x) { return x.id === id; }) || {};
-    var agName = row.name || '';
+    var agName = hintName || row.name || '';
     var on = row.status === 'online';
     var TRASH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>';
     var COPY = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a1 1 0 0 1 1-1h9"/></svg>';
@@ -1681,7 +1681,7 @@
       '<p class="qs-hint mtb-del-warn"><span class="mtb-del-warn-i"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" stroke="none" d="M10.27 3.86a2 2 0 0 1 3.46 0l7 12.13A2 2 0 0 1 19 19H5a2 2 0 0 1-1.73-3.01l7-12.13z"/><path d="M12 9v4.5" fill="none" stroke="#12161f" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="16.6" r="1.3" fill="#12161f" stroke="none"/></svg></span>' + esc(L('agDelQ')) + '</p>' +
       '<div class="mtb-del-panel">' +
         '<div class="mtb-del-idcol"><p class="mtb-del-k">' + esc(L('agentLabel')) + ':</p>' +
-        '<div class="mtb-del-nmrow"><b class="mtb-del-name" dir="ltr">' + esc(agName || '—') + '</b>' +
+        '<div class="mtb-del-nmrow"><b class="mtb-del-name" id="mtbDelName" dir="ltr">' + esc(agName || '\u2014') + '</b>' +
         (row.status ? '<span class="badge ' + (on ? 'ok' : 'err') + '"><span class="dot"></span>' + esc(L(on ? 'agStatOn' : 'agStatOff')) + '</span>' : '') +
         '</div></div>' +
         '<button type="button" class="mtb-del-copy" id="mtbDelCopy" title="' + esc(L('copy')) + '">' + COPY + '<span id="mtbDelCopyTx">' + esc(L('copy')) + '</span></button>' +
@@ -1695,6 +1695,13 @@
     document.body.appendChild(ov);
     ov.querySelectorAll('[data-mtb-close]').forEach(function (b) { b.addEventListener('click', function () { ov.remove(); }); });
     ov.addEventListener('click', function (e) { if (e.target === ov) ov.remove(); });
+    if (!agName) {
+      apiGet('api/ui/agents/' + encodeURIComponent(id)).then(function (d) {
+        agName = (d.agent || {}).name || '';
+        var nmEl = ov.querySelector('#mtbDelName');
+        if (nmEl) nmEl.textContent = agName || '\u2014';
+      }).catch(function () { /* the panel shows '—'; deletion still gated */ });
+    }
     var copyBtn = ov.querySelector('#mtbDelCopy');
     var copyTx = ov.querySelector('#mtbDelCopyTx');
     var delInp = ov.querySelector('#mtbAgDelName');
@@ -2113,7 +2120,7 @@
       return;
     }
     var dl = e.target && e.target.closest ? e.target.closest('[data-agdel]') : null;
-    if (dl) { agtDel(dl.getAttribute('data-agdel')); }
+    if (dl) { agtDel(dl.getAttribute('data-agdel'), dl.getAttribute('data-agdelname') || ''); }
   });
   function bindNav() {
     ['#sideNav', '#drawerNav'].forEach(function (sel) {
