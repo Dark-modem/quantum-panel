@@ -11661,6 +11661,8 @@ window.loadClusterStatus = loadClusterStatus;
       '.mtb-acts .quantum-btn{min-height:50px;border-radius:14px;font-size:15px;padding-inline:24px}' +
       '.mtb-modal .mtb-x{width:34px;height:34px;border:1px solid var(--ln);border-radius:10px;display:inline-flex;align-items:center;justify-content:center;background:transparent}}',
     '#mtbAgentModal .mtb-modal{width:min(640px,92vw)}',
+    '#mtbAgentModal .mtb-x{width:34px;height:34px;border:1px solid color-mix(in srgb, var(--ac) 45%, transparent);border-radius:10px;color:var(--ac);background:color-mix(in srgb, var(--ac) 8%, transparent);display:inline-flex;align-items:center;justify-content:center;font-size:18px}',
+    '#mtbAgentModal .mtb-x:hover{border-color:var(--ac);background:color-mix(in srgb, var(--ac) 16%, transparent)}',
     '.tc-header .mtb-wiz-hero{flex-wrap:nowrap;align-items:center}',
     '.mtb-agtx{display:flex;flex-direction:row;align-items:baseline;gap:6px}',
     '.mtb-agtx b{font-size:20px;color:var(--tx);line-height:1.15}',

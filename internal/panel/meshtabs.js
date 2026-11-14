@@ -805,8 +805,7 @@
       '<div class="mtb-acts" id="mtbWizFoot">' +
       '<button type="button" class="quantum-btn quantum-btn-secondary" id="mtbWizBack" hidden>' + esc(L('agWizBack')) + '</button>' +
       '<button type="button" class="quantum-btn quantum-btn-primary mtb-wiz-next" id="mtbWizNext">' + esc(L('agWizNext')) + ' <svg class="mtb-wiz-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>' +
-      '<button type="button" class="quantum-btn quantum-btn-primary" id="mtbMint" hidden>' + esc(L('mint')) + '</button>' +
-      '<button type="button" class="quantum-btn quantum-btn-secondary" data-mtb-close>' + esc(L('cancel')) + '</button></div>' +
+      '<button type="button" class="quantum-btn quantum-btn-primary" id="mtbMint" hidden>' + esc(L('mint')) + '</button></div>' +
       '</div>' +
       '<div id="mtbTokenOut" style="display:none">' +
       '<p class="mtb-token-ok">' + CHECK + ' ' + esc(L('agTokenOk')) + '</p>' +
