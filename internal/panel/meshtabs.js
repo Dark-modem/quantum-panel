@@ -64,6 +64,9 @@
     agTopoT: ['توپولوژی‌ها', 'Topologies'], agEngT: ['هسته‌های ایجنت', 'Agent engines'], agNoEng: ['انجینی ثبت نشده', 'No engines'],
     agNoTopo: ['عضو هیچ توپولوژی‌ای نیست', 'Not a member of any topology'], agPeers: ['هم‌تا', 'peers'],
     agEditT: ['ویرایش ایجنت', 'Edit agent'], agNameK: ['نام', 'Name'], agIPK: ['IP عمومی', 'Public IP'],
+    agEditSub: ['اطلاعات ایجنت را ویرایش و ذخیره کنید.', 'Edit the agent information and save.'],
+    agEdSt1: ['اطلاعات پایه', 'Basic info'], agEdSt2: ['بازبینی و ذخیره', 'Review & save'],
+    agEdNext: ['مرحله بعد', 'Next'],
     agSave: ['ذخیره', 'Save'], agDelT: ['حذف ایجنت', 'Delete agent'],
     agDelConfirm: ['برای تأیید حذف، اسم ایجنت را بنویس:', 'To confirm, type the agent name:'],
     agDelPh: ['اسم ایجنت', 'agent name'],
@@ -1508,17 +1511,25 @@
       var preV = /^v[0-9]/.test(curV) ? curV : '';
       var ov = document.createElement('div');
       ov.className = 'mtb-modal-ov';
-      ov.innerHTML = '<div class="mtb-modal" role="dialog" aria-modal="true">' +
-        '<div class="tc-header"><p class="tc-title">' + esc(L('agUpdT')) + '</p>' +
-        '<button type="button" class="mtb-x" data-mtb-close>\u00d7</button></div>' +
-        '<p class="qs-hint"><b>' + esc(ag.name || id) + '</b>' + (curV ? ' \u00b7 <bdi dir="ltr">' + esc(curV) + '</bdi>' : '') + '</p>' +
+      var PENCIL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3l4 4L8 20l-5 1 1-5z"/></svg>';
+    var CUBE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>';
+    var LINK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>';
+    var EXT = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg>';
+    var INFO = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M12 11.5V16"/></svg>';
+    var REFRESH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>';
+    var SERV = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="7" rx="1.5"/><rect x="3" y="13" width="18" height="7" rx="1.5"/><path d="M7 7.5h.01M7 16.5h.01"/></svg>';
+    ov.innerHTML = '<div class="mtb-modal mtb-ed-modal mtb-upd-modal" role="dialog" aria-modal="true">' +
+        '<div class="tc-header"><div class="mtb-wiz-hero"><span class="mtb-modal-badge">' + PENCIL + '</span><div class="mtb-wiz-hero-tx"><p class="tc-title">' + esc(L('agUpdT')) + '</p><p class="qs-hint"><b>' + esc(ag.name || id) + '</b>' + (curV ? ' · <bdi dir="ltr">' + esc(curV) + '</bdi>' : '') + '</p></div></div>' +
+        '<button type="button" class="mtb-x" data-mtb-close>×</button></div>' +
         '<div class="mtb-form">' +
-        '<label>' + esc(L('agUpdVer')) + ' <input id="mtbUpdVer" class="quantum-input" value="' + esc(preV) + '" dir="ltr" placeholder="v1.29.1"></label>' +
-        '<label>' + esc(L('agUpdUrl')) + ' <input id="mtbUpdUrl" class="quantum-input" value="' + esc(agLastUpdUrl) + '" dir="ltr" placeholder="https://.../quantum-agent-linux-' + esc(ag.arch || 'amd64') + '.tar.gz"></label>' +
-        '<p class="qs-hint">' + esc(L('agUpdHint')) + '</p>' +
+        '<span class="mtb-upd-k">' + SERV + esc(L('agUpdVer')) + '</span>' +
+        '<div class="mtb-field"><input id="mtbUpdVer" class="quantum-input" value="' + esc(preV) + '" dir="ltr" placeholder="v1.29.1"><span class="mtb-field-end">' + CUBE + '</span></div>' +
+        '<span class="mtb-upd-k">' + LINK + esc(L('agUpdUrl')) + '</span>' +
+        '<div class="mtb-field"><input id="mtbUpdUrl" class="quantum-input" value="' + esc(agLastUpdUrl) + '" dir="ltr" placeholder="https://.../quantum-agent-linux-' + esc(ag.arch || 'amd64') + '.tar.gz"><span class="mtb-field-end">' + EXT + '</span></div>' +
+        '<div class="mtb-upd-info"><span class="mtb-upd-ico">' + INFO + '</span><span class="mtb-upd-info-tx">' + esc(L('agUpdHint')) + '</span></div>' +
         '<p class="qs-hint mtb-formmsg" data-mtb-msg></p>' +
-        '<div class="mtb-acts"><button type="button" class="quantum-btn quantum-btn-primary" id="mtbUpdGo">' + esc(L('agUpdStart')) + '</button>' +
-        '<button type="button" class="quantum-btn quantum-btn-secondary" data-mtb-close>' + esc(L('cancel')) + '</button></div>' +
+        '<div class="mtb-acts"><button type="button" class="quantum-btn quantum-btn-secondary" data-mtb-close>' + esc(L('cancel')) + '</button>' +
+        '<button type="button" class="quantum-btn quantum-btn-primary" id="mtbUpdGo">' + REFRESH + ' ' + esc(L('agUpdStart')) + '</button></div>' +
         '</div></div>';
       document.body.appendChild(ov);
       ov.querySelectorAll('[data-mtb-close]').forEach(function (b) { b.addEventListener('click', function () { ov.remove(); }); });
@@ -1544,21 +1555,73 @@
   function openAgtEdit(id) {
     apiGet('api/ui/agents/' + encodeURIComponent(id)).then(function (d) {
       var ag = d.agent || {};
+      var PENCIL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3l4 4L8 20l-5 1 1-5z"/></svg>';
+      var USER = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 19a6.5 6.5 0 0 1 13 0"/></svg>';
+      var IPICO = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="7" rx="1.5"/><rect x="3" y="13" width="18" height="7" rx="1.5"/><path d="M7 7.5h.01M7 16.5h.01"/></svg>';
       var ov = document.createElement('div');
       ov.className = 'mtb-modal-ov';
-      ov.innerHTML = '<div class="mtb-modal" role="dialog" aria-modal="true">' +
-        '<div class="tc-header"><p class="tc-title">' + esc(L('agEditT')) + '</p>' +
+      ov.innerHTML = '<div class="mtb-modal mtb-ed-modal" role="dialog" aria-modal="true">' +
+        '<div class="tc-header"><div class="mtb-wiz-hero"><span class="mtb-modal-badge">' + PENCIL + '</span><div class="mtb-wiz-hero-tx"><p class="tc-title">' + esc(L('agEditT')) + '</p><p class="qs-hint">' + esc(L('agEditSub')) + '</p></div></div>' +
         '<button type="button" class="mtb-x" data-mtb-close>×</button></div>' +
+        '<div class="mtb-wiz" id="mtbEdWiz">' +
+        '<div class="mtb-wstep on" data-st="1"><span class="mtb-wstep-dot">1</span><span class="mtb-wstep-lbl">' + esc(L('agEdSt1')) + '</span></div>' +
+        '<span class="mtb-wline"></span>' +
+        '<div class="mtb-wstep" data-st="2"><span class="mtb-wstep-dot">2</span><span class="mtb-wstep-lbl">' + esc(L('agEdSt2')) + '</span></div>' +
+        '</div>' +
         '<div class="mtb-form">' +
-        '<label>' + esc(L('agNameK')) + ' <input id="mtbAgName" class="quantum-input" value="' + esc(ag.name || '') + '" dir="ltr"></label>' +
-        '<label>' + esc(L('agIPK')) + ' <input id="mtbAgIP" class="quantum-input" value="' + esc(ag.public_ip || '') + '" dir="ltr" placeholder="—"></label>' +
+        '<div class="mtb-wpage" data-pg="1">' +
+        '<div class="mtb-ed-panel">' +
+        '<div class="mtb-ed-row"><label class="mtb-ed-k"><i class="mtb-ed-req">*</i>' + esc(L('agNameK')) + '</label>' +
+        '<div class="mtb-field"><span class="mtb-field-ico">' + USER + '</span><input id="mtbAgName" class="quantum-input" value="' + esc(ag.name || '') + '" dir="ltr"></div></div>' +
+        '<div class="mtb-ed-row"><label class="mtb-ed-k"><i class="mtb-ed-req">*</i>' + esc(L('agIPK')) + '</label>' +
+        '<div class="mtb-field"><span class="mtb-field-ico">' + IPICO + '</span><input id="mtbAgIP" class="quantum-input" value="' + esc(ag.public_ip || '') + '" dir="ltr" placeholder="—"></div></div>' +
+        '</div>' +
+        '</div>' +
+        '<div class="mtb-wpage" data-pg="2" hidden>' +
+        '<div class="mtb-ed-panel" id="mtbEdRev"></div>' +
+        '</div>' +
         '<p class="qs-hint mtb-formmsg" data-mtb-msg></p>' +
-        '<div class="mtb-acts"><button type="button" class="quantum-btn quantum-btn-primary" id="mtbAgSave">' + esc(L('agSave')) + '</button>' +
-        '<button type="button" class="quantum-btn quantum-btn-secondary" data-mtb-close>' + esc(L('cancel')) + '</button></div>' +
+        '<div class="mtb-acts"><button type="button" class="quantum-btn quantum-btn-secondary mtb-ed-back" id="mtbEdBack" hidden>' + esc(L('agWizBack')) + '</button>' +
+        '<button type="button" class="quantum-btn quantum-btn-secondary" data-mtb-close>' + esc(L('cancel')) + '</button>' +
+        '<button type="button" class="quantum-btn quantum-btn-primary" id="mtbEdNext">' + esc(L('agEdNext')) + '</button>' +
+        '<button type="button" class="quantum-btn quantum-btn-primary" id="mtbAgSave" hidden>' + esc(L('agSave')) + '</button></div>' +
         '</div></div>';
       document.body.appendChild(ov);
       ov.querySelectorAll('[data-mtb-close]').forEach(function (b) { b.addEventListener('click', function () { ov.remove(); }); });
       ov.addEventListener('click', function (e) { if (e.target === ov) ov.remove(); });
+      var edStep = 1;
+      function edSync() {
+        ov.querySelectorAll('.mtb-wpage').forEach(function (p) { p.hidden = parseInt(p.getAttribute('data-pg'), 10) !== edStep; });
+        ov.querySelectorAll('.mtb-wstep').forEach(function (st2) {
+          var n2 = parseInt(st2.getAttribute('data-st'), 10);
+          st2.classList.toggle('on', n2 === edStep);
+          st2.classList.toggle('done', n2 < edStep);
+          st2.querySelector('.mtb-wstep-dot').innerHTML = n2 < edStep ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>' : String(n2);
+        });
+        ov.querySelectorAll('.mtb-wline').forEach(function (ln, i2) { ln.classList.toggle('fill', i2 < edStep - 1); });
+        document.getElementById('mtbEdBack').hidden = edStep === 1;
+        document.getElementById('mtbEdNext').hidden = edStep === 2;
+        document.getElementById('mtbAgSave').hidden = edStep !== 2;
+      }
+      ov.querySelector('#mtbEdNext').addEventListener('click', function () {
+        if (edStep === 1 && !ov.querySelector('#mtbAgName').value.trim()) {
+          ov.querySelector('[data-mtb-msg]').textContent = L('agNameK') + ' — ' + L('agSave');
+          return;
+        }
+        var nm = ov.querySelector('#mtbAgName').value.trim() || '—';
+        var pip = ov.querySelector('#mtbAgIP').value.trim() || '—';
+        ov.querySelector('#mtbEdRev').innerHTML =
+          '<div class="mtb-ed-rev-r"><span>' + esc(L('agNameK')) + '</span><b dir="ltr">' + esc(nm) + '</b></div>' +
+          '<div class="mtb-ed-rev-r"><span>' + esc(L('agIPK')) + '</span><b dir="ltr">' + esc(pip) + '</b></div>';
+        ov.querySelector('[data-mtb-msg]').textContent = '';
+        edStep = 2;
+        edSync();
+      });
+      document.getElementById('mtbEdBack').addEventListener('click', function () {
+        edStep = 1;
+        ov.querySelector('[data-mtb-msg]').textContent = '';
+        edSync();
+      });
       ov.querySelector('#mtbAgSave').addEventListener('click', function () {
         var nm = ov.querySelector('#mtbAgName').value.trim();
         var pip = ov.querySelector('#mtbAgIP').value.trim();
@@ -1572,6 +1635,7 @@
           msg.textContent = (e2.body && (e2.body.error || e2.body.message)) || ('HTTP ' + e2.status);
         });
       });
+      edSync();
     }).catch(function () {});
   }
   function agtDel(id) {
