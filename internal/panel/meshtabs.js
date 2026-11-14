@@ -1686,11 +1686,10 @@
         '</div></div>' +
         '<button type="button" class="mtb-del-copy" id="mtbDelCopy" title="' + esc(L('copy')) + '">' + COPY + '<span id="mtbDelCopyTx">' + esc(L('copy')) + '</span></button>' +
       '</div>' +
-      '<p class="qs-hint">' + esc(L('agDelConfirm')) + '</p>' +
+      '<p class="qs-hint mtb-del-type"><span class="mtb-del-type-i"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.001M12 12h.001M16 12h.001M7 16h10"/></svg></span>' + esc(L('agDelConfirm')) + '</p>' +
       '<input id="mtbAgDelName" class="quantum-input" placeholder="' + esc(L('agDelPh')) + '" dir="ltr" autocomplete="off" spellcheck="false" aria-label="' + esc(L('agDelPh')) + '">' +
       '<p class="qs-hint mtb-formmsg" data-mtb-msg></p>' +
-      '<div class="mtb-acts"><span class="mtb-del-foot-hint"><span class="mtb-del-foot-hint-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M12 11.5V16"/></svg></span>' + esc(L('agDelEnable')) + '</span>' +
-      '<button type="button" class="quantum-btn quantum-btn-secondary" data-mtb-close>' + esc(L('cancel')) + ' ' + XSM + '</button>' +
+      '<div class="mtb-acts"><button type="button" class="quantum-btn quantum-btn-secondary" data-mtb-close>' + esc(L('cancel')) + ' ' + XSM + '</button>' +
       '<button type="button" class="quantum-btn quantum-btn-danger" id="mtbAgDelGo" disabled>' + TRASH + ' ' + esc(L('agActDel')) + '</button></div>' +
       '</div>';
     document.body.appendChild(ov);
