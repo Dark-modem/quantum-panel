@@ -116,7 +116,7 @@
     agRoleForeignD: ['سرور خارج — کشور را انتخاب کنید', 'Foreign server — pick the country'],
     agNameHint: ['اسم قابل تشخیص بگذارید؛ بعداً از صفحه مدیریت ایجنت قابل تغییر است.', 'Pick a recognizable name; you can rename it later on the agent page.'],
     agNamePh: ['تهران-۳', 'tehran-3'],
-    agStName: ['نام', 'Name'], agStSide: ['سمت', 'Side'], agStTtl: ['زمان توکن', 'Token lifetime'],
+    agStName: ['نام', 'Name'], agStSide: ['نقش', 'Side'], agStTtl: ['زمان توکن', 'Token lifetime'],
     agWizNext: ['بعدی', 'Next'], agWizBack: ['قبلی', 'Back'],
     agNameReq: ['اسم ایجنت را وارد کنید', 'Enter the agent name'],
     agActMore: ['عملیات', 'Actions'],
