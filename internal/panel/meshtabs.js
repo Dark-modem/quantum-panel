@@ -1594,20 +1594,19 @@
         '<div class="mtb-del-nmrow"><b class="mtb-del-name" dir="ltr">' + esc(agName || '—') + '</b>' +
         (row.status ? '<span class="badge ' + (on ? 'ok' : 'err') + '"><span class="dot"></span>' + esc(L(on ? 'agStatOn' : 'agStatOff')) + '</span>' : '') +
         '</div></div>' +
-        '<button type="button" class="mtb-del-copy" id="mtbDelCopy" title="' + esc(L('copy')) + '">' + COPY + '</button>' +
+        '<button type="button" class="mtb-del-copy" id="mtbDelCopy" title="' + esc(L('copy')) + '">' + COPY + '<span id="mtbDelCopyTx">' + esc(L('copy')) + '</span></button>' +
       '</div>' +
       '<p class="qs-hint">' + esc(L('agDelConfirm')) + '</p>' +
       '<input id="mtbAgDelName" class="quantum-input" placeholder="' + esc(L('agDelPh')) + '" dir="ltr" autocomplete="off" spellcheck="false" aria-label="' + esc(L('agDelPh')) + '">' +
       '<p class="qs-hint mtb-formmsg" data-mtb-msg></p>' +
       '<div class="mtb-acts"><button type="button" class="quantum-btn quantum-btn-secondary" data-mtb-close>' + esc(L('cancel')) + ' ' + XSM + '</button>' +
       '<button type="button" class="quantum-btn quantum-btn-danger" id="mtbAgDelGo" disabled>' + TRASH + ' ' + esc(L('agActDel')) + '</button></div>' +
-      '<div class="mtb-copied-tip" id="mtbCopiedTip" hidden>' + CHK + ' ' + esc(L('agCopied')) + '</div>' +
       '</div>';
     document.body.appendChild(ov);
     ov.querySelectorAll('[data-mtb-close]').forEach(function (b) { b.addEventListener('click', function () { ov.remove(); }); });
     ov.addEventListener('click', function (e) { if (e.target === ov) ov.remove(); });
     var copyBtn = ov.querySelector('#mtbDelCopy');
-    var copTip = ov.querySelector('#mtbCopiedTip');
+    var copyTx = ov.querySelector('#mtbDelCopyTx');
     var delInp = ov.querySelector('#mtbAgDelName');
     var delGo = ov.querySelector('#mtbAgDelGo');
     var delMsg = ov.querySelector('[data-mtb-msg]');
@@ -1618,13 +1617,10 @@
     });
     copyBtn.addEventListener('click', function () {
       navigator.clipboard.writeText(agName).catch(function () { /* clipboard blocked */ });
-      var rb = copyBtn.getBoundingClientRect();
-      copTip.style.top = Math.max(6, rb.top - 44) + 'px';
-      copTip.style.insetInlineStart = 'auto';
-      copTip.style.left = Math.max(6, rb.left - 8) + 'px';
-      copTip.hidden = false;
-      clearTimeout(copTip._t);
-      copTip._t = setTimeout(function () { copTip.hidden = true; }, 1600);
+      copyTx.textContent = L('agCopied');
+      copyBtn.classList.add('done');
+      clearTimeout(copyBtn._t);
+      copyBtn._t = setTimeout(function () { copyTx.textContent = L('copy'); copyBtn.classList.remove('done'); }, 1600);
     });
     ov.querySelector('#mtbAgDelGo').addEventListener('click', function () {
       if (delGo.disabled) return;
