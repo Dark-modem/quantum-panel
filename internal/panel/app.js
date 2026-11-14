@@ -11859,6 +11859,8 @@ window.loadClusterStatus = loadClusterStatus;
     '.ev-t{margin-inline-start:auto;color:var(--dim);font-size:12px;white-space:nowrap;direction:ltr}',
     '.ev-empty{color:var(--dim);font-size:13px}',
     '.chart-card{position:relative}',
+    '#chartCard{isolation:isolate;overflow:hidden}',
+    '#chartCard::after{content:"";position:absolute;width:100px;height:100px;border-radius:50%;top:-32px;inset-inline-start:-32px;z-index:-1;pointer-events:none;background:radial-gradient(circle at 35% 35%, color-mix(in srgb, var(--ac) 24%, transparent) 0%, color-mix(in srgb, var(--ac) 8%, transparent) 72%)}',
     '.chart-legend .lg-item{display:inline-flex;align-items:center;gap:6px;background:none;border:0;color:var(--tx2);cursor:pointer;font:inherit;padding:2px 6px;border-radius:8px}',
     '.chart-legend .lg-item:hover{background:var(--sunk)}',
     '.chart-legend .lg-item[aria-pressed="false"]{opacity:.35;text-decoration:line-through}',
