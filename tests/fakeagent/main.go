@@ -175,9 +175,14 @@ reconnect:
 		hdr := http.Header{}
 		hdr.Set("X-Agent-Id", er.ID)
 		hdr.Set("X-Agent-Key", er.Key)
-		dialer := websocket.DefaultDialer
+		// A real agent's reconnect never waits forever: bound the dial (a
+		// dropped SYN after a container restart must RETRY, not hang).
+		dialer := &websocket.Dialer{HandshakeTimeout: 10 * time.Second}
 		if *insecure {
-			dialer = &websocket.Dialer{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
+			dialer = &websocket.Dialer{
+				HandshakeTimeout: 10 * time.Second,
+				TLSClientConfig:  &tls.Config{InsecureSkipVerify: true},
+			}
 		}
 		ws, _, err := dialer.Dial(wsURL, hdr)
 		if err != nil {
