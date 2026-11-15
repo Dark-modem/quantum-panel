@@ -1510,6 +1510,7 @@
         var rem = (tn.remote && tn.remote.name) || '\u2014';
         var remDc = dcDisp((tn.remote && tn.remote.datacenter) || '', tn.remote && tn.remote.datacenter_en);
         var remCc = tn.country ? String(tn.country).toLowerCase() : '';
+        var remCcL = remCc ? CN(remCc) : ''; // '' for codes the map does not know — no dangling separator
         var engName2 = engDisp[tn.engine] || tn.engine || '\u2014';
         // A down tunnel reports latency 0; that is "no measurement", not a
         // real RTT, so it must read as an em dash instead of "0 ms".
@@ -1522,7 +1523,7 @@
           '<td>' + (tkey ? '<b class="mono mtb-tun-key" dir="ltr" title="' + esc(tkey) + '">' + esc(tkey) + '</b>' : '\u2014') +
             (tTopo ? '<br><span class="mtb-muted" style="font-size:.85em">' + esc(tTopo) + '</span>' : '') + '</td>' +
           '<td><div class="mtb-dest"><span class="mtb-dest-flag">' + (remCc ? topologyFlagSvg(remCc) : '') + '</span><div class="mtb-dest-tx"><b>' + esc(rem) + '</b>' +
-            ((remDc || remCc) ? '<span class="mtb-muted" style="font-size:.85em">' + esc(remDc) + (remDc && remCc ? ' \u00b7 ' : '') + esc(remCc ? CN(remCc) : '') + '</span>' : '') + '</div></div></td>' +
+            ((remDc || remCcL) ? '<span class="mtb-muted" style="font-size:.85em">' + esc(remDc) + (remDc && remCcL ? ' \u00b7 ' : '') + esc(remCcL) + '</span>' : '') + '</div></div></td>' +
           '<td><span class="badge info mtb-eng-badge">' + engLogo({ engine: tn.engine }, engName2) + ' ' + esc(engName2) + '</span></td>' +
           '<td>' + b2 + '</td>' +
           '<td>' + (tn.weight_pct != null ? (Math.round(tn.weight_pct * 10) / 10) + '%' : '\u2014') + '</td>' +
