@@ -248,7 +248,8 @@ reconnect:
 					// engine_status report (the UI reads it back), and — for
 					// the e2e — persist the document exactly as received.
 					var dv struct {
-						Engines []struct {
+						Revision string `json:"revision"`
+						Engines  []struct {
 							Engine  string `json:"engine"`
 							Enabled *bool  `json:"enabled"`
 						} `json:"engines"`
@@ -264,6 +265,12 @@ reconnect:
 						if err := os.WriteFile(*desiredOut, env.Data, 0o644); err != nil {
 							log.Printf("desired-out: %v", err)
 						}
+					}
+					// ACK the revision (protocol v2 "ack"; a real agent
+					// answers after applying — the panel clears the pending
+					// desired only on this message).
+					if dv.Revision != "" {
+						write("ack", map[string]any{"revision": dv.Revision, "ok": true})
 					}
 					continue
 				}
