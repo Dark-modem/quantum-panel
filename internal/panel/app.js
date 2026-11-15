@@ -11560,14 +11560,14 @@ window.loadClusterStatus = loadClusterStatus;
     '.mtb-eng-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px}',
     '.mtb-eng-card{border:1px solid var(--ln);border-radius:12px;background:var(--sunk);padding:12px;display:flex;flex-direction:column;gap:10px}',
     '.mtb-eng-card.run{border-color:color-mix(in srgb, var(--ok) 45%, transparent);background:color-mix(in srgb, var(--ok) 6%, var(--sunk))}',
-    '.mtb-eng-top{display:flex;align-items:center;gap:10px;min-width:0}',
+    '.mtb-eng-top{display:flex;align-items:center;gap:10px;min-width:0;flex-wrap:wrap}', // tight cards drop the state pill to its own line instead of colliding
     // the state pill rides the top row (level with the name), not the vertical middle
     '.mtb-eng-card .mtb-eng-state{align-self:flex-start}',
     '.mtb-eng-logo{width:46px;height:46px;border-radius:999px;display:grid;place-items:center;flex:none;overflow:hidden}',
     '.mtb-eng-logo img{width:100%;height:100%;object-fit:contain;display:block;border-radius:999px}',
     '.mtb-eng-logo svg{width:34px;height:34px;display:block}',
     '.mtb-eng-id{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1}',
-    '.mtb-eng-id b{display:inline-flex;align-self:flex-start;padding:2px 10px;border-radius:8px;background:color-mix(in srgb, var(--ac) 12%, transparent);border:1px solid color-mix(in srgb, var(--ac) 28%, transparent)}',
+    '.mtb-eng-id b{display:inline-flex;align-self:flex-start;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:2px 10px;border-radius:8px;background:color-mix(in srgb, var(--ac) 12%, transparent);border:1px solid color-mix(in srgb, var(--ac) 28%, transparent)}',
     // version as a compact mono chip under the engine name — no "Version:" word,
     // the value speaks for itself on a card this small
     '.mtb-eng-ver{align-self:flex-start;font-size:12px;color:var(--tx2);background:color-mix(in srgb, var(--tx) 5%, transparent);border:1px solid var(--ln);border-radius:6px;padding:1px 7px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}',
