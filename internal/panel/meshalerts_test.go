@@ -153,6 +153,80 @@ func TestMeshAlertAgentOfflineRule(t *testing.T) {
 	}
 }
 
+// TestMeshAlertAgentOfflineFreshNotAlerted — round-3 F5 negative: a LIVE
+// agent (registry LastSeen fresh, exactly what the hub's batched per-
+// heartbeat persist maintains) must NOT alert offline. The old rule's
+// `Status != "online"` disjunct was always true (agentRegistryLoad resets
+// every record's status to offline), so live agents alerted too.
+func TestMeshAlertAgentOfflineFreshNotAlerted(t *testing.T) {
+	e, _ := newTestEngine(t, time.Now().Add(-time.Hour))
+	recs := []agentRecord{{ID: "agt_live", Name: "agt_live", Status: "online",
+		LastSeen: time.Now().Add(-5 * time.Second).Unix()}}
+	data, _ := json.Marshal(agentRegistryFile{Version: 1, Agents: recs})
+	if err := osWriteFileForTest(filepathJoinForTest(configDir, "agents.json"), data); err != nil {
+		t.Fatal(err)
+	}
+	for _, ev := range e.evaluate(time.Now()) {
+		if ev.Rule == "agent_offline" && ev.Target == "agt_live" {
+			t.Fatalf("agent_offline fired for a LIVE agent: %+v", ev)
+		}
+	}
+}
+
+// TestMeshAlertAgentOfflineRecoveryPath — the BACKEND-19 TASK C bug at the
+// engine level: offline dispatches for a stale agent, the agent comes
+// back (the hub persist refreshes LastSeen — the file form is seeded
+// directly here), and the NEXT tick dispatches the RECOVERY with the open
+// event's severity carried (F4). The old rule could never clear, so the
+// recovery message could never exist for this rule.
+func TestMeshAlertAgentOfflineRecoveryPath(t *testing.T) {
+	e, fake := newTestEngine(t, time.Now().Add(-2*time.Hour)) // past the quiet window
+	// keep the event stream clean: no real disk probe
+	diskUsageFn = func(string) (uint64, uint64, error) { return 0, 0, os.ErrInvalid }
+	t.Cleanup(func() { diskUsageFn = getDiskUsage })
+
+	writeReg := func(lastSeen int64) error {
+		recs := []agentRecord{{ID: "agt_rec", Name: "agt_rec", Status: "online", LastSeen: lastSeen}}
+		data, _ := json.Marshal(agentRegistryFile{Version: 1, Agents: recs})
+		return osWriteFileForTest(filepathJoinForTest(configDir, "agents.json"), data)
+	}
+	if err := writeReg(time.Now().Add(-10 * time.Minute).Unix()); err != nil {
+		t.Fatal(err)
+	}
+	e.tick(time.Now())
+	offlineSent := 0
+	fake.mu.Lock()
+	for _, ev := range fake.sent {
+		if !ev.Recovery && ev.Rule == "agent_offline" {
+			offlineSent++
+		}
+	}
+	fake.mu.Unlock()
+	if offlineSent != 1 {
+		t.Fatalf("the stale agent must dispatch exactly one offline alert, got %d (%+v)", offlineSent, fake.sent)
+	}
+
+	// the agent reconnects: the hub persist path refreshes LastSeen
+	if err := writeReg(time.Now().Unix()); err != nil {
+		t.Fatal(err)
+	}
+	e.tick(time.Now().Add(time.Second))
+	fake.mu.Lock()
+	defer fake.mu.Unlock()
+	recovery := 0
+	for _, ev := range fake.sent {
+		if ev.Recovery && ev.Rule == "agent_offline" && ev.Target == "agt_rec" {
+			recovery++
+			if ev.Sev != "warn" {
+				t.Fatalf("recovery must carry the open event's severity, got %q", ev.Sev)
+			}
+		}
+	}
+	if recovery != 1 {
+		t.Fatalf("the reconnect must dispatch exactly one recovery, got %d (%+v)", recovery, fake.sent)
+	}
+}
+
 func TestMeshAlertTunnelDownAndForeignAllDown(t *testing.T) {
 	e, _ := newTestEngine(t, time.Now().Add(-time.Hour))
 	s, err := storeOpenForTest()

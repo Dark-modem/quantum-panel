@@ -366,8 +366,16 @@ func (e *meshAlertEngine) evaluate(now time.Time) []meshAlertEvent {
 			if rec.Revoked {
 				continue
 			}
+			// Round-3 fix (backend-19 F5): fire on STALENESS only. The
+			// registry load-reset forces every record's Status to offline,
+			// so the old `Status != "online"` disjunct was always true —
+			// the rule fired for LIVE agents too and, because the condition
+			// could never clear, recovery notifications never dispatched
+			// (caught by the backend-19 recovery e2e). LastSeen is the
+			// hub-maintained freshness signal (hello + the batched
+			// per-heartbeat persist; the v2 path now persists too).
 			offlineFor := now.Sub(time.Unix(rec.LastSeen, 0))
-			if rec.Status != "online" || offlineFor > time.Duration(e.settings.AgentOfflineMin)*time.Minute {
+			if offlineFor > time.Duration(e.settings.AgentOfflineMin)*time.Minute {
 				evs = append(evs, meshAlertEvent{
 					Key: "agent_offline:" + rec.ID, Rule: "agent_offline", Target: rec.ID,
 					Sev: "warn", Now: now,
