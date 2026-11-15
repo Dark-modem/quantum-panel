@@ -11723,9 +11723,9 @@ window.loadClusterStatus = loadClusterStatus;
     // the line-box center, so against the badge the word read a touch low
     '.mtb-del-modal .tc-title{font-size:17px;translate:0 -1px}',
     // paste-from-clipboard button inside the confirm input (inline-end: right in EN, mirrored in fa)
-    '.mtb-del-inwrap{position:relative;display:flex;align-items:center}', // flex: the wrapper hugs the input (no line-box gap) so the paste button centers on it exactly
-    '.mtb-del-inwrap .quantum-input{padding-inline-end:52px}',
-    '.mtb-del-paste{position:absolute;inset-inline-end:8px;top:50%;translate:0 -50%;width:32px;height:32px;padding:0;border-radius:9px;border:1px solid color-mix(in srgb, var(--ac) 40%, transparent);background:color-mix(in srgb, var(--ac) 10%, transparent);color:var(--ac);display:inline-flex;align-items:center;justify-content:center;cursor:pointer}',
+    '.mtb-del-inwrap{display:flex;align-items:center;gap:8px}', // flex row: the paste button centers against the input box by construction (no absolute math)
+    '.mtb-del-inwrap .quantum-input{flex:1;min-width:0;}',
+    '.mtb-del-paste{flex:none;width:32px;height:32px;padding:0;border-radius:9px;border:1px solid color-mix(in srgb, var(--ac) 40%, transparent);background:color-mix(in srgb, var(--ac) 10%, transparent);color:var(--ac);display:inline-flex;align-items:center;justify-content:center;cursor:pointer}',
     '.mtb-del-paste svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}',
     '.mtb-del-paste:hover{border-color:var(--ac);background:color-mix(in srgb, var(--ac) 20%, transparent)}',
     '.mtb-del-badge svg{width:18px;height:18px}',
