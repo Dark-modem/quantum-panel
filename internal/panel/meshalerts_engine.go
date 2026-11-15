@@ -409,6 +409,13 @@ func (e *meshAlertEngine) evaluate(now time.Time) []meshAlertEvent {
 				if rt == nil {
 					continue // no report yet: not an alert (startup truth)
 				}
+				if rt.WireKnown && rt.WireSum > 0 {
+					// traffic resumed: reset the freeze window, so a FUTURE
+					// freeze still requires two consecutive dead ticks
+					// (round-3 fix: the entry used to linger forever and a
+					// re-freeze would fire after a single tick)
+					delete(meshTrafficFrozenSeen, t.TunnelKey)
+				}
 				if !rt.Up {
 					downByServer[t.RemoteServerID]++
 					evs = append(evs, meshAlertEvent{

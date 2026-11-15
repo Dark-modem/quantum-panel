@@ -60,6 +60,16 @@ func (f *fakeNotifier) count() int {
 func newTestEngine(t *testing.T, startedAt time.Time) (*meshAlertEngine, *fakeNotifier) {
 	t.Helper()
 	withTempConfig(t)
+	// evaluate() touches MeshStore; pin an IN-MEMORY store so the lazy
+	// open never creates a FILE db inside the temp config dir (Windows
+	// TempDir cleanup races an open quantum.db). Tests that seed rows
+	// re-pin their own store; both cleanups are safe (LIFO).
+	s, err := storeOpenForTest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	MeshStoreSetForTest(s)
+	t.Cleanup(MeshStoreCloseForTest)
 	e := newMeshAlertEngine()
 	e.startedAt = startedAt
 	fake := &fakeNotifier{}
