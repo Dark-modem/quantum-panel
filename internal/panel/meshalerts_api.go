@@ -25,14 +25,17 @@ func registerMeshAlertRoutes(mux *http.ServeMux, base string) {
 func handleMeshAlertsView(w http.ResponseWriter, r *http.Request) {
 	open, history, st := meshAlertEng.currentAlertsView()
 	writeJSON(w, map[string]any{
-		"enabled":               st.Enabled,
-		"agent_offline_min":     st.AgentOfflineMin,
-		"cert_expire_days":      st.CertExpireDays,
-		"disk_max_percent":      st.DiskMaxPercent,
-		"telegram_set":          st.TelegramToken != "" && st.TelegramChat != "",
-		"webhook_set":           st.WebhookURL != "",
-		"open":                  open,
-		"history":               history,
+		"enabled":           st.Enabled,
+		"agent_offline_min": st.AgentOfflineMin,
+		"cert_expire_days":  st.CertExpireDays,
+		"disk_max_percent":  st.DiskMaxPercent,
+		"telegram_set":      st.TelegramToken != "" && st.TelegramChat != "",
+		"webhook_set":       st.WebhookURL != "",
+		"open":              open,
+		"history":           history,
+		// Phase 16: ACTIVE maintenance windows (contract §2.15) so the
+		// rules card renders them without extra calls.
+		"maintenance":           meshAlertEng.maintenanceWindows(),
 		"quiet_until_startup_s": int(meshAlertQuietStart.Seconds()),
 	})
 }
