@@ -1659,6 +1659,8 @@ html[dir="rtl"] .topo-back .topo-back-ic { transform:scaleX(-1); }
 .topo-stat { align-content:center; padding:12px 16px; gap:4px; }
 .topo-stat-v { font-size:24px; }
 .topo-list-head th { color:var(--tx2); font-weight:600; }
+.topo-list-head .topo-th { display:inline-flex; align-items:center; gap:6px; }
+.topo-list-head .topo-th svg { width:13px; height:13px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; opacity:.8; flex:none; }
 .topo-list-head { background:var(--s2); }
 .topo-list-row:hover .topo-name { color:var(--ac); }
 .topo-list-row:hover .topo-cell-state .topo-state-pill { filter:brightness(1.06); }
