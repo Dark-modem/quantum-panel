@@ -13,6 +13,27 @@ import (
 	"github.com/Dark-modem/quantum-panel/internal/store"
 )
 
+// uiAgentResourceViews builds the cpu/mem/disk maps the UI renders — the
+// SAME shape at both serving spots (§2.3 rows and the §2.4 detail object),
+// so the agents pages' resource columns carry the detail page's semantics:
+// a metric stays nil until the agent's heartbeat reported it (mem/disk need
+// their totals, cpu needs cores).
+func uiAgentResourceViews(ag store.Agent) (cpu, mem, disk any) {
+	mem = nil
+	if ag.MemTotalMB > 0 {
+		mem = map[string]any{"total_mb": ag.MemTotalMB, "used_mb": ag.MemUsedMB}
+	}
+	disk = nil
+	if ag.DiskTotalGB > 0 {
+		disk = map[string]any{"total_gb": ag.DiskTotalGB, "used_gb": ag.DiskUsedGB}
+	}
+	cpu = nil
+	if ag.CPUCores > 0 {
+		cpu = map[string]any{"cores": ag.CPUCores, "percent": ag.CPUPct, "load1": ag.Load1}
+	}
+	return cpu, mem, disk
+}
+
 func handleUIAgentsList(w http.ResponseWriter, r *http.Request) {
 	h, ok := uiOpen(w, r)
 	if !ok {
@@ -37,6 +58,13 @@ func handleUIAgentsList(w http.ResponseWriter, r *http.Request) {
 			// agent" nudge when linked=false.
 			"linked": a.ServerID != 0,
 		})
+	}
+	// BACKEND-28: the rows carry the SAME cpu/mem/disk views the §2.4
+	// detail serves. Both accepted agents pages render their resource
+	// columns from this list; the store rows already hold the heartbeat
+	// values, so this enrichment costs no extra queries on the poll.
+	for i := range out {
+		out[i]["cpu"], out[i]["mem"], out[i]["disk"] = uiAgentResourceViews(agents[i])
 	}
 	writeJSON(w, map[string]any{"agents": out})
 }
@@ -78,18 +106,7 @@ func handleUIAgentDetail(w http.ResponseWriter, r *http.Request) {
 		uiErrWrite(w, r, "E-NOTFOUND", map[string]any{"agent": id}, "")
 		return
 	}
-	mem := any(nil)
-	if ag.MemTotalMB > 0 {
-		mem = map[string]any{"total_mb": ag.MemTotalMB, "used_mb": ag.MemUsedMB}
-	}
-	disk := any(nil)
-	if ag.DiskTotalGB > 0 {
-		disk = map[string]any{"total_gb": ag.DiskTotalGB, "used_gb": ag.DiskUsedGB}
-	}
-	cpu := any(nil)
-	if ag.CPUCores > 0 {
-		cpu = map[string]any{"cores": ag.CPUCores, "percent": ag.CPUPct, "load1": ag.Load1}
-	}
+	cpu, mem, disk := uiAgentResourceViews(ag)
 	effective := ag.PublicIP
 	if ag.PublicIPOverride != "" {
 		effective = ag.PublicIPOverride
