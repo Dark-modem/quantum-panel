@@ -11772,9 +11772,9 @@ window.loadClusterStatus = loadClusterStatus;
     '.mtb-pg-dots{color:var(--tx2);font-size:12.5px;padding:0 2px}',
     '.mtb-th{display:inline-flex;align-items:center;gap:6px}',
     '.mtb-th svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;opacity:.8}',
-    '.mtb-dest{display:flex;align-items:center;gap:8px;min-width:0}',
-    '.mtb-dest-flag svg{width:54px;height:38px}', // as tall as the two-line block (name + datacenter), aspect kept
-    '.mtb-dest-flag{display:flex;align-items:center}',
+    '.mtb-dest{display:flex;align-items:flex-start;gap:8px;min-width:0}',
+    '.mtb-dest-flag svg{width:20px;height:14px}',
+    '.mtb-dest-flag{margin-top:2px}',
     '.mtb-tun-topo{display:inline-flex;align-items:center;gap:4px;font-size:.85em}',
     '.mtb-tun-topo svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;opacity:.75;flex:none}',
     '.mtb-dest-tx{display:flex;flex-direction:column;gap:2px;min-width:0}',
