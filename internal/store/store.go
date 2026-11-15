@@ -346,6 +346,13 @@ CREATE TABLE agent_listening (
   PRIMARY KEY(agent_id, proto, port)
 );
 `,
+	// 8: Phase 26 bilingual datacenter names (UI-API-REQUESTS §9). Additive:
+	// old binaries ignore the column; DEFAULT '' keeps NOT NULL satisfied on
+	// reopen and makes the change downgrade-safe (pre-26 binaries read the
+	// table without the column and never write it).
+	`
+ALTER TABLE datacenters ADD COLUMN datacenter_en TEXT NOT NULL DEFAULT '';
+`,
 }
 
 func (s *Store) migrate() error {

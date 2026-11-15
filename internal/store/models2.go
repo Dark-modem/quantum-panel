@@ -52,7 +52,7 @@ type AgentV2State struct {
 // ---- datacenters / servers: list, get, update, delete ------------------
 
 func (s *Store) ListDatacenters() ([]Datacenter, error) {
-	rows, err := s.db.Query(`SELECT id, kind, name, price_coefficient, created_at FROM datacenters ORDER BY id`)
+	rows, err := s.db.Query(`SELECT id, kind, name, price_coefficient, COALESCE(datacenter_en, ''), created_at FROM datacenters ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +60,7 @@ func (s *Store) ListDatacenters() ([]Datacenter, error) {
 	var out []Datacenter
 	for rows.Next() {
 		var d Datacenter
-		if err := rows.Scan(&d.ID, &d.Kind, &d.Name, &d.PriceCoefficient, &d.CreatedAt); err != nil {
+		if err := rows.Scan(&d.ID, &d.Kind, &d.Name, &d.PriceCoefficient, &d.DatacenterEN, &d.CreatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, d)
@@ -70,12 +70,26 @@ func (s *Store) ListDatacenters() ([]Datacenter, error) {
 
 func (s *Store) GetDatacenter(id int64) (Datacenter, error) {
 	var d Datacenter
-	err := s.db.QueryRow(`SELECT id, kind, name, price_coefficient, created_at FROM datacenters WHERE id = ?`, id).
-		Scan(&d.ID, &d.Kind, &d.Name, &d.PriceCoefficient, &d.CreatedAt)
+	err := s.db.QueryRow(`SELECT id, kind, name, price_coefficient, COALESCE(datacenter_en, ''), created_at FROM datacenters WHERE id = ?`, id).
+		Scan(&d.ID, &d.Kind, &d.Name, &d.PriceCoefficient, &d.DatacenterEN, &d.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return d, ErrNotFound
 	}
 	return d, err
+}
+
+// SetDatacenterEN sets the optional English display name (phase 26 §9).
+// Empty clears it; anything above 100 characters is refused (the same bound
+// as the token's datacenter).
+func (s *Store) SetDatacenterEN(id int64, en string) error {
+	if len(en) > 100 {
+		return fmt.Errorf("datacenter_en out of range")
+	}
+	res, err := s.db.Exec(`UPDATE datacenters SET datacenter_en = ? WHERE id = ?`, en, id)
+	if err != nil {
+		return err
+	}
+	return requireRow(res)
 }
 
 // SetDatacenterPriceCoefficient updates the pricing HINT (never applied to
