@@ -441,7 +441,6 @@ function topologyRender() {
   $('topologyAddTunnelBtn').disabled = !topo || !topo.local_ip || !topo.remote_ip;
   $('tunnelsEmpty').hidden = !topo || inTunnel;
   if (!topo) $('tunnelsListCard').hidden = true;
-  $('topologyCount').textContent = String(topologyData.topologies.length);
   // KPI strip: three numbers the page can actually prove from its own data —
   // the server pairs on this panel, every tunnel attached to them, and how
   // many pairs currently report healthy.
