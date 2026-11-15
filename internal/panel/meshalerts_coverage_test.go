@@ -207,6 +207,92 @@ func TestMeshAlertTrafficDropRule(t *testing.T) {
 	}
 }
 
+// TestMeshAlertClockDriftRule — the phase-13 catalog stub became REAL with
+// R7 (StateReportV2.ReportedAt): a drifting agent clock over the
+// configurable threshold fires; a fresh clock does not; the drift is
+// absolute (an agent clock RUNNING AHEAD fires too); a legacy agent
+// (absent field, 0) skips silently.
+func TestMeshAlertClockDriftRule(t *testing.T) {
+	e, _ := newTestEngine13(t)
+	s := meshStoreMust(t)
+	_, _, agIr, _ := uiSeedWorld(t, s)
+	now := time.Now()
+
+	setReportedAt := func(agentID string, at int64) {
+		meshRuntimeMu.Lock()
+		meshReportedAtBy[agentID] = at
+		meshRuntimeMu.Unlock()
+	}
+	clearReportedAt := func(agentID string) {
+		meshRuntimeMu.Lock()
+		delete(meshReportedAtBy, agentID)
+		meshRuntimeMu.Unlock()
+	}
+	t.Cleanup(func() {
+		meshRuntimeMu.Lock()
+		meshReportedAtBy = map[string]int64{}
+		meshRuntimeMu.Unlock()
+	})
+
+	findDrift := func(evs []meshAlertEvent) *meshAlertEvent {
+		for i := range evs {
+			if evs[i].Rule == "clock_drift" {
+				return &evs[i]
+			}
+		}
+		return nil
+	}
+
+	// legacy agent (nothing reported): skip silently
+	var ev *meshAlertEvent
+	if ev = findDrift(e.evaluatePhase13(now)); ev != nil {
+		t.Fatalf("legacy agent must not fire clock_drift: %+v", *ev)
+	}
+
+	// drifting clock (200s behind, default threshold 90): fires, targets
+	// the agent, carries the structured fa/en view
+	setReportedAt(agIr, now.Unix()-200)
+	if ev = findDrift(e.evaluatePhase13(now)); ev == nil {
+		t.Fatal("clock_drift must fire for a 200s-behind clock")
+	}
+	if ev.Target != agIr || ev.Key != "clock_drift:"+agIr {
+		t.Fatalf("clock_drift target/key wrong: %+v", *ev)
+	}
+	if ev.UI == nil {
+		t.Fatal("clock_drift must carry the structured fa/en view")
+	}
+
+	// an agent clock RUNNING AHEAD is also drift (absolute difference)
+	setReportedAt(agIr, now.Unix()+200)
+	if ev = findDrift(e.evaluatePhase13(now)); ev == nil {
+		t.Fatal("clock_drift must fire for a clock running ahead too")
+	}
+
+	// threshold is configurable: a tight ceiling fires on a small drift…
+	e.settings.ClockDriftMaxS = 10
+	setReportedAt(agIr, now.Unix()-20)
+	if ev = findDrift(e.evaluatePhase13(now)); ev == nil {
+		t.Fatal("clock_drift must fire at the tightened threshold")
+	}
+	// …and the default threshold ignores a small drift
+	e.settings.ClockDriftMaxS = meshAlertClockDriftS
+	setReportedAt(agIr, now.Unix()-60)
+	for _, ev := range e.evaluatePhase13(now) {
+		if ev.Rule == "clock_drift" {
+			t.Fatalf("60s drift must NOT fire at the 90s default: %+v", ev)
+		}
+	}
+
+	// fresh clock: no fire
+	setReportedAt(agIr, now.Unix()-5)
+	for _, ev := range e.evaluatePhase13(now) {
+		if ev.Rule == "clock_drift" {
+			t.Fatalf("clock_drift fired for a fresh clock: %+v", ev)
+		}
+	}
+	clearReportedAt(agIr)
+}
+
 // TestAlertPhase13RemainingRules — the phase-13 rules that existed since
 // phase 13 but had NO fire assertion anywhere: agent_disk_high,
 // billing_spike, backup_old, desired_stuck. Contract = the phase-13
