@@ -111,6 +111,12 @@ func TestMeshAlertDedupRecoveryQuiet(t *testing.T) {
 	for _, s := range fake.sent {
 		if s.Recovery {
 			recov++
+			// round-3 F4: the recovery payload must carry the OPEN event's
+			// severity (it used to go out as an empty string, breaking
+			// severity-based webhook consumers)
+			if s.Sev != "warn" {
+				t.Fatalf("recovery severity must carry the open event's severity, got %q", s.Sev)
+			}
 		}
 	}
 	if recov != 1 {

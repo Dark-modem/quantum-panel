@@ -79,6 +79,7 @@ type meshAlertState struct {
 	lastSent time.Time
 	openedAt time.Time
 	lastText string
+	sev      string        // round-3 F4: carried into the recovery payload
 	lastUI   map[string]any // the structured fa/en view of the last event
 }
 
@@ -536,12 +537,14 @@ func (e *meshAlertEngine) tick(now time.Time) {
 			st.open = true
 			st.openedAt = now
 			st.lastText = ev.Text
+			st.sev = ev.Sev
 			if !quiet {
 				e.dispatchLocked(ev, false)
 				st.lastSent = now
 			}
 		} else if now.Sub(st.lastSent) >= meshAlertCooldown {
 			st.lastText = ev.Text
+			st.sev = ev.Sev
 			if !quiet {
 				e.dispatchLocked(ev, false)
 				st.lastSent = now
@@ -555,6 +558,7 @@ func (e *meshAlertEngine) tick(now time.Time) {
 		}
 		st.open = false
 		ev := meshAlertEvent{Key: key, Target: key, Now: now, Recovery: true,
+			Sev: st.sev, // round-3 F4: recoveries carried an EMPTY severity
 			Text: "recovered: " + st.lastText}
 		if i := strings.IndexByte(key, ':'); i >= 0 {
 			ev.Rule = key[:i]
