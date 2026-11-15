@@ -644,6 +644,7 @@
     setBody('magt', skel(3));
     apiGet('api/ui/agents').then(function (j) {
       if (seq.magt !== my) return;
+      agtListLoaded = true;
       cache.magt = (j && j.agents) || [];
       renderAgt();
     }).catch(function (e) {
@@ -1043,6 +1044,7 @@
     });
   }
   var agtView = { view: 'table' };
+  var agtListLoaded = false; // a successful agents-list fetch has landed this session
   var agtActsOpen = '';
   var agtActsUp = false;
   var engFilter = 'all';
@@ -1120,6 +1122,10 @@
     try { if (location.hash !== '#t=magt') history.replaceState(null, '', '#t=magt'); } catch (e) { /* non-fatal */ }
     var ags = cache.magt || [];
     if (!ags.length) {
+      // cold cache (deep-link boot race): fetch the list instead of declaring
+      // "no agents" — a genuinely zero-agent deployment reaches the hero only
+      // after a successful load, so this cannot loop
+      if (!agtListLoaded) { loadAgt(); return; }
       setBody('magt', mtbHero({
         title: L('heroAgT'), desc: L('heroAgD'), docQ: L('heroDocAg'),
         cta: '<button type="button" class="quantum-btn quantum-btn-primary mtb-hero-cta" id="mtbNewAgent">+ ' + esc(L('newAgent')).replace('+ ', '') + '</button>'
