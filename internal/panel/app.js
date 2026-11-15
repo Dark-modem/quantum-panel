@@ -11718,6 +11718,12 @@ window.loadClusterStatus = loadClusterStatus;
     // raise the single-line title 1px: the cap-band of 17px text sits ~1px below
     // the line-box center, so against the badge the word read a touch low
     '.mtb-del-modal .tc-title{font-size:17px;translate:0 -1px}',
+    // paste-from-clipboard button inside the confirm input (inline-end: right in EN, mirrored in fa)
+    '.mtb-del-inwrap{position:relative}',
+    '.mtb-del-inwrap .quantum-input{padding-inline-end:52px}',
+    '.mtb-del-paste{position:absolute;inset-inline-end:8px;top:50%;translate:0 -50%;width:32px;height:32px;border-radius:9px;border:1px solid color-mix(in srgb, var(--ac) 40%, transparent);background:color-mix(in srgb, var(--ac) 10%, transparent);color:var(--ac);display:inline-flex;align-items:center;justify-content:center;cursor:pointer}',
+    '.mtb-del-paste svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}',
+    '.mtb-del-paste:hover{border-color:var(--ac);background:color-mix(in srgb, var(--ac) 20%, transparent)}',
     '.mtb-del-badge svg{width:18px;height:18px}',
     '.mtb-ed-modal{width:min(640px,92vw)}',
     '.mtb-modal-badge{width:44px;height:44px;border-radius:12px;border:1px solid color-mix(in srgb, var(--ac) 50%, transparent);background:color-mix(in srgb, var(--ac) 12%, transparent);color:var(--ac);display:inline-flex;align-items:center;justify-content:center;flex:none;box-shadow:0 0 14px color-mix(in srgb, var(--ac) 22%, transparent)}',

@@ -65,6 +65,8 @@
     agNoTopo: ['عضو هیچ توپولوژی‌ای نیست', 'Not a member of any topology'], agPeers: ['هم‌تا', 'peers'],
     agEditT: ['ویرایش ایجنت', 'Edit agent'], agNameK: ['نام', 'Name'], agIPK: ['آدرس عمومی', 'Public IP'],
     agEdSaved: ['تغییرات ایجنت ذخیره شد', 'Agent changes saved'],
+    agDelPaste: ['چسباندن از کلیپ‌بورد', 'Paste from clipboard'],
+    agDelPasteErr: ['کلیپ‌بورد خالی است یا اجازه ندارد — با Ctrl+V بچسبانید', 'Clipboard empty or blocked — paste with Ctrl+V'],
     agEditSub: ['اطلاعات ایجنت را ویرایش و ذخیره کنید.', 'Edit the agent information and save.'],
     agEdSt1: ['اطلاعات پایه', 'Basic info'], agEdSt2: ['بازبینی و ذخیره', 'Review & save'],
     agEdNext: ['مرحله بعد', 'Next'],
@@ -1709,6 +1711,7 @@
     var TRASH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>';
     var COPY = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a1 1 0 0 1 1-1h9"/></svg>';
     var XSM = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+    var PASTE = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>';
     var CHK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>';
     var ov = document.createElement('div');
     ov.className = 'mtb-modal-ov';
@@ -1724,7 +1727,8 @@
         '<button type="button" class="mtb-del-copy" id="mtbDelCopy" title="' + esc(L('copy')) + '">' + COPY + '<span id="mtbDelCopyTx">' + esc(L('copy')) + '</span></button>' +
       '</div>' +
       '<p class="qs-hint mtb-del-type"><span class="mtb-del-type-i"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.001M12 12h.001M16 12h.001M7 16h10"/></svg></span>' + esc(L('agDelConfirm')) + '</p>' +
-      '<input id="mtbAgDelName" class="quantum-input" placeholder="' + esc(L('agDelPh')) + '" dir="ltr" autocomplete="off" spellcheck="false" aria-label="' + esc(L('agDelPh')) + '">' +
+      '<div class="mtb-del-inwrap"><input id="mtbAgDelName" class="quantum-input" placeholder="' + esc(L('agDelPh')) + '" dir="ltr" autocomplete="off" spellcheck="false" aria-label="' + esc(L('agDelPh')) + '">' +
+      '<button type="button" class="mtb-del-paste" id="mtbDelPaste" title="' + esc(L('agDelPaste')) + '" aria-label="' + esc(L('agDelPaste')) + '">' + PASTE + '</button></div>' +
       '<p class="qs-hint mtb-formmsg" data-mtb-msg></p>' +
       '<div class="mtb-acts"><button type="button" class="quantum-btn quantum-btn-secondary" data-mtb-close>' + XSM + ' ' + esc(L('cancel')) + '</button>' +
       '<button type="button" class="quantum-btn quantum-btn-danger" id="mtbAgDelGo" disabled>' + TRASH + ' ' + esc(L('agActDel')) + '</button></div>' +
@@ -1755,6 +1759,20 @@
       copyBtn.classList.add('done');
       clearTimeout(copyBtn._t);
       copyBtn._t = setTimeout(function () { copyTx.textContent = L('copy'); copyBtn.classList.remove('done'); }, 1600);
+    });
+    document.getElementById('mtbDelPaste').addEventListener('click', function () {
+      var paste = function (t) {
+        if (!(t || '').trim()) { delMsg.textContent = L('agDelPasteErr'); delInp.focus(); return; }
+        delInp.value = t.trim();
+        delInp.dispatchEvent(new Event('input', { bubbles: true }));
+        delMsg.textContent = '';
+        delInp.focus();
+      };
+      if (!navigator.clipboard || !navigator.clipboard.readText) { delMsg.textContent = L('agDelPasteErr'); delInp.focus(); return; }
+      navigator.clipboard.readText().then(paste).catch(function () {
+        delMsg.textContent = L('agDelPasteErr');
+        delInp.focus();
+      });
     });
     ov.querySelector('#mtbAgDelGo').addEventListener('click', function () {
       if (delGo.disabled) return;
