@@ -63,7 +63,7 @@ func TestAlertPhase13Rules(t *testing.T) {
 	// rollup, not zero-based window sums), this hour 0.
 	// both samples INSIDE the same clock hour (an hour boundary between them
 	// would split the delta across two single-sample hours → zero deltas)
-	weekAgoHour := now.Add(-7*24*time.Hour).Truncate(time.Hour).Unix()
+	weekAgoHour := now.Add(-7 * 24 * time.Hour).Truncate(time.Hour).Unix()
 	_ = s.AddTrafficSample(store.TrafficSample{TunnelID: tun.ID, At: weekAgoHour + 60,
 		WireRx: 0, WireTx: 0, PayloadRx: 0, PayloadTx: 0,
 		CountersKnown: true, PayloadKnown: true, AgentID: agIr})

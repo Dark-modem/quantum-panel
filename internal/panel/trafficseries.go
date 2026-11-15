@@ -46,11 +46,11 @@ func handleUITrafficSeries(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 
 	type pt struct {
-		T          int64 `json:"t"`
-		IranDL     int64 `json:"iran_dl"`
-		IranUL     int64 `json:"iran_ul"`
-		ForeignDL  int64 `json:"foreign_dl"`
-		ForeignUL  int64 `json:"foreign_ul"`
+		T         int64 `json:"t"`
+		IranDL    int64 `json:"iran_dl"`
+		IranUL    int64 `json:"iran_ul"`
+		ForeignDL int64 `json:"foreign_dl"`
+		ForeignUL int64 `json:"foreign_ul"`
 	}
 	byHour := map[int64]*pt{}
 	var order []int64

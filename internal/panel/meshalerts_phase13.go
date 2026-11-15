@@ -277,7 +277,7 @@ func (e *meshAlertEngine) evaluatePhase13(now time.Time) []meshAlertEvent {
 		// billing_drop storms. Both sides are now honest hourly deltas:
 		//   cur  = the last COMPLETE hour (the rollup lags ≤2h by design)
 		//   prev = the same clock hour, 7 days earlier
-		curH := (hourStart - 2*3600) / 3600 - 1 // last hour with a GUARANTEED rollup row (the fold horizon is exclusive)
+		curH := (hourStart-2*3600)/3600 - 1 // last hour with a GUARANTEED rollup row (the fold horizon is exclusive)
 		prevH := lastWeekStart / 3600
 		var curD, prevD int64
 		if err := s.DB().QueryRow(`SELECT COALESCE(SUM(last_rx - first_rx), 0) FROM traffic_hourly

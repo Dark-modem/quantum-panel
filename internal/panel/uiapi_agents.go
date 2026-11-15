@@ -53,8 +53,8 @@ func handleUIAgentsList(w http.ResponseWriter, r *http.Request) {
 		out = append(out, map[string]any{
 			"id": a.ID, "name": a.Name, "role": a.Role, "country": a.Country,
 			"topologies": agentTopos,
-			"status":  uiAgentStatus(a),
-			"version": a.Version, "arch": a.Arch,
+			"status":     uiAgentStatus(a),
+			"version":    a.Version, "arch": a.Arch,
 			"last_seen": a.LastSeen,
 			"server":    h.uiServerRef(a.ServerID),
 			// UI-API-REQUESTS #3 (decided: option b): an UNLINKED agent is
@@ -172,7 +172,7 @@ func handleUIAgentDetail(w http.ResponseWriter, r *http.Request) {
 						"tunnel_key": tn.TunnelKey, "engine": tn.Engine, "topology": tp.Name,
 						"local": h.uiServerRef(tn.LocalServerID), "remote": h.uiServerRef(tn.RemoteServerID),
 						"country": tnCountry[tn.RemoteServerID],
-						"state": state, "latency_ms": lat[tn.TunnelKey],
+						"state":   state, "latency_ms": lat[tn.TunnelKey],
 						"today_bytes": todayBytes,
 					}
 					// Only connected tunnels carry weight — a dropped tunnel
