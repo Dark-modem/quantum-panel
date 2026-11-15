@@ -49,6 +49,11 @@ type checkFinding struct {
 	What     string `json:"what"`
 	Fix      string `json:"fix"`
 	Objects  string `json:"objects,omitempty"`
+	// Persian mirror (phase 16, UI-API-CONTRACT.md §2.14): rendered by
+	// the Persian-first UI; absent → fall back to the English field.
+	TitleFa string `json:"title_fa,omitempty"`
+	WhatFa  string `json:"what_fa,omitempty"`
+	FixFa   string `json:"fix_fa,omitempty"`
 }
 
 type selfcheckReport struct {
@@ -57,9 +62,152 @@ type selfcheckReport struct {
 	Findings []checkFinding `json:"findings"`
 }
 
-func (r *selfcheckReport) add(id string, sev checkSeverity, title, what, fix, objects string) {
-	r.Findings = append(r.Findings, checkFinding{ID: id, Severity: string(sev),
-		Title: title, What: what, Fix: fix, Objects: objects})
+// scFaText: the Persian mirror of one finding. what/fix are FORMAT
+// templates fed the SAME args as the English one (explicit %[n] indexes
+// keep the order language-free); title is static.
+type scFaText struct {
+	Title string
+	What  string
+	Fix   string
+}
+
+// selfcheckFa: one entry per finding id. An id without an entry (or an
+// empty field inside) leaves the corresponding _fa field absent and the
+// UI falls back to the English text.
+var selfcheckFa = map[string]scFaText{
+	"tunnels.read": {
+		"خواندن تونل‌ها ممکن نشد",
+		"خواندن پایگاه‌داده شکست خورد: %[1]v",
+		"لاگ پنل را بررسی کنید؛ ممکن است پایگاه‌داده خراب باشد.",
+	},
+	"tunnel.missing-server": {
+		"تونل فعال به سرور ناموجود اشاره می‌کند",
+		"تونل %[1]s (موتور %[2]s) به سرور %[3]d اشاره می‌کند که وجود ندارد.",
+		"تونل را غیرفعال کنید یا سرور را دوباره بسازید.",
+	},
+	"tunnel.agent-unlinked": {
+		"تونل فعال بدون عامل متصل",
+		"تونل %[1]s: سرور «%[2]s» هیچ عاملی متصل ندارد — تونل نمی‌تواند اجرا شود و ترافیکش دیده نمی‌شود.",
+		"در تب عامل‌ها یک عامل را به این سرور ثبت/متصل کنید.",
+	},
+	"tunnel.agent-offline": {
+		"تونل فعال با عامل آفلاین",
+		"تونل %[1]s: عامل «%[2]s» آفلاین است.",
+		"سرویس عامل را روی آن سرور بررسی کنید (systemctl status quantum-agent).",
+	},
+	"tunnel.engine-unreported": {
+		"وضعیت موتور تونل فعال هرگز گزارش نشده",
+		"تونل %[1]s از موتور %[2]s استفاده می‌کند اما عامل «%[3]s» هنوز وضعیت این موتور را گزارش نکرده است (نه heartbeat با engine_status آمده، نه عامل قدیمی‌تر از فاز ۱۱ است).",
+		"منتظر heartbeat بمانید؛ اگر ادامه یافت، نسخهٔ عامل را بررسی کنید.",
+	},
+	"tunnel.engine-disabled": {
+		"تونل فعال با موتور غیرفعال روی عامل",
+		"تونل %[1]s از موتور %[2]s استفاده می‌کند که عامل «%[3]s» آن را غیرفعال گزارش می‌دهد — تونل نمی‌تواند اجرا شود.",
+		"عامل‌ها > این عامل > موتورها: موتور را فعال کنید و سپس push بزنید.",
+	},
+	"tunnel.engine-not-installed": {
+		"موتور تونل فعال هرگز نصب نشده",
+		"تونل %[1]s: موتور %[2]s روی عامل «%[3]s» فعال است ولی نصب‌نشده گزارش می‌شود (آخرین خطا: %[4]s).",
+		"مصرفی (artifact) برای معماری عامل را بررسی کنید (موتورها > مصرفی‌ها) و لاگ عامل را ببینید.",
+	},
+	"weight.range": {
+		"وزن خارج از بازه",
+		"توپولوژی «%[1]s» یک سیاست وزن %[2]d دارد (مجاز 0 تا 1000).",
+		"از API/UI وزن‌ها اصلاح کنید.",
+	},
+	"weight.conflict": {
+		"ردیف‌های وزن متعارض برای یک تونل",
+		"توپولوژی «%[1]s» %[2]d ردیف وزن در سطح تونل برای تونل %[3]d دارد — ترتیب حل‌تعارض فقط یکی را مؤثر می‌کند.",
+		"ردیف‌های اضافه را حذف کنید (API وزن‌ها) و یکی را نگه دارید.",
+	},
+	"counters.nonmonotonic": {
+		"شمارنده‌های مصرف داخل یک جریان به عقب برگشته‌اند",
+		"%[1]d نمونه در یک جریان تونل+عامل به عقب برگشته (اولین: %[2]s). بایت‌های بین افت و خواندن بعدی از مجموع‌ها حذف می‌شوند.",
+		"معمولاً ری‌استارت منبع شمارنده بدون پرچم unknown است؛ منبع شمارندهٔ موتور را بررسی کنید. اگر محدود است نیازی به اقدام نیست.",
+	},
+	"rollup.never-ran": {
+		"Rollup ساعتی هرگز اجرا نشده",
+		"هیچ ساعت کامل هنوز جمع نشده (نصب تازه، یا rollup تازه شروع شده).",
+		"کاری لازم نیست؛ واترمارک خودکار جلو می‌رود.",
+	},
+	"rollup.holes": {
+		"حفره‌های rollup ساعتی زیر واترمارک",
+		"%[1]d جریان نمونهٔ خام در ساعت‌هایی دارند که بدون آن‌ها جمع شده‌اند (اولین: %[2]s). خواندن بازه‌های قدیمی آن جریان‌ها کم‌شماری می‌شود.",
+		"معمولاً foldی که وسط ساعت و پیش از رفع فاز ۱۱ اجرا شده؛ با حذف ردیف traffic_rollup_state، fold بعدی بازسازی می‌کند.",
+	},
+	"sqlite.integrity": {
+		"بررسی یکپارچگی SQLite شکست خورد",
+		"فایل پایگاه‌داده بررسی یکپارچگی را پاس نکرد: %[1]s",
+		"پنل را متوقف کنید، از پوشهٔ داده پشتیبان بگیرید و از آخرین پشتیبان سالم بازیابی کنید.",
+	},
+	"sqlite.fk": {
+		"نقض کلید خارجی موجود است",
+		"%[1]d ردیف کلیدهای خارجی را نقض می‌کنند (ارجاع بی‌والد).",
+		"ردیف‌های یتیم را پیدا و حذف کنید؛ ویرایش دستی پایگاه‌داده را بررسی کنید.",
+	},
+	"file.perms": {
+		"فایل محرمانه برای گروه/سایر خواندنی است",
+		"%[1]s با دسترسی %[2]04o ذخیره شده — اعتبارنامه‌های داخل آن در دسترس دیگر کاربران محلی است.",
+		"این دستور را اجرا کنید: %[3]s",
+	},
+	"tls.unreadable": {
+		"گواهی TLS خواندنی نیست",
+		"گواهی پیکربندی‌شده تجزیه نشد: %[1]v",
+		"دوباره صادر کنید: quantum-panel tls issue (یا tls ip).",
+	},
+	"tls.expired": {
+		"گواهی TLS منقضی شده است",
+		"گواهی پنل %[1]d روز پیش منقضی شده — عامل‌ها/مرورگرها هشدار می‌دهند یا رد می‌کنند.",
+		"quantum-panel tls renew (یا issue).",
+	},
+	"tls.expiring": {
+		"گواهی TLS به‌زودی منقضی می‌شود",
+		"گواهی پنل تا %[1]d روز دیگر منقضی می‌شود.",
+		"quantum-panel tls renew؛ اگر KEY عوض شود، پنجرهٔ pin شدن TOFU عامل‌ها را به یاد داشته باشید.",
+	},
+	"time.sync": {
+		"زمان با NTP همگام نیست",
+		"ساعت میزبان با NTP همگام نیست — پنجره‌های billing و بررسی گواهی به آن وابسته‌اند.",
+		"کلاینت NTP را فعال کنید: timedatectl set-ntp true.",
+	},
+	"disk.full": {
+		"دیسک تقریباً پر است",
+		"فایل‌سیستمِ نگه‌دارندهٔ %[1]s تا %[2]d%% پر شده — پایگاه‌داده و پشتیبان‌ها جا لازم دارند.",
+		"جا آزاد کنید یا پوشهٔ داده را جابه‌جا کنید؛ فایل‌های WAL قدیمی را بررسی کنید.",
+	},
+}
+
+// fmtOrVerbatim: Sprintf only when the template actually carries format
+// verbs; static texts (many fix lines, the Persian mirrors without
+// numbers) must render verbatim instead of swallowing the arg list into
+// a %!(EXTRA…) tail.
+func fmtOrVerbatim(tmpl string, args []any) string {
+	if len(args) == 0 || !strings.Contains(tmpl, "%") {
+		return tmpl
+	}
+	return fmt.Sprintf(tmpl, args...)
+}
+
+// add records one finding. what/fix are FORMAT templates; args feed both
+// the English render and (when the id has a catalog entry) the Persian
+// one. Passing the dynamic values as args (never interpolated into the
+// template) keeps % in values from breaking the render.
+func (r *selfcheckReport) add(id string, sev checkSeverity, title, what, fix, objects string, args ...any) {
+	f := checkFinding{ID: id, Severity: string(sev), Title: title, Objects: objects}
+	f.What = fmtOrVerbatim(what, args)
+	f.Fix = fmtOrVerbatim(fix, args)
+	if fa, ok := selfcheckFa[id]; ok {
+		if fa.Title != "" {
+			f.TitleFa = fa.Title
+		}
+		if fa.What != "" {
+			f.WhatFa = fmtOrVerbatim(fa.What, args)
+		}
+		if fa.Fix != "" {
+			f.FixFa = fmtOrVerbatim(fa.Fix, args)
+		}
+	}
+	r.Findings = append(r.Findings, f)
 	if sev == sevCritical {
 		r.OK = false
 	}
@@ -83,7 +231,7 @@ func runSelfcheck(s *store.Store) *selfcheckReport {
 func checkTunnels(s *store.Store, rep *selfcheckReport) {
 	tunnels, err := s.ListAllTunnels()
 	if err != nil {
-		rep.add("tunnels.read", sevCritical, "Tunnels unreadable", err.Error(), "Check the panel log; the store may be corrupt.", "")
+		rep.add("tunnels.read", sevCritical, "Tunnels unreadable", "%[1]v", "Check the panel log; the store may be corrupt.", "", err)
 		return
 	}
 	agents, _ := s.ListAgents()
@@ -101,21 +249,21 @@ func checkTunnels(s *store.Store, rep *selfcheckReport) {
 			sv, err := s.GetServer(sid)
 			if err != nil {
 				rep.add("tunnel.missing-server", sevCritical, "Enabled tunnel references a missing server",
-					fmt.Sprintf("Tunnel %s (engine %s) points at server %d which does not exist.", t.TunnelKey, t.Engine, sid),
-					"Disable the tunnel or recreate the server.", t.TunnelKey)
+					"Tunnel %[1]s (engine %[2]s) points at server %[3]d which does not exist.",
+					"Disable the tunnel or recreate the server.", t.TunnelKey, t.TunnelKey, t.Engine, sid)
 				continue
 			}
 			ag, linked := byServer[sid]
 			if !linked {
 				rep.add("tunnel.agent-unlinked", sevWarning, "Enabled tunnel without a linked agent",
-					fmt.Sprintf("Tunnel %s: server %q has no agent linked — the tunnel cannot run and its traffic is invisible.", t.TunnelKey, sv.Name),
-					"Agents tab: enroll/link an agent to this server.", t.TunnelKey)
+					"Tunnel %[1]s: server %[2]q has no agent linked — the tunnel cannot run and its traffic is invisible.",
+					"Agents tab: enroll/link an agent to this server.", t.TunnelKey, t.TunnelKey, sv.Name)
 				continue
 			}
 			if uiAgentStatus(ag) != "online" {
 				rep.add("tunnel.agent-offline", sevWarning, "Enabled tunnel whose agent is offline",
-					fmt.Sprintf("Tunnel %s: agent %q is offline.", t.TunnelKey, ag.Name),
-					"Check the agent service on that server (systemctl status quantum-agent).", t.TunnelKey)
+					"Tunnel %[1]s: agent %[2]q is offline.",
+					"Check the agent service on that server (systemctl status quantum-agent).", t.TunnelKey, t.TunnelKey, ag.Name)
 			}
 			// Engine state on the agent's side: use the agent's OWN
 			// reported engine_status row when present (the legacy
@@ -132,18 +280,17 @@ func checkTunnels(s *store.Store, rep *selfcheckReport) {
 			switch {
 			case row == nil:
 				rep.add("tunnel.engine-unreported", sevWarning, "Enabled tunnel whose engine state was never reported",
-					fmt.Sprintf("Tunnel %s uses engine %q but agent %q has never reported that engine's status (no heartbeat with engine_status yet, or the agent predates phase 11).",
-						t.TunnelKey, t.Engine, ag.Name),
-					"Wait for a heartbeat; if it persists, check the agent version.", t.TunnelKey)
+					"Tunnel %[1]s uses engine %[2]q but agent %[3]q has never reported that engine's status (no heartbeat with engine_status yet, or the agent predates phase 11).",
+					"Wait for a heartbeat; if it persists, check the agent version.", t.TunnelKey, t.TunnelKey, t.Engine, ag.Name)
 			case !row.Desired:
 				rep.add("tunnel.engine-disabled", sevCritical, "Enabled tunnel whose engine is not enabled on the agent",
-					fmt.Sprintf("Tunnel %s uses engine %q which the agent %q reports as NOT enabled — the tunnel cannot run.", t.TunnelKey, t.Engine, ag.Name),
-					"Agents > the agent > Engines: enable the engine, then push.", t.TunnelKey)
+					"Tunnel %[1]s uses engine %[2]q which the agent %[3]q reports as NOT enabled — the tunnel cannot run.",
+					"Agents > the agent > Engines: enable the engine, then push.", t.TunnelKey, t.TunnelKey, t.Engine, ag.Name)
 			case !row.Installed && row.Instances == 0:
 				rep.add("tunnel.engine-not-installed", sevWarning, "Enabled tunnel whose engine never installed",
-					fmt.Sprintf("Tunnel %s: engine %q is enabled on agent %q but reports not-installed (last error: %s).",
-						t.TunnelKey, t.Engine, ag.Name, redactErrorText(row.LastError)),
-					"Check the artifact for the agent's arch (Engines > Artifacts) and the agent log.", t.TunnelKey)
+					"Tunnel %[1]s: engine %[2]q is enabled on agent %[3]q but reports not-installed (last error: %[4]s).",
+					"Check the artifact for the agent's arch (Engines > Artifacts) and the agent log.",
+					t.TunnelKey, t.TunnelKey, t.Engine, ag.Name, redactErrorText(row.LastError))
 			}
 		}
 	}
@@ -160,8 +307,8 @@ func checkWeights(s *store.Store, rep *selfcheckReport) {
 		for _, w := range ws {
 			if w.Weight < 0 || w.Weight > 1000 {
 				rep.add("weight.range", sevCritical, "Weight out of range",
-					fmt.Sprintf("Topology %q has a weight policy of %d (valid 0-1000).", tp.Name, w.Weight),
-					"Fix via the weights API/UI.", tp.Name)
+					"Topology %[1]q has a weight policy of %[2]d (valid 0-1000).",
+					"Fix via the weights API/UI.", tp.Name, tp.Name, w.Weight)
 			}
 			if w.TunnelID != nil {
 				seen[*w.TunnelID]++
@@ -170,8 +317,8 @@ func checkWeights(s *store.Store, rep *selfcheckReport) {
 		for tid, n := range seen {
 			if n > 1 {
 				rep.add("weight.conflict", sevCritical, "Conflicting weight rows for one tunnel",
-					fmt.Sprintf("Topology %q has %d tunnel-scope weight rows for tunnel %d — the resolution order makes only one effective.", tp.Name, n, tid),
-					"Delete the extra rows (weights API), keep one.", tp.Name)
+					"Topology %[1]q has %[2]d tunnel-scope weight rows for tunnel %[3]d — the resolution order makes only one effective.",
+					"Delete the extra rows (weights API), keep one.", tp.Name, tp.Name, n, tid)
 			}
 		}
 	}
@@ -211,9 +358,9 @@ func checkCountersMonotonic(s *store.Store, rep *selfcheckReport) {
 	}
 	if decreases > 0 {
 		rep.add("counters.nonmonotonic", sevWarning, "Usage counters decreased inside a stream",
-			fmt.Sprintf("%d sample(s) went backwards within one tunnel+agent stream (first: %s). Bytes between the drop and the next reading are LOST from the totals.",
-				decreases, firstBad),
-			"Usually a counter source restart without the unknown flag; check the engine's counter source. No action if bounded.", firstBad)
+			"%[1]d sample(s) went backwards within one tunnel+agent stream (first: %[2]s). Bytes between the drop and the next reading are LOST from the totals.",
+			"Usually a counter source restart without the unknown flag; check the engine's counter source. No action if bounded.",
+			firstBad, decreases, firstBad)
 	}
 }
 
@@ -283,9 +430,9 @@ func checkRollupCoverage(s *store.Store, rep *selfcheckReport) {
 	}
 	if holeStreams > 0 {
 		rep.add("rollup.holes", sevWarning, "Hourly rollup holes under the watermark",
-			fmt.Sprintf("%d stream(s) have raw samples in hours that were folded WITHOUT them (first: %s). Old-range reads undercount those streams.",
-				holeStreams, firstHole),
-			"Usually a fold that ran mid-hour before phase 11 fixed the watermark; re-fold by deleting the traffic_rollup_state row and letting the next fold rebuild.", firstHole)
+			"%[1]d stream(s) have raw samples in hours that were folded WITHOUT them (first: %[2]s). Old-range reads undercount those streams.",
+			"Usually a fold that ran mid-hour before phase 11 fixed the watermark; re-fold by deleting the traffic_rollup_state row and letting the next fold rebuild.",
+			firstHole, holeStreams, firstHole)
 	}
 }
 
@@ -293,8 +440,8 @@ func checkSQLite(s *store.Store, rep *selfcheckReport) {
 	var integrity string
 	if err := s.DB().QueryRow(`PRAGMA integrity_check`).Scan(&integrity); err == nil && integrity != "ok" {
 		rep.add("sqlite.integrity", sevCritical, "SQLite integrity_check FAILED",
-			"The database file failed its integrity check: "+integrity,
-			"Stop the panel, back up the directory, and restore from the last good backup.", "")
+			"The database file failed its integrity check: %[1]s",
+			"Stop the panel, back up the directory, and restore from the last good backup.", "", integrity)
 	}
 	rows, err := s.DB().Query(`PRAGMA foreign_key_check`)
 	if err == nil {
@@ -305,8 +452,8 @@ func checkSQLite(s *store.Store, rep *selfcheckReport) {
 		rows.Close()
 		if bad > 0 {
 			rep.add("sqlite.fk", sevCritical, "Foreign-key violations present",
-				fmt.Sprintf("%d row(s) violate foreign keys (orphaned references).", bad),
-				"Identify and delete the orphaned rows; check for manual DB edits.", "")
+				"%[1]d row(s) violate foreign keys (orphaned references).",
+				"Identify and delete the orphaned rows; check for manual DB edits.", "", bad)
 		}
 	}
 }
@@ -333,8 +480,8 @@ func checkFilePerms(rep *selfcheckReport) {
 				fix = "chmod 640 " + p
 			}
 			rep.add("file.perms", sevCritical, "Secret file is group/world readable",
-				fmt.Sprintf("%s has mode %04o — credentials inside are exposed to other local users.", p, uint32(mode)),
-				fix, name)
+				"%[1]s has mode %[2]04o — credentials inside are exposed to other local users.",
+				"%[3]s", name, p, uint32(mode), fix)
 		}
 	}
 }
@@ -346,20 +493,20 @@ func checkTLS(rep *selfcheckReport) {
 	exp, _, err := tlsCertExpiry()
 	if err != nil {
 		rep.add("tls.unreadable", sevWarning, "TLS certificate unreadable",
-			"The configured certificate failed to parse: "+err.Error(),
-			"Re-issue with: quantum-panel tls issue (or tls ip).", "")
+			"The configured certificate failed to parse: %[1]v",
+			"Re-issue with: quantum-panel tls issue (or tls ip).", "", err)
 		return
 	}
 	days := int(time.Until(exp).Hours() / 24)
 	switch {
 	case days < 0:
 		rep.add("tls.expired", sevCritical, "TLS certificate EXPIRED",
-			fmt.Sprintf("The panel certificate expired %d days ago — agents/browsers refuse or warn.", -days),
-			"quantum-panel tls renew (or issue).", "")
+			"The panel certificate expired %[1]d days ago — agents/browsers refuse or warn.",
+			"quantum-panel tls renew (or issue).", "", -days)
 	case days < 15:
 		rep.add("tls.expiring", sevWarning, "TLS certificate expiring soon",
-			fmt.Sprintf("The panel certificate expires in %d days.", days),
-			"quantum-panel tls renew; remember the agents' TOFU pin window if the KEY changes.", "")
+			"The panel certificate expires in %[1]d days.",
+			"quantum-panel tls renew; remember the agents' TOFU pin window if the KEY changes.", "", days)
 	}
 }
 
@@ -397,8 +544,8 @@ func checkDisk(rep *selfcheckReport) {
 			sev = sevCritical
 		}
 		rep.add("disk.full", sev, "Disk almost full",
-			fmt.Sprintf("The filesystem holding %s is %d%% full — the store and backups need headroom.", configDir, pct),
-			"Free space or move the data dir; check old WAL files.", configDir)
+			"The filesystem holding %[1]s is %[2]d%% full — the store and backups need headroom.",
+			"Free space or move the data dir; check old WAL files.", configDir, configDir, pct)
 	}
 }
 

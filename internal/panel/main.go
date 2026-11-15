@@ -841,6 +841,8 @@ func Main(args []string) int {
 	// gate and the store's audit table records the domain events.
 	registerMeshRoutes(mux, base)
 	registerUIAPIRoutes(mux, base)
+	// Phase 16: maintenance-mode API (agentmaintenance.go, contract §2.15).
+	registerAgentMaintenanceRoutes(mux, base)
 	registerGuardRoutes(mux, base)
 	// Phase 5 R5: engine artifact store + agent manifest (engineartifacts.go).
 	registerEngineArtifactRoutes(mux, base)
