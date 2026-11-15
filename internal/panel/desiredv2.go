@@ -234,6 +234,22 @@ func compileDesiredV2(s *store.Store, ag store.Agent) (desired *protocol.Desired
 		Engines: engines, Tunnels: specs, Balancing: &bal,
 		TargetGroups: targetGroups, Forwards: forwards,
 	}
+	// R6 (PROTOCOL-REQUESTS.md): stamp the receiving agent's SELF — the
+	// mesh server name it is linked to (the enrollment name), spelled
+	// exactly like the LocalServer/RemoteServer strings above — so the
+	// agent locates itself by NAME (FRP frps/frpc role resolution).
+	// Alignment validation: every spec must reference this server name
+	// on one end, else the agent cannot find itself in the document.
+	if strings.TrimSpace(server.Name) == "" {
+		warnings = append(warnings, fmt.Sprintf("server %d has an empty name: self identifier NOT stamped (R6)", server.ID))
+	} else {
+		desired.Self = &protocol.SelfInfo{Name: server.Name, Role: server.Role}
+		for _, sp := range specs {
+			if sp.LocalServer != server.Name && sp.RemoteServer != server.Name {
+				warnings = append(warnings, fmt.Sprintf("tunnel %s references %q/%q but self is %q (R6 alignment)", sp.ID, sp.LocalServer, sp.RemoteServer, server.Name))
+			}
+		}
+	}
 	return desired, "", warnings, nil
 }
 

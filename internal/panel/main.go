@@ -843,6 +843,8 @@ func Main(args []string) int {
 	registerUIAPIRoutes(mux, base)
 	// Phase 16: maintenance-mode API (agentmaintenance.go, contract §2.15).
 	registerAgentMaintenanceRoutes(mux, base)
+	// Phase 17: additive /api/mesh→/api/ui read aliases (uifold.go).
+	registerUIFoldRoutes(mux, base)
 	registerGuardRoutes(mux, base)
 	// Phase 5 R5: engine artifact store + agent manifest (engineartifacts.go).
 	registerEngineArtifactRoutes(mux, base)
