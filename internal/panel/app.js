@@ -11678,7 +11678,11 @@ window.loadClusterStatus = loadClusterStatus;
     '.mtb-del-badge svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}',
     '.mtb-del-modal .qs-hint{white-space:normal;color:var(--tx);font-size:13px;line-height:1.6}',
     '.mtb-del-warn{display:block;color:var(--tx);margin:2px 0 14px}',
-    '.mtb-del-warn-i{display:inline-flex;vertical-align:middle;width:24px;height:24px;margin-inline-end:6px;flex:none;border-radius:7px;border:1px solid color-mix(in srgb, var(--er) 35%, transparent);background:color-mix(in srgb, var(--er) 10%, transparent);color:var(--er);align-items:center;justify-content:center}',
+    // vertical-align:middle centers on the x-height; the system-font em box sits
+    // ~2.4px higher, so nudge the badge up to the line's optical middle
+    // (measured 2.35px). Vazirmatn/RTL metrics are already level — opt out there.
+    '.mtb-del-warn-i{display:inline-flex;vertical-align:middle;translate:0 -2.35px;width:24px;height:24px;margin-inline-end:6px;flex:none;border-radius:7px;border:1px solid color-mix(in srgb, var(--er) 35%, transparent);background:color-mix(in srgb, var(--er) 10%, transparent);color:var(--er);align-items:center;justify-content:center}',
+    'html[dir="rtl"] .mtb-del-warn-i{translate:none}',
     '.mtb-del-warn-i svg{width:14px;height:14px;display:block}',
     '.mtb-del-type{display:flex;align-items:center;gap:6px;color:var(--tx)}',
     '#mtbAgDelName{height:48px;margin-top:10px;border-radius:12px;font-size:14px}',
