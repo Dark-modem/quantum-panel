@@ -146,6 +146,7 @@ type soakAgent struct {
 	curWS     *websocket.Conn
 	dropAt    time.Time // set by the dropper right before force-close
 	recoverAt time.Time // set on the first successful heartbeat write after the drop
+	hbFail    bool      // set by heartbeat() on a write error → the session loop redials
 	mu        sync.Mutex
 }
 
@@ -531,6 +532,12 @@ func runAgent(a *soakAgent, stop chan struct{}) {
 		}
 		ws, _, err := dialer.Dial(strings.Replace(panelURL, "http://", "ws://", 1)+"/api/agent/ws", hdr)
 		if err != nil {
+			a.mu.Lock()
+			wasDropped := !a.dropAt.IsZero()
+			a.mu.Unlock()
+			if wasDropped {
+				fmt.Printf("[soak-agent] %s dial error after drop: %v\n", a.id, err)
+			}
 			time.Sleep(2 * time.Second)
 			continue
 		}
@@ -585,6 +592,13 @@ func runAgent(a *soakAgent, stop chan struct{}) {
 			hb, _ := json.Marshal(protocol.HeartbeatV2{TS: time.Now().Unix(), State: &st})
 			ws.SetWriteDeadline(time.Now().Add(10 * time.Second))
 			if err := ws.WriteJSON(protocol.Envelope{V: 2, Type: protocol.MsgHeartbeat, Data: hb}); err != nil {
+				a.mu.Lock()
+				dropped := !a.dropAt.IsZero()
+				a.hbFail = true // the session loop must redial (phase 20)
+				a.mu.Unlock()
+				if dropped {
+					fmt.Printf("[soak-agent] %s heartbeat write error: %v\n", a.id, err)
+				}
 				agentsMu.Lock()
 				a.sendErrs++
 				totalSendEr++
@@ -595,11 +609,18 @@ func runAgent(a *soakAgent, stop chan struct{}) {
 				a.mu.Lock()
 				if !a.dropAt.IsZero() && a.recoverAt.IsZero() {
 					a.recoverAt = time.Now()
+					fmt.Printf("[soak-agent] %s re-established after %.1fs\n",
+						a.id, a.recoverAt.Sub(a.dropAt).Seconds())
 				}
 				a.mu.Unlock()
 			}
 		}
 		heartbeat()
+		// phase 20: a dead connection must behave like the real agent —
+		// redial. The phase-12 loop had NO error-exit path: after a
+		// mid-stream drop the fake agent kept ticking on the dead conn
+		// forever (every heartbeat write failing, never re-establishing).
+	session:
 		for {
 			select {
 			case <-stop:
@@ -607,6 +628,20 @@ func runAgent(a *soakAgent, stop chan struct{}) {
 				return
 			case <-tick.C:
 				heartbeat()
+				a.mu.Lock()
+				hbFail := a.hbFail
+				a.mu.Unlock()
+				if hbFail {
+					a.mu.Lock()
+					a.hbFail = false
+					if a.curWS == ws {
+						a.curWS = nil
+					}
+					a.mu.Unlock()
+					ws.Close()
+					time.Sleep(2 * time.Second) // agent-like redial backoff
+					break session
+				}
 			}
 		}
 	}
