@@ -11786,7 +11786,7 @@ window.loadClusterStatus = loadClusterStatus;
     '.mtb-dest-dc svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;opacity:.75;flex:none}',
     // agents-list first column: chip glyph before the agent name, server glyph before the datacenter
     '.mtb-ag-ic{display:inline-flex;color:var(--ac);flex:none}',
-    '.mtb-ag-ic svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;opacity:.9;flex:none}',
+    '.mtb-ag-ic svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;opacity:.9;flex:none}',
     '.mtb-ag-dc{display:inline-flex;align-items:center;gap:4px}',
     '.mtb-dc-ic{display:inline-flex;flex:none;opacity:.75}',
     '.mtb-dc-ic svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}',

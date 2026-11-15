@@ -1158,7 +1158,7 @@
 
       var dc = dcDisp((a.server && a.server.datacenter) || '', a.server && a.server.datacenter_en);
       var row = '<tr>' +
-        '<td><b class="mtb-aglink" data-agd="' + esc(a.id) + '"><span class="mtb-ag-ic" aria-hidden="true">' + MTB_ICO.chip + '</span>' + esc(a.name || a.id) + '</b>' +
+        '<td><b class="mtb-aglink" data-agd="' + esc(a.id) + '"><span class="mtb-ag-ic" aria-hidden="true">' + ICO_AGT + '</span>' + esc(a.name || a.id) + '</b>' +
         (dc ? '<br><span class="mtb-muted mtb-ag-dc"><span class="mtb-dc-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="7" rx="1.5"/><rect x="3" y="13" width="18" height="7" rx="1.5"/><path d="M7 7.5h.01M7 16.5h.01"/></svg></span>' + esc(dc) + '</span>' : '') + '</td>' +
         '<td>' + stateBadge(a.status) + '</td>' +
         '<td class="mtb-muted">' + (a.last_seen ? esc(ago(a.last_seen)) : '—') + '</td>' +
