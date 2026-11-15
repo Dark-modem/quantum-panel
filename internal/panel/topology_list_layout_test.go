@@ -31,7 +31,9 @@ func TestTopologyListSemanticTable(t *testing.T) {
 		t.Fatalf("got %d topology columns, want %d", len(headers), len(want))
 	}
 	for i, header := range headers {
-		if !strings.Contains(header[1], `scope="col"`) || strings.TrimSpace(header[2]) != want[i] {
+		// the label must be present and in order; the th may also carry a glyph
+		// wrapper (svg + inner data-i18n span) around it
+		if !strings.Contains(header[1], `scope="col"`) || !strings.Contains(header[2], want[i]) {
 			t.Errorf("column %d must be a scoped %q header", i, want[i])
 		}
 	}
