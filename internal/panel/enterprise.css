@@ -1637,13 +1637,29 @@ html[dir="rtl"] .topo-back .topo-back-ic { transform:scaleX(-1); }
 
 /* ---- Topology page shell v3 ---- */
 .topo-stats { gap:12px; }
-.topo-stat { grid-template-columns:minmax(0,1fr); align-content:start; gap:6px; padding:14px 16px; }
+.topo-stat { display:flex; align-items:center; gap:12px; padding:14px 16px; }
+.topo-stat-ic { width:44px; height:44px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; flex:none; }
+.topo-stat-ic svg { width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.topo-stat-accent .topo-stat-ic { background:color-mix(in srgb, var(--ac) 14%, transparent); color:var(--ac); }
+.topo-stat-ok .topo-stat-ic { background:color-mix(in srgb, var(--ok) 14%, transparent); color:var(--ok); }
+.topo-stat-bad .topo-stat-ic { background:color-mix(in srgb, var(--er) 14%, transparent); color:var(--er); }
+.topo-stat-tx { display:flex; flex-direction:column; gap:2px; min-width:0; flex:1; }
 .topo-stat-v { font-size:26px; letter-spacing:0; }
 .topo-list-tools { display:flex; align-items:center; gap:12px; }
-.topo-searchbox { max-width:420px; }
+.topo-searchbox { flex:1; min-width:0; max-width:420px; }
 .topo-searchbox .topo-search { background:var(--s1); }
+.topo-status-filter { position:relative; display:flex; align-items:center; flex:none; }
+.topo-filter-ic { position:absolute; inset-inline-start:10px; width:15px; height:15px; fill:none;
+  stroke:var(--mu); stroke-width:2; stroke-linecap:round; opacity:.85; pointer-events:none; }
+.topo-status-filter .topo-filter { height:36px; padding-inline-start:30px; background:var(--s1); }
 .topo-name::before { content:none; }
-.topo-count { min-width:0; height:auto; padding:0; border-radius:0; background:none; }
+.topo-name-ic { display:inline-flex; color:var(--ac); flex:none; }
+.topo-name-ic svg { width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+.topo-count { display:inline-flex; align-items:center; gap:6px; height:24px; padding:0 10px;
+  border-radius:8px; background:var(--ac-soft); color:var(--ac); font-size:var(--fs-caption); font-weight:700; }
+.topo-count svg { width:13px; height:13px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; flex:none; }
+.topo-region { display:inline-flex; align-items:center; gap:8px; min-width:0; }
+.topo-cell-region .topo-flag-svg { width:27px; height:19px; }
 .topo-state-pill.st-none { color:var(--mu); border-color:var(--ln2); background:var(--s2); }
 .topo-list-head th { font-size:12px; color:var(--mu); }
 .topo-list-row { min-height:72px; }

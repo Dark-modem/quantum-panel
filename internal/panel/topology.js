@@ -49,6 +49,13 @@ async function topologyPower(id, active) {
 }
 // Foreign endpoint country, chosen by the user (ISO 3166-1 alpha-2). The Iran
 // side is always the home server; an empty country falls back to a globe icon.
+const TOPO_MESH = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="6" r="2.5"/><circle cx="19" cy="6" r="2.5"/><circle cx="12" cy="19" r="2.5"/><path d="M7.5 6h9M6.3 8l4.7 8.8M17.7 8l-4.7 8.8"/></svg>';
+// English label of a topology's country ('' when unknown/Other) — fa mode
+// translates it through faText (the same phrase table the agents table uses).
+function topoCountryName(cc) {
+  const i = TOPO_COUNTRIES.findIndex(c => c[0] === String(cc || '').toLowerCase());
+  return i < 0 ? '' : TOPO_COUNTRIES[i][1];
+}
 const TOPO_COUNTRIES = [
   ['de', 'Germany'], ['fi', 'Finland'], ['nl', 'Netherlands'], ['fr', 'France'],
   ['gb', 'United Kingdom'], ['us', 'USA'], ['tr', 'Turkey'], ['ru', 'Russia'],
@@ -428,6 +435,14 @@ function topologySearchMatches(t, tunnels) {
   return [t.name, endpoints.iran, endpoints.foreign]
     .some(value => String(value || '').toLowerCase().includes(query));
 }
+// Status filter (All statuses / Healthy / Unhealthy) — health buckets match
+// the list's status pill: ok counts as Healthy, everything else Unhealthy.
+let topologyStatusFilter = 'all';
+function topologyStatusMatches(t, tunnels) {
+  if (topologyStatusFilter === 'all') return true;
+  const h = topologyHealthOf(t, tunnels);
+  return topologyStatusFilter === 'ok' ? h === 'ok' : h !== 'ok';
+}
 function topologyRender() {
   const topo = topologyCurrent();
   const inTunnel = typeof _tunnelDetail !== 'undefined' && _tunnelDetail !== null;
@@ -452,11 +467,14 @@ function topologyRender() {
       if (topologyHealthOf(t, own) === 'ok') healthy++;
     });
     $('topoStatPairs').textContent = String(topologyData.topologies.length);
-    $('topoStatTunnels').textContent = String(tunnelTotal);
     $('topoStatHealthy').textContent = String(healthy);
+    const unhealthy = $('topoStatUnhealthy');
+    if (unhealthy) unhealthy.textContent = String(topologyData.topologies.length - healthy);
   }
   const searching = topologySearchQuery.trim() !== '';
-  const visible = topologyData.topologies.filter(t => topologySearchMatches(t, topologyExistingTunnels(t)));
+  const visible = topologyData.topologies
+    .filter(t => topologySearchMatches(t, topologyExistingTunnels(t)))
+    .filter(t => topologyStatusMatches(t, topologyExistingTunnels(t)));
   const foot = $('topologyFootCount');
   if (foot) foot.textContent = tr('', '{n} item(s)').replace('{n}', String(visible.length));
   $('topologiesList').innerHTML = visible.length
@@ -477,19 +495,18 @@ function topologyRender() {
         const powering = health === 'down' || !remaining;
         return `<tr class="topo-list-row" role="row" tabindex="0" data-topo-id="${esc(t.id)}" aria-label="${esc(t.name)}">
         <td role="cell" class="topo-cell-no">${i + 1}</td>
-        <td role="cell" class="topo-cell-name" data-label="${esc(tr('', 'Name'))}"><button type="button" class="topo-name" data-topo-open="${esc(t.id)}"><bdi>${esc(t.name)}</bdi></button></td>
-        <td role="cell" class="topo-cell-iran" data-label="${esc(tr('', 'Iran'))}">${serverCell('ir', endpoints.iran)}</td>
-        <td role="cell" class="topo-cell-foreign" data-label="${esc(tr('', 'Foreign'))}">${serverCell(t.country, endpoints.foreign)}</td>
-        <td role="cell" class="topo-cell-tunnels" data-label="${esc(tr('', 'Tunnels'))}"><span class="topo-count" aria-label="${esc(countLabel)}">${remaining}</span></td>
+        <td role="cell" class="topo-cell-name" data-label="${esc(tr('', 'Name'))}"><button type="button" class="topo-name" data-topo-open="${esc(t.id)}"><span class="topo-name-ic" aria-hidden="true">${TOPO_MESH}</span><bdi>${esc(t.name)}</bdi></button></td>
+        <td role="cell" class="topo-cell-region" data-label="${esc(tr('', 'Country / Region'))}"><span class="topo-region">${t.country ? topologyFlagSvg(t.country) : ''}<span>${esc(topoCountryName(t.country))}</span></span></td>
+        <td role="cell" class="topo-cell-tunnels" data-label="${esc(tr('', 'Tunnels'))}"><span class="topo-count" aria-label="${esc(countLabel)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16"/><path d="M16.5 8.5L20 12l-3.5 3.5"/><path d="M7.5 8.5L4 12l3.5 3.5"/></svg>${remaining}</span></td>
         <td role="cell" class="topo-cell-state" data-label="${esc(tr('', 'Status'))}"><span class="topo-state-pill ${pillClass}"><i aria-hidden="true"></i>${esc(healthLabel)}</span></td>
         <td role="cell" class="topo-cell-actions" data-label="${esc(tr('', 'Actions'))}"><div class="topo-actions"><div class="topo-menu"><button type="button" class="topo-kebab" data-topo-menu="${esc(t.id)}" aria-haspopup="menu" aria-expanded="false" aria-label="${esc(tr('', 'Tunnel actions'))}"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></button><div class="topo-menu-pop hidden" role="menu" aria-label="${esc(tr('', 'Tunnel actions'))}"><button type="button" class="topo-menu-item" role="menuitem" data-topo-open="${esc(t.id)}">${esc(tr('', 'View'))}</button><button type="button" class="topo-menu-item" role="menuitem" data-topo-power="${esc(t.id)}" data-active="${powering ? 'true' : 'false'}">${esc(powering ? tr('', 'Activate') : tr('', 'Deactivate'))}</button><span class="topo-delete-wrap" title="${esc(deleteTitle)}"><button type="button" class="quantum-btn quantum-btn-danger topo-delete topo-menu-item" role="menuitem" data-topo-delete="${esc(t.id)}" aria-label="${esc(tr('', 'Delete topology'))}"${remaining ? ` title="${esc(tr('', 'Delete all tunnels in this topology first'))}"` : ''}>${esc(tr('', 'Delete'))}</button></span></div></div></div></td>
       </tr>`;
       }).join('')
     : searching
-      ? `<tr class="topo-list-empty"><td colspan="7"><div class="ent-empty"><b>${esc(tr('', 'No topology matches your search.'))}</b><span>${esc(tr('', 'Clear the search to see all topologies.'))}</span></div></td></tr>`
+      ? `<tr class="topo-list-empty"><td colspan="6"><div class="ent-empty"><b>${esc(tr('', 'No topology matches your search.'))}</b><span>${esc(tr('', 'Clear the search to see all topologies.'))}</span></div></td></tr>`
       : topologyLoading && !topologyLoadedOnce
-        ? `<tr class="topo-list-empty topo-list-skel"><td colspan="7">${skel(2)}</td></tr>`
-        : `<tr class="topo-list-empty"><td colspan="7"><div class="mtb-hero"><div class="mtb-hero-in">
+        ? `<tr class="topo-list-empty topo-list-skel"><td colspan="6">${skel(2)}</td></tr>`
+        : `<tr class="topo-list-empty"><td colspan="6"><div class="mtb-hero"><div class="mtb-hero-in">
             <svg class="mtb-hero-logo" width="110" height="110" viewBox="0 0 100 100" fill="none" aria-hidden="true"><rect width="100" height="100" rx="22" fill="#090d16" stroke="rgba(56,189,248,0.25)" stroke-width="1.5"/><path d="M50 48 C42 38 26 32 12 42 C4 48 1 56 3 62 C6 60 12 54 20 55 C32 56 42 60 50 52 C58 60 68 56 80 55 C88 54 94 60 97 62 C99 56 96 48 88 42 C74 32 58 38 50 48 Z" fill="#38bdf8"/></svg>
             <h3 class="mtb-hero-title">${esc(tr('', 'Build your first topology'))}</h3>
             <p class="mtb-hero-desc">${esc(tr('', 'Set the server roles, then connect tunnels between them.'))}</p>
@@ -1463,6 +1480,7 @@ $('topoCreateX').onclick = topoCreateCancel;
 $('topoCreateBack').onclick = topoCreateBack;
 $('topoCreateNext').onclick = topoCreateNext;
 $('topologySearch').addEventListener('input', e => { topologySearchQuery = (e && e.target ? e.target.value : '') || ''; topologyRender(); });
+$('topologyStatusFilter').addEventListener('change', e => { topologyStatusFilter = (e && e.target ? e.target.value : 'all') || 'all'; topologyRender(); });
 document.querySelectorAll('[data-topo-role]').forEach(b => { b.onclick = () => topologyChooseRole(b.dataset.topoRole); });
 $('tab-tunnel').addEventListener('click', e => {
   const target = e.target.closest('button'); if (!target) return;
