@@ -11565,7 +11565,9 @@ window.loadClusterStatus = loadClusterStatus;
     '.mtb-eng-logo img{width:100%;height:100%;object-fit:contain;display:block;border-radius:999px}',
     '.mtb-eng-logo svg{width:34px;height:34px;display:block}',
     '.mtb-eng-id{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}',
-    '.mtb-eng-ver{font-size:12px;color:var(--tx2)}',
+    // version as a compact mono chip under the engine name — no "Version:" word,
+    // the value speaks for itself on a card this small
+    '.mtb-eng-ver{align-self:flex-start;font-size:12px;color:var(--tx2);background:color-mix(in srgb, var(--tx) 5%, transparent);border:1px solid var(--ln);border-radius:6px;padding:1px 7px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}',
     '.mtb-eng-state{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;flex:none;white-space:nowrap}',
     '.mtb-eng-state svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}',
     '.mtb-eng-state i{width:8px;height:8px;border-radius:999px;background:currentColor}',

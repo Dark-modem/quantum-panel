@@ -1490,7 +1490,7 @@
         return '<div class="mtb-eng-card' + (st === 'run' ? ' run' : '') + '" data-no-i18n>' +
           '<div class="mtb-eng-top"><span class="mtb-eng-logo e-' + esc(en.engine || '') + '">' + engLogo(en, disp) + '</span>' +
           '<span class="mtb-eng-id"><b>' + esc(disp) + '</b>' +
-          (en.version ? '<span class="mtb-eng-ver">' + esc(L('engVersion')) + ': <bdi dir="ltr">' + esc(en.version) + '</bdi></span>'
+          (en.version ? '<span class="mtb-eng-ver"><bdi dir="ltr">' + esc(en.version) + '</bdi></span>'
             : (en.kernel ? '<span class="mtb-eng-ver">' + esc(L('engKernel')) + '</span>' : '')) +
           (en.last_error ? '<span class="mtb-eng-err">' + esc(en.last_error) + '</span>' : '') +
           '</span>' + pill + '</div>' + act + '</div>';
