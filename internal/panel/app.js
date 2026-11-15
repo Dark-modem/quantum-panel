@@ -11430,7 +11430,7 @@ window.loadClusterStatus = loadClusterStatus;
     '.mtb-eng-row{display:flex;align-items:center;gap:12px;padding:9px 4px;border-bottom:1px solid color-mix(in srgb, var(--ln) 55%, transparent)}',
     '.mtb-eng-row:last-child{border-bottom:0}',
     '.mtb-eng-row > b{font-size:13px;color:var(--tx)}',
-    '.mtb-eng-ver{margin-inline-start:auto;font-size:12.5px;color:var(--tx2)}',
+    '.mtb-eng-ver{margin:0;font-size:12.5px;color:var(--tx2)}',
     '.mtb-body .dcard-title{display:inline-flex;align-items:center;gap:7px}',
     '.mtb-body .dcard-title svg{width:15px;height:15px;fill:none;stroke:var(--ac);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}',
     '.mtb-agstat{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}',
