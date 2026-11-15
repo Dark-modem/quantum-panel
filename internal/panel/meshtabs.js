@@ -2046,7 +2046,13 @@
     var ed = e.target && e.target.closest ? e.target.closest('[data-agedit]') : null;
     if (ed) { openAgtEdit(ed.getAttribute('data-agedit')); return; }
     var bk = e.target && e.target.closest ? e.target.closest('[data-agback]') : null;
-    if (bk) { agtView = { view: 'table' }; renderAgt(); return; }
+    if (bk) {
+      agtView = { view: 'table' };
+      // a deep-linked detail (#t=magt&ag=…) boots without loadAgt, so the list
+      // cache can be cold here — refetch instead of rendering the empty hero
+      if ((cache.magt || []).length) renderAgt(); else loadAgt();
+      return;
+    }
     var uu = e.target && e.target.closest ? e.target.closest('[data-agupd]') : null;
     if (uu) { openAgtUpd(uu.getAttribute('data-agupd')); return; }
     var cp = e.target && e.target.closest ? e.target.closest('[data-copyval]') : null;
@@ -2226,6 +2232,12 @@
           agtView = { view: 'detail', id: agId };
           activate(m[1]);
           renderAgtDetail(agId);
+          // warm the list cache in the background: this boot skipped loadAgt,
+          // and Back-to-list renders from it (fill-only, never clobbers, no DOM)
+          apiGet('api/ui/agents').then(function (j) {
+            var list = (j && j.agents) || [];
+            if (list.length && !(cache.magt || []).length) cache.magt = list;
+          }).catch(function () {});
         } catch (e) { /* fall back to the table */ }
         return;
       }
