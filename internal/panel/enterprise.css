@@ -1669,7 +1669,8 @@ html[dir="rtl"] .topo-back .topo-back-ic { transform:scaleX(-1); }
 .topo-list-head th:last-child .topo-th { justify-content:flex-end; }
 .topo-list-row .topo-cell-tunnels, .topo-list-row .topo-cell-state { text-align:center; }
 .topo-list-row .topo-cell-tunnels .topo-count, .topo-list-row .topo-cell-state .topo-state-pill { margin-inline:auto; }
-.topo-list-row .topo-cell-name .topo-name, .topo-list-row .topo-cell-region .topo-region { justify-content:center; margin-inline:auto; }
+.topo-list-row .topo-cell-name .topo-name { justify-content:center; margin-inline:auto; }
+.topo-list-row .topo-cell-region { text-align:center; }
 .topo-list-row .topo-cell-actions { justify-content:flex-end; }
 .topo-list-head th:last-child { text-align:end; }
 .topo-list-row { min-height:72px; }
