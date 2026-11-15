@@ -1233,7 +1233,7 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
    three tracks are pure fr (minmax(0,…) strips content-based minimums, the
    usual source of header/body drift); Tunnels and Actions are fixed so the
    header can never drift against a row. */
-.topo-list-head, .topo-list-row { display:grid; grid-template-columns:36px minmax(200px,320px) minmax(160px,260px) minmax(96px,110px) minmax(110px,140px) minmax(56px,64px); justify-content:space-between; gap:14px; align-items:center; padding:14px 18px; }
+.topo-list-head, .topo-list-row { display:grid; grid-template-columns:44px minmax(0,1.5fr) minmax(0,1.25fr) minmax(0,1.25fr) 90px 150px 72px; gap:14px; align-items:center; padding:14px 18px; }
 .topo-list-head { background:var(--s2); border-bottom:1px solid var(--ln); }
 .topo-list-head th { min-width:0; padding:0; color:var(--mu); font-size:var(--fs-caption); font-weight:650; text-align:start; text-transform:uppercase; letter-spacing:.07em; }
 /* Persian is a joined script: letter-spacing and uppercase only break it. */
@@ -1257,6 +1257,9 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 .topo-name:hover { color:var(--ac); }
 .topo-name:focus-visible, .topo-actions button:focus-visible { outline:2px solid var(--ent-focus); outline-offset:3px; border-radius:4px; }
 .topo-server { display:flex; align-items:center; gap:8px; min-width:0; font-size:var(--fs-caption); }
+.topo-server-tx { display:flex; flex-direction:column; gap:1px; min-width:0; }
+.topo-server-tx b { font-size:13px; font-weight:650; color:var(--tx); }
+.topo-server-sub { color:var(--mu); font-size:var(--fs-caption); font-variant-numeric:tabular-nums; }
 .topo-flag { flex:none; display:inline-flex; line-height:1; }
 /* Embedded SVG country flags: fixed 20x14 footprint, rounded corners and a
    subtle in-SVG frame, aligned with the mono IP in both LTR and RTL. */
@@ -1642,7 +1645,7 @@ html[dir="rtl"] .topo-back .topo-back-ic { transform:scaleX(-1); }
 .topo-stat-ic svg { width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
 .topo-stat-accent .topo-stat-ic { background:color-mix(in srgb, var(--ac) 14%, transparent); color:var(--ac); }
 .topo-stat-ok .topo-stat-ic { background:color-mix(in srgb, var(--ok) 14%, transparent); color:var(--ok); }
-.topo-stat-bad .topo-stat-ic { background:color-mix(in srgb, var(--er) 14%, transparent); color:var(--er); }
+.topo-stat-warn .topo-stat-ic { background:color-mix(in srgb, var(--wr) 16%, transparent); color:var(--wr); }
 .topo-stat-tx { display:flex; flex-direction:column; align-items:flex-end; gap:2px; min-width:0; flex:1; }
 .topo-stat-v { font-size:26px; letter-spacing:0; }
 .topo-list-tools { display:flex; align-items:center; gap:12px; }

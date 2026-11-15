@@ -26,7 +26,7 @@ func TestTopologyListSemanticTable(t *testing.T) {
 		t.Error("generated topology rows must remain inside the table body")
 	}
 	headers := regexp.MustCompile(`(?s)<th\b([^>]*)>(.*?)</th>`).FindAllStringSubmatch(table[1], -1)
-	want := []string{"", "Name", "Country / Region", "Tunnels", "Status", "Actions"}
+	want := []string{"#", "Topology name", "Iran server", "Foreign server", "Tunnels", "Status", "Actions"}
 	if len(headers) != len(want) {
 		t.Fatalf("got %d topology columns, want %d", len(headers), len(want))
 	}
@@ -138,14 +138,12 @@ func TestTopologyListSharedResponsiveColumns(t *testing.T) {
 			t.Errorf("shared header/row rule lacks %s", property)
 		}
 	}
-	// Tunnels and Actions sit on bounded tracks so the headers stay over their
-	// cells no matter how the flexible name/country columns squeeze. The
-	// Iran/Foreign pair merged into one Country/Region column (2026-11-16),
-	// that column was pulled in (owner: it stretched), and the leftover width
-	// now spreads as even inter-column gaps (space-between) — the trio keeps
-	// its 96-110px (Tunnels), 110-140px (Status) and 56-64px (Actions) bounds.
-	if !regexp.MustCompile(`grid-template-columns\s*:[^}]*minmax\(96px,110px\)\s+minmax\(110px,140px\)\s+minmax\(56px,64px\)`).MatchString(shared[1]) {
-		t.Error("shared grid must keep the bounded Tunnels/Status/Actions tracks (minmax 96-110, 110-140, 56-64)")
+	// Tunnels and Actions sit on fixed tracks so the headers stay over their
+	// cells no matter how the flexible name/server columns squeeze. The
+	// mockup redesign (2026-11-16) restored # and the two server columns;
+	// the fixed trio settled at 90px (Tunnels), 150px (Status), 72px (Actions).
+	if !regexp.MustCompile(`grid-template-columns\s*:[^}]*90px\s+150px\s+72px`).MatchString(shared[1]) {
+		t.Error("shared grid must keep fixed 90px (Tunnels), 150px (Status) and 72px (Actions) tracks")
 	}
 
 	media := regexp.MustCompile(`@media\s*\(\s*max-width\s*:\s*799px\s*\)`).FindStringIndex(css)
