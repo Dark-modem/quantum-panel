@@ -11686,7 +11686,10 @@ window.loadClusterStatus = loadClusterStatus;
     '.mtb-del-warn-i svg{width:14px;height:14px;display:block}',
     '.mtb-del-type{display:flex;align-items:center;gap:6px;color:var(--tx)}',
     '#mtbAgDelName{height:48px;margin-top:10px;border-radius:12px;font-size:14px}',
-    '.mtb-del-type-i{width:20px;height:20px;flex:none;color:var(--ac);display:inline-flex;margin-top:1px}',
+    // 24px slot like the warn badge above: the centered glyph sits on the text's
+    // optical middle and the sentence start lines up with the warn sentence
+    // (the old 20px box + margin-top:1px lost half the nudge to flex centering)
+    '.mtb-del-type-i{width:24px;height:24px;flex:none;color:var(--ac);display:inline-flex;align-items:center;justify-content:center}',
     '.mtb-del-type-i svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}',
     '.mtb-del-panel{display:flex;align-items:center;gap:12px;border:1px solid var(--ln);border-radius:14px;background:color-mix(in srgb, var(--tx) 4%, transparent);padding:14px 16px;margin:2px 0 10px}',
     '.mtb-del-foot-hint{display:inline-flex;align-items:center;gap:9px;margin-inline-end:auto;color:var(--tx2);font-size:12.5px;min-width:0}',
