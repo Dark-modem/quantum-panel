@@ -37,7 +37,10 @@ const (
 	meshAlertTick          = 30 * time.Second
 	meshAlertMaxHistory    = 200
 	meshAlertCertWarnDays  = 14
-	meshAlertHardeningFrac = 0.2 // warn when <20% of the confirm window remains
+	meshAlertHardeningFrac = 0.2   // warn when <20% of the confirm window remains
+	meshAlertClockDriftS   = 90    // default |panel − agent| clock drift threshold (phase-13 spec)
+	meshAlertDriftFloorS   = 10    // settings floor: below this the rule would spam on transport jitter
+	meshAlertDriftCeilS    = 86400 // settings ceiling: 1 day
 )
 
 // meshAlertSettings is the operator-configurable part (persisted sealed).
@@ -46,13 +49,15 @@ type meshAlertSettings struct {
 	AgentOfflineMin int    `json:"agent_offline_min"`        // default 5
 	CertExpireDays  int    `json:"cert_expire_days"`         // default 14
 	DiskMaxPercent  int    `json:"disk_max_percent"`         // default 90
+	ClockDriftMaxS  int    `json:"clock_drift_max_s"`        // default 90 (R7: |panel − agent reported_at|)
 	TelegramToken   string `json:"telegram_token,omitempty"` // sealed at rest
 	TelegramChat    string `json:"telegram_chat,omitempty"`  // sealed at rest
 	WebhookURL      string `json:"webhook_url,omitempty"`    // sealed at rest
 }
 
 func defaultMeshAlertSettings() meshAlertSettings {
-	return meshAlertSettings{Enabled: false, AgentOfflineMin: 5, CertExpireDays: meshAlertCertWarnDays, DiskMaxPercent: 90}
+	return meshAlertSettings{Enabled: false, AgentOfflineMin: 5, CertExpireDays: meshAlertCertWarnDays,
+		DiskMaxPercent: 90, ClockDriftMaxS: meshAlertClockDriftS}
 }
 
 // meshAlertEvent is one evaluated condition snapshot.
@@ -254,6 +259,7 @@ func (e *meshAlertEngine) loadMeshAlertSettings() {
 		AgentOfflineMin     int              `json:"agent_offline_min"`
 		CertExpireDays      int              `json:"cert_expire_days"`
 		DiskMaxPercent      int              `json:"disk_max_percent"`
+		ClockDriftMaxS      int              `json:"clock_drift_max_s"`
 		TelegramTokenSealed string           `json:"telegram_token_sealed"`
 		TelegramChatSealed  string           `json:"telegram_chat_sealed"`
 		WebhookURLSealed    string           `json:"webhook_url_sealed"`
@@ -272,6 +278,9 @@ func (e *meshAlertEngine) loadMeshAlertSettings() {
 	}
 	if stored.DiskMaxPercent > 0 && stored.DiskMaxPercent <= 99 {
 		e.settings.DiskMaxPercent = stored.DiskMaxPercent
+	}
+	if stored.ClockDriftMaxS > 0 {
+		e.settings.ClockDriftMaxS = stored.ClockDriftMaxS
 	}
 	if key, err := meshAlertSealKey(); err == nil {
 		if b, err := pasarguard.Open(key, stored.TelegramTokenSealed); err == nil {
@@ -344,6 +353,7 @@ func (e *meshAlertEngine) persistMeshSettings() error {
 		"agent_offline_min":     e.settings.AgentOfflineMin,
 		"cert_expire_days":      e.settings.CertExpireDays,
 		"disk_max_percent":      e.settings.DiskMaxPercent,
+		"clock_drift_max_s":     e.settings.ClockDriftMaxS,
 		"telegram_token_sealed": tokSealed,
 		"telegram_chat_sealed":  chatSealed,
 		"webhook_url_sealed":    urlSealed,

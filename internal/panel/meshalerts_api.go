@@ -30,6 +30,7 @@ func handleMeshAlertsView(w http.ResponseWriter, r *http.Request) {
 		"agent_offline_min": st.AgentOfflineMin,
 		"cert_expire_days":  st.CertExpireDays,
 		"disk_max_percent":  st.DiskMaxPercent,
+		"clock_drift_max_s": st.ClockDriftMaxS,
 		"telegram_set":      st.TelegramToken != "" && st.TelegramChat != "",
 		"webhook_set":       st.WebhookURL != "",
 		"open":              open,
@@ -47,6 +48,7 @@ func handleMeshAlertsSettings(w http.ResponseWriter, r *http.Request) {
 		AgentOfflineMin *int   `json:"agent_offline_min"`
 		CertExpireDays  *int   `json:"cert_expire_days"`
 		DiskMaxPercent  *int   `json:"disk_max_percent"`
+		ClockDriftMaxS  *int   `json:"clock_drift_max_s"`
 		TelegramToken   string `json:"telegram_token"` // "" = keep, "-" = clear
 		TelegramChat    string `json:"telegram_chat"`
 		WebhookURL      string `json:"webhook_url"`
@@ -67,6 +69,11 @@ func handleMeshAlertsSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	if q.DiskMaxPercent != nil && *q.DiskMaxPercent >= 10 && *q.DiskMaxPercent <= 99 {
 		st.DiskMaxPercent = *q.DiskMaxPercent
+	}
+	// R7: the clock_drift threshold (|panel − agent reported_at|). The floor
+	// keeps transport jitter from spamming; the ceiling is one day.
+	if q.ClockDriftMaxS != nil && *q.ClockDriftMaxS >= meshAlertDriftFloorS && *q.ClockDriftMaxS <= meshAlertDriftCeilS {
+		st.ClockDriftMaxS = *q.ClockDriftMaxS
 	}
 	if q.TelegramToken == "-" {
 		st.TelegramToken = ""

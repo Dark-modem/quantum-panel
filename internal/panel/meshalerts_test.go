@@ -381,6 +381,75 @@ func TestMeshAlertsSettingsAPIRoundTrip(t *testing.T) {
 	}
 }
 
+// TestMeshAlertsClockDriftThresholdRoundTrip (R7): the clock_drift
+// threshold is operator-configurable like the other rule thresholds —
+// the view exposes it, in-range values stick, out-of-range ones are
+// ignored (defaults hold), and the sealed settings file persists it so
+// it survives a restart and a backup/restore.
+func TestMeshAlertsClockDriftThresholdRoundTrip(t *testing.T) {
+	withTempConfig(t)
+	s, err := storeOpenForTest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	MeshStoreSetForTest(s)
+	t.Cleanup(MeshStoreCloseForTest)
+
+	mux := http.NewServeMux()
+	registerMeshAlertRoutes(mux, "")
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	client := meshSession(t)
+
+	post := func(body string) {
+		req, _ := http.NewRequest("POST", srv.URL+"/api/mesh/alerts/settings",
+			strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != 200 {
+			t.Fatalf("settings POST %s: %d", body, resp.StatusCode)
+		}
+	}
+	viewOf := func() map[string]any {
+		resp, err := client.Get(srv.URL + "/api/mesh/alerts")
+		if err != nil {
+			t.Fatal(err)
+		}
+		var v map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&v)
+		resp.Body.Close()
+		return v
+	}
+
+	// default value surfaced by the view
+	if v := viewOf(); v["clock_drift_max_s"] != float64(meshAlertClockDriftS) {
+		t.Fatalf("default clock_drift_max_s wrong: %v", v["clock_drift_max_s"])
+	}
+	post(`{"clock_drift_max_s":120}`)
+	if v := viewOf(); v["clock_drift_max_s"] != float64(120) {
+		t.Fatalf("clock_drift_max_s did not stick: %v", v["clock_drift_max_s"])
+	}
+	// out-of-range values are ignored (below floor / above ceiling)
+	post(`{"clock_drift_max_s":3}`)
+	if v := viewOf(); v["clock_drift_max_s"] != float64(120) {
+		t.Fatalf("below-floor value must be ignored: %v", v["clock_drift_max_s"])
+	}
+	post(`{"clock_drift_max_s":90000}`)
+	if v := viewOf(); v["clock_drift_max_s"] != float64(120) {
+		t.Fatalf("above-ceiling value must be ignored: %v", v["clock_drift_max_s"])
+	}
+	// persisted (sealed file) so it survives a restart
+	raw, _ := os.ReadFile(filepath.Join(configDir, "mesh-alerts.json"))
+	if !strings.Contains(string(raw), `"clock_drift_max_s":120`) {
+		t.Fatalf("clock_drift_max_s not persisted: %s", raw)
+	}
+}
+
 // meshTelegramNotifierFake is the REAL notifier's payload logic pointed
 // at a local fake server (the only difference from production is the
 // base URL — proving the request shape without leaving the machine).
