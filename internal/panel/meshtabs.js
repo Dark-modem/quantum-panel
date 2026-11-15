@@ -100,6 +100,9 @@
     agBackList: ['بازگشت به لیست ایجنت‌ها', 'Back to agents list'],
     agRefreshed: ['وضعیت ایجنت تازه‌سازی شد', 'Agent status refreshed'],
     agDc: ['دیتاسنتر', 'Datacenter'], agResT: ['منابع سرور', 'Server resources'], agCores: ['هسته', 'cores'],
+    agDcHint: ['دیتاسنتری که این ایجنت به آن تعلق دارد؛ نام جدید هم می‌توانید بنویسید.', 'The datacenter this agent belongs to; typing a new name is fine too.'],
+    agDcPh: ['نام دیتاسنتر', 'Datacenter name'],
+    agDcReq: ['دیتاسنتر را وارد کنید', 'Enter the datacenter'],
     agMembers: ['تعداد اعضا', 'Members'], agViewTopo: ['مشاهده توپولوژی', 'View topology'],
     topoRelH: ['توپولوژی‌های مرتبط', 'Related topologies'], topoSrv: ['سرور', 'servers'],
     topoMemberN: ['عضو', 'members'], topoViewDtl: ['مشاهده جزئیات', 'View details'],
@@ -210,6 +213,10 @@
     hourAgo: ['ساعت پیش', 'h ago'], dayAgo: ['روز پیش', 'd ago']
   };
   function L(k) { var p = TXT[k] || [k, k]; return isFa() ? p[0] : p[1]; }
+  // datacenter display name: prefer the backend-provided English name
+  // (datacenter_en — requested in UI-API-REQUESTS §9) in EN mode; fa always
+  // shows the primary name. Falls back cleanly while the field is missing.
+  function dcDisp(dc, dcEn) { return (!isFa() && dcEn) ? dcEn : (dc || ''); }
   function Lf(k, reps) {
     var s = L(k);
     Object.keys(reps || {}).forEach(function (key) { s = s.replace('{' + key + '}', reps[key]); });
@@ -805,6 +812,10 @@
       }).join('') +
       '</div></div>' +
       '<input type="hidden" id="mtbCountry" value=""></label>' +
+      '<label id="mtbDcRow">' + esc(L('agDc')) + ' ' +
+      '<span class="mtb-tip-i" data-tipopen data-tip="' + esc(L('agDcHint')) + '" aria-label="' + esc(L('agDcHint')) + '">!</span>' +
+      '<input id="mtbDc" class="quantum-input" list="mtbDcList" dir="ltr" placeholder="' + esc(L('agDcPh')) + '" autocomplete="off">' +
+      '<datalist id="mtbDcList"></datalist></label>' +
       '</div>' +
       '<div class="mtb-wpage" data-pg="3" hidden>' +
       '<div class="mtb-tip-row"><button type="button" class="mtb-tip-i" data-tipopen data-tip="' + esc(L('agTtlHint')) + '" aria-label="' + esc(L('agTtlHint')) + '">!</button></div>' +
@@ -834,6 +845,16 @@
       '</div>' +
       '</div>';
     document.body.appendChild(ov);
+    // datalist: datacenters already seen on enrolled agents (typing a new one stays allowed)
+    (function () {
+      var seen = {}, opts = '';
+      ((cache && cache.magt) || []).forEach(function (a) {
+        var d = a.server && a.server.datacenter;
+        if (d && !seen[d]) { seen[d] = 1; opts += '<option value="' + esc(d) + '">'; }
+      });
+      var dl = document.getElementById('mtbDcList');
+      if (dl) dl.innerHTML = opts;
+    })();
     ov.querySelectorAll('[data-mtb-close]').forEach(function (b) { b.addEventListener('click', function () { ov.remove(); }); });
     ov.addEventListener('click', function (e) {
       if (e.target === ov) { ov.remove(); return; }
@@ -914,6 +935,11 @@
           ov.querySelector('[data-mtb-msg]').textContent = L('pickCountry');
           return;
         }
+        if (!(document.getElementById('mtbDc') || {}).value.trim()) {
+          ov.querySelector('[data-mtb-msg]').textContent = L('agDcReq');
+          document.getElementById('mtbDc').focus();
+          return;
+        }
       }
       ov.querySelector('[data-mtb-msg]').textContent = '';
       wizStep = Math.min(3, wizStep + 1);
@@ -938,6 +964,7 @@
           n: document.getElementById('mtbAgentLabel').value,
           r: (ov.querySelector('input[name="mtbRole"]:checked') || {}).value || 'iran',
           c: (document.getElementById('mtbCountry') || {}).value || '',
+          dc: (document.getElementById('mtbDc') || {}).value || '',
           d: document.getElementById('mtbExpiry').value
         }));
       } catch (err) { /* storage blocked */ }
@@ -964,6 +991,7 @@
         if (rr) { rr.checked = true; syncRole(); }
       }
       if (saved.c) setCountry(saved.c);
+      if (saved.dc) document.getElementById('mtbDc').value = saved.dc;
       if (saved.d) {
         document.getElementById('mtbExpiry').value = saved.d;
         ov.querySelectorAll('.mtb-chip').forEach(function (c2) { c2.classList.toggle('on', parseInt(c2.getAttribute('data-days'), 10) === parseInt(saved.d, 10)); });
@@ -983,8 +1011,10 @@
         if (!country) { ov.querySelector('[data-mtb-msg]').textContent = L('pickCountry'); return; }
       }
       var label = document.getElementById('mtbAgentLabel').value.trim() || ('agent-' + Date.now() % 10000);
+      var dc = (document.getElementById('mtbDc') || {}).value.trim();
+      if (!dc) { ov.querySelector('[data-mtb-msg]').textContent = L('agDcReq'); return; }
       var days = Math.max(1, Math.min(3650, parseInt(document.getElementById('mtbExpiry').value, 10) || 365));
-      apiSend('POST', 'api/agents/tokens', { role: role, label: label, expires_days: days, country: country }).then(function (r) {
+      apiSend('POST', 'api/agents/tokens', { role: role, label: label, expires_days: days, country: country, datacenter: dc }).then(function (r) {
         var tok = (r && (r.token || (r.data && r.data.token))) || '';
         if (!tok) { ov.querySelector('[data-mtb-msg]').textContent = 'no token in response'; return; }
         document.getElementById('mtbAgentForm').style.display = 'none';
@@ -1117,7 +1147,7 @@
     var trs = pageAgs.map(function (a) {
       var r = a.resources || a;
 
-      var dc = (a.server && a.server.datacenter) || '';
+      var dc = dcDisp((a.server && a.server.datacenter) || '', a.server && a.server.datacenter_en);
       var row = '<tr>' +
         '<td><b class="mtb-aglink" data-agd="' + esc(a.id) + '">' + esc(a.name || a.id) + '</b>' +
         (dc ? '<br><span class="mtb-muted" style="font-size:.85em">' + esc(dc) + '</span>' : '') + '</td>' +
@@ -1328,7 +1358,7 @@
       html += '<div class="tunnel-card"><div class="tc-header dcard-head"><p class="tc-title dcard-title">' + MTB_ICO.info + esc(L('agInfoT')) + '</p></div>' +
         '<div class="mtb-kv-grid">' +
         kvTile(MTB_ICO.pin, esc(L('agRoleH')), agentRoleCell(ag)) +
-        kvTile(MTB_ICO.stack, esc(L('agDc')), esc(ag.datacenter || '\u2014')) +
+        kvTile(MTB_ICO.stack, esc(L('agDc')), esc(dcDisp(ag.datacenter, ag.datacenter_en) || '\u2014')) +
         kvTile(MTB_ICO.chip, esc(L('archCol')), '<span class="mono">' + esc(ag.arch || '\u2014') + '</span>') +
         kvTile(mtbOsLogo(ag.os || ag.hostname), esc(L('agOS')), ag.os ? esc(ag.os.charAt(0).toUpperCase() + ag.os.slice(1)) : esc(ag.hostname ? ag.hostname.charAt(0).toUpperCase() + ag.hostname.slice(1) : '\u2014')) +
         '</div><div class="mtb-kv-grid mtb-mt8">' +
@@ -1471,7 +1501,7 @@
         // Always a word, never a bare dash: up / down / disabled / unknown.
         var b2 = tn.state === 'healthy' ? badge('ok', esc(L('agTunUp')), true) : (tn.state === 'down' ? badge('err', esc(L('st_down')), true) : (tn.state === 'disabled' ? badge('dim', esc(L('disabled')), true) : badge('dim', esc(L('st_unknown')), true)));
         var rem = (tn.remote && tn.remote.name) || '\u2014';
-        var remDc = (tn.remote && tn.remote.datacenter) || '';
+        var remDc = dcDisp((tn.remote && tn.remote.datacenter) || '', tn.remote && tn.remote.datacenter_en);
         var remCc = tn.country ? String(tn.country).toLowerCase() : '';
         var engName2 = engDisp[tn.engine] || tn.engine || '\u2014';
         // A down tunnel reports latency 0; that is "no measurement", not a
@@ -1865,7 +1895,7 @@
     }).join('');
     var svRows = (r.per_server || []).map(function (s) {
       var u = s.usage || {}, b = s.billable || {};
-      return '<tr><td><b>' + esc(s.name) + '</b></td><td>' + esc(s.datacenter || '—') + '</td>' +
+      return '<tr><td><b>' + esc(s.name) + '</b></td><td>' + esc(dcDisp(s.datacenter, s.datacenter_en) || '—') + '</td>' +
         tdNum(bytes(b.wire_rx)) + tdNum(bytes(u.wire_tx)) + tdNum(bytes(b.payload_rx)) +
         tdNum(s.overhead_ratio != null ? num(s.overhead_ratio, 3) : '—') +
         '<td>' + qualityPill(s.quality) + '</td></tr>';
