@@ -58,9 +58,14 @@ func readPanelJSON(t *testing.T) map[string]any {
 
 func TestListenerFirstStartAutoSwitchPersists(t *testing.T) {
 	listenerTestCfg(t)
-	// Squat the preferred port: FIRST start must move once + save.
+	// Squat the preferred port: FIRST start must move once + save. On
+	// Windows Go's listener sets SO_REUSEADDR, so the real portFree probe
+	// reports the squatted port as FREE — override the seam (BACKEND-24).
 	_, done := writeSquatter(t, 18777)
 	defer done()
+	oldProbe := portFreeFn
+	portFreeFn = func(p int) bool { return p != 18777 }
+	t.Cleanup(func() { portFreeFn = oldProbe })
 
 	cfg.PortsFinalized = false
 	ensureFreeHTTPPort()

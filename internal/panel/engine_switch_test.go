@@ -26,6 +26,7 @@ func engineLab(t *testing.T, bins []string, units []string) {
 	oldDirs, oldExtra, oldUnit := engineBinDirs, backhaulExtraBins, engineUnitDir
 	engineBinDirs, backhaulExtraBins, engineUnitDir = []string{binDir}, nil, unitDir
 	t.Cleanup(func() { engineBinDirs, backhaulExtraBins, engineUnitDir = oldDirs, oldExtra, oldUnit })
+	relaxExecProbeOnWindows(t)
 }
 
 func recordSystemctl(t *testing.T, failOn string) *[]string {
@@ -92,10 +93,7 @@ func TestEngineConfigIsOwnerOnly(t *testing.T) {
 	if err := writeEngineFile(dir, "frps.toml", "auth.token = \"x\"\n"); err != nil {
 		t.Fatal(err)
 	}
-	fi, err := os.Stat(filepath.Join(dir, "frps.toml"))
-	if err != nil || fi.Mode().Perm() != 0o600 {
-		t.Fatalf("config must be 0600, got %v %v", fi, err)
-	}
+	assertPerm0600(t, filepath.Join(dir, "frps.toml"))
 	if err := writeEngineFile(filepath.Join(dir, "frps.toml", "sub"), "a", "b"); err == nil {
 		t.Error("expected error when directory cannot be created")
 	}

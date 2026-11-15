@@ -30,6 +30,7 @@ func withTempConfig(t *testing.T) {
 	t.Cleanup(func() {
 		agentHubDrainAll()
 		AgentObserverWait()
+		MeshStoreCloseForTest() // close the lazily-opened quantum.db BEFORE the temp dir is removed (Windows file locks, BACKEND-24)
 		configDir = old
 	})
 }

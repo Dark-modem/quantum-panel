@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const source = fs.readFileSync(path.join(__dirname, 'app.js'), 'utf8');
+const source = fs.readFileSync(path.join(__dirname, 'app.js'), 'utf8').replace(new RegExp('\\r\\n', 'g'), '\n');
 function section(start, end) {
   const a = source.indexOf(start), b = source.indexOf(end, a + start.length);
   assert.ok(a >= 0 && b > a, 'source anchors: ' + start);
@@ -13,7 +13,8 @@ function section(start, end) {
 }
 const code = section('function engLabel(e)', 'function latBadge(ms)')
   + section('function setTraffic(', '// Canvas cannot read CSS variables')
-  + section('function linkStrip(s)', '// Engine of the base tunnel:')
+  + section('function linkStrip()', '// Engine of the base tunnel:')
+  + section('async function refreshControllerFleet()', 'async function refreshDash()')
   + section('function hydrateCachedTraffic()', 'try { hydrateCachedTraffic();')
   + section('async function refreshDash()', 'function drawActivityChart(')
   + section('function usageCols(d, tot)', 'async function loadUsage()')

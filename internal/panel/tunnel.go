@@ -778,17 +778,24 @@ func executableFile(p string) bool {
 	return err == nil && fi.Mode().IsRegular() && fi.Mode().Perm()&0o111 != 0
 }
 
+// executableFileFn is the exec-bit probe seam (the diskUsageFn pattern):
+// production keeps the POSIX semantics above — a regular file with an exec
+// bit. Windows cannot represent the exec bit via chmod (os.Stat always
+// reports 0666), so tests that stub engine binaries override the probe;
+// production behavior is unchanged.
+var executableFileFn = executableFile
+
 // engineBinaryPresent reports whether the engine ("frps", "frpc" or
 // "backhaul") has an executable binary in any known install location.
 func engineBinaryPresent(engine string) bool {
 	for _, d := range engineBinDirs {
-		if executableFile(filepath.Join(d, engine)) {
+		if executableFileFn(filepath.Join(d, engine)) {
 			return true
 		}
 	}
 	if engine == "backhaul" {
 		for _, p := range backhaulExtraBins {
-			if executableFile(p) {
+			if executableFileFn(p) {
 				return true
 			}
 		}

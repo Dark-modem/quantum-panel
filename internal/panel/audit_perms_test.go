@@ -15,13 +15,7 @@ func TestGreMTUFileModeIsPrivate(t *testing.T) {
 	if err := savePathMTU(1300); err != nil {
 		t.Fatalf("set: %v", err)
 	}
-	fi, err := os.Stat(filepath.Join(configDir, "gre_mtu"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if fi.Mode().Perm() != 0o600 {
-		t.Fatalf("gre_mtu mode = %v, want 0600", fi.Mode().Perm())
-	}
+	assertPerm0600(t, filepath.Join(configDir, "gre_mtu"))
 	// And the value round-trips.
 	if got := savedPathMTU(); got != 1300 {
 		t.Fatalf("round trip: %d", got)
@@ -38,13 +32,9 @@ func TestClusterLBFilesAreNotWorldReadable(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, f := range []string{lbPooledPortsFile(), lbBindsFile()} {
-		fi, err := os.Stat(f)
-		if err != nil {
-			t.Fatalf("%s: %v", f, err)
-		}
 		// 0600/0640 are the accepted modes: nothing may be OTHER-readable.
-		if fi.Mode().Perm()&0o004 != 0 || fi.Mode().Perm()&0o003 != 0 {
-			t.Fatalf("%s mode = %v — other-readable/writable panel files are not allowed", f, fi.Mode().Perm())
-		}
+		// (assertPermIs checks the full POSIX mode on Linux; Windows has no
+		// such bits — BACKEND-24.)
+		assertPermIs(t, f, 0o640)
 	}
 }

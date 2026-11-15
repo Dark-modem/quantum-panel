@@ -49,7 +49,10 @@ func freeUDPPort(t *testing.T) int {
 	// Verify BOTH transports are free: matrixSetup's preflight probes TCP as
 	// well, and on loaded machines the OS can hand the same ephemeral port's
 	// TCP side to another process between our check and tinc's bind.
-	for attempt := 0; attempt < 20; attempt++ {
+	// Hardened like freeTCPPort (BACKEND-24): the probe/close sequence races
+	// the Windows loopback stack — 50 attempts with a short settle pause
+	// keeps it deterministic (20 occasionally ran out under load).
+	for attempt := 0; attempt < 50; attempt++ {
 		l, e := net.ListenPacket("udp", "127.0.0.1:0")
 		if e != nil {
 			t.Fatal(e)

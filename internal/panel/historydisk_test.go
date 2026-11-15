@@ -19,9 +19,7 @@ func TestHistoryRoundTripKeepsRecentDropsOld(t *testing.T) {
 	if err := h.save(f, now); err != nil {
 		t.Fatal(err)
 	}
-	if st, _ := os.Stat(f); st.Mode().Perm() != 0600 {
-		t.Errorf("history file mode %v, want 0600", st.Mode().Perm())
-	}
+	assertPerm0600(t, f)
 	if _, err := os.Stat(f + ".tmp"); err == nil {
 		t.Error("temp file must not be left behind")
 	}

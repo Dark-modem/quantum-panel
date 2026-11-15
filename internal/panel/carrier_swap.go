@@ -468,13 +468,13 @@ func updatePeerRecord(id int, fn func(p *peerRecord)) error {
 
 func engineBinaryPath(name string) string {
 	for _, d := range engineBinDirs {
-		if p := filepath.Join(d, name); executableFile(p) {
+		if p := filepath.Join(d, name); executableFileFn(p) {
 			return p
 		}
 	}
 	if name == "backhaul" {
 		for _, p := range backhaulExtraBins {
-			if executableFile(p) {
+			if executableFileFn(p) {
 				return p
 			}
 		}
