@@ -11561,6 +11561,8 @@ window.loadClusterStatus = loadClusterStatus;
     '.mtb-eng-card{border:1px solid var(--ln);border-radius:12px;background:var(--sunk);padding:12px;display:flex;flex-direction:column;gap:10px}',
     '.mtb-eng-card.run{border-color:color-mix(in srgb, var(--ok) 45%, transparent);background:color-mix(in srgb, var(--ok) 6%, var(--sunk))}',
     '.mtb-eng-top{display:flex;align-items:center;gap:10px;min-width:0}',
+    // the state pill rides the top row (level with the name), not the vertical middle
+    '.mtb-eng-card .mtb-eng-state{align-self:flex-start}',
     '.mtb-eng-logo{width:46px;height:46px;border-radius:999px;display:grid;place-items:center;flex:none;overflow:hidden}',
     '.mtb-eng-logo img{width:100%;height:100%;object-fit:contain;display:block;border-radius:999px}',
     '.mtb-eng-logo svg{width:34px;height:34px;display:block}',
