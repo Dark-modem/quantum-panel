@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -516,7 +517,9 @@ func TestSecretboxRoundTripAndKeyFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Mode().Perm() != 0o600 {
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 {
+		// POSIX mode bits are unrepresentable via os.Stat on Windows/NTFS;
+		// the owner-only property is verified by the WSL gate (BACKEND-24).
 		t.Fatalf("key file mode = %v, want 0600", info.Mode().Perm())
 	}
 	sealed, err := Seal(key, []byte(`{"password":"hunter2"}`))

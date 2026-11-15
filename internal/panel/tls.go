@@ -560,7 +560,7 @@ func startHTTPSListener() {
 		}()
 		httpsSrv = nil
 	}
-	if !portFree(port) {
+	if !portFreeFn(port) {
 		if cfg.PortsFinalized {
 			log.Fatalf("panel HTTPS port %d is busy and the listener ports are FINALIZED — "+
 				"the panel will NOT auto-switch (enrolled agents already use this URL). "+
@@ -605,12 +605,18 @@ var tlsBindRetryDelays = []time.Duration{
 // without os.Exit.
 var tlsBindFatalf = log.Fatalf
 
+// tlsListenAndServeFn seams the actual TLS serve call so tests can script
+// bind failures deterministically: on Windows Go's listener sets
+// SO_REUSEADDR, so a second bind to a squatted port SUCCEEDS and the real
+// loopback cannot simulate a busy port. Production behavior is unchanged.
+var tlsListenAndServeFn = func(srv *http.Server) error { return srv.ListenAndServeTLS("", "") }
+
 // tlsServeWithRetry runs the HTTPS listener: retry bind-class failures
 // with backoff, record non-bind failures once (they will not heal), and
 // fail the unit loudly when the port stays busy through every attempt.
 func tlsServeWithRetry(srv *http.Server) {
 	for i, delay := range tlsBindRetryDelays {
-		err := srv.ListenAndServeTLS("", "")
+		err := tlsListenAndServeFn(srv)
 		if err == nil || err == http.ErrServerClosed {
 			return
 		}

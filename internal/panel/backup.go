@@ -32,6 +32,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -493,7 +494,13 @@ func untarBackup(tarBytes []byte) (*backupManifest, map[string][]byte, error) {
 		if err != nil {
 			return nil, nil, err
 		}
-		name := filepath.Clean(hdr.Name)
+		// Tar member names are slash-separated by spec: clean with the
+		// slash-based path package so the keys match the manifest on every
+		// platform (Windows filepath.Clean rewrote tls/server.key to
+		// tls\server.key and every restore of a bundle with a subdirectory
+		// member failed its manifest lookup). filepath.IsAbs stays: it is
+		// the check that recognizes Windows drive-letter members.
+		name := path.Clean(hdr.Name)
 		if strings.HasPrefix(name, "..") || filepath.IsAbs(name) {
 			return nil, nil, fmt.Errorf("unsafe member name %q", hdr.Name)
 		}

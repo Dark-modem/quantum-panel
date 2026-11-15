@@ -195,13 +195,7 @@ func TestEnableOriginThenDisableLeavesNothing(t *testing.T) {
 		t.Fatalf("bad state %+v", st)
 	}
 	for _, f := range []string{"frps.toml", "frpc.toml", "fw.nft"} {
-		fi, err := os.Stat(filepath.Join(configDir, "rescue", f))
-		if err != nil {
-			t.Fatalf("%s missing: %v", f, err)
-		}
-		if fi.Mode().Perm() != 0600 {
-			t.Fatalf("%s has mode %v, want 0600 (contains secrets)", f, fi.Mode().Perm())
-		}
+		assertPerm0600(t, filepath.Join(configDir, "rescue", f))
 	}
 	for _, u := range []string{"quantum-rescue-fw", "quantum-rescue-frps", "quantum-rescue-frpc"} {
 		if _, err := os.Stat(filepath.Join(rescueUnitDir, u+".service")); err != nil {

@@ -216,10 +216,7 @@ func TestUpdateChannelEndpoint(t *testing.T) {
 	if rec := post(`{"channel":"dev"}`); rec.Code != http.StatusOK {
 		t.Fatalf("valid dev => %d %s", rec.Code, rec.Body.String())
 	}
-	st, err := os.Stat(filepath.Join(dir, "update.json"))
-	if err != nil || st.Mode().Perm() != 0600 {
-		t.Fatalf("update.json missing or mode %v (%v)", st, err)
-	}
+	assertPerm0600(t, filepath.Join(dir, "update.json"))
 	if _, err := os.Stat(filepath.Join(dir, "update.json.tmp")); err == nil {
 		t.Fatal("tmp file left behind")
 	}
@@ -387,10 +384,7 @@ func TestSaveUpdateChannelPerms(t *testing.T) {
 	if err := saveUpdateChannel("dev"); err != nil {
 		t.Fatal(err)
 	}
-	st, err := os.Stat(updateConfigPath())
-	if err != nil || st.Mode().Perm() != 0600 {
-		t.Fatalf("update.json perms: %v %v", st, err)
-	}
+	assertPerm0600(t, updateConfigPath())
 	if left, _ := filepath.Glob(filepath.Join(configDir, "update.json.*")); len(left) != 0 {
 		t.Fatalf("temp files left behind: %v", left)
 	}

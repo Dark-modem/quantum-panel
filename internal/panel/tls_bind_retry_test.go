@@ -15,9 +15,12 @@ import (
 	"crypto/x509/pkix"
 	"errors"
 	"fmt"
+	"io/fs"
 	"math/big"
 	"net"
 	"net/http"
+	"os"
+	"strconv"
 	"strings"
 	"syscall"
 	"testing"
@@ -92,14 +95,24 @@ func TestHTTPSBindRetriesUntilPortFrees(t *testing.T) {
 	stubTLSBindDelays(t, 20*time.Millisecond, 30*time.Millisecond, 40*time.Millisecond)
 	fatalMsg := stubTLSBindFatal(t)
 
-	blocker, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("blocker listen: %v", err)
-	}
-	addr := blocker.Addr().String()
-
+	// Pick a loopback port and free it, then SCRIPT the first bind attempt
+	// to fail with the transient EADDRINUSE the retry loop exists for;
+	// later attempts serve for real. (On Windows Go's listener sets
+	// SO_REUSEADDR, so a live squatter cannot simulate a busy bind — the
+	// seam makes the failure deterministic on both gates, BACKEND-24.)
+	addr := "127.0.0.1:" + strconv.Itoa(pickFreePortForTest(t))
 	srv := bindRetryTestServer(addr, testTLSCert(t))
 	t.Cleanup(func() { _ = srv.Shutdown(context.Background()) })
+	oldServe := tlsListenAndServeFn
+	attempts := 0
+	tlsListenAndServeFn = func(srv *http.Server) error {
+		attempts++
+		if attempts == 1 {
+			return &net.OpError{Op: "listen", Net: "tcp", Err: &os.SyscallError{Syscall: "listen", Err: syscall.EADDRINUSE}}
+		}
+		return oldServe(srv)
+	}
+	t.Cleanup(func() { tlsListenAndServeFn = oldServe })
 	serving := make(chan string, 1)
 	go func() {
 		defer func() {
@@ -110,10 +123,6 @@ func TestHTTPSBindRetriesUntilPortFrees(t *testing.T) {
 		tlsServeWithRetry(srv)
 		serving <- "" // returned without a fatal: not serving anymore
 	}()
-
-	// let at least one attempt hit the busy port, then free it
-	time.Sleep(30 * time.Millisecond)
-	blocker.Close()
 
 	client := &http.Client{
 		Timeout:   time.Second,
@@ -127,6 +136,9 @@ func TestHTTPSBindRetriesUntilPortFrees(t *testing.T) {
 			if resp.StatusCode != http.StatusOK {
 				t.Fatalf("unexpected status %d", resp.StatusCode)
 			}
+			if attempts < 2 {
+				t.Fatalf("endpoint answered after only %d attempts", attempts)
+			}
 			select {
 			case msg := <-fatalMsg:
 				t.Fatalf("schedule was NOT exhausted but the unit was failed loudly: %s", msg)
@@ -134,12 +146,26 @@ func TestHTTPSBindRetriesUntilPortFrees(t *testing.T) {
 				t.Fatal("serve goroutine returned while the endpoint answers")
 			default:
 			}
-			return // PASS: HTTPS came up after the port freed
+			return // PASS: HTTPS came up after the scripted first failure
 		}
 		lastErr = err
 		time.Sleep(20 * time.Millisecond)
 	}
 	t.Fatalf("HTTPS never came up after the port freed: %v", lastErr)
+}
+
+// pickFreePortForTest picks a loopback TCP port that is free NOW (the
+// caller must use it immediately; the check-then-use window is inherent).
+func pickFreePortForTest(t *testing.T) int {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	port := ln.Addr().(*net.TCPAddr).Port
+	ln.Close()
+	time.Sleep(5 * time.Millisecond) // settle before the product binds it
+	return port
 }
 
 // TestHTTPSBindFatalAfterExhaustedRetries: a port that stays busy through
@@ -149,15 +175,14 @@ func TestHTTPSBindFatalAfterExhaustedRetries(t *testing.T) {
 	stubTLSBindDelays(t, 10*time.Millisecond)
 	fatalMsg := stubTLSBindFatal(t)
 
-	blocker, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("blocker listen: %v", err)
-	}
-	defer blocker.Close()
-	addr := blocker.Addr().String()
-
+	addr := "127.0.0.1:" + strconv.Itoa(pickFreePortForTest(t))
 	srv := bindRetryTestServer(addr, testTLSCert(t))
 	done := make(chan struct{})
+	oldServe := tlsListenAndServeFn
+	tlsListenAndServeFn = func(*http.Server) error {
+		return &net.OpError{Op: "listen", Net: "tcp", Err: &os.SyscallError{Syscall: "listen", Err: syscall.EADDRINUSE}} // every attempt fails: the schedule must exhaust
+	}
+	t.Cleanup(func() { tlsListenAndServeFn = oldServe })
 	go func() {
 		defer close(done)
 		defer func() { _ = recover() }() // the stub panics to unwind
@@ -196,7 +221,18 @@ func TestHTTPSNonBindErrorRecorded(t *testing.T) {
 	}
 	// ListenAndServeTLS("", "") with no certificate configured fails with
 	// a fs.PathError ("open : no such file or directory") — a non-bind
-	// error: recorded once, no retry, no unit failure.
+	// error: recorded once, no retry, no unit failure. The failure is
+	// INJECTED via the serve seam so the message is identical on both
+	// gates (the real Windows error text differs, BACKEND-24).
+	oldServe := tlsListenAndServeFn
+	tlsListenAndServeFn = func(*http.Server) error {
+		// A plain non-bind error whose TEXT is identical on both gates (a
+		// real syscall.ENOENT renders the platform's own message: "no such
+		// file or directory" on Linux, "The system cannot find the file
+		// specified." on Windows).
+		return &fs.PathError{Op: "open", Path: "", Err: errNoSuchFile}
+	}
+	t.Cleanup(func() { tlsListenAndServeFn = oldServe })
 	tlsServeWithRetry(srv) // must return on its own
 
 	errMu.Lock()
@@ -208,6 +244,10 @@ func TestHTTPSNonBindErrorRecorded(t *testing.T) {
 	}
 	t.Fatal("E-TLS-08 not recorded for the non-bind failure")
 }
+
+// errNoSuchFile: a non-bind error with the UNIX message text so the
+// E-TLS-08 assertion is platform-neutral (BACKEND-24).
+var errNoSuchFile = errors.New("no such file or directory")
 
 // TestTLSIsBindErr: exactly the transient bind-family errors are
 // retryable; everything else takes the record-once path.

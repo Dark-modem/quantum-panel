@@ -145,13 +145,7 @@ func TestEngineArtifactUploadHappyPath(t *testing.T) {
 
 	// File stored with 0600 in the dedicated dir.
 	p := filepath.Join(env.dir, "engine-artifacts", name)
-	fi, err := os.Stat(p)
-	if err != nil {
-		t.Fatalf("stored file: %v", err)
-	}
-	if fi.Mode().Perm() != 0o600 {
-		t.Fatalf("stored file mode = %v, want 0600", fi.Mode().Perm())
-	}
+	assertPerm0600(t, p)
 	onDisk, _ := os.ReadFile(p)
 	if !bytes.Equal(onDisk, artifact) {
 		t.Fatal("stored bytes differ from the upload")

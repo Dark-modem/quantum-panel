@@ -232,6 +232,12 @@ func portFree(port int) bool {
 	return true
 }
 
+// portFreeFn is the port-occupancy probe seam (the diskUsageFn pattern):
+// on Windows Go's listener sets SO_REUSEADDR, so the real probe reports an
+// OCCUPIED port as free and the auto-switch tests cannot simulate a squat;
+// tests override the seam. Production behavior is unchanged.
+var portFreeFn = portFree
+
 // panelBindAddr builds the listen address for the panel's listeners,
 // honoring panel.json bind_host (reverse-proxy mode: "127.0.0.1" keeps
 // the panel private behind nginx). Empty binds all interfaces.
@@ -282,7 +288,7 @@ func pickFreePort(start int) int {
 		if p < 1 {
 			continue
 		}
-		if portFree(p) {
+		if portFreeFn(p) {
 			return p
 		}
 	}
@@ -321,7 +327,7 @@ func ensureFreeHTTPPort() {
 	} else if desired < 1 || desired > 65535 {
 		desired = 7777
 	}
-	if portFree(desired) {
+	if portFreeFn(desired) {
 		if cfg.Port != desired {
 			cfg.Port = desired
 			saveCfg()

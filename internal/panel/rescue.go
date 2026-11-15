@@ -214,7 +214,7 @@ func pickCtrlPort(avoid map[int]bool) int {
 		b := make([]byte, 2)
 		_, _ = rand.Read(b)
 		p := 20000 + (int(b[0])<<8|int(b[1]))%40000
-		if !avoid[p] && portFree(p) {
+		if !avoid[p] && portFreeFn(p) {
 			return p
 		}
 	}
@@ -522,7 +522,7 @@ func rescueApplyCode(code string) (rescueState, error) {
 	reserved := rescueReserved(c.CPort)
 	var use, skipped []int
 	for _, p := range c.Ports {
-		if reserved[p] || !portFree(p) {
+		if reserved[p] || !portFreeFn(p) {
 			skipped = append(skipped, p)
 			continue
 		}

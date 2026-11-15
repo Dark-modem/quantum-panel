@@ -398,6 +398,7 @@ func (c *agentE2EConn) read() (string, json.RawMessage, error) {
 
 func TestAgentTunnelControllerLoopRealHub(t *testing.T) {
 	dir := t.TempDir()
+	t.Cleanup(MeshStoreCloseForTest) // close the lazily-opened store before the temp dir is removed (BACKEND-24)
 	oldDir := configDir
 	oldAck, oldPort, oldCmd := agentTunnelAckWait, agentTunnelPortWait, agentTunnelCmdTimeout
 	configDir = dir
