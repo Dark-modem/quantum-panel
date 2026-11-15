@@ -1523,7 +1523,7 @@
         var tTopo = tn.topology || '';
         return '<tr>' +
           '<td>' + (tkey ? '<b class="mono mtb-tun-key" dir="ltr" title="' + esc(tkey) + '">' + esc(tkey) + '</b>' : '\u2014') +
-            (tTopo ? '<br><span class="mtb-muted" style="font-size:.85em">' + esc(tTopo) + '</span>' : '') + '</td>' +
+            (tTopo ? '<br><span class="mtb-muted mtb-tun-topo">' + MTB_ICO.mesh + esc(tTopo) + '</span>' : '') + '</td>' +
           '<td><div class="mtb-dest"><span class="mtb-dest-flag">' + (remCc ? topologyFlagSvg(remCc) : '') + '</span><div class="mtb-dest-tx"><b>' + esc(rem) + '</b>' +
             ((remDc || remCcL) ? '<span class="mtb-muted" style="font-size:.85em">' + esc(remDc) + (remDc && remCcL ? ' \u00b7 ' : '') + esc(remCcL) + '</span>' : '') + '</div></div></td>' +
           '<td><span class="badge info mtb-eng-badge">' + engLogo({ engine: tn.engine }, engName2) + ' ' + esc(engName2) + '</span></td>' +

@@ -11774,6 +11774,8 @@ window.loadClusterStatus = loadClusterStatus;
     '.mtb-dest{display:flex;align-items:center;gap:8px;min-width:0}',
     '.mtb-dest-flag svg{width:54px;height:38px}', // as tall as the two-line block (name + datacenter), aspect kept
     '.mtb-dest-flag{display:flex;align-items:center}',
+    '.mtb-tun-topo{display:inline-flex;align-items:center;gap:4px;font-size:.85em}',
+    '.mtb-tun-topo svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;opacity:.75;flex:none}',
     '.mtb-dest-tx{display:flex;flex-direction:column;gap:2px;min-width:0}',
     '.mtb-eng-badge img{width:16px;height:16px;object-fit:contain;border-radius:3px}',
     '.mtb-eng-badge svg{width:16px;height:16px}', // inline fallback art (qmark/spoof) sized like the brand imgs
