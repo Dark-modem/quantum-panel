@@ -11673,6 +11673,7 @@ window.loadClusterStatus = loadClusterStatus;
     '#mtbAgentModal .mtb-x{width:34px;height:34px;border:1px solid color-mix(in srgb, var(--ac) 45%, transparent);border-radius:10px;color:var(--ac);background:color-mix(in srgb, var(--ac) 8%, transparent);display:inline-flex;align-items:center;justify-content:center;font-size:18px}',
     '#mtbAgentModal .mtb-x:hover{border-color:var(--ac);background:color-mix(in srgb, var(--ac) 16%, transparent)}',
     '#mtbAgentModal #mtbWizBack{margin-inline-end:auto}',
+    '.mtb-ed-modal #mtbEdBack{margin-inline-end:auto}',
     '.mtb-del-hero{display:flex;align-items:center;gap:12px;flex:1;min-width:0}',
     '.mtb-del-badge{width:44px;height:44px;border-radius:12px;border:1px solid color-mix(in srgb, var(--er) 50%, transparent);background:color-mix(in srgb, var(--er) 12%, transparent);color:var(--er);display:inline-flex;align-items:center;justify-content:center;flex:none}',
     '.mtb-del-badge svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}',

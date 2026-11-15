@@ -1609,7 +1609,6 @@
         '</div>' +
         '<p class="qs-hint mtb-formmsg" data-mtb-msg></p>' +
         '<div class="mtb-acts"><button type="button" class="quantum-btn quantum-btn-secondary mtb-ed-back" id="mtbEdBack" hidden>' + esc(L('agWizBack')) + '</button>' +
-        '<button type="button" class="quantum-btn quantum-btn-secondary" data-mtb-close>' + esc(L('cancel')) + '</button>' +
         '<button type="button" class="quantum-btn quantum-btn-primary" id="mtbEdNext">' + esc(L('agEdNext')) + '</button>' +
         '<button type="button" class="quantum-btn quantum-btn-primary" id="mtbAgSave" hidden>' + esc(L('agSave')) + '</button></div>' +
         '</div></div>';
