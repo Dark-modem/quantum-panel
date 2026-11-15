@@ -2,10 +2,16 @@ package panel
 
 // meshalerts_coverage_test.go — BACKEND-19 TASK B: unit coverage for the
 // four phase-13 rules that had no tests (hardening_expiring, cert_expiry,
-// disk_usage, traffic_drop). Together with the existing meshalerts_test.go
-// (agent_offline, tunnel_down, foreign_all_down, dedup/recovery/quiet) and
-// agentmaintenance_test.go (maintenance silencing), every intended rule is
-// now covered at the engine level.
+// disk_usage, traffic_drop) and, in TestAlertPhase13RemainingRules, fire
+// tests for the four phase-13 rules that existed but were never asserted
+// (agent_disk_high, billing_spike, backup_old, desired_stuck). Together
+// with meshalerts_test.go (agent_offline, tunnel_down, foreign_all_down,
+// dedup/recovery/quiet) and agentmaintenance_test.go (maintenance
+// silencing), every dispatch-intended rule class is covered at engine
+// level. Known remaining gaps (documented, not invented): clock_drift is
+// a catalog stub — StateReportV2 carries NO agent timestamp, so the rule
+// needs a protocol+agent field first (deferred); panel_disk_full shells
+// out to df and cannot fire hermetically (no seam yet).
 
 import (
 	"crypto/ecdsa"
@@ -13,9 +19,13 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/json"
 	"encoding/pem"
+	"fmt"
 	"math/big"
 	"os"
+	"path/filepath"
+	"sort"
 	"testing"
 	"time"
 
@@ -120,19 +130,26 @@ func TestMeshAlertCertExpiryRule(t *testing.T) {
 func TestMeshAlertDiskUsageRule(t *testing.T) {
 	e, _ := newTestEngine(t, time.Now().Add(-time.Hour))
 	r3TestStore(t)
-	// threshold floor is 10% (settings validation): any real machine is
-	// above it, so the rule must fire for the config dir
-	e.settings.DiskMaxPercent = 10
-	evs := e.evaluate(time.Now())
-	ev := findRule(t, evs, "disk_usage")
+	// Hermetic: pin the probe (the real syscall probe depends on the HOST
+	// disk — 4% used on one machine, 54% on another — which made the first
+	// version of this test fail on a lightly-used WSL root).
+	diskUsageFn = func(path string) (uint64, uint64, error) {
+		if path != configDir {
+			return 0, 0, fmt.Errorf("unexpected probe path %q", path)
+		}
+		return uint64(100) << 30, uint64(80) << 30, nil // 20% used
+	}
+	t.Cleanup(func() { diskUsageFn = getDiskUsage })
+	// exactly at the ceiling fires (>=), one point below it does not
+	e.settings.DiskMaxPercent = 20
+	ev := findRule(t, e.evaluate(time.Now()), "disk_usage")
 	if ev.Target != configDir {
 		t.Fatalf("disk_usage must target the config dir: %+v", ev)
 	}
-	// an unreachable ceiling (99%) must NOT fire on a healthy disk
-	e.settings.DiskMaxPercent = 99
+	e.settings.DiskMaxPercent = 21
 	for _, ev := range e.evaluate(time.Now()) {
 		if ev.Rule == "disk_usage" {
-			t.Fatalf("disk_usage fired at 99%% ceiling on a healthy disk: %+v", ev)
+			t.Fatalf("disk_usage fired below the ceiling: %+v", ev)
 		}
 	}
 }
@@ -187,5 +204,104 @@ func TestMeshAlertTrafficDropRule(t *testing.T) {
 	}
 	if _, ok := meshTrafficFrozenSeen["k-td"]; ok {
 		t.Fatal("freeze state must clear when traffic resumes")
+	}
+}
+
+// TestAlertPhase13RemainingRules — the phase-13 rules that existed since
+// phase 13 but had NO fire assertion anywhere: agent_disk_high,
+// billing_spike, backup_old, desired_stuck. Contract = the phase-13
+// catalog (alertTextCatalog) + the evaluatePhase13 branches.
+func TestAlertPhase13RemainingRules(t *testing.T) {
+	e, _ := newTestEngine13(t)
+	s := meshStoreMust(t)
+	_, _, agIr, _ := uiSeedWorld(t, s)
+	now := time.Now()
+
+	// agent_disk_high: 95% of the agent's reported disk (threshold 90%);
+	// CPU/memory kept healthy so ONLY the disk rule fires from this report.
+	if err := s.UpdateAgentResources(agIr, 4, 10, 0.5, 8192, 800, 100, 95, 86400, "kvm"); err != nil {
+		t.Fatal(err)
+	}
+	// billing_spike: last week carried 2 MB, this hour 20 MB (>8x) on the
+	// seeded tunnel; a sibling tunnel with FLAT traffic must not spike.
+	tun, err := s.GetTunnelByKey("tl-a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AddTrafficSample(store.TrafficSample{TunnelID: tun.ID, AgentID: agIr,
+		At: now.Add(-7 * 24 * time.Hour).Unix(), WireRx: 2 << 20, WireTx: 1 << 20, CountersKnown: true}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AddTrafficSample(store.TrafficSample{TunnelID: tun.ID, AgentID: agIr,
+		At: now.Add(-time.Minute).Unix(), WireRx: 20 << 20, WireTx: 0, CountersKnown: true}); err != nil {
+		t.Fatal(err)
+	}
+	// backup_old: the backup state file 8 days stale (threshold 7 days).
+	bst := filepath.Join(configDir, "backup-state.json")
+	if err := os.WriteFile(bst, []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	stale := now.Add(-8 * 24 * time.Hour)
+	if err := os.Chtimes(bst, stale, stale); err != nil {
+		t.Fatal(err)
+	}
+	// desired_stuck: a queued desired revision + last_seen 16 min ago
+	// (threshold >15 min). Fresh last_seen must NOT fire (asserted below).
+	ag, err := s.GetAgent(agIr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ag.LastSeen = now.Add(-16 * time.Minute).Unix()
+	if err := s.UpsertAgent(ag); err != nil {
+		t.Fatal(err)
+	}
+	dv, err := json.Marshal(protocol.DesiredV2{Revision: "rev-stuck-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetPendingDesiredV2(agIr, string(dv)); err != nil {
+		t.Fatal(err)
+	}
+
+	evs := e.evaluatePhase13(now)
+	got := map[string]meshAlertEvent{}
+	for _, ev := range evs {
+		if _, dup := got[ev.Rule]; !dup {
+			got[ev.Rule] = ev
+		}
+	}
+	for _, want := range []string{"agent_disk_high", "billing_spike", "backup_old", "desired_stuck"} {
+		ev, ok := got[want]
+		if !ok {
+			fired := make([]string, 0, len(got))
+			for r := range got {
+				fired = append(fired, r)
+			}
+			sort.Strings(fired)
+			t.Fatalf("rule %q did not fire; fired: %v", want, fired)
+		}
+		if ev.UI == nil {
+			t.Fatalf("rule %s must carry the structured fa/en view", want)
+		}
+	}
+	if got["agent_disk_high"].Target != agIr {
+		t.Fatalf("agent_disk_high must target the agent: %+v", got["agent_disk_high"])
+	}
+	if got["billing_spike"].Target != tun.TunnelKey {
+		t.Fatalf("billing_spike must target the tunnel key: %+v", got["billing_spike"])
+	}
+
+	// negatives: fresh backup state + a healthy disk → those two must not
+	// fire (billing/desired state intentionally left as-is — out of scope).
+	if err := os.Chtimes(bst, now, now); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpdateAgentResources(agIr, 4, 10, 0.5, 8192, 800, 100, 50, 86400, "kvm"); err != nil {
+		t.Fatal(err)
+	}
+	for _, ev := range e.evaluatePhase13(now) {
+		if ev.Rule == "backup_old" || ev.Rule == "agent_disk_high" {
+			t.Fatalf("rule %q must not fire in the healthy state: %+v", ev.Rule, ev)
+		}
 	}
 }

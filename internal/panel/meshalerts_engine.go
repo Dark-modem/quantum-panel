@@ -79,7 +79,7 @@ type meshAlertState struct {
 	lastSent time.Time
 	openedAt time.Time
 	lastText string
-	sev      string        // round-3 F4: carried into the recovery payload
+	sev      string         // round-3 F4: carried into the recovery payload
 	lastUI   map[string]any // the structured fa/en view of the last event
 }
 
@@ -468,7 +468,7 @@ func (e *meshAlertEngine) evaluate(now time.Time) []meshAlertEvent {
 			})
 		}
 	}
-	if total, free, err := getDiskUsage(configDir); err == nil && total > 0 {
+	if total, free, err := diskUsageFn(configDir); err == nil && total > 0 {
 		pct := 100 - int(100*free/total)
 		if pct >= e.settings.DiskMaxPercent {
 			evs = append(evs, meshAlertEvent{
@@ -509,6 +509,13 @@ type meshTunnelRuntimeView struct {
 
 // meshTrafficFrozenSeen tracks two consecutive zero-traffic ticks.
 var meshTrafficFrozenSeen = map[string]time.Time{}
+
+// diskUsageFn is the disk-probe seam: production uses the syscall probe
+// (disk_unix.go/disk_windows.go); tests pin fixed numbers so the rule's
+// threshold math never depends on how full the HOST disk happens to be
+// (round-3 follow-up: the first version of the coverage test assumed
+// "any real machine is above 10% used" and failed on a 4%-used WSL root).
+var diskUsageFn = getDiskUsage
 
 func (e *meshAlertEngine) trafficFrozen(key string, now time.Time) bool {
 	first, ok := meshTrafficFrozenSeen[key]
@@ -558,7 +565,7 @@ func (e *meshAlertEngine) tick(now time.Time) {
 		}
 		st.open = false
 		ev := meshAlertEvent{Key: key, Target: key, Now: now, Recovery: true,
-			Sev: st.sev, // round-3 F4: recoveries carried an EMPTY severity
+			Sev:  st.sev, // round-3 F4: recoveries carried an EMPTY severity
 			Text: "recovered: " + st.lastText}
 		if i := strings.IndexByte(key, ':'); i >= 0 {
 			ev.Rule = key[:i]
