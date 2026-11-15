@@ -84,6 +84,13 @@ func backupKeyFiles() (map[string]string, error) {
 	if _, err := os.Stat(enginePubKeyPath()); err == nil {
 		files["engine-artifacts/engine-pub.b64"] = enginePubKeyPath()
 	}
+	// Round-3 finding F3: the sealed mesh-alerts settings file carries the
+	// alert thresholds, the notifier secrets AND the phase-16 maintenance
+	// windows — without it a backup/restore round trip silently dropped
+	// that state (0600: sealed secrets at rest).
+	if _, err := os.Stat(meshAlertSettingsPath()); err == nil {
+		files["mesh-alerts.json"] = meshAlertSettingsPath()
+	}
 	return files, nil
 }
 

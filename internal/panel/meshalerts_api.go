@@ -11,6 +11,7 @@ package panel
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -121,6 +122,11 @@ func handleMeshAlertsTest(w http.ResponseWriter, r *http.Request) {
 			sent++
 		}
 	}
+	// Round-3 audit (SECURITY-AUDIT-PANEL): the test send pokes REAL
+	// notifiers — it is an operator action on the alerting surface and gets
+	// an audit line like settings changes do (no secrets in details).
+	LogSecurityAudit("alerts_test_sent", cfg.Username, ClientIP(r),
+		"sent="+strconv.Itoa(sent)+" notifiers="+strconv.Itoa(len(ns)))
 	meshAlertEng.mu.Lock()
 	meshAlertEng.history = append(meshAlertEng.history, meshAlertHistoryItem{
 		At: ev.Now.Unix(), Key: "test", Rule: "test", Sev: "info", Text: ev.Text,

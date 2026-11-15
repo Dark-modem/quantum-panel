@@ -79,6 +79,7 @@ type meshAlertState struct {
 	lastSent time.Time
 	openedAt time.Time
 	lastText string
+	sev      string         // round-3 F4: carried into the recovery payload
 	lastUI   map[string]any // the structured fa/en view of the last event
 }
 
@@ -365,8 +366,16 @@ func (e *meshAlertEngine) evaluate(now time.Time) []meshAlertEvent {
 			if rec.Revoked {
 				continue
 			}
+			// Round-3 fix (backend-19 F5): fire on STALENESS only. The
+			// registry load-reset forces every record's Status to offline,
+			// so the old `Status != "online"` disjunct was always true —
+			// the rule fired for LIVE agents too and, because the condition
+			// could never clear, recovery notifications never dispatched
+			// (caught by the backend-19 recovery e2e). LastSeen is the
+			// hub-maintained freshness signal (hello + the batched
+			// per-heartbeat persist; the v2 path now persists too).
 			offlineFor := now.Sub(time.Unix(rec.LastSeen, 0))
-			if rec.Status != "online" || offlineFor > time.Duration(e.settings.AgentOfflineMin)*time.Minute {
+			if offlineFor > time.Duration(e.settings.AgentOfflineMin)*time.Minute {
 				evs = append(evs, meshAlertEvent{
 					Key: "agent_offline:" + rec.ID, Rule: "agent_offline", Target: rec.ID,
 					Sev: "warn", Now: now,
@@ -408,6 +417,13 @@ func (e *meshAlertEngine) evaluate(now time.Time) []meshAlertEvent {
 				rt := e.runtimeFor(t.TunnelKey)
 				if rt == nil {
 					continue // no report yet: not an alert (startup truth)
+				}
+				if rt.WireKnown && rt.WireSum > 0 {
+					// traffic resumed: reset the freeze window, so a FUTURE
+					// freeze still requires two consecutive dead ticks
+					// (round-3 fix: the entry used to linger forever and a
+					// re-freeze would fire after a single tick)
+					delete(meshTrafficFrozenSeen, t.TunnelKey)
 				}
 				if !rt.Up {
 					downByServer[t.RemoteServerID]++
@@ -460,7 +476,7 @@ func (e *meshAlertEngine) evaluate(now time.Time) []meshAlertEvent {
 			})
 		}
 	}
-	if total, free, err := getDiskUsage(configDir); err == nil && total > 0 {
+	if total, free, err := diskUsageFn(configDir); err == nil && total > 0 {
 		pct := 100 - int(100*free/total)
 		if pct >= e.settings.DiskMaxPercent {
 			evs = append(evs, meshAlertEvent{
@@ -502,6 +518,13 @@ type meshTunnelRuntimeView struct {
 // meshTrafficFrozenSeen tracks two consecutive zero-traffic ticks.
 var meshTrafficFrozenSeen = map[string]time.Time{}
 
+// diskUsageFn is the disk-probe seam: production uses the syscall probe
+// (disk_unix.go/disk_windows.go); tests pin fixed numbers so the rule's
+// threshold math never depends on how full the HOST disk happens to be
+// (round-3 follow-up: the first version of the coverage test assumed
+// "any real machine is above 10% used" and failed on a 4%-used WSL root).
+var diskUsageFn = getDiskUsage
+
 func (e *meshAlertEngine) trafficFrozen(key string, now time.Time) bool {
 	first, ok := meshTrafficFrozenSeen[key]
 	if !ok {
@@ -529,12 +552,14 @@ func (e *meshAlertEngine) tick(now time.Time) {
 			st.open = true
 			st.openedAt = now
 			st.lastText = ev.Text
+			st.sev = ev.Sev
 			if !quiet {
 				e.dispatchLocked(ev, false)
 				st.lastSent = now
 			}
 		} else if now.Sub(st.lastSent) >= meshAlertCooldown {
 			st.lastText = ev.Text
+			st.sev = ev.Sev
 			if !quiet {
 				e.dispatchLocked(ev, false)
 				st.lastSent = now
@@ -548,6 +573,7 @@ func (e *meshAlertEngine) tick(now time.Time) {
 		}
 		st.open = false
 		ev := meshAlertEvent{Key: key, Target: key, Now: now, Recovery: true,
+			Sev:  st.sev, // round-3 F4: recoveries carried an EMPTY severity
 			Text: "recovered: " + st.lastText}
 		if i := strings.IndexByte(key, ':'); i >= 0 {
 			ev.Rule = key[:i]
