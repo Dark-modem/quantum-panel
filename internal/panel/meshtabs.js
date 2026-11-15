@@ -64,6 +64,7 @@
     agTopoT: ['توپولوژی‌ها', 'Topologies'], agEngT: ['هسته‌های ایجنت', 'Agent engines'], agNoEng: ['انجینی ثبت نشده', 'No engines'],
     agNoTopo: ['عضو هیچ توپولوژی‌ای نیست', 'Not a member of any topology'], agPeers: ['هم‌تا', 'peers'],
     agEditT: ['ویرایش ایجنت', 'Edit agent'], agNameK: ['نام', 'Name'], agIPK: ['آدرس عمومی', 'Public IP'],
+    agEdSaved: ['تغییرات ایجنت ذخیره شد', 'Agent changes saved'],
     agEditSub: ['اطلاعات ایجنت را ویرایش و ذخیره کنید.', 'Edit the agent information and save.'],
     agEdSt1: ['اطلاعات پایه', 'Basic info'], agEdSt2: ['بازبینی و ذخیره', 'Review & save'],
     agEdNext: ['مرحله بعد', 'Next'],
@@ -1685,6 +1686,7 @@
         apiSend('POST', 'api/ui/agents/' + encodeURIComponent(id) + '/rename', { name: nm }).then(function () {
           return apiSend('POST', 'api/ui/agents/' + encodeURIComponent(id) + '/public-ip', { public_ip: pip });
         }).then(function () {
+          mtbToast(L('agEdSaved'));
           ov.remove(); renderAgtDetail(id);
         }).catch(function (e2) {
           msg.textContent = (e2.body && (e2.body.error || e2.body.message)) || ('HTTP ' + e2.status);
