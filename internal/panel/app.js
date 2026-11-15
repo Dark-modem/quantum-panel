@@ -11550,7 +11550,7 @@ window.loadClusterStatus = loadClusterStatus;
     '.mtb-topo-view:hover{border-color:var(--ac);color:var(--ac)}',
     '.mtb-eng-filters{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}',
     '.mtb-lat.ok{color:var(--ok);font-weight:700}',
-    '.mtb-lat.warn{color:var(--wr, #eab308);font-weight:700}',
+    '.mtb-lat.warn{color:var(--wr);font-weight:700}',
     '.mtb-lat.bad{color:var(--er);font-weight:700}',
     '.mtb-lat.na{color:var(--tx2)}',
     '.mtb-eng-chip{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--ln);border-radius:999px;background:var(--sunk);padding:5px 12px;font-size:12.5px;font-weight:600;color:var(--tx2);cursor:pointer;transition:border-color .2s,color .2s}',
@@ -11649,7 +11649,7 @@ window.loadClusterStatus = loadClusterStatus;
     '.mtb-field-ok svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}',
     '.mtb-tip-row{margin-top:8px}',
     '.mtb-tip-i{position:relative;width:20px;height:20px;border-radius:50%;border:1px solid color-mix(in srgb, var(--ac) 45%, transparent);background:color-mix(in srgb, var(--ac) 12%, transparent);color:var(--ac);font-size:12px;font-weight:700;cursor:help;display:inline-flex;align-items:center;justify-content:center;padding:0}',
-    '.mtb-tip-i::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 8px);inset-inline-start:0;z-index:9;width:max-content;max-width:280px;background:var(--s1, #12161f);border:1px solid color-mix(in srgb, var(--ac) 30%, var(--ln));border-radius:10px;padding:8px 10px;font-size:12px;font-weight:400;line-height:1.5;color:var(--tx);text-align:start;white-space:normal;opacity:0;pointer-events:none;transform:translateY(4px);transition:opacity .2s,transform .2s;box-shadow:0 10px 24px rgba(0,0,0,.4)}',
+    '.mtb-tip-i::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 8px);inset-inline-start:0;z-index:9;width:max-content;max-width:280px;background:var(--s1);border:1px solid color-mix(in srgb, var(--ac) 30%, var(--ln));border-radius:10px;padding:8px 10px;font-size:12px;font-weight:400;line-height:1.5;color:var(--tx);text-align:start;white-space:normal;opacity:0;pointer-events:none;transform:translateY(4px);transition:opacity .2s,transform .2s;box-shadow:0 10px 24px rgba(0,0,0,.4)}',
     '.mtb-tip-i:hover::after,.mtb-tip-i.tipopen::after{opacity:1;transform:none}',
     '.mtb-tip-infield{position:absolute;inset-inline-end:40px;top:50%;transform:translateY(-50%)}',
     '.mtb-hint-row{display:none}',
@@ -11657,10 +11657,10 @@ window.loadClusterStatus = loadClusterStatus;
     '.mtb-tip-infield:hover::after,.mtb-tip-infield.tipopen::after{transform:none}',
     '@media (max-width:760px){.mtb-wiz{gap:8px;margin:12px 0 18px}' +
       '.mtb-wstep{gap:6px;padding:7px 10px;min-width:0}' +
-      '.mtb-wstep-dot{width:22px;height:22px;font-size:11px}' +
+      '.mtb-wstep-dot{width:22px;height:22px;font-size:12px}' +
       '.mtb-wstep-dot svg{width:11px;height:11px}' +
       '.mtb-wstep.on .mtb-wstep-dot{box-shadow:0 0 10px color-mix(in srgb, var(--ac) 55%, transparent)}' +
-      '.mtb-wstep-lbl{font-size:11px}' +
+      '.mtb-wstep-lbl{font-size:12px}' +
       '.mtb-wline{flex:1;min-width:6px}' +
       '.mtb-field .quantum-input{height:58px;font-size:16px;border-radius:18px}' +
       '.mtb-field-ico{inset-inline-start:16px}' +
@@ -11748,7 +11748,7 @@ window.loadClusterStatus = loadClusterStatus;
     '.mtb-dest-flag{margin-top:2px}',
     '.mtb-dest-tx{display:flex;flex-direction:column;gap:2px;min-width:0}',
     '.mtb-eng-badge img{width:16px;height:16px;object-fit:contain;border-radius:3px}',
-    '#tab-magt .mtb-eng-badge{max-width:100%;flex-wrap:wrap;row-gap:2px;font-size:11px}',
+    '#tab-magt .mtb-eng-badge{max-width:100%;flex-wrap:wrap;row-gap:2px;font-size:12px}',
     '#tab-magt .mtb-eng-badge img{width:13px;height:13px}',
     '.mtb-cdd-opt:hover{background:color-mix(in srgb, var(--ac) 12%, transparent)}',
     '.mtb-cdd-opt.on{background:color-mix(in srgb, var(--ac) 16%, transparent);color:var(--ac)}',
@@ -12163,8 +12163,8 @@ window.loadClusterStatus = loadClusterStatus;
       var tf = (ov.traffic && ov.traffic.today) || {};
       var irDl = tf.billable_download_bytes || 0, irUl = tf.upload_bytes || 0;
       var allDl = tf.wire_rx_bytes || 0, allUl = tf.wire_tx_bytes || 0;
-      // the card reads as "ترافیک لحظه‌ای": show per-second rates from the
-      // counter delta between two polls instead of cumulative totals
+      // the card reads as the instant-traffic tile: show per-second rates from
+      // the counter delta between two polls instead of cumulative totals
       var now = Date.now();
       var rate = function (cur, prev) {
         if (!prev) return null;
