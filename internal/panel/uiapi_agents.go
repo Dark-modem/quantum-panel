@@ -82,13 +82,15 @@ func (h uiStoreHandle) uiServerRef(serverID int64) any {
 	if err != nil {
 		return nil
 	}
-	dcName := ""
+	dcName, dcEn := "", ""
 	if sv.DatacenterID != 0 {
 		if dc, err := h.GetDatacenter(sv.DatacenterID); err == nil {
 			dcName = dc.Name
+			dcEn = dc.DatacenterEN // phase 26 §9: English display name (empty = unset)
 		}
 	}
-	return map[string]any{"id": sv.ID, "name": sv.Name, "role": sv.Role, "datacenter": dcName}
+	return map[string]any{"id": sv.ID, "name": sv.Name, "role": sv.Role,
+		"datacenter": dcName, "datacenter_en": dcEn}
 }
 
 func handleUIAgentDetail(w http.ResponseWriter, r *http.Request) {
@@ -118,12 +120,14 @@ func handleUIAgentDetail(w http.ResponseWriter, r *http.Request) {
 	if ag.PublicIPOverride != "" {
 		effective = ag.PublicIPOverride
 	}
-	dcName := ""
-	if ag.ServerID != 0 {
-		if sv, serr := h.GetServer(ag.ServerID); serr == nil && sv.DatacenterID != 0 {
-			if dc, derr := h.GetDatacenter(sv.DatacenterID); derr == nil {
-				dcName = dc.Name
-			}
+	// The agent's datacenter (phase 26 §9): derived from its linked server's
+	// datacenter exactly like the agents rows' a.server.datacenter; empty
+	// for an unlinked agent.
+	dcName, dcEn := "", ""
+	if ref := h.uiServerRef(ag.ServerID); ref != nil {
+		if m, ok := ref.(map[string]any); ok {
+			dcName, _ = m["datacenter"].(string)
+			dcEn, _ = m["datacenter_en"].(string)
 		}
 	}
 
@@ -222,7 +226,7 @@ func handleUIAgentDetail(w http.ResponseWriter, r *http.Request) {
 			"effective_public_ip": effective,
 			"cpu":                 cpu, "mem": mem, "disk": disk,
 			"uptime_s": ag.UptimeS, "virt": nilIfEmpty(ag.Virt),
-			"datacenter": dcName, "cpu_model": nilIfEmpty(ag.CPUModel),
+			"datacenter": dcName, "datacenter_en": dcEn, "cpu_model": nilIfEmpty(ag.CPUModel),
 		},
 		"topologies":    topos,
 		"tunnels":       tunRows,

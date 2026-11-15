@@ -32,6 +32,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -83,6 +84,13 @@ func backupKeyFiles() (map[string]string, error) {
 	}
 	if _, err := os.Stat(enginePubKeyPath()); err == nil {
 		files["engine-artifacts/engine-pub.b64"] = enginePubKeyPath()
+	}
+	// Round-3 finding F3: the sealed mesh-alerts settings file carries the
+	// alert thresholds, the notifier secrets AND the phase-16 maintenance
+	// windows — without it a backup/restore round trip silently dropped
+	// that state (0600: sealed secrets at rest).
+	if _, err := os.Stat(meshAlertSettingsPath()); err == nil {
+		files["mesh-alerts.json"] = meshAlertSettingsPath()
 	}
 	return files, nil
 }
@@ -486,7 +494,13 @@ func untarBackup(tarBytes []byte) (*backupManifest, map[string][]byte, error) {
 		if err != nil {
 			return nil, nil, err
 		}
-		name := filepath.Clean(hdr.Name)
+		// Tar member names are slash-separated by spec: clean with the
+		// slash-based path package so the keys match the manifest on every
+		// platform (Windows filepath.Clean rewrote tls/server.key to
+		// tls\server.key and every restore of a bundle with a subdirectory
+		// member failed its manifest lookup). filepath.IsAbs stays: it is
+		// the check that recognizes Windows drive-letter members.
+		name := path.Clean(hdr.Name)
 		if strings.HasPrefix(name, "..") || filepath.IsAbs(name) {
 			return nil, nil, fmt.Errorf("unsafe member name %q", hdr.Name)
 		}

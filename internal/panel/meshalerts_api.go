@@ -11,6 +11,7 @@ package panel
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -25,14 +26,18 @@ func registerMeshAlertRoutes(mux *http.ServeMux, base string) {
 func handleMeshAlertsView(w http.ResponseWriter, r *http.Request) {
 	open, history, st := meshAlertEng.currentAlertsView()
 	writeJSON(w, map[string]any{
-		"enabled":               st.Enabled,
-		"agent_offline_min":     st.AgentOfflineMin,
-		"cert_expire_days":      st.CertExpireDays,
-		"disk_max_percent":      st.DiskMaxPercent,
-		"telegram_set":          st.TelegramToken != "" && st.TelegramChat != "",
-		"webhook_set":           st.WebhookURL != "",
-		"open":                  open,
-		"history":               history,
+		"enabled":           st.Enabled,
+		"agent_offline_min": st.AgentOfflineMin,
+		"cert_expire_days":  st.CertExpireDays,
+		"disk_max_percent":  st.DiskMaxPercent,
+		"clock_drift_max_s": st.ClockDriftMaxS,
+		"telegram_set":      st.TelegramToken != "" && st.TelegramChat != "",
+		"webhook_set":       st.WebhookURL != "",
+		"open":              open,
+		"history":           history,
+		// Phase 16: ACTIVE maintenance windows (contract §2.15) so the
+		// rules card renders them without extra calls.
+		"maintenance":           meshAlertEng.maintenanceWindows(),
 		"quiet_until_startup_s": int(meshAlertQuietStart.Seconds()),
 	})
 }
@@ -43,6 +48,7 @@ func handleMeshAlertsSettings(w http.ResponseWriter, r *http.Request) {
 		AgentOfflineMin *int   `json:"agent_offline_min"`
 		CertExpireDays  *int   `json:"cert_expire_days"`
 		DiskMaxPercent  *int   `json:"disk_max_percent"`
+		ClockDriftMaxS  *int   `json:"clock_drift_max_s"`
 		TelegramToken   string `json:"telegram_token"` // "" = keep, "-" = clear
 		TelegramChat    string `json:"telegram_chat"`
 		WebhookURL      string `json:"webhook_url"`
@@ -63,6 +69,11 @@ func handleMeshAlertsSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	if q.DiskMaxPercent != nil && *q.DiskMaxPercent >= 10 && *q.DiskMaxPercent <= 99 {
 		st.DiskMaxPercent = *q.DiskMaxPercent
+	}
+	// R7: the clock_drift threshold (|panel − agent reported_at|). The floor
+	// keeps transport jitter from spamming; the ceiling is one day.
+	if q.ClockDriftMaxS != nil && *q.ClockDriftMaxS >= meshAlertDriftFloorS && *q.ClockDriftMaxS <= meshAlertDriftCeilS {
+		st.ClockDriftMaxS = *q.ClockDriftMaxS
 	}
 	if q.TelegramToken == "-" {
 		st.TelegramToken = ""
@@ -118,6 +129,11 @@ func handleMeshAlertsTest(w http.ResponseWriter, r *http.Request) {
 			sent++
 		}
 	}
+	// Round-3 audit (SECURITY-AUDIT-PANEL): the test send pokes REAL
+	// notifiers — it is an operator action on the alerting surface and gets
+	// an audit line like settings changes do (no secrets in details).
+	LogSecurityAudit("alerts_test_sent", cfg.Username, ClientIP(r),
+		"sent="+strconv.Itoa(sent)+" notifiers="+strconv.Itoa(len(ns)))
 	meshAlertEng.mu.Lock()
 	meshAlertEng.history = append(meshAlertEng.history, meshAlertHistoryItem{
 		At: ev.Now.Unix(), Key: "test", Rule: "test", Sev: "info", Text: ev.Text,

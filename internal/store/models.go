@@ -19,9 +19,12 @@ func wrapNotFound(err error) error {
 // Datacenter is an Iran or foreign datacenter. PriceCoefficient is a
 // pricing hint; it is NEVER applied to byte statistics.
 type Datacenter struct {
-	ID               int64   `json:"id"`
-	Kind             string  `json:"kind"` // "iran" | "foreign"
-	Name             string  `json:"name"`
+	ID   int64  `json:"id"`
+	Kind string `json:"kind"` // "iran" | "foreign"
+	Name string `json:"name"`
+	// DatacenterEN (phase 26, UI-API-REQUESTS §9): optional English display
+	// name — EN mode prefers it, fa keeps Name. Empty = not set.
+	DatacenterEN     string  `json:"datacenter_en,omitempty"`
 	PriceCoefficient float64 `json:"price_coefficient"`
 	CreatedAt        int64   `json:"created_at"`
 }
@@ -143,10 +146,15 @@ func (s *Store) UpsertDatacenter(dc Datacenter) (int64, error) {
 	if dc.CreatedAt == 0 {
 		dc.CreatedAt = now()
 	}
-	res, err := s.db.Exec(`INSERT INTO datacenters (kind, name, price_coefficient, created_at)
-		VALUES (?, ?, ?, ?)
-		ON CONFLICT(name) DO UPDATE SET kind=excluded.kind, price_coefficient=excluded.price_coefficient`,
-		dc.Kind, dc.Name, dc.PriceCoefficient, dc.CreatedAt)
+	// datacenter_en (phase 26, UI-API-REQUESTS §9): the English display
+	// name. An empty incoming value PRESERVES the stored one — the enroll
+	// path find-or-creates datacenters by name and must not clobber an
+	// operator-entered English name with ''.
+	res, err := s.db.Exec(`INSERT INTO datacenters (kind, name, price_coefficient, datacenter_en, created_at)
+		VALUES (?, ?, ?, ?, ?)
+		ON CONFLICT(name) DO UPDATE SET kind=excluded.kind, price_coefficient=excluded.price_coefficient,
+			datacenter_en = CASE WHEN excluded.datacenter_en != '' THEN excluded.datacenter_en ELSE datacenters.datacenter_en END`,
+		dc.Kind, dc.Name, dc.PriceCoefficient, dc.DatacenterEN, dc.CreatedAt)
 	if err != nil {
 		return 0, err
 	}
@@ -159,9 +167,9 @@ func (s *Store) UpsertDatacenter(dc Datacenter) (int64, error) {
 
 // DatacenterByName returns the datacenter with that name.
 func (s *Store) DatacenterByName(name string) (Datacenter, error) {
-	row := s.db.QueryRow(`SELECT id, kind, name, price_coefficient, created_at FROM datacenters WHERE name = ?`, name)
+	row := s.db.QueryRow(`SELECT id, kind, name, price_coefficient, COALESCE(datacenter_en, ''), created_at FROM datacenters WHERE name = ?`, name)
 	var dc Datacenter
-	err := row.Scan(&dc.ID, &dc.Kind, &dc.Name, &dc.PriceCoefficient, &dc.CreatedAt)
+	err := row.Scan(&dc.ID, &dc.Kind, &dc.Name, &dc.PriceCoefficient, &dc.DatacenterEN, &dc.CreatedAt)
 	return dc, wrapNotFound(err)
 }
 

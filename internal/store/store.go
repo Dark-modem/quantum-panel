@@ -361,6 +361,15 @@ ALTER TABLE agents ADD COLUMN country TEXT NOT NULL DEFAULT '';
 	`
 ALTER TABLE agents ADD COLUMN cpu_model TEXT NOT NULL DEFAULT '';
 `,
+	// 10: Phase 26 bilingual datacenter names (UI-API-REQUESTS §9). Additive:
+	// old binaries ignore the column; DEFAULT '' keeps NOT NULL satisfied on
+	// reopen and makes the change downgrade-safe (pre-26 binaries read the
+	// table without the column and never write it). Renumbered from main's
+	// migration 8 in the merge — this line's country/cpu_model migrations
+	// (8, 9) shipped first on the demo line.
+	`
+ALTER TABLE datacenters ADD COLUMN datacenter_en TEXT NOT NULL DEFAULT '';
+`,
 }
 
 func (s *Store) migrate() error {

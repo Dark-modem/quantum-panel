@@ -3,6 +3,7 @@ package panel
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -14,6 +15,7 @@ func staleLab(t *testing.T) (binDir string) {
 	binDir = t.TempDir()
 	oldDirs, oldExtra := engineBinDirs, backhaulExtraBins
 	engineBinDirs, backhaulExtraBins = []string{binDir}, nil
+	relaxExecProbeOnWindows(t)
 	files := []string{
 		filepath.Join(backhaulDir, "client.toml"),
 		filepath.Join(frpDir, "frpc.toml"),
@@ -65,10 +67,15 @@ func TestStaleConfigNoBinaryRoleUnknown(t *testing.T) {
 
 func TestStaleConfigBackhaulBinaryRestoresRole(t *testing.T) {
 	bin := staleLab(t)
-	// non-executable file does not count
-	fakeBinary(t, bin, "backhaul", 0o644)
-	if st := localStatusFrom(&hostView{active: map[string]bool{}}); st.Role != "" {
-		t.Fatalf("non-executable binary must not count, got role=%q", st.Role)
+	// non-executable file does not count (POSIX exec-bit semantics: on
+	// Windows chmod cannot clear the bit — os.Stat always reports 0666 —
+	// and the relaxed probe counts regular files; the negative case is
+	// verified by the WSL gate, BACKEND-24)
+	if runtime.GOOS != "windows" {
+		fakeBinary(t, bin, "backhaul", 0o644)
+		if st := localStatusFrom(&hostView{active: map[string]bool{}}); st.Role != "" {
+			t.Fatalf("non-executable binary must not count, got role=%q", st.Role)
+		}
 	}
 	fakeBinary(t, bin, "backhaul", 0o755)
 	st := localStatusFrom(&hostView{active: map[string]bool{}})

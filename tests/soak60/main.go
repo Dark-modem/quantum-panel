@@ -1,17 +1,25 @@
 // soak60 — phase 12 TASK 3 scale/soak driver (standalone, black-box).
 //
-// Shape: 30 topologies × (1 iran + 1 foreign server) × 6 tunnels/pair =
-// 180 tunnels; 60 fake v2 agents (2 per pair) each reporting those 6
-// tunnels → 360 tunnel counter streams over REAL websockets with
-// realistic 30 s heartbeats (cumulative counters, proc[],
-// engine_status[], resources). UI load: 10 pollers on overview (10 s),
-// 10 on tunnel detail (15 s), slow pollers on the other /api/ui
-// endpoints. Every 30 s one metrics row lands in SOAK_OUT/metrics.csv;
-// the final summary (p95 per endpoint) goes to SOAK_OUT/summary.json.
+// Shape (SOAK_PAIRS pairs, default 30 = the historical run): N topologies
+// × (1 iran + 1 foreign server) × 6 tunnels/pair; 2 fake v2 agents per
+// pair each reporting those 6 tunnels → pairs*2 agents, pairs*12 tunnel
+// counter streams over REAL websockets with realistic 30 s heartbeats
+// (cumulative counters, proc[], engine_status[], resources). UI load:
+// 20 concurrent pollers — 8 on /api/ui/overview (10 s) + 12 spread over
+// the folded /api/ui alias mix (topologies, engines, alerts, pasarguard,
+// agents list, tunnel detail; 2 each, 10 s). Every 30 s one metrics row
+// lands in SOAK_OUT/metrics.csv; the final summary (p95 per endpoint,
+// non-200 counts, WS-reconnect records) goes to SOAK_OUT/summary.json.
 //
-// Run inside a throwaway netns by .lab/p12/soak-run.sh against a real
-// panel process (SOAK_PANEL_PID lets the sampler read its /proc;
-// SOAK_DB_PATH points at quantum.db for size/WAL tracking).
+// WS reconnect under load (phase 20): SOAK_DROP_AT=<duration> (from
+// start) + SOAK_DROP_N=<n> force-close the first N agents' live
+// connections mid-soak; each agent's redial loop re-establishes, and
+// per-agent drop→recovered latencies land in SOAK_OUT/reconnect.json.
+//
+// Run against a real panel process (SOAK_PANEL_PID lets the sampler read
+// its /proc for CPU; SOAK_DB_PATH points at quantum.db for size/WAL
+// tracking; both optional — a containerized panel samples those from
+// outside the driver).
 package main
 
 import (
@@ -134,7 +142,12 @@ type soakAgent struct {
 	wireRX     uint64
 	heartbeats int
 	sendErrs   int
-	mu         sync.Mutex
+	// phase 20: WS-reconnect tracking (all under mu)
+	curWS     *websocket.Conn
+	dropAt    time.Time // set by the dropper right before force-close
+	recoverAt time.Time // set on the first successful heartbeat write after the drop
+	hbFail    bool      // set by heartbeat() on a write error → the session loop redials
+	mu        sync.Mutex
 }
 
 var (
@@ -144,14 +157,23 @@ var (
 	agentsMu    sync.Mutex
 	latMu       sync.Mutex
 	lat         = map[string][]float64{}
+	failMu      sync.Mutex
+	failCount   = map[string]int{} // endpoint name -> non-200 responses
 	totalHB     int64
 	totalSendEr int64
+	soakPairs   = 30
 )
 
 func recordLat(name string, ms float64) {
 	latMu.Lock()
 	lat[name] = append(lat[name], ms)
 	latMu.Unlock()
+}
+
+func recordFail(name string) {
+	failMu.Lock()
+	failCount[name]++
+	failMu.Unlock()
 }
 
 func main() {
@@ -162,6 +184,9 @@ func main() {
 	cores = envInt("SOAK_CORES", 1)
 	if cores < 1 {
 		cores = 1
+	}
+	if soakPairs = envInt("SOAK_PAIRS", 30); soakPairs < 1 {
+		soakPairs = 30
 	}
 	var err error
 	if duration, err = time.ParseDuration(env("SOAK_DURATION", "20m")); err != nil {
@@ -180,7 +205,7 @@ func main() {
 		panic(err)
 	}
 	seed(c)
-	fmt.Printf("[soak] seeded 30 topologies, %d tunnels, %d agents\n", len(tunnelKeys), len(agents))
+	fmt.Printf("[soak] seeded %d topologies, %d tunnels, %d agents\n", soakPairs, len(tunnelKeys), len(agents))
 
 	stop := make(chan struct{})
 	var wg sync.WaitGroup
@@ -190,6 +215,43 @@ func main() {
 			defer wg.Done()
 			runAgent(a, stop)
 		}(a)
+	}
+
+	// phase 20: mid-soak WS reconnect probe — force-close the first
+	// SOAK_DROP_N agents' live connections at SOAK_DROP_AT; each agent's
+	// own redial loop re-establishes (the reconnect latencies are a
+	// property of the redial loop's granularity, not the panel's).
+	dropAt, dropErr := time.ParseDuration(env("SOAK_DROP_AT", ""))
+	dropN := envInt("SOAK_DROP_N", 5)
+	if dropErr == nil && dropAt > 0 && dropN > 0 {
+		if dropN > len(agents) {
+			dropN = len(agents)
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			delay := dropAt - time.Since(startAt)
+			if delay > 0 {
+				time.Sleep(delay)
+			}
+			dropped := 0
+			for _, a := range agents {
+				if dropped >= dropN {
+					break
+				}
+				a.mu.Lock()
+				ws := a.curWS
+				if ws != nil {
+					a.dropAt = time.Now()
+				}
+				a.mu.Unlock()
+				if ws != nil {
+					_ = ws.Close() // the agent notices on its next write and redials
+					dropped++
+				}
+			}
+			fmt.Printf("[soak] dropped %d agent connections at %s\n", dropped, dropAt)
+		}()
 	}
 
 	// ---- UI pollers with latency recording ----
@@ -207,19 +269,29 @@ func main() {
 					start := time.Now()
 					if code, _ := c.get(path); code == 200 {
 						recordLat(name, float64(time.Since(start).Microseconds())/1000.0)
+					} else if code != 0 {
+						recordFail(name)
 					}
 				}
 			}
 		}()
 	}
-	for i := 0; i < 10; i++ {
+	// phase 20: exactly 20 concurrent pollers — 8 overview + 12 over the
+	// folded /api/ui alias mix (2 pollers per alias, 10 s cadence).
+	for i := 0; i < 8; i++ {
 		poll("overview", "/api/ui/overview", 10*time.Second)
-		poll("tunnel_detail", "/api/ui/tunnels/"+tunnelKeys[i*len(tunnelKeys)/10], 15*time.Second)
 	}
-	poll("agents_list", "/api/ui/agents", 30*time.Second)
-	poll("topology_detail", "/api/ui/topologies/1", 30*time.Second)
-	poll("agent_detail", "/api/ui/agents/"+agents[0].id, 30*time.Second)
-	poll("session", "/api/ui/session", 30*time.Second)
+	aliasMix := []string{
+		"topologies_list", "/api/ui/topologies",
+		"engines_tab", "/api/ui/engines",
+		"alerts_view", "/api/ui/alerts",
+		"pasarguard_list", "/api/ui/pasarguard",
+		"agents_list", "/api/ui/agents",
+		"tunnel_detail", "/api/ui/tunnels/" + tunnelKeys[0],
+	}
+	for i := 0; i < 12; i++ {
+		poll(aliasMix[(i*2)%len(aliasMix)], aliasMix[(i*2+1)%len(aliasMix)], 10*time.Second)
+	}
 
 	// ---- metrics sampler every 30 s ----
 	metrics, err := os.Create(outDir + "/metrics.csv")
@@ -266,8 +338,10 @@ func main() {
 	summary := map[string]any{
 		"duration_s": time.Since(startAt).Seconds(),
 		"p95_ms":     map[string]float64{},
+		"pairs":      soakPairs,
 		"agents":     len(agents),
 		"tunnels":    len(tunnelKeys),
+		"pollers":    20,
 	}
 	latMu.Lock()
 	for name, vals := range lat {
@@ -275,6 +349,33 @@ func main() {
 		summary["p95_ms"].(map[string]float64)[name] = vals[len(vals)*95/100]
 	}
 	latMu.Unlock()
+	failMu.Lock()
+	summary["ui_non200"] = failCount
+	failMu.Unlock()
+	// reconnect records: only agents that were actually dropped
+	type rec struct {
+		Agent       string `json:"agent"`
+		DroppedAtMs int64  `json:"dropped_at_ms"`
+		RecoveredMs int64  `json:"recovered_after_ms"`
+	}
+	recs := []rec{}
+	agentsMu.Lock()
+	for _, a := range agents {
+		a.mu.Lock()
+		if !a.dropAt.IsZero() {
+			r := rec{Agent: a.id, DroppedAtMs: a.dropAt.Sub(startAt).Milliseconds()}
+			if !a.recoverAt.IsZero() {
+				r.RecoveredMs = a.recoverAt.Sub(a.dropAt).Milliseconds()
+			}
+			recs = append(recs, r)
+		}
+		a.mu.Unlock()
+	}
+	agentsMu.Unlock()
+	if b, err := json.MarshalIndent(recs, "", "  "); err == nil {
+		_ = os.WriteFile(outDir+"/reconnect.json", b, 0o644)
+	}
+	summary["dropped_agents"] = len(recs)
 	sample()
 	b, _ := json.MarshalIndent(summary, "", "  ")
 	_ = os.WriteFile(outDir+"/summary.json", b, 0o644)
@@ -292,7 +393,7 @@ func seed(c *client) {
 	}
 	iranServers, foreignServers := []float64{}, []float64{}
 	pairs := [][2]float64{}
-	for i := 0; i < 30; i++ {
+	for i := 0; i < soakPairs; i++ {
 		_, raw1 := c.post("/api/mesh/servers", map[string]any{
 			"name": fmt.Sprintf("soak-ir-%02d", i), "role": "iran",
 			"datacenter_id": dcID["soak-iran"], "address": fmt.Sprintf("10.190.0.%d", i+1)})
@@ -306,7 +407,7 @@ func seed(c *client) {
 		foreignServers = append(foreignServers, frM["id"].(float64))
 		pairs = append(pairs, [2]float64{irM["id"].(float64), frM["id"].(float64)})
 	}
-	for i := 0; i < 30; i++ {
+	for i := 0; i < soakPairs; i++ {
 		c.mustPost("/api/mesh/topologies/generate", map[string]any{
 			"name":             fmt.Sprintf("soak-topo-%02d", i),
 			"iran_servers":     []float64{iranServers[i]},
@@ -326,7 +427,7 @@ func seed(c *client) {
 		}
 	}
 	// Attach tunnel keys (both ends of a pair report the same 6).
-	for i := 0; i < 30; i++ {
+	for i := 0; i < soakPairs; i++ {
 		topos := c.mustGet("/api/mesh/topologies")
 		var topoID float64
 		for _, raw := range topos["topologies"].([]any) {
@@ -431,6 +532,12 @@ func runAgent(a *soakAgent, stop chan struct{}) {
 		}
 		ws, _, err := dialer.Dial(strings.Replace(panelURL, "http://", "ws://", 1)+"/api/agent/ws", hdr)
 		if err != nil {
+			a.mu.Lock()
+			wasDropped := !a.dropAt.IsZero()
+			a.mu.Unlock()
+			if wasDropped {
+				fmt.Printf("[soak-agent] %s dial error after drop: %v\n", a.id, err)
+			}
 			time.Sleep(2 * time.Second)
 			continue
 		}
@@ -445,6 +552,9 @@ func runAgent(a *soakAgent, stop chan struct{}) {
 			continue
 		}
 		ws.SetReadDeadline(time.Time{})
+		a.mu.Lock()
+		a.curWS = ws
+		a.mu.Unlock()
 		tick := time.NewTicker(30 * time.Second)
 		heartbeat := func() {
 			agentsMu.Lock()
@@ -482,13 +592,35 @@ func runAgent(a *soakAgent, stop chan struct{}) {
 			hb, _ := json.Marshal(protocol.HeartbeatV2{TS: time.Now().Unix(), State: &st})
 			ws.SetWriteDeadline(time.Now().Add(10 * time.Second))
 			if err := ws.WriteJSON(protocol.Envelope{V: 2, Type: protocol.MsgHeartbeat, Data: hb}); err != nil {
+				a.mu.Lock()
+				dropped := !a.dropAt.IsZero()
+				a.hbFail = true // the session loop must redial (phase 20)
+				a.mu.Unlock()
+				if dropped {
+					fmt.Printf("[soak-agent] %s heartbeat write error: %v\n", a.id, err)
+				}
 				agentsMu.Lock()
 				a.sendErrs++
 				totalSendEr++
 				agentsMu.Unlock()
+			} else {
+				// phase 20: a successful write after a forced drop = the
+				// redial loop re-established the session
+				a.mu.Lock()
+				if !a.dropAt.IsZero() && a.recoverAt.IsZero() {
+					a.recoverAt = time.Now()
+					fmt.Printf("[soak-agent] %s re-established after %.1fs\n",
+						a.id, a.recoverAt.Sub(a.dropAt).Seconds())
+				}
+				a.mu.Unlock()
 			}
 		}
 		heartbeat()
+		// phase 20: a dead connection must behave like the real agent —
+		// redial. The phase-12 loop had NO error-exit path: after a
+		// mid-stream drop the fake agent kept ticking on the dead conn
+		// forever (every heartbeat write failing, never re-establishing).
+	session:
 		for {
 			select {
 			case <-stop:
@@ -496,6 +628,20 @@ func runAgent(a *soakAgent, stop chan struct{}) {
 				return
 			case <-tick.C:
 				heartbeat()
+				a.mu.Lock()
+				hbFail := a.hbFail
+				a.mu.Unlock()
+				if hbFail {
+					a.mu.Lock()
+					a.hbFail = false
+					if a.curWS == ws {
+						a.curWS = nil
+					}
+					a.mu.Unlock()
+					ws.Close()
+					time.Sleep(2 * time.Second) // agent-like redial backoff
+					break session
+				}
 			}
 		}
 	}

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -125,9 +126,7 @@ func TestSelfcheckWeightConflictAndPerms(t *testing.T) {
 	checkPermsDir = func() string { return permDir }
 	t.Cleanup(func() { checkPermsDir = func() string { return configDir } })
 
-	if fi, err := os.Stat(secret); err != nil || fi.Mode().Perm() != 0o644 {
-		t.Fatalf("seed broken: sessions.json mode=%v err=%v", fi, err)
-	}
+	assertPermIs(t, secret, 0o644) // on Windows only existence (NTFS has no POSIX bits)
 	rep := runSelfcheck(s)
 	ids := map[string]bool{}
 	for _, f := range rep.Findings {
@@ -136,7 +135,9 @@ func TestSelfcheckWeightConflictAndPerms(t *testing.T) {
 	if !ids["weight.conflict"] {
 		t.Fatalf("the weight conflict must be flagged: %+v", rep.Findings)
 	}
-	if !ids["file.perms"] {
+	if runtime.GOOS != "windows" && !ids["file.perms"] {
+		// checkFilePerms skips Windows itself (POSIX bits are meaningless on
+		// NTFS via os.Stat) — the finding is expected on Linux only.
 		t.Fatalf("the world-readable secret must be flagged: %+v", rep.Findings)
 	}
 }

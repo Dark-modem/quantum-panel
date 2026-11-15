@@ -286,6 +286,7 @@ func handleMeshDCCreate(w http.ResponseWriter, r *http.Request) {
 		Name             string  `json:"name"`
 		Kind             string  `json:"kind"`
 		PriceCoefficient float64 `json:"price_coefficient"`
+		DatacenterEN     string  `json:"datacenter_en"` // phase 26 §9: optional English name
 	}
 	if !meshReadBody(w, r, &body) {
 		return
@@ -294,11 +295,16 @@ func handleMeshDCCreate(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, r, "E-IN-06", "kind must be iran or foreign")
 		return
 	}
+	dcEn := strings.TrimSpace(body.DatacenterEN)
+	if len(dcEn) > 100 {
+		writeAPIError(w, r, "E-IN-06", "datacenter_en must be at most 100 characters")
+		return
+	}
 	if body.PriceCoefficient == 0 {
 		body.PriceCoefficient = 1.0
 	}
 	id, err := s.UpsertDatacenter(store.Datacenter{
-		Kind: body.Kind, Name: strings.TrimSpace(body.Name),
+		Kind: body.Kind, Name: strings.TrimSpace(body.Name), DatacenterEN: dcEn,
 		PriceCoefficient: body.PriceCoefficient, CreatedAt: time.Now().Unix(),
 	})
 	if err != nil {
@@ -321,16 +327,36 @@ func handleMeshDCPatch(w http.ResponseWriter, r *http.Request) {
 	}
 	var body struct {
 		PriceCoefficient *float64 `json:"price_coefficient"`
+		DatacenterEN     *string  `json:"datacenter_en"` // phase 26 §9: optional English name
 	}
-	if !meshReadBody(w, r, &body) || body.PriceCoefficient == nil {
-		writeAPIError(w, r, "E-IN-02", "price_coefficient is required")
+	if !meshReadBody(w, r, &body) || (body.PriceCoefficient == nil && body.DatacenterEN == nil) {
+		writeAPIError(w, r, "E-IN-02", "price_coefficient or datacenter_en is required")
 		return
 	}
-	if err := s.SetDatacenterPriceCoefficient(id, *body.PriceCoefficient); err != nil {
-		meshErr(w, r, err)
-		return
+	if body.PriceCoefficient != nil {
+		if err := s.SetDatacenterPriceCoefficient(id, *body.PriceCoefficient); err != nil {
+			meshErr(w, r, err)
+			return
+		}
 	}
-	meshAudit(meshActor(r), "mesh.datacenter.price", fmt.Sprintf(`{"id":%d,"price_coefficient":%g}`, id, *body.PriceCoefficient))
+	if body.DatacenterEN != nil {
+		en := strings.TrimSpace(*body.DatacenterEN)
+		if len(en) > 100 {
+			writeAPIError(w, r, "E-IN-06", "datacenter_en must be at most 100 characters")
+			return
+		}
+		if err := s.SetDatacenterEN(id, en); err != nil {
+			meshErr(w, r, err)
+			return
+		}
+	}
+	meshAudit(meshActor(r), "mesh.datacenter.price",
+		func() string {
+			if body.PriceCoefficient == nil {
+				return fmt.Sprintf(`{"id":%d,"datacenter_en_set":true}`, id)
+			}
+			return fmt.Sprintf(`{"id":%d,"price_coefficient":%g,"datacenter_en_set":false}`, id, *body.PriceCoefficient)
+		}())
 	writeJSON(w, map[string]any{"ok": true})
 }
 

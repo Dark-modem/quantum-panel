@@ -37,7 +37,10 @@ const (
 	meshAlertTick          = 30 * time.Second
 	meshAlertMaxHistory    = 200
 	meshAlertCertWarnDays  = 14
-	meshAlertHardeningFrac = 0.2 // warn when <20% of the confirm window remains
+	meshAlertHardeningFrac = 0.2   // warn when <20% of the confirm window remains
+	meshAlertClockDriftS   = 90    // default |panel − agent| clock drift threshold (phase-13 spec)
+	meshAlertDriftFloorS   = 10    // settings floor: below this the rule would spam on transport jitter
+	meshAlertDriftCeilS    = 86400 // settings ceiling: 1 day
 )
 
 // meshAlertSettings is the operator-configurable part (persisted sealed).
@@ -46,13 +49,15 @@ type meshAlertSettings struct {
 	AgentOfflineMin int    `json:"agent_offline_min"`        // default 5
 	CertExpireDays  int    `json:"cert_expire_days"`         // default 14
 	DiskMaxPercent  int    `json:"disk_max_percent"`         // default 90
+	ClockDriftMaxS  int    `json:"clock_drift_max_s"`        // default 90 (R7: |panel − agent reported_at|)
 	TelegramToken   string `json:"telegram_token,omitempty"` // sealed at rest
 	TelegramChat    string `json:"telegram_chat,omitempty"`  // sealed at rest
 	WebhookURL      string `json:"webhook_url,omitempty"`    // sealed at rest
 }
 
 func defaultMeshAlertSettings() meshAlertSettings {
-	return meshAlertSettings{Enabled: false, AgentOfflineMin: 5, CertExpireDays: meshAlertCertWarnDays, DiskMaxPercent: 90}
+	return meshAlertSettings{Enabled: false, AgentOfflineMin: 5, CertExpireDays: meshAlertCertWarnDays,
+		DiskMaxPercent: 90, ClockDriftMaxS: meshAlertClockDriftS}
 }
 
 // meshAlertEvent is one evaluated condition snapshot.
@@ -67,6 +72,11 @@ type meshAlertEvent struct {
 	// UI is the structured fa/en view (phase 13 TASK 2) for the API
 	// view and the notifiers; nil for the phase-<13 rules.
 	UI map[string]any
+	// maintTargets (phase 16): EXTRA maintenance keys whose active
+	// window should silence DELIVERY besides ev.Target — for
+	// tunnel-scoped rules the AGENT ids of both ends (a tunnel event
+	// must not page an operator who put that agent into maintenance).
+	maintTargets []string
 }
 
 type meshAlertState struct {
@@ -74,6 +84,7 @@ type meshAlertState struct {
 	lastSent time.Time
 	openedAt time.Time
 	lastText string
+	sev      string         // round-3 F4: carried into the recovery payload
 	lastUI   map[string]any // the structured fa/en view of the last event
 }
 
@@ -107,7 +118,8 @@ type meshAlertEngine struct {
 }
 
 // SetMaintenance silences delivery for one target until the deadline
-// (phase 13 TASK 2); rules keep evaluating and recording.
+// (phase 13 TASK 2); rules keep evaluating and recording. In-memory
+// primitive (tests); the API path uses maintenanceSet to persist.
 func (e *meshAlertEngine) SetMaintenance(target string, until time.Time) {
 	e.notifyMu.Lock()
 	if e.maintenance == nil {
@@ -115,6 +127,50 @@ func (e *meshAlertEngine) SetMaintenance(target string, until time.Time) {
 	}
 	e.maintenance[target] = until
 	e.notifyMu.Unlock()
+}
+
+// maintenanceSet stores one window AND persists it into the sealed
+// alert-settings file so the window survives a panel restart (phase 16
+// API path). until.IsZero() clears the window.
+func (e *meshAlertEngine) maintenanceSet(target string, until time.Time) error {
+	e.SetMaintenance(target, until)
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.persistMeshSettings()
+}
+
+// maintenanceUntil: the active window for one target (0, false = none).
+func (e *meshAlertEngine) maintenanceUntil(target string) (int64, bool) {
+	e.notifyMu.Lock()
+	defer e.notifyMu.Unlock()
+	until, ok := e.maintenance[target]
+	if !ok {
+		return 0, false
+	}
+	if time.Now().After(until) {
+		delete(e.maintenance, target)
+		return 0, false
+	}
+	return until.Unix(), true
+}
+
+// maintenanceWindows: the ACTIVE windows for the alerts view (sorted by
+// target; expired entries stay until the next maintenanceActive touch).
+func (e *meshAlertEngine) maintenanceWindows() []map[string]any {
+	e.notifyMu.Lock()
+	defer e.notifyMu.Unlock()
+	now := time.Now()
+	out := []map[string]any{}
+	for t, until := range e.maintenance {
+		if now.After(until) {
+			continue
+		}
+		out = append(out, map[string]any{"target": t, "until": until.Unix()})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return out[i]["target"].(string) < out[j]["target"].(string)
+	})
+	return out
 }
 
 // maintenanceActive: is the target silenced right now?
@@ -130,6 +186,42 @@ func (e *meshAlertEngine) maintenanceActive(target string) bool {
 		return false
 	}
 	return true
+}
+
+// maintenanceSilenced: is this event's delivery silenced — by its own
+// target OR any of the extra (tunnel-end agent) targets?
+func (e *meshAlertEngine) maintenanceSilenced(ev meshAlertEvent) bool {
+	if e.maintenanceActive(ev.Target) {
+		return true
+	}
+	for _, t := range ev.maintTargets {
+		if e.maintenanceActive(t) {
+			return true
+		}
+	}
+	return false
+}
+
+// maintForEnds: the agent ids whose maintenance windows should silence
+// alerts for a tunnel between the two servers (deduped; "" skipped).
+func maintForEnds(agByServer map[int64]string, local, remote int64) []string {
+	var out []string
+	for _, ag := range []string{agByServer[local], agByServer[remote]} {
+		if ag == "" {
+			continue
+		}
+		dup := false
+		for _, x := range out {
+			if x == ag {
+				dup = true
+				break
+			}
+		}
+		if !dup {
+			out = append(out, ag)
+		}
+	}
+	return out
 }
 
 // meshAlertNotifier is the pluggable delivery seam (tests fake it).
@@ -163,13 +255,15 @@ func (e *meshAlertEngine) loadMeshAlertSettings() {
 		return
 	}
 	var stored struct {
-		Enabled             bool   `json:"enabled"`
-		AgentOfflineMin     int    `json:"agent_offline_min"`
-		CertExpireDays      int    `json:"cert_expire_days"`
-		DiskMaxPercent      int    `json:"disk_max_percent"`
-		TelegramTokenSealed string `json:"telegram_token_sealed"`
-		TelegramChatSealed  string `json:"telegram_chat_sealed"`
-		WebhookURLSealed    string `json:"webhook_url_sealed"`
+		Enabled             bool             `json:"enabled"`
+		AgentOfflineMin     int              `json:"agent_offline_min"`
+		CertExpireDays      int              `json:"cert_expire_days"`
+		DiskMaxPercent      int              `json:"disk_max_percent"`
+		ClockDriftMaxS      int              `json:"clock_drift_max_s"`
+		TelegramTokenSealed string           `json:"telegram_token_sealed"`
+		TelegramChatSealed  string           `json:"telegram_chat_sealed"`
+		WebhookURLSealed    string           `json:"webhook_url_sealed"`
+		Maintenance         map[string]int64 `json:"maintenance"` // phase 16
 	}
 	if json.Unmarshal(raw, &stored) != nil {
 		return
@@ -185,6 +279,9 @@ func (e *meshAlertEngine) loadMeshAlertSettings() {
 	if stored.DiskMaxPercent > 0 && stored.DiskMaxPercent <= 99 {
 		e.settings.DiskMaxPercent = stored.DiskMaxPercent
 	}
+	if stored.ClockDriftMaxS > 0 {
+		e.settings.ClockDriftMaxS = stored.ClockDriftMaxS
+	}
 	if key, err := meshAlertSealKey(); err == nil {
 		if b, err := pasarguard.Open(key, stored.TelegramTokenSealed); err == nil {
 			e.settings.TelegramToken = string(b)
@@ -196,6 +293,16 @@ func (e *meshAlertEngine) loadMeshAlertSettings() {
 			e.settings.WebhookURL = string(b)
 		}
 	}
+	// Restore the maintenance windows (phase 16): skip expired ones.
+	e.notifyMu.Lock()
+	e.maintenance = map[string]time.Time{}
+	now := time.Now()
+	for t, u := range stored.Maintenance {
+		if t != "" && now.Before(time.Unix(u, 0)) {
+			e.maintenance[t] = time.Unix(u, 0)
+		}
+	}
+	e.notifyMu.Unlock()
 	e.rebuildMeshNotifiers()
 }
 
@@ -231,14 +338,26 @@ func (e *meshAlertEngine) persistMeshSettings() error {
 	if err != nil {
 		return err
 	}
+	// Active maintenance windows only (caller holds e.mu; notifyMu nests).
+	maintSnap := map[string]int64{}
+	now := time.Now()
+	e.notifyMu.Lock()
+	for t, u := range e.maintenance {
+		if t != "" && now.Before(u) {
+			maintSnap[t] = u.Unix()
+		}
+	}
+	e.notifyMu.Unlock()
 	man, err := json.Marshal(map[string]any{
 		"enabled":               e.settings.Enabled,
 		"agent_offline_min":     e.settings.AgentOfflineMin,
 		"cert_expire_days":      e.settings.CertExpireDays,
 		"disk_max_percent":      e.settings.DiskMaxPercent,
+		"clock_drift_max_s":     e.settings.ClockDriftMaxS,
 		"telegram_token_sealed": tokSealed,
 		"telegram_chat_sealed":  chatSealed,
 		"webhook_url_sealed":    urlSealed,
+		"maintenance":           maintSnap,
 	})
 	if err != nil {
 		return err
@@ -257,8 +376,16 @@ func (e *meshAlertEngine) evaluate(now time.Time) []meshAlertEvent {
 			if rec.Revoked {
 				continue
 			}
+			// Round-3 fix (backend-19 F5): fire on STALENESS only. The
+			// registry load-reset forces every record's Status to offline,
+			// so the old `Status != "online"` disjunct was always true —
+			// the rule fired for LIVE agents too and, because the condition
+			// could never clear, recovery notifications never dispatched
+			// (caught by the backend-19 recovery e2e). LastSeen is the
+			// hub-maintained freshness signal (hello + the batched
+			// per-heartbeat persist; the v2 path now persists too).
 			offlineFor := now.Sub(time.Unix(rec.LastSeen, 0))
-			if rec.Status != "online" || offlineFor > time.Duration(e.settings.AgentOfflineMin)*time.Minute {
+			if offlineFor > time.Duration(e.settings.AgentOfflineMin)*time.Minute {
 				evs = append(evs, meshAlertEvent{
 					Key: "agent_offline:" + rec.ID, Rule: "agent_offline", Target: rec.ID,
 					Sev: "warn", Now: now,
@@ -270,6 +397,18 @@ func (e *meshAlertEngine) evaluate(now time.Time) []meshAlertEvent {
 	if s, err := MeshStore(); err == nil {
 		downByServer := map[int64]int{}
 		totalByServer := map[int64]int{}
+		// agent id per server (phase 16): tunnel events carry the END
+		// agents' ids as maintenance targets so a window on one agent
+		// also silences its tunnels' alerts.
+		agByServer := map[int64]string{}
+		if agents, err := s.ListAgents(); err == nil {
+			for _, a := range agents {
+				if a.ServerID != 0 {
+					agByServer[a.ServerID] = a.ID
+				}
+			}
+		}
+		maintByServer := map[int64][]string{} // remote sid -> local-end agents
 		topos, _ := s.ListTopologies()
 		for _, topo := range topos {
 			tuns, err := s.ListTunnels(topo.ID)
@@ -281,21 +420,32 @@ func (e *meshAlertEngine) evaluate(now time.Time) []meshAlertEvent {
 					continue
 				}
 				totalByServer[t.RemoteServerID]++
+				mt := maintForEnds(agByServer, t.LocalServerID, t.RemoteServerID)
+				if len(mt) > 0 {
+					maintByServer[t.RemoteServerID] = append(maintByServer[t.RemoteServerID], mt...)
+				}
 				rt := e.runtimeFor(t.TunnelKey)
 				if rt == nil {
 					continue // no report yet: not an alert (startup truth)
+				}
+				if rt.WireKnown && rt.WireSum > 0 {
+					// traffic resumed: reset the freeze window, so a FUTURE
+					// freeze still requires two consecutive dead ticks
+					// (round-3 fix: the entry used to linger forever and a
+					// re-freeze would fire after a single tick)
+					delete(meshTrafficFrozenSeen, t.TunnelKey)
 				}
 				if !rt.Up {
 					downByServer[t.RemoteServerID]++
 					evs = append(evs, meshAlertEvent{
 						Key: "tunnel_down:" + t.TunnelKey, Rule: "tunnel_down", Target: t.TunnelKey,
-						Sev: "crit", Now: now,
+						Sev: "crit", Now: now, maintTargets: mt,
 						Text: fmt.Sprintf("tunnel %s (%s) is DOWN", t.TunnelKey, rt.Engine),
 					})
 				} else if rt.WireKnown && rt.WireSum == 0 && e.trafficFrozen(t.TunnelKey, now) {
 					evs = append(evs, meshAlertEvent{
 						Key: "traffic_drop:" + t.TunnelKey, Rule: "traffic_drop", Target: t.TunnelKey,
-						Sev: "warn", Now: now,
+						Sev: "warn", Now: now, maintTargets: mt,
 						Text: fmt.Sprintf("tunnel %s up but wire traffic frozen across 2 checks", t.TunnelKey),
 					})
 				}
@@ -306,7 +456,8 @@ func (e *meshAlertEngine) evaluate(now time.Time) []meshAlertEvent {
 				evs = append(evs, meshAlertEvent{
 					Key: fmt.Sprintf("foreign_all_down:%d", sid), Rule: "foreign_all_down",
 					Target: fmt.Sprintf("server-%d", sid), Sev: "crit", Now: now,
-					Text: fmt.Sprintf("ALL %d tunnels to server %d are down", down, sid),
+					maintTargets: maintByServer[sid],
+					Text:         fmt.Sprintf("ALL %d tunnels to server %d are down", down, sid),
 				})
 			}
 		}
@@ -335,7 +486,7 @@ func (e *meshAlertEngine) evaluate(now time.Time) []meshAlertEvent {
 			})
 		}
 	}
-	if total, free, err := getDiskUsage(configDir); err == nil && total > 0 {
+	if total, free, err := diskUsageFn(configDir); err == nil && total > 0 {
 		pct := 100 - int(100*free/total)
 		if pct >= e.settings.DiskMaxPercent {
 			evs = append(evs, meshAlertEvent{
@@ -377,6 +528,13 @@ type meshTunnelRuntimeView struct {
 // meshTrafficFrozenSeen tracks two consecutive zero-traffic ticks.
 var meshTrafficFrozenSeen = map[string]time.Time{}
 
+// diskUsageFn is the disk-probe seam: production uses the syscall probe
+// (disk_unix.go/disk_windows.go); tests pin fixed numbers so the rule's
+// threshold math never depends on how full the HOST disk happens to be
+// (round-3 follow-up: the first version of the coverage test assumed
+// "any real machine is above 10% used" and failed on a 4%-used WSL root).
+var diskUsageFn = getDiskUsage
+
 func (e *meshAlertEngine) trafficFrozen(key string, now time.Time) bool {
 	first, ok := meshTrafficFrozenSeen[key]
 	if !ok {
@@ -404,12 +562,14 @@ func (e *meshAlertEngine) tick(now time.Time) {
 			st.open = true
 			st.openedAt = now
 			st.lastText = ev.Text
+			st.sev = ev.Sev
 			if !quiet {
 				e.dispatchLocked(ev, false)
 				st.lastSent = now
 			}
 		} else if now.Sub(st.lastSent) >= meshAlertCooldown {
 			st.lastText = ev.Text
+			st.sev = ev.Sev
 			if !quiet {
 				e.dispatchLocked(ev, false)
 				st.lastSent = now
@@ -423,6 +583,7 @@ func (e *meshAlertEngine) tick(now time.Time) {
 		}
 		st.open = false
 		ev := meshAlertEvent{Key: key, Target: key, Now: now, Recovery: true,
+			Sev:  st.sev, // round-3 F4: recoveries carried an EMPTY severity
 			Text: "recovered: " + st.lastText}
 		if i := strings.IndexByte(key, ':'); i >= 0 {
 			ev.Rule = key[:i]
@@ -443,7 +604,7 @@ func (e *meshAlertEngine) dispatchLocked(ev meshAlertEvent, recovery bool) {
 	e.notifyMu.Lock()
 	ns := append([]meshAlertNotifier(nil), e.notifiers...)
 	e.notifyMu.Unlock()
-	maint := e.maintenanceActive(ev.Target) // rules still record; delivery silenced
+	maint := e.maintenanceSilenced(ev) // rules still record; delivery silenced
 	if !maint {
 		for _, n := range ns {
 			_ = n.Send(ev) // synchronous: notifiers carry their own timeouts

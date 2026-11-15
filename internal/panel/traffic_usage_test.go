@@ -119,9 +119,7 @@ func TestUsagePersistAndReload(t *testing.T) {
 	if err := s.save(path, t0.Add(61*time.Second)); err != nil {
 		t.Fatal(err)
 	}
-	if st, err := os.Stat(path); err != nil || st.Mode().Perm() != 0600 {
-		t.Fatalf("file must exist with mode 0600: %v %v", st, err)
-	}
+	assertPerm0600(t, path)
 	// "restart": a fresh store reads the file and continues from the saved baseline
 	r := newUsage()
 	if n := r.load(path, t0.Add(2*time.Minute)); n != 2 {

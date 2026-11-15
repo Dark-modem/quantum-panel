@@ -21,7 +21,7 @@ var backhaulCoreVersion = func() string {
 	}
 	cands = append(cands, backhaulExtraBins...)
 	for _, bin := range cands {
-		if !executableFile(bin) {
+		if !executableFileFn(bin) {
 			continue
 		}
 		out, err := runCmdTimeoutOut(5*time.Second, bin, "-v")

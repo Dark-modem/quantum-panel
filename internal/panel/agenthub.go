@@ -544,6 +544,21 @@ func (c *agentConn) handleHeartbeat(data json.RawMessage) {
 				// legacy path so the existing dashboard keeps working.
 				c.ingestLegacyMatrix(hb2.State.Matrix)
 			}
+			// Round-3 fix (backend-19 F5): a plain v2 session never touched
+			// the legacy registry — LastSeen froze at hello time (the alert
+			// engine's "offline for ..." text went stale) and the offline
+			// rule's freshness input never refreshed, so agent_offline
+			// could never clear and RECOVERY notifications never dispatched
+			// (caught by the backend-19 recovery e2e). Mirror the legacy
+			// path: refresh lastSeen, persist on the same batched cadence.
+			now := time.Now()
+			c.state.mu.Lock()
+			c.state.lastSeen = now.Unix()
+			due := now.Sub(c.state.lastPersist) >= agentPersistEvery
+			c.state.mu.Unlock()
+			if due {
+				c.persistSessionState()
+			}
 			return
 		}
 		// Not a v2 heartbeat shape: fall through to the v1 decoder so a

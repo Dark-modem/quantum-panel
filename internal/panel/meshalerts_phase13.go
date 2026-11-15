@@ -9,7 +9,8 @@ package panel
 //	tunnel flapping (N state changes in M minutes, from tunnel_events)
 //	billing anomaly: sudden drop-to-zero / x-fold growth vs the same
 //	  hour last week (from the billing ranges)
-//	clock drift (heartbeat ts vs panel time > 90 s)
+//	clock drift (agent-reported clock vs panel time > threshold — REAL
+//	since R7: StateReportV2.ReportedAt; legacy agents skip silently)
 //	cert expiry (panel TLS; already a rule — kept)
 //	backup age (no successful backup in N days, from the backup state)
 //	panel data-dir disk usage
@@ -187,15 +188,6 @@ func (e *meshAlertEngine) evaluatePhase13(now time.Time) []meshAlertEvent {
 					fmt.Sprintf("agent %s disk at %.0f%%", a.Name, diskPct), a.Name, diskPct)
 			}
 		}
-		// clock drift: heartbeat ts vs panel time (the agents table's
-		// last_seen is panel time; the drift rides the report — use the
-		// runtime snapshot's age vs last_seen)
-		if fresh := meshRuntimeFresh(a.ID, time.Minute); fresh {
-			meshRuntimeMu.Lock()
-			rt := meshRuntimeBy[a.ID]
-			meshRuntimeMu.Unlock()
-			_ = rt
-		}
 	}
 
 	// 2. engine enabled but nothing running.
@@ -354,6 +346,30 @@ func (e *meshAlertEngine) evaluatePhase13(now time.Time) []meshAlertEvent {
 			e.alertEmit(&evs, now, "desired_stuck", "desired_stuck:"+a.ID, a.ID, "info",
 				fmt.Sprintf("agent %s has a queued desired state for %s", a.Name, time.Duration(now.Unix()-a.LastSeen)*time.Second),
 				a.Name, (time.Duration(now.Unix()-a.LastSeen) * time.Second).String())
+		}
+	}
+
+	// 9. clock drift (R7, PROTOCOL-REQUESTS): the agent's own report clock
+	// vs panel time. The phase-13 stub became REAL when the protocol grew
+	// StateReportV2.ReportedAt — legacy agents (absent field, 0) skip
+	// silently. Online agents only: an offline agent already has its own
+	// alert, and a stale last report says nothing about its clock NOW.
+	for _, a := range v2rows {
+		if a.Status != "online" {
+			continue
+		}
+		rep, ok := meshReportedAt(a.ID)
+		if !ok || rep <= 0 {
+			continue // legacy agent / nothing reported yet: not an alert
+		}
+		drift := now.Unix() - rep
+		if drift < 0 {
+			drift = -drift
+		}
+		if drift > int64(e.settings.ClockDriftMaxS) {
+			e.alertEmit(&evs, now, "clock_drift", "clock_drift:"+a.ID, a.ID, "warn",
+				fmt.Sprintf("agent %s clock is %s off panel time", a.Name, (time.Duration(drift)*time.Second).Round(time.Second)),
+				a.Name, (time.Duration(drift) * time.Second).String())
 		}
 	}
 	return evs

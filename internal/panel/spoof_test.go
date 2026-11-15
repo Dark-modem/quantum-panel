@@ -309,18 +309,9 @@ garbage line
 
 func TestSpoofTesterStartStop(t *testing.T) {
 	spoofLab(t)
-	// A fake binary so engineBinaryPresent passes; skip where the exec bit
-	// cannot be set (Windows), matching the repo's other exec-bit tests.
-	bin := filepath.Join(t.TempDir(), spoofBinName)
-	if err := os.WriteFile(bin, []byte("#!/bin/sh\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	ob := engineBinDirs
-	engineBinDirs = []string{filepath.Dir(bin)}
-	t.Cleanup(func() { engineBinDirs = ob })
-	if !engineBinaryPresent(spoofBinName) {
-		t.Skip("exec bit not settable here (verified in CI)")
-	}
+	// A fake binary so engineBinaryPresent passes; stubEngineBins relaxes
+	// the exec probe on Windows (BACKEND-24) instead of skipping.
+	stubEngineBins(t, spoofBinName)
 
 	srcFile := filepath.Join(spoofDir, "tester-sources.txt")
 	spoofTesterRun = func(ctx context.Context, args []string) (string, error) {

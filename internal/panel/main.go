@@ -232,6 +232,12 @@ func portFree(port int) bool {
 	return true
 }
 
+// portFreeFn is the port-occupancy probe seam (the diskUsageFn pattern):
+// on Windows Go's listener sets SO_REUSEADDR, so the real probe reports an
+// OCCUPIED port as free and the auto-switch tests cannot simulate a squat;
+// tests override the seam. Production behavior is unchanged.
+var portFreeFn = portFree
+
 // panelBindAddr builds the listen address for the panel's listeners,
 // honoring panel.json bind_host (reverse-proxy mode: "127.0.0.1" keeps
 // the panel private behind nginx). Empty binds all interfaces.
@@ -282,7 +288,7 @@ func pickFreePort(start int) int {
 		if p < 1 {
 			continue
 		}
-		if portFree(p) {
+		if portFreeFn(p) {
 			return p
 		}
 	}
@@ -321,7 +327,7 @@ func ensureFreeHTTPPort() {
 	} else if desired < 1 || desired > 65535 {
 		desired = 7777
 	}
-	if portFree(desired) {
+	if portFreeFn(desired) {
 		if cfg.Port != desired {
 			cfg.Port = desired
 			saveCfg()
@@ -867,6 +873,10 @@ func Main(args []string) int {
 	// gate and the store's audit table records the domain events.
 	registerMeshRoutes(mux, base)
 	registerUIAPIRoutes(mux, base)
+	// Phase 16: maintenance-mode API (agentmaintenance.go, contract §2.15).
+	registerAgentMaintenanceRoutes(mux, base)
+	// Phase 17: additive /api/mesh→/api/ui read aliases (uifold.go).
+	registerUIFoldRoutes(mux, base)
 	registerGuardRoutes(mux, base)
 	// Phase 5 R5: engine artifact store + agent manifest (engineartifacts.go).
 	registerEngineArtifactRoutes(mux, base)

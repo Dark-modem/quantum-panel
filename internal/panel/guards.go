@@ -258,11 +258,153 @@ func handleAgentDependencies(w http.ResponseWriter, r *http.Request) {
 // ---- audit log API ----------------------------------------------------
 
 type auditEntryView struct {
-	At     int64          `json:"at"`
-	Actor  string         `json:"actor"`
-	IP     string         `json:"ip,omitempty"`
-	Action string         `json:"action"`
-	Detail map[string]any `json:"detail,omitempty"`
+	At      int64          `json:"at"`
+	Actor   string         `json:"actor"`
+	IP      string         `json:"ip,omitempty"`
+	Action  string         `json:"action"`
+	Summary string         `json:"summary,omitempty"` // phase 16: short human line
+	Detail  map[string]any `json:"detail,omitempty"`
+}
+
+// auditSummaryKeyOK: (action, field) pairs whose field NAME is
+// secret-shaped but whose VALUE is a UI identifier, not a credential
+// (the tunnel key is shown on every screen; redactAuditDetail still
+// scrubs it inside the raw detail).
+var auditSummaryKeyOK = map[string]bool{"mesh.tunnel.create:key": true}
+
+// auditSummary builds the per-entry short human line (phase 16,
+// UI-API-CONTRACT.md §2.13 — the UI renders it instead of the raw JSON
+// detail). Built ONLY from the recorded action + detail fields (ids
+// where the detail only carries ids; NO extra store lookups — the read
+// stays one query). Fields whose NAME is secret-shaped summarize as
+// [redacted] unless allowlisted — the same policy redactAuditDetail
+// applies to the raw detail, so the summary never echoes what the
+// detail hides. Unknown actions → "" (field omitted; the UI keeps
+// showing the raw detail).
+func auditSummary(action string, d map[string]any) string {
+	// JSON detail numbers arrive as float64; keep the accessors forgiving.
+	str := func(k string) string {
+		v, ok := d[k]
+		if !ok {
+			return "?"
+		}
+		lk := strings.ToLower(k)
+		if strings.Contains(lk, "key") || strings.Contains(lk, "token") ||
+			strings.Contains(lk, "secret") || strings.Contains(lk, "password") ||
+			strings.Contains(lk, "signature") || strings.Contains(lk, "sha256") {
+			if !auditSummaryKeyOK[action+":"+k] {
+				return "[redacted]"
+			}
+		}
+		switch t := v.(type) {
+		case string:
+			return t
+		case float64:
+			return strconv.FormatInt(int64(t), 10)
+		case bool:
+			return strconv.FormatBool(t)
+		}
+		return "?"
+	}
+	num := func(k string) int64 {
+		if v, ok := d[k].(float64); ok {
+			return int64(v)
+		}
+		return 0
+	}
+	switch action {
+	case "mesh.import.legacy":
+		return fmt.Sprintf("legacy import: agents=%s topologies=%s servers=%s tunnels=%s",
+			str("agents"), str("topologies"), str("servers"), str("tunnels"))
+	case "mesh.datacenter.upsert":
+		if k, ok := d["kind"].(string); ok && k != "" {
+			return fmt.Sprintf("datacenter #%s (%s) saved", str("id"), k)
+		}
+		return fmt.Sprintf("datacenter #%s saved", str("id"))
+	case "mesh.datacenter.price":
+		return fmt.Sprintf("datacenter #%s price coefficient set to %g", str("id"), float64(num("price_coefficient")))
+	case "mesh.datacenter.delete":
+		return fmt.Sprintf("datacenter #%s deleted", str("id"))
+	case "mesh.server.upsert":
+		if k, ok := d["role"].(string); ok && k != "" {
+			return fmt.Sprintf("server #%s (%s) saved", str("id"), k)
+		}
+		return fmt.Sprintf("server #%s saved", str("id"))
+	case "mesh.server.update":
+		return fmt.Sprintf("server #%s updated", str("id"))
+	case "mesh.server.delete":
+		return fmt.Sprintf("server #%s deleted", str("id"))
+	case "mesh.topology.update":
+		return fmt.Sprintf("topology #%s updated", str("id"))
+	case "mesh.topology.delete":
+		return fmt.Sprintf("topology #%s deleted", str("id"))
+	case "mesh.topology.generate":
+		return fmt.Sprintf("generated topology %s with %d tunnels", str("name"), num("tunnels"))
+	case "mesh.weight.set":
+		if tid := num("tunnel_id"); tid > 0 {
+			return fmt.Sprintf("weight %d set on tunnel #%d (topology #%d)",
+				num("weight"), tid, num("topology_id"))
+		}
+		return fmt.Sprintf("weight %d set (topology #%d, pair-scope)", num("weight"), num("topology_id"))
+	case "mesh.tunnel.create":
+		return fmt.Sprintf("tunnel %s created (engine %s)", str("key"), str("engine"))
+	case "mesh.tunnel.update":
+		return fmt.Sprintf("tunnel #%s updated (engine %s, enabled %s)", str("id"), str("engine"), str("enabled"))
+	case "mesh.tunnel.delete":
+		return fmt.Sprintf("tunnel #%s deleted", str("id"))
+	case "mesh.tunnel.engine_warning":
+		return fmt.Sprintf("engine warning recorded (%s): %s", str("engine"), str("warn"))
+	case "mesh.forward.create":
+		return fmt.Sprintf("forward #%s created (%s listen %s -> target %s)",
+			str("id"), str("proto"), str("listen_port"), str("target_port"))
+	case "mesh.forward.update":
+		return fmt.Sprintf("forward #%s updated", str("id"))
+	case "mesh.forward.delete":
+		return fmt.Sprintf("forward #%s deleted", str("id"))
+	case "mesh.agent.link":
+		return fmt.Sprintf("agent %s linked to server #%s", str("agent"), str("server_id"))
+	case "mesh.agent.public_ip":
+		return fmt.Sprintf("agent %s public IP override set to %s", str("agent"), str("public_ip"))
+	case "mesh.agent.engine_catalog":
+		return fmt.Sprintf("engine catalog stored for agent %s (%s engines)", str("agent"), str("engines"))
+	case "mesh.agent.maintenance":
+		if d["active"] == true {
+			return fmt.Sprintf("maintenance window for agent %s set until epoch %s", str("agent"), str("until"))
+		}
+		return fmt.Sprintf("maintenance window for agent %s cleared", str("agent"))
+	case "mesh.profile.apply":
+		return fmt.Sprintf("hardening profile %s applied on agent %s (rollback timer %ss)",
+			str("kind"), str("agent"), str("rollback_timer_s"))
+	case "mesh.profile.confirm":
+		return fmt.Sprintf("hardening profile confirmed on agent %s (kind %s)", str("agent"), str("kind"))
+	case "mesh.profile.rollback":
+		return fmt.Sprintf("hardening profile rolled back on agent %s (kind %s, ok %s)", str("agent"), str("kind"), str("ok"))
+	case "mesh.desired.queued":
+		return fmt.Sprintf("desired state queued for agent %s (revision %s, %d tunnels, %d engines)",
+			str("agent"), str("revision"), num("tunnels"), num("engines"))
+	case "mesh.desired.push":
+		return fmt.Sprintf("desired state pushed to agent %s (revision %s, %d tunnels, %d engines)",
+			str("agent"), str("revision"), num("tunnels"), num("engines"))
+	case "mesh.desired.ack":
+		return fmt.Sprintf("desired state acked by agent %s (revision %s, ok %s)", str("agent"), str("revision"), str("ok"))
+	case "pg.connect":
+		return fmt.Sprintf("PasarGuard connected (%d nodes)", num("nodes"))
+	case "pg.reconcile.apply":
+		return fmt.Sprintf("PasarGuard reconcile applied (creates %d, updates %d, reconnects %d)",
+			num("creates"), num("updates"), num("reconnects"))
+	case "pg.orphans.delete":
+		return fmt.Sprintf("PasarGuard orphan nodes deleted (requested %d)", num("requested"))
+	case "pg.cert.store":
+		return fmt.Sprintf("PasarGuard certificate stored for server #%s", str("server_id"))
+	case "pg.install_command":
+		return fmt.Sprintf("PasarGuard install command generated for server #%s (port %s)", str("server_id"), str("node_port"))
+	case "pg.dc.apply":
+		return fmt.Sprintf("PasarGuard per-DC config applied (servers %d, inbound creates %d, modifies %d, host changes %d)",
+			num("servers"), num("inbound_creates"), num("inbound_modifies"), num("host_changes"))
+	case "confirm.used":
+		return "confirmation token used"
+	}
+	return ""
 }
 
 // auditViewList reads the log with filters (actor, action, since, until,
@@ -304,11 +446,19 @@ func (h uiStoreHandle) auditViewList(actor, action, q string, since, until int64
 	for rows.Next() {
 		var e auditEntryView
 		var detail string
+		rawDetail := map[string]any{}
 		if err := rows.Scan(&e.At, &e.Actor, &e.Action, &detail); err != nil {
 			return nil, err
 		}
 		e.Detail = map[string]any{}
-		if json.Unmarshal([]byte(detail), &e.Detail) == nil {
+		if json.Unmarshal([]byte(detail), &rawDetail) == nil {
+			// Summary from the RAW detail: redactAuditDetail scrubs
+			// secret-SHAPED keys (any "*key*" field — including the
+			// harmless tunnel key) which would corrupt the line. The
+			// summary only prints known identifier fields and still
+			// passes redactErrorText (pattern-based) as defense in depth.
+			e.Summary = redactErrorText(auditSummary(e.Action, rawDetail))
+			e.Detail = rawDetail
 			redactAuditDetail(e.Detail)
 		} else if detail != "" {
 			e.Detail = map[string]any{"raw": redactErrorText(detail)}
@@ -353,10 +503,10 @@ func handleAuditLog(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 		w.Header().Set("Content-Disposition", "attachment; filename=audit.csv")
 		cw := csv.NewWriter(w)
-		_ = cw.Write([]string{"at", "actor", "ip", "action", "detail"})
+		_ = cw.Write([]string{"at", "actor", "ip", "action", "summary", "detail"})
 		for _, e := range entries {
 			dj, _ := json.Marshal(e.Detail)
-			_ = cw.Write([]string{strconv.FormatInt(e.At, 10), e.Actor, "", e.Action, string(dj)})
+			_ = cw.Write([]string{strconv.FormatInt(e.At, 10), e.Actor, "", e.Action, e.Summary, string(dj)})
 		}
 		cw.Flush()
 		return

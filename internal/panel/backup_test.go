@@ -37,7 +37,11 @@ func backupTestEnv(t *testing.T) (string, string) {
 	if _, err := disk.UpsertDatacenter(store.Datacenter{Kind: "iran", Name: "drak-bak"}); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
-	t.Cleanup(func() { _ = disk.Close() })
+	// Close NOW: the round-trip test wipes the db file mid-test and Windows
+	// cannot delete an open file (the snapshot re-opens its own copy).
+	if err := disk.Close(); err != nil {
+		t.Fatalf("close seeded store: %v", err)
+	}
 
 	// Seed the key files BEFORE the backup so the bundle carries them.
 	tlsDir := filepath.Join(configDir, "tls")
@@ -78,9 +82,7 @@ func TestBackupRestoreRoundTrip(t *testing.T) {
 	if err != nil || fi.Size() < 100 {
 		t.Fatalf("backup file: %v size=%d", err, fi.Size())
 	}
-	if got := fi.Mode().Perm(); got != 0o600 {
-		t.Fatalf("backup file mode = %v, want 0600", got)
-	}
+	assertPerm0600(t, bak)
 
 	// WIPE: destroy the db + key material, then restore.
 	for _, f := range []string{dbPath, dbPath + "-wal", dbPath + "-shm",
@@ -104,13 +106,7 @@ func TestBackupRestoreRoundTrip(t *testing.T) {
 		filepath.Join(configDir, "tls", "server.crt"): 0o640,
 		filepath.Join(configDir, "pasarguard.key"):    0o600,
 	} {
-		fi, err := os.Stat(f)
-		if err != nil {
-			t.Fatalf("restored %s missing: %v", f, err)
-		}
-		if fi.Mode().Perm() != want {
-			t.Fatalf("restored %s mode=%v, want %v", f, fi.Mode().Perm(), want)
-		}
+		assertPermIs(t, f, want)
 	}
 
 	// "login works" equivalent: the restored store opens, has the data.
@@ -215,9 +211,7 @@ func TestRestoreMembersClampModes(t *testing.T) {
 	if rc := restoreMembers(man, files, dir); rc != 0 {
 		t.Fatalf("restore rc=%d", rc)
 	}
-	if fi, err := os.Stat(filepath.Join(dir, "quantum.db")); err != nil || fi.Mode().Perm() != 0o640 {
-		t.Fatalf("mode not clamped: %v err=%v", fi.Mode().Perm(), err)
-	}
+	assertPermIs(t, filepath.Join(dir, "quantum.db"), 0o640)
 	// Tampered member hash → refusal without writing.
 	files["quantum.db"] = []byte("EVIL")
 	if rc := restoreMembers(man, files, filepath.Join(dir, "w")); rc == 0 {

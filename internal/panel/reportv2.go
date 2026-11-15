@@ -26,10 +26,21 @@ import (
 )
 
 var (
-	meshRuntimeMu   sync.Mutex
-	meshRuntimeBy   = map[string][]protocol.TunnelRuntime{} // agentID → latest report
-	meshRuntimeSeen = map[string]int64{}                    // agentID → last ingest at
+	meshRuntimeMu    sync.Mutex
+	meshRuntimeBy    = map[string][]protocol.TunnelRuntime{} // agentID → latest report
+	meshRuntimeSeen  = map[string]int64{}                    // agentID → last ingest at
+	meshReportedAtBy = map[string]int64{}                    // agentID → the agent's own report clock (R7; 0 = legacy)
 )
+
+// meshReportedAt returns the agent's own clock from its latest v2 report
+// (0, false = never reported / legacy agent without the R7 field — the
+// clock_drift rule skips those silently).
+func meshReportedAt(agentID string) (int64, bool) {
+	meshRuntimeMu.Lock()
+	defer meshRuntimeMu.Unlock()
+	at, ok := meshReportedAtBy[agentID]
+	return at, ok
+}
 
 // meshRuntimeSnapshot returns a copy of an agent's latest tunnel runtimes.
 func meshRuntimeSnapshot(agentID string) []protocol.TunnelRuntime {
@@ -116,6 +127,7 @@ func ingestStateReportV2(agentID string, rep *protocol.StateReportV2) {
 	meshRuntimeMu.Lock()
 	meshRuntimeBy[agentID] = rep.Tunnels
 	meshRuntimeSeen[agentID] = now
+	meshReportedAtBy[agentID] = rep.ReportedAt // R7: the agent's own clock (0 = legacy agent)
 	meshRuntimeMu.Unlock()
 
 	// Persist per-tunnel state transitions + errors into the bounded

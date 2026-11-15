@@ -103,7 +103,21 @@ func compileDesiredV2(s *store.Store, ag store.Agent) (desired *protocol.Desired
 		topoSeen[topo.ID] = true
 	}
 	if len(specs) == 0 {
-		return nil, "no enabled tunnels reference this server yet", nil, nil
+		// BACKLOG-PANEL (P18-1, from PHASE17-AGENT-REPORT UNVERIFIED #1):
+		// a tunnel-less document for a server that active wiring still
+		// names is the mis-link / silently-unwired signal — it used to
+		// surface only as an absent delivery. Say exactly WHY the doc is
+		// empty, per agent, in the push response's warnings.
+		if named, total := namedByEnabledTopologies(s, server.ID); total > 0 {
+			more := ""
+			if total > len(named) {
+				more = " …"
+			}
+			warnings = append(warnings, fmt.Sprintf(
+				"server %q compiles NO tunnels but is still named by %d tunnel(s) of enabled topologies (%s%s) — the agent would receive a tunnel-less document; check disabled tunnels, missing engines, or a mis-link (R6)",
+				server.Name, total, strings.Join(named, ", "), more))
+		}
+		return nil, "no enabled tunnels reference this server yet", warnings, nil
 	}
 
 	// Engines (Phase 11): a tunnel's engine is always enabled; the
@@ -234,6 +248,22 @@ func compileDesiredV2(s *store.Store, ag store.Agent) (desired *protocol.Desired
 		Engines: engines, Tunnels: specs, Balancing: &bal,
 		TargetGroups: targetGroups, Forwards: forwards,
 	}
+	// R6 (PROTOCOL-REQUESTS.md): stamp the receiving agent's SELF — the
+	// mesh server name it is linked to (the enrollment name), spelled
+	// exactly like the LocalServer/RemoteServer strings above — so the
+	// agent locates itself by NAME (FRP frps/frpc role resolution).
+	// Alignment validation: every spec must reference this server name
+	// on one end, else the agent cannot find itself in the document.
+	if strings.TrimSpace(server.Name) == "" {
+		warnings = append(warnings, fmt.Sprintf("server %d has an empty name: self identifier NOT stamped (R6)", server.ID))
+	} else {
+		desired.Self = &protocol.SelfInfo{Name: server.Name, Role: server.Role}
+		for _, sp := range specs {
+			if sp.LocalServer != server.Name && sp.RemoteServer != server.Name {
+				warnings = append(warnings, fmt.Sprintf("tunnel %s references %q/%q but self is %q (R6 alignment)", sp.ID, sp.LocalServer, sp.RemoteServer, server.Name))
+			}
+		}
+	}
 	return desired, "", warnings, nil
 }
 
@@ -273,6 +303,33 @@ func compileForwardRule(s *store.Store, topoID int64, f store.ForwardRule) (*pro
 		wire.TargetPort = f.ListenPort
 	}
 	return wire, &protocol.TargetGroup{ID: gid, TopologyID: topoName, RemoteServer: remoteName}, nil
+}
+
+// namedByEnabledTopologies lists tunnel keys that still name serverID on
+// one of their ends AND belong to an ENABLED topology (BACKLOG-PANEL
+// P18-1): a server wired into active topologies whose agent compiles a
+// tunnel-less document is the mis-link / silently-unwired signal. Disabled
+// tunnels of an enabled topology count (a disabled row is exactly why the
+// doc ends up tunnel-less); tunnels of disabled topologies do not (that
+// wiring was deliberately retired). Returns up to maxNamedWarningKeys keys
+// for the message plus the TOTAL count.
+func namedByEnabledTopologies(s *store.Store, serverID int64) (keys []string, total int) {
+	const maxNamedWarningKeys = 5
+	rows, err := s.TunnelsForServer(serverID)
+	if err != nil {
+		return nil, 0
+	}
+	for _, t := range rows {
+		topo, err := s.GetTopology(t.TopologyID)
+		if err != nil || !topo.Enabled {
+			continue
+		}
+		total++
+		if len(keys) < maxNamedWarningKeys {
+			keys = append(keys, t.TunnelKey)
+		}
+	}
+	return keys, total
 }
 
 // name caches keep the compiler off the DB for repeated lookups inside one

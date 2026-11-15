@@ -179,7 +179,8 @@ func TestAuditLogAPIFilterAndRedaction(t *testing.T) {
 	buf := make([]byte, 4096)
 	n, _ := resp3.Body.Read(buf)
 	csvText := string(buf[:n])
-	if !strings.HasPrefix(csvText, "at,actor,ip,action,detail") {
+	// Phase 16: the summary column rides the CSV (contract §2.13).
+	if !strings.HasPrefix(csvText, "at,actor,ip,action,summary,detail") {
 		t.Fatalf("csv header wrong: %q", csvText)
 	}
 	if strings.Contains(csvText, "hunter2") {

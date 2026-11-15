@@ -60,6 +60,16 @@ func (f *fakeNotifier) count() int {
 func newTestEngine(t *testing.T, startedAt time.Time) (*meshAlertEngine, *fakeNotifier) {
 	t.Helper()
 	withTempConfig(t)
+	// evaluate() touches MeshStore; pin an IN-MEMORY store so the lazy
+	// open never creates a FILE db inside the temp config dir (Windows
+	// TempDir cleanup races an open quantum.db). Tests that seed rows
+	// re-pin their own store; both cleanups are safe (LIFO).
+	s, err := storeOpenForTest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	MeshStoreSetForTest(s)
+	t.Cleanup(MeshStoreCloseForTest)
 	e := newMeshAlertEngine()
 	e.startedAt = startedAt
 	fake := &fakeNotifier{}
@@ -101,6 +111,12 @@ func TestMeshAlertDedupRecoveryQuiet(t *testing.T) {
 	for _, s := range fake.sent {
 		if s.Recovery {
 			recov++
+			// round-3 F4: the recovery payload must carry the OPEN event's
+			// severity (it used to go out as an empty string, breaking
+			// severity-based webhook consumers)
+			if s.Sev != "warn" {
+				t.Fatalf("recovery severity must carry the open event's severity, got %q", s.Sev)
+			}
 		}
 	}
 	if recov != 1 {
@@ -134,6 +150,80 @@ func TestMeshAlertAgentOfflineRule(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("agent_offline rule must fire for a 30-min-stale agent: %+v", evs)
+	}
+}
+
+// TestMeshAlertAgentOfflineFreshNotAlerted — round-3 F5 negative: a LIVE
+// agent (registry LastSeen fresh, exactly what the hub's batched per-
+// heartbeat persist maintains) must NOT alert offline. The old rule's
+// `Status != "online"` disjunct was always true (agentRegistryLoad resets
+// every record's status to offline), so live agents alerted too.
+func TestMeshAlertAgentOfflineFreshNotAlerted(t *testing.T) {
+	e, _ := newTestEngine(t, time.Now().Add(-time.Hour))
+	recs := []agentRecord{{ID: "agt_live", Name: "agt_live", Status: "online",
+		LastSeen: time.Now().Add(-5 * time.Second).Unix()}}
+	data, _ := json.Marshal(agentRegistryFile{Version: 1, Agents: recs})
+	if err := osWriteFileForTest(filepathJoinForTest(configDir, "agents.json"), data); err != nil {
+		t.Fatal(err)
+	}
+	for _, ev := range e.evaluate(time.Now()) {
+		if ev.Rule == "agent_offline" && ev.Target == "agt_live" {
+			t.Fatalf("agent_offline fired for a LIVE agent: %+v", ev)
+		}
+	}
+}
+
+// TestMeshAlertAgentOfflineRecoveryPath — the BACKEND-19 TASK C bug at the
+// engine level: offline dispatches for a stale agent, the agent comes
+// back (the hub persist refreshes LastSeen — the file form is seeded
+// directly here), and the NEXT tick dispatches the RECOVERY with the open
+// event's severity carried (F4). The old rule could never clear, so the
+// recovery message could never exist for this rule.
+func TestMeshAlertAgentOfflineRecoveryPath(t *testing.T) {
+	e, fake := newTestEngine(t, time.Now().Add(-2*time.Hour)) // past the quiet window
+	// keep the event stream clean: no real disk probe
+	diskUsageFn = func(string) (uint64, uint64, error) { return 0, 0, os.ErrInvalid }
+	t.Cleanup(func() { diskUsageFn = getDiskUsage })
+
+	writeReg := func(lastSeen int64) error {
+		recs := []agentRecord{{ID: "agt_rec", Name: "agt_rec", Status: "online", LastSeen: lastSeen}}
+		data, _ := json.Marshal(agentRegistryFile{Version: 1, Agents: recs})
+		return osWriteFileForTest(filepathJoinForTest(configDir, "agents.json"), data)
+	}
+	if err := writeReg(time.Now().Add(-10 * time.Minute).Unix()); err != nil {
+		t.Fatal(err)
+	}
+	e.tick(time.Now())
+	offlineSent := 0
+	fake.mu.Lock()
+	for _, ev := range fake.sent {
+		if !ev.Recovery && ev.Rule == "agent_offline" {
+			offlineSent++
+		}
+	}
+	fake.mu.Unlock()
+	if offlineSent != 1 {
+		t.Fatalf("the stale agent must dispatch exactly one offline alert, got %d (%+v)", offlineSent, fake.sent)
+	}
+
+	// the agent reconnects: the hub persist path refreshes LastSeen
+	if err := writeReg(time.Now().Unix()); err != nil {
+		t.Fatal(err)
+	}
+	e.tick(time.Now().Add(time.Second))
+	fake.mu.Lock()
+	defer fake.mu.Unlock()
+	recovery := 0
+	for _, ev := range fake.sent {
+		if ev.Recovery && ev.Rule == "agent_offline" && ev.Target == "agt_rec" {
+			recovery++
+			if ev.Sev != "warn" {
+				t.Fatalf("recovery must carry the open event's severity, got %q", ev.Sev)
+			}
+		}
+	}
+	if recovery != 1 {
+		t.Fatalf("the reconnect must dispatch exactly one recovery, got %d (%+v)", recovery, fake.sent)
 	}
 }
 
@@ -288,6 +378,75 @@ func TestMeshAlertsSettingsAPIRoundTrip(t *testing.T) {
 	}
 	if _, ok := view2["webhook_url"]; ok {
 		t.Fatal("raw webhook url must never be echoed to the client")
+	}
+}
+
+// TestMeshAlertsClockDriftThresholdRoundTrip (R7): the clock_drift
+// threshold is operator-configurable like the other rule thresholds —
+// the view exposes it, in-range values stick, out-of-range ones are
+// ignored (defaults hold), and the sealed settings file persists it so
+// it survives a restart and a backup/restore.
+func TestMeshAlertsClockDriftThresholdRoundTrip(t *testing.T) {
+	withTempConfig(t)
+	s, err := storeOpenForTest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	MeshStoreSetForTest(s)
+	t.Cleanup(MeshStoreCloseForTest)
+
+	mux := http.NewServeMux()
+	registerMeshAlertRoutes(mux, "")
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	client := meshSession(t)
+
+	post := func(body string) {
+		req, _ := http.NewRequest("POST", srv.URL+"/api/mesh/alerts/settings",
+			strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != 200 {
+			t.Fatalf("settings POST %s: %d", body, resp.StatusCode)
+		}
+	}
+	viewOf := func() map[string]any {
+		resp, err := client.Get(srv.URL + "/api/mesh/alerts")
+		if err != nil {
+			t.Fatal(err)
+		}
+		var v map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&v)
+		resp.Body.Close()
+		return v
+	}
+
+	// default value surfaced by the view
+	if v := viewOf(); v["clock_drift_max_s"] != float64(meshAlertClockDriftS) {
+		t.Fatalf("default clock_drift_max_s wrong: %v", v["clock_drift_max_s"])
+	}
+	post(`{"clock_drift_max_s":120}`)
+	if v := viewOf(); v["clock_drift_max_s"] != float64(120) {
+		t.Fatalf("clock_drift_max_s did not stick: %v", v["clock_drift_max_s"])
+	}
+	// out-of-range values are ignored (below floor / above ceiling)
+	post(`{"clock_drift_max_s":3}`)
+	if v := viewOf(); v["clock_drift_max_s"] != float64(120) {
+		t.Fatalf("below-floor value must be ignored: %v", v["clock_drift_max_s"])
+	}
+	post(`{"clock_drift_max_s":90000}`)
+	if v := viewOf(); v["clock_drift_max_s"] != float64(120) {
+		t.Fatalf("above-ceiling value must be ignored: %v", v["clock_drift_max_s"])
+	}
+	// persisted (sealed file) so it survives a restart
+	raw, _ := os.ReadFile(filepath.Join(configDir, "mesh-alerts.json"))
+	if !strings.Contains(string(raw), `"clock_drift_max_s":120`) {
+		t.Fatalf("clock_drift_max_s not persisted: %s", raw)
 	}
 }
 

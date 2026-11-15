@@ -50,6 +50,7 @@ func withBinaries(t *testing.T, names ...string) {
 	}
 	oldDirs, oldExtra := engineBinDirs, backhaulExtraBins
 	engineBinDirs, backhaulExtraBins = []string{dir}, nil
+	relaxExecProbeOnWindows(t)
 	t.Cleanup(func() { engineBinDirs, backhaulExtraBins = oldDirs, oldExtra })
 }
 
