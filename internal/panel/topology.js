@@ -494,6 +494,7 @@ function topologyRender() {
         const pillClass = !remaining ? 'st-none' : 'st-' + health;
         const powering = health === 'down' || !remaining;
         return `<tr class="topo-list-row" role="row" tabindex="0" data-topo-id="${esc(t.id)}" aria-label="${esc(t.name)}">
+        <td role="cell" class="topo-cell-no">${i + 1}</td>
         <td role="cell" class="topo-cell-name" data-label="${esc(tr('', 'Name'))}"><button type="button" class="topo-name" data-topo-open="${esc(t.id)}"><span class="topo-name-ic" aria-hidden="true">${TOPO_MESH}</span><bdi>${esc(t.name)}</bdi></button></td>
         <td role="cell" class="topo-cell-region" data-label="${esc(tr('', 'Country / Region'))}"><span class="topo-region">${t.country ? topologyFlagSvg(t.country) : ''}<span>${esc(topoCountryName(t.country))}</span></span></td>
         <td role="cell" class="topo-cell-tunnels" data-label="${esc(tr('', 'Tunnels'))}"><span class="topo-count" aria-label="${esc(countLabel)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16"/><path d="M16.5 8.5L20 12l-3.5 3.5"/><path d="M7.5 8.5L4 12l3.5 3.5"/></svg>${remaining}</span></td>
@@ -502,10 +503,10 @@ function topologyRender() {
       </tr>`;
       }).join('')
     : searching
-      ? `<tr class="topo-list-empty"><td colspan="5"><div class="ent-empty"><b>${esc(tr('', 'No topology matches your search.'))}</b><span>${esc(tr('', 'Clear the search to see all topologies.'))}</span></div></td></tr>`
+      ? `<tr class="topo-list-empty"><td colspan="6"><div class="ent-empty"><b>${esc(tr('', 'No topology matches your search.'))}</b><span>${esc(tr('', 'Clear the search to see all topologies.'))}</span></div></td></tr>`
       : topologyLoading && !topologyLoadedOnce
-        ? `<tr class="topo-list-empty topo-list-skel"><td colspan="5">${skel(2)}</td></tr>`
-        : `<tr class="topo-list-empty"><td colspan="5"><div class="mtb-hero"><div class="mtb-hero-in">
+        ? `<tr class="topo-list-empty topo-list-skel"><td colspan="6">${skel(2)}</td></tr>`
+        : `<tr class="topo-list-empty"><td colspan="6"><div class="mtb-hero"><div class="mtb-hero-in">
             <svg class="mtb-hero-logo" width="110" height="110" viewBox="0 0 100 100" fill="none" aria-hidden="true"><rect width="100" height="100" rx="22" fill="#090d16" stroke="rgba(56,189,248,0.25)" stroke-width="1.5"/><path d="M50 48 C42 38 26 32 12 42 C4 48 1 56 3 62 C6 60 12 54 20 55 C32 56 42 60 50 52 C58 60 68 56 80 55 C88 54 94 60 97 62 C99 56 96 48 88 42 C74 32 58 38 50 48 Z" fill="#38bdf8"/></svg>
             <h3 class="mtb-hero-title">${esc(tr('', 'Build your first topology'))}</h3>
             <p class="mtb-hero-desc">${esc(tr('', 'Set the server roles, then connect tunnels between them.'))}</p>
