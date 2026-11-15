@@ -308,18 +308,39 @@ func TestAlertPhase13RemainingRules(t *testing.T) {
 	if err := s.UpdateAgentResources(agIr, 4, 10, 0.5, 8192, 800, 100, 95, 86400, "kvm"); err != nil {
 		t.Fatal(err)
 	}
-	// billing_spike: last week carried 2 MB, this hour 20 MB (>8x) on the
-	// seeded tunnel; a sibling tunnel with FLAT traffic must not spike.
+	// billing_spike: the same clock hour last week carried ~2 MB, the last
+	// complete hour carried 32 MB (>8x) on the seeded tunnel. The rule reads
+	// the hourly ROLLUP with counter-based deltas (the demo line's honest
+	// hourly-deltas semantics, owner review round 4): each bucket needs a
+	// RISING pair of readings inside a complete hour, then an explicit fold —
+	// the same pattern meshalerts_phase13_test.go uses.
 	tun, err := s.GetTunnelByKey("tl-a")
 	if err != nil {
 		t.Fatal(err)
 	}
+	hourStart := now.Truncate(time.Hour).Unix()
+	curH := (hourStart-2*3600)/3600 - 1 // the rule's own fold-horizon bucket
+	prevHourStart := hourStart - 7*86400
 	if err := s.AddTrafficSample(store.TrafficSample{TunnelID: tun.ID, AgentID: agIr,
-		At: now.Add(-7 * 24 * time.Hour).Unix(), WireRx: 2 << 20, WireTx: 1 << 20, CountersKnown: true}); err != nil {
+		At: prevHourStart + 60, WireRx: 0, WireTx: 0, CountersKnown: true}); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.AddTrafficSample(store.TrafficSample{TunnelID: tun.ID, AgentID: agIr,
-		At: now.Add(-time.Minute).Unix(), WireRx: 20 << 20, WireTx: 0, CountersKnown: true}); err != nil {
+		At: prevHourStart + 1800, WireRx: 2 << 20, WireTx: 1 << 20, CountersKnown: true}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.RollupTrafficHourly(prevHourStart + 3600); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AddTrafficSample(store.TrafficSample{TunnelID: tun.ID, AgentID: agIr,
+		At: curH*3600 + 60, WireRx: 0, WireTx: 0, CountersKnown: true}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AddTrafficSample(store.TrafficSample{TunnelID: tun.ID, AgentID: agIr,
+		At: curH*3600 + 1800, WireRx: 32 << 20, WireTx: 0, CountersKnown: true}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.RollupTrafficHourly(curH*3600 + 3600); err != nil {
 		t.Fatal(err)
 	}
 	// backup_old: the backup state file 8 days stale (threshold 7 days).
