@@ -194,7 +194,11 @@ reconnect:
 		// engineEnabled mirrors the last desired state (phase-11: the UI's
 		// engine table reads the agent's own engine_status report — a real
 		// agent flips these when it applies the desired document).
+		// appliedRev reports what THIS agent actually applied (a real agent
+		// echoes it in StateReportV2; reporting a constant would stomp the
+		// panel's applied_revision on every heartbeat).
 		engineEnabled := true
+		appliedRev := ""
 		write := func(typ string, payload any) {
 			if b, err := wrap(2, typ, payload); err == nil {
 				wmu.Lock()
@@ -271,6 +275,7 @@ reconnect:
 					// desired only on this message).
 					if dv.Revision != "" {
 						write("ack", map[string]any{"revision": dv.Revision, "ok": true})
+						appliedRev = dv.Revision
 					}
 					continue
 				}
@@ -324,7 +329,7 @@ reconnect:
 				rt[i] = t
 			}
 			beat := map[string]any{
-				"applied_revision": "1",
+				"applied_revision": appliedRev,
 				"tunnels":          rt,
 				"proc":             proc,
 				"engine_status": func() []map[string]any {
