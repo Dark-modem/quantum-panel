@@ -31,6 +31,7 @@ var r3Reads = [][2]string{
 	{"/api/ui/pasarguard/overhead", "/api/mesh/overhead"},
 	{"/api/ui/profiles/pending", "/api/mesh/profiles/pending"},
 	{"/api/ui/pasarguard/status", "/api/mesh/pasarguard/status"},
+	{"/api/ui/pasarguard/crosscheck", "/api/mesh/pasarguard/crosscheck"},
 }
 
 // r3Mutations: [alias, twin, JSON body]. Twin "" = no mesh twin (new in
