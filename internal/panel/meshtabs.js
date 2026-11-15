@@ -1568,15 +1568,14 @@
       var preV = /^v[0-9]/.test(curV) ? curV : '';
       var ov = document.createElement('div');
       ov.className = 'mtb-modal-ov';
-      var PENCIL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3l4 4L8 20l-5 1 1-5z"/></svg>';
-    var CUBE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>';
+      var CUBE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>';
     var LINK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>';
     var EXT = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg>';
     var INFO = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M12 11.5V16"/></svg>';
     var REFRESH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>';
     var SERV = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="7" rx="1.5"/><rect x="3" y="13" width="18" height="7" rx="1.5"/><path d="M7 7.5h.01M7 16.5h.01"/></svg>';
     ov.innerHTML = '<div class="mtb-modal mtb-ed-modal mtb-upd-modal" role="dialog" aria-modal="true">' +
-        '<div class="tc-header"><div class="mtb-wiz-hero"><span class="mtb-modal-badge">' + PENCIL + '</span><div class="mtb-wiz-hero-tx"><p class="tc-title">' + esc(L('agUpdT')) + '</p><p class="qs-hint"><b>' + esc(ag.name || id) + '</b>' + (curV ? ' · <bdi dir="ltr">' + esc(curV) + '</bdi>' : '') + '</p></div></div>' +
+        '<div class="tc-header"><div class="mtb-wiz-hero"><span class="mtb-modal-badge">' + REFRESH + '</span><div class="mtb-wiz-hero-tx"><p class="tc-title">' + esc(L('agUpdT')) + '</p><p class="qs-hint"><b>' + esc(ag.name || id) + '</b>' + (curV ? ' · <bdi dir="ltr">' + esc(curV) + '</bdi>' : '') + '</p></div></div>' +
         '<button type="button" class="mtb-x" data-mtb-close>×</button></div>' +
         '<div class="mtb-form">' +
         '<span class="mtb-upd-k">' + SERV + esc(L('agUpdVer')) + '</span>' +
