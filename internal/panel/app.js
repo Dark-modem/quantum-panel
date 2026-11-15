@@ -11385,7 +11385,7 @@ window.loadClusterStatus = loadClusterStatus;
       '.mtb-acts-row.open .mtb-acts-pop{display:flex}}',
     '.mtb-act-del{color:var(--er);background:color-mix(in srgb, var(--er) 9%, transparent);border-color:color-mix(in srgb, var(--er) 26%, transparent)}',
     '@media (hover: hover){.mtb-act.mtb-act-del:hover{color:var(--er);background:color-mix(in srgb, var(--er) 18%, transparent);border-color:color-mix(in srgb, var(--er) 45%, transparent)}}',
-    '.mtb-aglink{cursor:pointer}',
+    '.mtb-aglink{cursor:pointer;display:inline-flex;align-items:center;gap:5px;vertical-align:middle}', // flex: the glyph and the name center by construction
     '.mtb-aglink:hover{color:var(--ac)}',
     '.mtb-detail-head .quantum-btn svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}',
     '.mtb-dtl-head .quantum-btn svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}',
@@ -11787,7 +11787,7 @@ window.loadClusterStatus = loadClusterStatus;
     // agents-list first column: chip glyph before the agent name, server glyph before the datacenter
     '.mtb-ag-ic{display:inline-flex;color:var(--ac);flex:none}',
     '.mtb-ag-ic svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;opacity:.9;flex:none}',
-    '.mtb-ag-dc{display:inline-flex;align-items:center;gap:4px}',
+    '.mtb-ag-dc{display:inline-flex;align-items:center;gap:4px;vertical-align:middle}',
     '.mtb-dc-ic{display:inline-flex;flex:none;opacity:.75}',
     '.mtb-dc-ic svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}',
     '.mtb-tun-topo{display:inline-flex;align-items:center;gap:4px;font-size:.85em}',
