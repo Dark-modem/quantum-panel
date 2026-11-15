@@ -11674,8 +11674,10 @@ window.loadClusterStatus = loadClusterStatus;
     '#mtbAgentModal .mtb-x:hover{border-color:var(--ac);background:color-mix(in srgb, var(--ac) 16%, transparent)}',
     '#mtbAgentModal #mtbWizBack{margin-inline-end:auto}',
     '.mtb-ed-modal #mtbEdBack{margin-inline-end:auto}',
-    '.mtb-del-hero{display:flex;align-items:center;gap:12px;flex:1;min-width:0}',
-    '.mtb-del-badge{width:44px;height:44px;border-radius:12px;border:1px solid color-mix(in srgb, var(--er) 50%, transparent);background:color-mix(in srgb, var(--er) 12%, transparent);color:var(--er);display:inline-flex;align-items:center;justify-content:center;flex:none}',
+    '.mtb-del-hero{display:flex;align-items:center;gap:10px;flex:1;min-width:0}',
+    // 36px (not the wizards' 44px): the delete header is a single title line, so
+    // the 44px chip dwarfed it and read as off-level even though boxes centered
+    '.mtb-del-badge{width:36px;height:36px;border-radius:11px;border:1px solid color-mix(in srgb, var(--er) 50%, transparent);background:color-mix(in srgb, var(--er) 12%, transparent);color:var(--er);display:inline-flex;align-items:center;justify-content:center;flex:none}',
     '.mtb-del-badge svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}',
     '.mtb-del-modal .qs-hint{white-space:normal;color:var(--tx);font-size:13px;line-height:1.6}',
     '.mtb-del-warn{display:block;color:var(--tx);margin:2px 0 14px}',
@@ -11707,7 +11709,9 @@ window.loadClusterStatus = loadClusterStatus;
     '.mtb-del-copy svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}',
     '.mtb-del-modal .mtb-acts .quantum-btn,.mtb-ed-modal .mtb-acts .quantum-btn{min-height:48px;border-radius:14px;font-size:15px;padding-inline:24px;display:inline-flex;align-items:center;gap:9px}',
     '.mtb-del-modal .mtb-acts .quantum-btn svg,.mtb-ed-modal .mtb-acts .quantum-btn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}',
-    '.mtb-del-modal .tc-title{font-size:17px}',
+    // raise the single-line title 1px: the cap-band of 17px text sits ~1px below
+    // the line-box center, so against the badge the word read a touch low
+    '.mtb-del-modal .tc-title{font-size:17px;translate:0 -1px}',
     '.mtb-del-badge svg{width:18px;height:18px}',
     '.mtb-ed-modal{width:min(640px,92vw)}',
     '.mtb-modal-badge{width:44px;height:44px;border-radius:12px;border:1px solid color-mix(in srgb, var(--ac) 50%, transparent);background:color-mix(in srgb, var(--ac) 12%, transparent);color:var(--ac);display:inline-flex;align-items:center;justify-content:center;flex:none;box-shadow:0 0 14px color-mix(in srgb, var(--ac) 22%, transparent)}',
