@@ -1525,7 +1525,7 @@
           '<td>' + (tkey ? '<b class="mono mtb-tun-key" dir="ltr" title="' + esc(tkey) + '">' + esc(tkey) + '</b>' : '\u2014') +
             (tTopo ? '<br><span class="mtb-muted mtb-tun-topo">' + MTB_ICO.mesh + esc(tTopo) + '</span>' : '') + '</td>' +
           '<td><div class="mtb-dest"><span class="mtb-dest-flag">' + (remCc ? topologyFlagSvg(remCc) : '') + '</span><div class="mtb-dest-tx"><b>' + esc(rem) + '</b>' +
-            (remDc ? '<br><span class="mtb-muted mtb-dest-dc"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="7" rx="1.5"/><rect x="3" y="13" width="18" height="7" rx="1.5"/><path d="M7 7.5h.01M7 16.5h.01"/></svg>' + esc(remDc) + '</span>' : '') + '</div></div></td>' +
+            (remDc ? '<span class="mtb-muted mtb-dest-dc"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="7" rx="1.5"/><rect x="3" y="13" width="18" height="7" rx="1.5"/><path d="M7 7.5h.01M7 16.5h.01"/></svg>' + esc(remDc) + '</span>' : '') + '</div></div></td>' +
           '<td><span class="badge info mtb-eng-badge">' + engLogo({ engine: tn.engine }, engName2) + ' ' + esc(engName2) + '</span></td>' +
           '<td>' + b2 + '</td>' +
           '<td>' + (tn.weight_pct != null ? (Math.round(tn.weight_pct * 10) / 10) + '%' : '\u2014') + '</td>' +
