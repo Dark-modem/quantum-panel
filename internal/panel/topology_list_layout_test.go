@@ -140,11 +140,11 @@ func TestTopologyListSharedResponsiveColumns(t *testing.T) {
 	}
 	// Tunnels and Actions sit on fixed tracks so the headers stay over their
 	// cells no matter how the flexible name/country columns squeeze. The
-	// Iran/Foreign pair merged into one Country/Region column (2026-11-16)
-	// and that column was pulled in (owner: it stretched); the fixed trio
-	// settled at 96px (Tunnels), 130px (Status), 56px (Actions).
-	if !regexp.MustCompile(`grid-template-columns\s*:[^}]*96px\s+130px\s+56px`).MatchString(shared[1]) {
-		t.Error("shared grid must keep fixed 96px (Tunnels), 130px (Status) and 56px (Actions) tracks")
+	// Iran/Foreign pair merged into one Country/Region column (2026-11-16);
+	// the flexible pair splits evenly and the fixed trio settled at
+	// 110px (Tunnels), 140px (Status), 64px (Actions).
+	if !regexp.MustCompile(`grid-template-columns\s*:[^}]*110px\s+140px\s+64px`).MatchString(shared[1]) {
+		t.Error("shared grid must keep fixed 110px (Tunnels), 140px (Status) and 64px (Actions) tracks")
 	}
 
 	media := regexp.MustCompile(`@media\s*\(\s*max-width\s*:\s*799px\s*\)`).FindStringIndex(css)
