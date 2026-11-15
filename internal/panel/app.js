@@ -11785,6 +11785,12 @@ window.loadClusterStatus = loadClusterStatus;
     '.mtb-dest-flag{display:flex}',
     '.mtb-dest-dc{display:inline-flex;align-items:center;gap:4px;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
     '.mtb-dest-dc svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;opacity:.75;flex:none}',
+    // agents-list first column: chip glyph before the agent name, server glyph before the datacenter
+    '.mtb-ag-ic{display:inline-flex;color:var(--ac);flex:none}',
+    '.mtb-ag-ic svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;opacity:.9;flex:none}',
+    '.mtb-ag-dc{display:inline-flex;align-items:center;gap:4px}',
+    '.mtb-dc-ic{display:inline-flex;flex:none;opacity:.75}',
+    '.mtb-dc-ic svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}',
     '.mtb-tun-topo{display:inline-flex;align-items:center;gap:4px;font-size:.85em}',
     '.mtb-tun-topo svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;opacity:.75;flex:none}',
     '.mtb-dest-tx{display:flex;flex-direction:column;gap:2px;min-width:0}',
