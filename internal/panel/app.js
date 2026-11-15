@@ -11710,9 +11710,10 @@ window.loadClusterStatus = loadClusterStatus;
     '.mtb-del-copy:hover{background:color-mix(in srgb, var(--ac) 20%, transparent);border-color:color-mix(in srgb, var(--ac) 60%, transparent);box-shadow:0 0 14px color-mix(in srgb, var(--ac) 25%, transparent)}',
     '.mtb-del-copy svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}',
     '.mtb-del-modal .mtb-acts .quantum-btn,.mtb-ed-modal .mtb-acts .quantum-btn{min-height:48px;border-radius:14px;font-size:15px;padding-inline:24px;display:inline-flex;align-items:center;gap:9px}',
-    // delete footer: Cancel anchors to the far inline-start edge (left in EN,
-    // mirrored right in fa) — the dangerous action stays alone at inline-end
-    '.mtb-del-modal .mtb-acts [data-mtb-close]{margin-inline-end:auto}',
+    // every modal footer: the dismiss button (Cancel / Back-to-list) anchors to
+    // the far inline-start edge (left in EN, mirrored right in fa) — the primary
+    // action stays alone at inline-end
+    '.mtb-acts [data-mtb-close]{margin-inline-end:auto}',
     '.mtb-del-modal .mtb-acts .quantum-btn svg,.mtb-ed-modal .mtb-acts .quantum-btn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}',
     // raise the single-line title 1px: the cap-band of 17px text sits ~1px below
     // the line-box center, so against the badge the word read a touch low
