@@ -16,6 +16,7 @@ import (
 	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -90,11 +91,15 @@ type agentEnrollToken struct {
 	TokenPrefix string `json:"token_prefix"` // first 8 chars for UI display
 	Role        string `json:"role"`
 	Label       string `json:"label,omitempty"`
-	CreatedAt   int64  `json:"created_at"`
-	ExpiresAt   int64  `json:"expires_at"`
-	UsedBy      string `json:"used_by,omitempty"`
-	UsedAt      int64  `json:"used_at,omitempty"`
-	Revoked     bool   `json:"revoked,omitempty"`
+	// Datacenter (phase 26, UI-API-REQUESTS §9): the free-text datacenter the
+	// operator picks in the add-agent wizard; applied to the enrolled agent's
+	// server record at enroll time so the agents rows carry a.server.datacenter.
+	Datacenter string `json:"datacenter,omitempty"`
+	CreatedAt  int64  `json:"created_at"`
+	ExpiresAt  int64  `json:"expires_at"`
+	UsedBy     string `json:"used_by,omitempty"`
+	UsedAt     int64  `json:"used_at,omitempty"`
+	Revoked    bool   `json:"revoked,omitempty"`
 }
 
 const (
@@ -392,6 +397,14 @@ func handleAgentEnroll(w http.ResponseWriter, r *http.Request) {
 	// succeeds even if the store is down; the registry file stays
 	// authoritative for identity and credentials).
 	meshMirrorAgentEnroll(rec)
+	if tok.Datacenter != "" {
+		// Phase 26 §9: a token minted with a datacenter auto-provisions the
+		// enrolled agent's server record — find-or-create the datacenters
+		// row, find-or-create the server (role + name), link the agent — so
+		// GET /api/ui/agents rows carry a.server.datacenter like seeded
+		// data. Best effort, same contract as the mirror above.
+		meshApplyEnrollDatacenter(rec, tok.Role, tok.Datacenter)
+	}
 	LogSecurityAudit("agent_enroll", id, ip, "role="+tok.Role)
 	writeJSON(w, map[string]string{"id": id, "key": key, "base_path": cfg.BasePath})
 }
@@ -414,6 +427,63 @@ func meshMirrorAgentEnroll(rec agentRecord) {
 	}
 }
 
+// agentTokenDcMax caps the free-text datacenter carried on a minted token
+// (UI-API-REQUESTS §9: trim, empty = absent, sane max length).
+const agentTokenDcMax = 100
+
+// meshApplyEnrollDatacenter applies the token's datacenter to the enrolled
+// agent's server record (phase 26 §9): find-or-create the datacenters row
+// (kind = the token's role, only on CREATE — an existing datacenter keeps
+// its kind), find-or-create the agent's server (role + enrollment name)
+// with that datacenter, and link the agent to it — so GET /api/ui/agents
+// rows carry a.server.datacenter exactly like seeded data. Best effort:
+// enrollment already succeeded; a store failure only means the operator
+// links manually (unchanged pre-26 behavior).
+func meshApplyEnrollDatacenter(rec agentRecord, role, datacenter string) {
+	s, err := MeshStore()
+	if err != nil {
+		noteStoreRetry()
+		return
+	}
+	dc, err := s.DatacenterByName(datacenter)
+	if errors.Is(err, store.ErrNotFound) {
+		if dc.ID, err = s.UpsertDatacenter(store.Datacenter{Kind: role, Name: datacenter}); err != nil {
+			log.Printf("[mesh] enroll datacenter %q: %v", datacenter, err)
+			return
+		}
+	} else if err != nil {
+		log.Printf("[mesh] enroll datacenter lookup %q: %v", datacenter, err)
+		return
+	}
+	dcID := dc.ID
+	sv, err := s.ServerByName(rec.Name)
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+		if _, err = s.UpsertServer(store.Server{Name: rec.Name, Role: role, DatacenterID: dcID}); err != nil {
+			log.Printf("[mesh] enroll server %q: %v", rec.Name, err)
+			return
+		}
+		if sv, err = s.ServerByName(rec.Name); err != nil {
+			log.Printf("[mesh] enroll server re-fetch %q: %v", rec.Name, err)
+			return
+		}
+	case err != nil:
+		log.Printf("[mesh] enroll server lookup %q: %v", rec.Name, err)
+		return
+	default:
+		if sv.DatacenterID == 0 {
+			// a pre-created server with this name: fill the datacenter without
+			// clobbering an explicit assignment or the server's own role
+			if _, err := s.UpsertServer(store.Server{Name: sv.Name, Role: sv.Role, DatacenterID: dcID, Address: sv.Address}); err != nil {
+				log.Printf("[mesh] enroll server %q dc fill: %v", sv.Name, err)
+			}
+		}
+	}
+	if err := s.LinkAgentServer(rec.ID, sv.ID); err != nil {
+		log.Printf("[mesh] enroll link %s -> server %d: %v", rec.ID, sv.ID, err)
+	}
+}
+
 // ---- enrollment token management (session-authenticated upstream) ----
 
 // handleAgentTokenPost mints one single-use enrollment token. The plaintext
@@ -423,6 +493,7 @@ func handleAgentTokenPost(w http.ResponseWriter, r *http.Request) {
 		Role        string `json:"role"`
 		Label       string `json:"label"`
 		ExpiresDays int    `json:"expires_days"`
+		Datacenter  string `json:"datacenter"` // phase 26 §9: applied to the enrolled agent's server
 	}
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10)).Decode(&body); err != nil {
 		agentPlainError(w, http.StatusBadRequest, "body must be a JSON object")
@@ -430,6 +501,11 @@ func handleAgentTokenPost(w http.ResponseWriter, r *http.Request) {
 	}
 	if body.Role != "iran" && body.Role != "foreign" {
 		agentPlainError(w, http.StatusBadRequest, "role must be iran or foreign")
+		return
+	}
+	datacenter := strings.TrimSpace(body.Datacenter)
+	if len(datacenter) > agentTokenDcMax {
+		agentPlainError(w, http.StatusBadRequest, "datacenter must be at most 100 characters")
 		return
 	}
 	days := body.ExpiresDays
@@ -468,6 +544,7 @@ func handleAgentTokenPost(w http.ResponseWriter, r *http.Request) {
 		TokenPrefix: token[:8],
 		Role:        body.Role,
 		Label:       label,
+		Datacenter:  datacenter,
 		CreatedAt:   now.Unix(),
 		ExpiresAt:   now.Add(time.Duration(days) * 24 * time.Hour).Unix(),
 	}

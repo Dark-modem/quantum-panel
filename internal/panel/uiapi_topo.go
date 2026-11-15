@@ -143,6 +143,14 @@ func handleUITopologyDetail(w http.ResponseWriter, r *http.Request) {
 		entry := map[string]any{
 			"id": sv.ID, "name": sv.Name, "agent": agentRef, "tunnels": rows,
 		}
+		// phase 26 §9: the member entry carries its datacenter (bilingual) —
+		// the same server-ref shape the tunnel rows use.
+		if ref := h.uiServerRef(sv.ID); ref != nil {
+			if m, ok := ref.(map[string]any); ok {
+				entry["datacenter"] = m["datacenter"]
+				entry["datacenter_en"] = m["datacenter_en"]
+			}
+		}
 		if sv.Role == "iran" {
 			iranRows = append(iranRows, entry)
 		} else {

@@ -54,6 +54,7 @@ type BillingServerRow struct {
 	Name         string         `json:"name"`
 	DatacenterID int64          `json:"datacenter_id,omitempty"`
 	Datacenter   string         `json:"datacenter,omitempty"`
+	DatacenterEN string         `json:"datacenter_en,omitempty"` // phase 26 §9: English display name
 	Usage        Usage          `json:"usage"`
 	Billable     Usage          `json:"billable"`
 	Overhead     float64        `json:"overhead_ratio"`
@@ -254,11 +255,11 @@ func (s *Store) BillingReport(from, to int64) (dcs []BillingDCRow, servers []Bil
 	trows.Close()
 
 	type serverMeta struct {
-		name, dc string
-		dcID     int64
+		name, dc, dcEn string
+		dcID           int64
 	}
 	sm := map[int64]*serverMeta{}
-	srows, err := s.db.Query(`SELECT s.id, s.name, COALESCE(d.id,0), COALESCE(d.name,''), COALESCE(d.price_coefficient,1.0)
+	srows, err := s.db.Query(`SELECT s.id, s.name, COALESCE(d.id,0), COALESCE(d.name,''), COALESCE(d.datacenter_en,''), COALESCE(d.price_coefficient,1.0)
 		FROM servers s LEFT JOIN datacenters d ON d.id = s.datacenter_id`)
 	if err != nil {
 		return nil, nil, nil, err
@@ -267,7 +268,7 @@ func (s *Store) BillingReport(from, to int64) (dcs []BillingDCRow, servers []Bil
 		var id int64
 		var price float64
 		m := &serverMeta{}
-		if err := srows.Scan(&id, &m.name, &m.dcID, &m.dc, &price); err != nil {
+		if err := srows.Scan(&id, &m.name, &m.dcID, &m.dc, &m.dcEn, &price); err != nil {
 			srows.Close()
 			return nil, nil, nil, err
 		}
@@ -328,7 +329,7 @@ func (s *Store) BillingReport(from, to int64) (dcs []BillingDCRow, servers []Bil
 			}
 			sr := svRows[sid]
 			if sr == nil {
-				sr = &BillingServerRow{ServerID: sid, Name: smeta.name, DatacenterID: smeta.dcID, Datacenter: smeta.dc}
+				sr = &BillingServerRow{ServerID: sid, Name: smeta.name, DatacenterID: smeta.dcID, Datacenter: smeta.dc, DatacenterEN: smeta.dcEn}
 				svRows[sid] = sr
 			}
 			sr.Usage = sr.Usage.add(usage)
