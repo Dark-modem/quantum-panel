@@ -175,9 +175,14 @@ reconnect:
 		hdr := http.Header{}
 		hdr.Set("X-Agent-Id", er.ID)
 		hdr.Set("X-Agent-Key", er.Key)
-		dialer := websocket.DefaultDialer
+		// A real agent's reconnect never waits forever: bound the dial (a
+		// dropped SYN after a container restart must RETRY, not hang).
+		dialer := &websocket.Dialer{HandshakeTimeout: 10 * time.Second}
 		if *insecure {
-			dialer = &websocket.Dialer{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
+			dialer = &websocket.Dialer{
+				HandshakeTimeout: 10 * time.Second,
+				TLSClientConfig:  &tls.Config{InsecureSkipVerify: true},
+			}
 		}
 		ws, _, err := dialer.Dial(wsURL, hdr)
 		if err != nil {
@@ -194,7 +199,11 @@ reconnect:
 		// engineEnabled mirrors the last desired state (phase-11: the UI's
 		// engine table reads the agent's own engine_status report — a real
 		// agent flips these when it applies the desired document).
+		// appliedRev reports what THIS agent actually applied (a real agent
+		// echoes it in StateReportV2; reporting a constant would stomp the
+		// panel's applied_revision on every heartbeat).
 		engineEnabled := true
+		appliedRev := ""
 		write := func(typ string, payload any) {
 			if b, err := wrap(2, typ, payload); err == nil {
 				wmu.Lock()
@@ -248,7 +257,8 @@ reconnect:
 					// engine_status report (the UI reads it back), and — for
 					// the e2e — persist the document exactly as received.
 					var dv struct {
-						Engines []struct {
+						Revision string `json:"revision"`
+						Engines  []struct {
 							Engine  string `json:"engine"`
 							Enabled *bool  `json:"enabled"`
 						} `json:"engines"`
@@ -264,6 +274,13 @@ reconnect:
 						if err := os.WriteFile(*desiredOut, env.Data, 0o644); err != nil {
 							log.Printf("desired-out: %v", err)
 						}
+					}
+					// ACK the revision (protocol v2 "ack"; a real agent
+					// answers after applying — the panel clears the pending
+					// desired only on this message).
+					if dv.Revision != "" {
+						write("ack", map[string]any{"revision": dv.Revision, "ok": true})
+						appliedRev = dv.Revision
 					}
 					continue
 				}
@@ -317,7 +334,7 @@ reconnect:
 				rt[i] = t
 			}
 			beat := map[string]any{
-				"applied_revision": "1",
+				"applied_revision": appliedRev,
 				"tunnels":          rt,
 				"proc":             proc,
 				"engine_status": func() []map[string]any {
