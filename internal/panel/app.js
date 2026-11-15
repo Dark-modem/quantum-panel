@@ -11680,7 +11680,9 @@ window.loadClusterStatus = loadClusterStatus;
     '.mtb-del-badge{width:36px;height:36px;border-radius:11px;border:1px solid color-mix(in srgb, var(--er) 50%, transparent);background:color-mix(in srgb, var(--er) 12%, transparent);color:var(--er);display:inline-flex;align-items:center;justify-content:center;flex:none}',
     '.mtb-del-badge svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}',
     '.mtb-del-modal .qs-hint{white-space:normal;color:var(--tx);font-size:13px;line-height:1.6}',
-    '.mtb-del-warn{display:block;color:var(--tx);margin:2px 0 14px}',
+    // 10px top margin: the header badge and the warn badge are both red chips —
+    // at 2px they read as one stuck-together blob
+    '.mtb-del-warn{display:block;color:var(--tx);margin:10px 0 14px}',
     // vertical-align:middle centers on the x-height; the system-font em box sits
     // ~2.4px higher, so nudge the badge up to the line's optical middle
     // (measured 2.35px). Vazirmatn/RTL metrics are already level — opt out there.
