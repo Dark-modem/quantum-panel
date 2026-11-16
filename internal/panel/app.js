@@ -11405,7 +11405,7 @@ window.loadClusterStatus = loadClusterStatus;
     '.mtb-agc-tx{display:flex;flex-direction:column;gap:2px}',
     '.mtb-agc-tx b{font-size:13px;color:var(--tx)}',
     '.mtb-agc-tx i{font-style:normal;font-size:12.5px;color:var(--tx2)}',
-    '.mtb-chips{display:flex;gap:6px;flex-wrap:wrap}',
+    '.mtb-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}',
     '.mtb-chip{padding:7px 14px;border-radius:999px;border:1px solid var(--ln);background:var(--sunk);color:var(--tx2);font-size:12.5px;cursor:pointer;transition:color .2s ease,border-color .2s ease}',
     '.mtb-chip:hover{color:var(--ac);border-color:var(--ac-b30)}',
     '.mtb-chip.on{color:var(--ac);border-color:var(--ac);background:color-mix(in srgb, var(--ac) 10%, transparent)}',
