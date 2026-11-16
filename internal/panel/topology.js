@@ -569,8 +569,7 @@ function topologyRender() {
     cur.textContent = String(topoPage);
     prev.disabled = topoPage <= 1;
     next.disabled = topoPage >= pages;
-    const pager = cur.parentElement;
-    if (pager) pager.hidden = pages <= 1;
+    cur.disabled = pages <= 1;
   }
   $('topologiesList').innerHTML = visible.length
     ? visible.map((t, i) => {
