@@ -547,7 +547,7 @@ const I18N = {
     topology_stat_pairs: "Total topologies",
     topology_stat_with: "With tunnels",
     topology_stat_without: "Without tunnels",
-    topology_col_name: "Topology name",
+    topology_col_name: "Name",
     topology_col_iran: "Iran server",
     topology_col_foreign: "Foreign server",
     topology_filter_all: "All statuses",
