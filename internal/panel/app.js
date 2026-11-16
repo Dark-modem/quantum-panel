@@ -11423,7 +11423,8 @@ window.loadClusterStatus = loadClusterStatus;
     '.mtb-cdd-btn:hover{border-color:var(--ac-b30)}',
     '.mtb-cdd-arrow svg{width:14px;height:14px;fill:none;stroke:var(--tx2);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}',
     '.mtb-cdd-pop{position:absolute;top:calc(100% + 4px);inset-inline-start:0;min-width:100%;max-height:220px;overflow:auto;z-index:10;border-radius:10px;border:1px solid var(--ln);background:var(--s1);box-shadow:0 12px 40px rgba(0,0,0,.5);padding:4px}',
-    '.mtb-cdd-opt{display:flex;align-items:center;gap:10px;width:100%;height:28px;padding:0 10px;border:0;border-radius:7px;background:none;color:var(--tx);font-size:13px;line-height:28px;cursor:pointer;text-align:start}',
+    '.mtb-cdd-opt{display:flex;align-items:center;gap:8px;width:100%;height:28px;padding:0 10px;border:0;border-radius:7px;background:none;color:var(--tx);font-size:13px;line-height:28px;cursor:pointer;text-align:start}',
+    '.mtb-cdd-opt img{width:18px;height:13px;flex:none;margin:0 !important;border-radius:3px}', // uniform flag slot: every name starts at the same x
     '.mtb-cdd-opt img{width:20px;height:14px;object-fit:cover;display:block;flex:none;border-radius:2px}',
     '.mtb-kv-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px}',
     '.mtb-kv-tile{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--ln);border-radius:10px;background:var(--sunk);padding:10px 12px}',
