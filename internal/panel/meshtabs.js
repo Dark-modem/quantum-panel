@@ -941,11 +941,11 @@
       if (wizStep === 2) {
         var foreignRole = (ov.querySelector('input[name="mtbRole"]:checked') || {}).value === 'foreign';
         if (foreignRole && !((document.getElementById('mtbCountry') || {}).value)) {
-          ov.querySelector('[data-mtb-msg]').textContent = L('pickCountry');
+          mtbToast(L('pickCountry'), 'err');
           return;
         }
         if (!(document.getElementById('mtbDc') || {}).value.trim()) {
-          ov.querySelector('[data-mtb-msg]').textContent = L('agDcReq');
+          mtbToast(L('agDcReq'), 'err');
           document.getElementById('mtbDc').focus();
           return;
         }
