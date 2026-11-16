@@ -241,24 +241,58 @@ func (e *meshAlertEngine) evaluatePhase13(now time.Time) []meshAlertEvent {
 		if !t.Enabled {
 			continue
 		}
-		cur, _, err := s.RangeUsageDetailed([]int64{t.ID}, hourStart, now.Unix())
-		if err != nil {
+		// a tunnel that is currently DOWN is already covered by the
+		// tunnel_down rule — billing_drop on top of it is noise (review 4)
+		downNow := false
+		meshRuntimeMu.Lock()
+		now2 := time.Now().Unix()
+		for aid, rts := range meshRuntimeBy {
+			// inline the freshness check: meshRuntimeFresh() takes the SAME
+			// mutex — calling it while holding meshRuntimeMu self-deadlocks
+			if now2-meshRuntimeSeen[aid] >= 120 {
+				continue // stale runtime snapshots never suppress the rule
+			}
+			for _, tr := range rts {
+				if tr.TunnelID == t.TunnelKey && !tr.Up {
+					downNow = true
+				}
+			}
+		}
+		meshRuntimeMu.Unlock()
+		if downNow {
 			continue
 		}
-		prev, _, err := s.RangeUsageDetailed([]int64{t.ID}, lastWeekStart, lastWeekStart+3600)
-		if err != nil {
+		// Like-for-like hourly DELTAS from the rollup (review round 4): the
+		// old pair ran RangeUsageDetailed, whose zero-base rule counts a
+		// stream's first in-window reading as full usage — any counter reset
+		// or mid-chain window start inflated the baseline and fired false
+		// billing_drop storms. Both sides are now honest hourly deltas:
+		//   cur  = the last COMPLETE hour (the rollup lags ≤2h by design)
+		//   prev = the same clock hour, 7 days earlier
+		curH := (hourStart-2*3600)/3600 - 1 // last hour with a GUARANTEED rollup row (the fold horizon is exclusive)
+		prevH := lastWeekStart / 3600
+		var curD, prevD int64
+		if err := s.DB().QueryRow(`SELECT COALESCE(SUM(last_rx - first_rx), 0) FROM traffic_hourly
+			WHERE tunnel_id = ? AND hour = ?`, t.ID, curH).Scan(&curD); err != nil {
 			continue
+		}
+		if err := s.DB().QueryRow(`SELECT COALESCE(SUM(last_rx - first_rx), 0) FROM traffic_hourly
+			WHERE tunnel_id = ? AND hour = ?`, t.ID, prevH).Scan(&prevD); err != nil {
+			continue
+		}
+		if curD < 0 {
+			curD = 0
 		}
 		switch {
-		case prev.WireRx > 1<<20 && cur.WireRx < prev.WireRx/100:
+		case prevD > 1<<20 && curD < prevD/100:
 			e.alertEmit(&evs, now, "billing_drop", "billing_drop:"+t.TunnelKey, t.TunnelKey, "warn",
-				fmt.Sprintf("tunnel %s carried ~0 bytes this hour vs %d last week", t.TunnelKey, prev.WireRx),
-				t.TunnelKey, prev.WireRx)
-		case prev.WireRx > 1<<20 && float64(cur.WireRx) > 8*float64(prev.WireRx):
+				fmt.Sprintf("tunnel %s carried ~0 bytes in the last complete hour vs %d the same hour last week", t.TunnelKey, prevD),
+				t.TunnelKey, prevD)
+		case prevD > 1<<20 && float64(curD) > 8*float64(prevD):
 			e.alertEmit(&evs, now, "billing_spike", "billing_spike:"+t.TunnelKey, t.TunnelKey, "warn",
-				fmt.Sprintf("tunnel %s carried %d bytes this hour (%.1fx last week)", t.TunnelKey, cur.WireRx,
-					float64(cur.WireRx)/float64(prev.WireRx)),
-				t.TunnelKey, cur.WireRx, float64(cur.WireRx)/float64(prev.WireRx))
+				fmt.Sprintf("tunnel %s carried %d bytes in the last complete hour (%.1fx the same hour last week)", t.TunnelKey, curD,
+					float64(curD)/float64(prevD)),
+				t.TunnelKey, curD, float64(curD)/float64(prevD))
 		}
 	}
 

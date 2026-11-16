@@ -58,11 +58,21 @@ func TestAlertPhase13Rules(t *testing.T) {
 		_ = s.AddTunnelEvent(store.TunnelEvent{TunnelID: tun.ID, At: now.Add(-time.Duration(i) * time.Minute).Unix(),
 			Kind: "state", FromState: "up", ToState: "down"})
 	}
-	// billing anomaly: last week carried 4 MB, this hour 0.
-	weekAgo := now.Add(-7 * 24 * time.Hour).Unix()
-	_ = s.AddTrafficSample(store.TrafficSample{TunnelID: tun.ID, At: weekAgo,
+	// billing anomaly: the same clock hour last week carried a 4 MB hourly
+	// DELTA (two samples — the rule compares honest hourly deltas from the
+	// rollup, not zero-based window sums), this hour 0.
+	// both samples INSIDE the same clock hour (an hour boundary between them
+	// would split the delta across two single-sample hours → zero deltas)
+	weekAgoHour := now.Add(-7 * 24 * time.Hour).Truncate(time.Hour).Unix()
+	_ = s.AddTrafficSample(store.TrafficSample{TunnelID: tun.ID, At: weekAgoHour + 60,
+		WireRx: 0, WireTx: 0, PayloadRx: 0, PayloadTx: 0,
+		CountersKnown: true, PayloadKnown: true, AgentID: agIr})
+	_ = s.AddTrafficSample(store.TrafficSample{TunnelID: tun.ID, At: weekAgoHour + 1800,
 		WireRx: 4 << 20, WireTx: 1 << 20, PayloadRx: 3 << 20, PayloadTx: 900000,
 		CountersKnown: true, PayloadKnown: true, AgentID: agIr})
+	if _, err := s.RollupTrafficHourly(weekAgoHour + 3600); err != nil {
+		t.Fatal(err)
+	}
 
 	evs := e.evaluatePhase13(now)
 	got := map[string]bool{}
