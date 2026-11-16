@@ -707,6 +707,7 @@ window.FA_TEXT = {
  "Search topology name, server or IP...": "جستجو در نام توپولوژی، سرور یا IP...",
  "Showing {a} to {b} of {c} topologies": "نمایش {a} تا {b} از {c} توپولوژی",
  "server": "سرور",
+ "servers": "سرور",
  "Duplicate topology": "تکرار توپولوژی",
  "Topology duplicated": "توپولوژی تکرار شد",
  "Activate": "فعال‌سازی",

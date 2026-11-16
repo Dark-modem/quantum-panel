@@ -1,10 +1,11 @@
 // A topology groups existing tunnels between a pair of servers. Only an empty
 // grouping can be deleted; tunnels and engines are never removed automatically.
 let topologyData = { topologies: [], tunnels: [] };
-// Per-side datacenter labels keyed by topology NAME: /api/ui/agents exposes
-// each agent's server.datacenter(_en) plus the topology names it serves —
-// the only place where a datacenter and a topology side meet.
-let topoDcByTopo = {};
+// Per-side SERVER lists keyed by topology NAME: /api/ui/agents exposes each
+// agent's server (datacenter, datacenter_en) plus the topology names it
+// serves; /api/mesh/servers contributes the per-server address. A topology
+// side renders every server it has — one line per datacenter group.
+let topoServersByTopo = {};
 let topoDcLoaded = false;
 let topologyDcFilter = 'all';
 let topoPage = 1;
@@ -14,30 +15,41 @@ async function topoDcLoad() {
   if (topoDcLoaded) return;
   topoDcLoaded = true;
   try {
-    const r = await api('/api/ui/agents');
-    (r.agents || []).forEach(a => {
-      const dc = (a.server && a.server.datacenter) || '';
-      const dcEn = (a.server && a.server.datacenter_en) || '';
-      const cc = String(a.country || '').toUpperCase();
+    const [ag, sv] = await Promise.all([api('/api/ui/agents'), api('/api/mesh/servers')]);
+    const addr = {};
+    ((sv && sv.servers) || []).forEach(s => { addr[s.id] = s.address || ''; });
+    (ag.agents || []).forEach(a => {
+      const srv = a.server || {};
+      if (!srv.id) return;
+      const entry = {
+        dc: srv.datacenter || '',
+        dcEn: srv.datacenter_en || '',
+        cc: String(a.country || '').toUpperCase(),
+        ip: addr[srv.id] || '',
+        name: srv.name || a.name || '',
+      };
       (a.topologies || []).forEach(name => {
-        const slot = topoDcByTopo[name] || (topoDcByTopo[name] = {});
-        if (a.role === 'iran' && dc && !slot.iran) slot.iran = { dc, dcEn };
-        if (a.role === 'foreign' && dc && !slot.foreign) slot.foreign = { dc, dcEn, cc };
+        const slot = topoServersByTopo[name] || (topoServersByTopo[name] = {});
+        const side = a.role === 'foreign' ? 'foreign' : 'iran';
+        const list = slot[side] || (slot[side] = []);
+        if (!list.some(x => x.name === entry.name)) list.push(entry);
       });
     });
-  } catch (e) { /* labels stay empty; the cells fall back to country names */ }
+  } catch (e) { /* lists stay empty; the cells fall back to country names */ }
+}
+function topoSideServers(t, side) {
+  return (topoServersByTopo[t.name] && topoServersByTopo[t.name][side]) || [];
 }
 function topoDcName(t, side) {
-  const slot = topoDcByTopo[t.name];
-  const s = slot && slot[side];
-  if (!s) return '';
-  return topoIsFa() ? s.dc : (s.dcEn || s.dc);
+  const list = topoSideServers(t, side);
+  if (!list.length) return '';
+  const s = list[0];
+  return topoIsFa() ? (s.dc || s.dcEn) : (s.dcEn || s.dc);
 }
 function topoDcCc(t, side) {
-  const slot = topoDcByTopo[t.name];
-  const s = slot && slot[side];
   if (side === 'iran') return 'IR';
-  return (s && s.cc) || String(t.country || '').toUpperCase();
+  const list = topoSideServers(t, side);
+  return (list[0] && list[0].cc) || String(t.country || '').toUpperCase();
 }
 let topologySelected = null;
 let topologySearchQuery = '';
@@ -539,8 +551,10 @@ function topologyRender() {
     const seen = {}, opts = ['<option value="all">' + esc(tr('', 'All datacenters')) + '</option>'];
     topologyData.topologies.forEach(t => {
       ['iran', 'foreign'].forEach(side => {
-        const dc = topoDcName(t, side);
-        if (dc && !seen[dc]) { seen[dc] = 1; opts.push('<option value="' + esc(dc) + '">' + esc(dc) + '</option>'); }
+        topoSideServers(t, side).forEach(s => {
+          const dc = topoIsFa() ? (s.dc || s.dcEn) : (s.dcEn || s.dc);
+          if (dc && !seen[dc]) { seen[dc] = 1; opts.push('<option value="' + esc(dc) + '">' + esc(dc) + '</option>'); }
+        });
       });
     });
     dcSel.innerHTML = opts.join('');
@@ -585,12 +599,31 @@ function topologyRender() {
           : tr('', health === 'ok' ? 'Active' : health === 'down' ? 'Down' : 'Unknown');
         const pillClass = !remaining ? 'st-none' : 'st-' + health;
         const powering = health === 'down' || !remaining;
-        // The mockup's server cell: flag, "Datacenter (CC)" and a "1 server • IP" line.
+        // The mockup's server cell, extended for multi-server sides: one block
+        // per datacenter — flag, "Datacenter (CC)", the server count, and one
+        // mono address line per server. A single-server side keeps the exact
+        // mockup line ("1 server • IP").
         const serverCell = (side, flag, ip) => {
-          const dc = topoDcName(t, side);
+          const list = topoSideServers(t, side);
           const ccUp = topoDcCc(t, side);
-          const label = dc ? (ccUp ? dc + ' (' + ccUp + ')' : dc) : (side === 'iran' ? tr('', 'Iran') : topoCountryName(flag));
-          return `<span class="topo-server"><span class="topo-flag" aria-hidden="true">${topologyFlagSvg(flag)}</span><span class="topo-server-tx"><b>${esc(label || '—')}</b><span class="topo-server-sub u-mono" dir="ltr">${esc('1 ' + tr('', 'server') + ' • ' + (ip || '—'))}</span></span></span>`;
+          const dcLabel = s0 => {
+            const dc = s0 ? (topoIsFa() ? (s0.dc || s0.dcEn) : (s0.dcEn || s0.dc)) : '';
+            const base = dc || (side === 'iran' ? tr('', 'Iran') : topoCountryName(flag));
+            return base && ccUp ? base + ' (' + ccUp + ')' : (base || '—');
+          };
+          if (list.length <= 1) {
+            const line = '1 ' + tr('', 'server') + ' • ' + ((list[0] && list[0].ip) || ip || '—');
+            return `<span class="topo-server"><span class="topo-flag" aria-hidden="true">${topologyFlagSvg(flag)}</span><span class="topo-server-tx"><b>${esc(dcLabel(list[0]))}</b><span class="topo-server-sub u-mono" dir="ltr">${esc(line)}</span></span></span>`;
+          }
+          // group by datacenter: the label line carries the count, the IPs stack below
+          const groups = [];
+          list.forEach(s => {
+            const key = (topoIsFa() ? (s.dc || s.dcEn) : (s.dcEn || s.dc)) || (side === 'iran' ? tr('', 'Iran') : topoCountryName(flag));
+            const g = groups.find(x => x.key === key);
+            if (g) g.servers.push(s); else groups.push({ key, servers: [s] });
+          });
+          const blocks = groups.map(g => `<div class="topo-server"><span class="topo-flag" aria-hidden="true">${topologyFlagSvg(flag)}</span><span class="topo-server-tx"><b>${esc(g.key)}<span class="topo-server-count">${esc(' · ' + String(g.servers.length) + ' ' + tr('', 'servers'))}</span></b>${g.servers.map(s => `<span class="topo-server-sub u-mono" dir="ltr">${esc(s.ip || '—')}</span>`).join('')}</span></div>`).join('');
+          return `<div class="topo-server-stack">${blocks}</div>`;
         };
         return `<tr class="topo-list-row" role="row" tabindex="0" data-topo-id="${esc(t.id)}" aria-label="${esc(t.name)}">
         <td role="cell" class="topo-cell-no">${pageFrom + i + 1}</td>
@@ -717,7 +750,10 @@ async function topologyCopy(id) {
 }
 function topologyDcMatches(t) {
   if (topologyDcFilter === 'all') return true;
-  return ['iran', 'foreign'].some(side => topoDcName(t, side) === topologyDcFilter);
+  return ['iran', 'foreign'].some(side => topoSideServers(t, side).some(s => {
+    const dc = topoIsFa() ? (s.dc || s.dcEn) : (s.dcEn || s.dc);
+    return dc === topologyDcFilter;
+  }));
 }
 async function topologyAttach() {
   const topo = topologyCurrent(), id = $('topologyAttachSelect').value;
