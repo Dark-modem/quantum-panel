@@ -1288,8 +1288,9 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 .topo-menu-pop { position:fixed; min-width:172px; z-index:80;
   background:var(--s2); border:1px solid var(--ln2); border-radius:10px; box-shadow:var(--lift);
   padding:6px; display:grid; gap:2px; }
-.topo-menu-item { display:flex; align-items:center; width:100%; text-align:start; padding:8px 10px;
+.topo-menu-item { display:flex; align-items:center; gap:8px; width:100%; text-align:start; padding:8px 10px;
   border-radius:8px; background:none; border:0; color:var(--tx); font:inherit; font-size:var(--fs-small); cursor:pointer; }
+.topo-menu-ic { width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; flex:none; opacity:.75; }
 .topo-menu-item:hover { background:var(--s3); }
 .topo-menu-pop .topo-delete { border:0; background:none; color:var(--er); justify-content:flex-start; }
 .topo-menu-pop .topo-delete:hover { background:color-mix(in srgb, var(--er) 10%, transparent); }
