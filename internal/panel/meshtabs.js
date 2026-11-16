@@ -805,7 +805,7 @@
       '<span class="mtb-agc-ico"><span class="mtb-glob">' + GLOBE + '</span></span>' +
       '<span class="mtb-agc-tx"><b>' + esc(L('roleForeign')) + '</b><i>' + esc(L('agRoleForeignD')) + '</i></span></label>' +
       '</div>' +
-      '<label id="mtbCountryRow" style="display:none">' + esc(L('agentCountry')) + ' ' +
+      '<label id="mtbCountryRow">' + esc(L('agentCountry')) + ' ' +
       '<div class="mtb-cdd" id="mtbCdd">' +
       '<button type="button" class="mtb-cdd-btn" id="mtbCddBtn">' +
       '<span class="mtb-cdd-cur" id="mtbCddCur">' + esc(L('noneOpt')) + '</span>' +
