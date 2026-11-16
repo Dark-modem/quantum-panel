@@ -813,9 +813,12 @@
       '</button>' +
       '<div class="mtb-cdd-pop" id="mtbCddPop" hidden>' +
       '<button type="button" class="mtb-cdd-opt" data-cc="">' + esc(L('noneOpt')) + '</button>' +
-      Object.keys(COUNTRIES).map(function (cc) {
-        return '<button type="button" class="mtb-cdd-opt" data-cc="' + cc + '">' + flagImg(cc) + ' ' + esc(CN(cc)) + '</button>';
-      }).join('') +
+      Object.keys(COUNTRIES)
+        .map(function (cc) { return { cc: cc, lbl: CN(cc) || cc }; })
+        .sort(function (a, b) { return a.lbl.localeCompare(b.lbl, isFa() ? 'fa' : 'en'); })
+        .map(function (o) {
+          return '<button type="button" class="mtb-cdd-opt" data-cc="' + o.cc + '">' + flagImg(o.cc) + ' ' + esc(o.lbl) + '</button>';
+        }).join('') +
       '</div></div>' +
       '<input type="hidden" id="mtbCountry" value=""></label>' +
       '<label id="mtbDcRow"><div class="mtb-field"><span class="mtb-field-ico">' + DCG + '</span>' +
