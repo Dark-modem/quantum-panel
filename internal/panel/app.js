@@ -11429,6 +11429,8 @@ window.loadClusterStatus = loadClusterStatus;
     '.topo-list-row .topo-cell-name{text-align:start !important}',
     '.topo-list-row .topo-cell-name .topo-name{margin-inline:0 !important; justify-content:flex-start !important}',
     '.mtb-cdd-opt img{width:20px;height:14px;object-fit:cover;display:block;flex:none;border-radius:2px}',
+    '.mtb-cdd-opt .mtb-globe-slot{display:inline-flex;width:20px;height:14px;align-items:center;justify-content:center;flex:none}', // the None option's globe rides the same 20×14 slot as the flags
+    '.mtb-cdd-opt .mtb-globe-slot svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}',
     '.mtb-kv-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px}',
     '.mtb-kv-tile{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--ln);border-radius:10px;background:var(--sunk);padding:10px 12px}',
     '.mtb-kv-k2{font-size:12.5px;color:var(--tx2)}',
