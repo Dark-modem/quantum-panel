@@ -767,6 +767,7 @@
     var old = document.getElementById('mtbAgentModal');
     if (old) old.remove();
     var GLOBE = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.7 2.7 4 5.8 4 9s-1.3 6.3-4 9c-2.7-2.7-4-5.8-4-9s1.3-6.3 4-9z"/></svg>';
+    var GLOBE_IC = '<span style="display:inline-flex;width:13px;height:13px;margin-inline-end:6px;vertical-align:-2px">' + GLOBE + '</span>';
     var PLUS = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
     var DCG = '<svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5.5" rx="8.5" ry="3"/><path d="M3.5 5.5v13c0 1.66 3.8 3 8.5 3s8.5-1.34 8.5-3v-13"/><path d="M3.5 12c0 1.66 3.8 3 8.5 3s8.5-1.34 8.5-3"/></svg>';
     var USER = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 19a6.5 6.5 0 0 1 13 0"/></svg>';
@@ -808,7 +809,7 @@
       '<label id="mtbCountryRow">' + esc(L('agentCountry')) + ' ' +
       '<div class="mtb-cdd" id="mtbCdd">' +
       '<button type="button" class="mtb-cdd-btn" id="mtbCddBtn">' +
-      '<span class="mtb-cdd-cur" id="mtbCddCur">' + esc(L('noneOpt')) + '</span>' +
+      '<span class="mtb-cdd-cur" id="mtbCddCur">' + GLOBE_IC + esc(L('noneOpt')) + '</span>' +
       '<span class="mtb-cdd-arrow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span>' +
       '</button>' +
       '<div class="mtb-cdd-pop" id="mtbCddPop" hidden>' +
@@ -891,7 +892,7 @@
     var cdd = document.getElementById('mtbCdd');
     function setCountry(cc) {
       cInp.value = cc;
-      cddCur.innerHTML = cc ? (flagImg(cc) + ' ' + esc(CN(cc) || cc)) : esc(L('noneOpt'));
+      cddCur.innerHTML = cc ? (flagImg(cc) + ' ' + esc(CN(cc) || cc)) : GLOBE_IC + esc(L('noneOpt'));
       cddPop.querySelectorAll('.mtb-cdd-opt').forEach(function (op) { op.classList.toggle('on', op.getAttribute('data-cc') === cc); });
       cddPop.hidden = true;
       if (typeof wizSave === 'function') wizSave();
