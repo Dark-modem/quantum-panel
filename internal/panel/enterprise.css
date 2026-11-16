@@ -1885,3 +1885,13 @@ html[dir="rtl"] .topo-back .topo-back-ic { transform:scaleX(-1); }
 .topo-server-stack { display:flex; flex-direction:column; gap:6px; min-width:0; }
 .topo-server-stack .topo-server { display:flex; }
 .topo-server-count { color:var(--mu); font-size:12px; font-weight:600; white-space:nowrap; }
+
+/* --- Cores page: agent-grouped core management --------------------------- */
+.cores-tools { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.cores-tools .mtb-eng-filters { margin:0; flex:1; min-width:0; }
+.cores-count { color:var(--mu); font-size:12.5px; font-weight:600; white-space:nowrap; }
+.cores-agent { margin-bottom:14px; }
+.cores-agent:last-child { margin-bottom:0; }
+.cores-agent-head { display:flex; align-items:center; gap:10px; padding:10px 2px; }
+.cores-agent-head b { color:var(--tx); font-size:14px; }
+.cores-agent-n { color:var(--mu); font-size:12.5px; font-weight:600; margin-inline-start:auto; }

@@ -2073,11 +2073,13 @@
           </header>
         </div>
         <div class="ent-card">
-          <div class="ent-empty">
-            <b data-i18n="cores_empty_t">No cores to show yet</b>
-            <span data-i18n="cores_empty_d">Cores appear here once they are provisioned for your topologies.</span>
+          <div class="cores-tools">
+            <div class="mtb-eng-filters" id="coresFilters"></div>
+            <span class="cores-count" id="coresCount"></span>
+            <button type="button" class="quantum-btn quantum-btn-secondary" id="coresRefresh" data-cores-refresh><svg class="topo-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg><span data-i18n="cores_refresh">Refresh</span></button>
           </div>
         </div>
+        <div class="ent-card" id="coresList"></div>
       </section>
       <!-- ==================== CLUSTER TAB ==================== -->
       <section id="tab-cluster" role="tabpanel" hidden>

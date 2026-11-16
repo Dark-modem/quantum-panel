@@ -489,6 +489,7 @@ const I18N = {
     cores_title: "Cores",
     cores_empty_t: "No cores to show yet",
     cores_empty_d: "Cores appear here once they are provisioned for your topologies.",
+    cores_refresh: "Refresh",
     nav_agents: "Agents",
     agents_tokens_title: "Enrollment Tokens",
     agents_tokens_hint: "One token enrolls exactly one endpoint agent. The token is shown once — copy it and run the command on the endpoint server.",
@@ -12521,4 +12522,106 @@ window.loadClusterStatus = loadClusterStatus;
   if (el && vTxt) el.textContent = vTxt;
   var elM = document.getElementById('sbVerM');
   if (elM && vTxt) elM.textContent = vTxt;
+})();
+
+// ===== Cores: every core the agents manage, gathered on one page ==========
+// Each agent's page installs/starts/stops its cores (engines); this view
+// pulls every agent's engine list and offers the same controls in one place.
+let coresCache = null;
+let coresFilter = 'all';
+let coresLoading = false;
+const CORES_ENGINE_IMG = { aestun: 'img/engines/aestun.png', rakhsh: 'img/engines/rakhsh.png', gost: 'img/engines/gost.png', xray: 'img/engines/xray.svg', wireguard: 'img/engines/wireguard.png', rathole: 'img/engines/rathole.png', wst: 'img/engines/wstunnel.png', wstunnel: 'img/engines/wstunnel.png', tinc: 'img/engines/tinc.svg', hysteria: 'img/engines/hysteria.png', singbox: 'img/engines/singbox.png', midos: 'img/engines/midos.png', dagger: 'img/engines/dagger.png', pengo: 'img/engines/pengo.png', backhaul: 'img/engines/backhaul.png', backpack: 'img/engines/backpack.png', narnia: 'img/engines/narnia.png', waterwall: 'img/engines/waterwall.png', wattunnel: 'img/engines/wattunnel.png', udp2raw: 'img/engines/udp2raw.png', paqet: 'img/engines/paqet.png', frp: 'img/engines/frp.png', easytier: 'img/engines/easytier.png', chisel: 'img/engines/chisel.png' };
+const CORES_ENGINE_NAME = { aestun: 'AESTun', rakhsh: 'Rakhsh', matrix: 'Matrix', frp: 'FRP', backhaul: 'Backhaul', gost: 'Gost', xray: 'Xray', wireguard: 'WireGuard', wst: 'wstunnel', wstunnel: 'wstunnel', chisel: 'Chisel', rathole: 'Rathole', tinc: 'Tinc', backpack: 'BackPack', dagger: 'DaggerConnect', easytier: 'EasyTier', hysteria: 'Hysteria', midos: 'Midos', narnia: 'Narnia', paqet: 'Paqet', pengo: 'Pengo', singbox: 'sing-box', spoof: 'Spoof', udp2raw: 'udp2raw', waterwall: 'WaterWall', wattunnel: 'WatTunnel' };
+const CORES_CUBE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l8 4.5v9L12 20l-8-4.5v-9L12 2z"/><path d="M4 6.5l8 4.5 8-4.5M12 11v9"/></svg>';
+function coresEngineState(en) {
+  if (!en.installed) return 'notinst';
+  if (en.enabled && ((en.instances || 0) > 0 || en.health === 'healthy')) return 'run';
+  return 'stopped';
+}
+async function loadCores(force) {
+  const list = $('coresList');
+  if (!list || coresLoading) return;
+  if (!force && coresCache) { renderCores(); return; }
+  coresLoading = true;
+  const rf = $('coresRefresh'); if (rf) rf.disabled = true;
+  list.innerHTML = '<div class="ent-empty"><b>' + esc(tr('', 'Loading cores...')) + '</b></div>';
+  try {
+    const ags = ((await api('/api/ui/agents')).agents) || [];
+    const details = await Promise.all(ags.map(a => api('/api/ui/agents/' + encodeURIComponent(a.id)).catch(() => null)));
+    coresCache = details.filter(Boolean).map(d => ({
+      id: (d.agent && d.agent.id) || '',
+      name: (d.agent && d.agent.name) || '',
+      status: (d.agent && d.agent.status) || '',
+      engines: d.engines || [],
+    })).filter(x => x.id);
+    renderCores();
+  } catch (e) {
+    list.innerHTML = '<div class="ent-empty"><b>' + esc(tr('', 'Cores could not be loaded')) + '</b><span>' + esc(e.message || '') + '</span></div>';
+  } finally {
+    coresLoading = false;
+    if (rf) rf.disabled = false;
+  }
+}
+function coresEngineCard(agid, en) {
+  const st = coresEngineState(en);
+  const disp = CORES_ENGINE_NAME[en.engine] || en.engine || '';
+  const img = CORES_ENGINE_IMG[en.engine]
+    ? '<img src="' + CORES_ENGINE_IMG[en.engine] + '" alt="' + esc(disp) + '" draggable="false">'
+    : CORES_CUBE;
+  const pill = st === 'run'
+    ? '<span class="mtb-eng-state run"><i></i>' + esc(tr('', 'Running')) + '</span>'
+    : '<span class="mtb-eng-state ' + (st === 'stopped' ? 'stop' : 'notinst') + '"><i></i>' + esc(st === 'stopped' ? tr('', 'Stopped') : tr('', 'Not installed')) + '</span>';
+  const act = st === 'notinst'
+    ? '<button type="button" class="quantum-btn quantum-btn-secondary mtb-eng-btn" data-cores-toggle data-cores-agid="' + esc(agid) + '" data-cores-eng="' + esc(en.engine || '') + '" data-cores-to="enable">' + esc(tr('', 'Install')) + '</button>'
+    : (st === 'run'
+      ? '<button type="button" class="quantum-btn quantum-btn-secondary mtb-eng-btn" data-cores-toggle data-cores-agid="' + esc(agid) + '" data-cores-eng="' + esc(en.engine || '') + '" data-cores-to="disable">' + esc(tr('', 'Stop')) + '</button>'
+      : '<button type="button" class="quantum-btn quantum-btn-primary mtb-eng-btn" data-cores-toggle data-cores-agid="' + esc(agid) + '" data-cores-eng="' + esc(en.engine || '') + '" data-cores-to="enable">' + esc(tr('', 'Start')) + '</button>');
+  return '<div class="mtb-eng-card' + (st === 'run' ? ' run' : '') + '" data-no-i18n>' +
+    '<div class="mtb-eng-top"><span class="mtb-eng-logo e-' + esc(en.engine || '') + '">' + img + '</span>' +
+    '<span class="mtb-eng-id"><b>' + esc(disp) + '</b>' +
+    (en.version ? '<span class="mtb-eng-ver"><bdi dir="ltr">' + esc(en.version) + '</bdi></span>' : (en.kernel ? '<span class="mtb-eng-ver">' + esc(tr('', 'kernel')) + '</span>' : '')) +
+    (en.last_error ? '<span class="mtb-eng-err">' + esc(en.last_error) + '</span>' : '') +
+    '</span>' + pill + '</div>' + act + '</div>';
+}
+function renderCores() {
+  const list = $('coresList');
+  if (!list) return;
+  const chips = [['all', tr('', 'All'), 'var(--ac)'], ['run', tr('', 'Running'), 'var(--ok)'], ['stopped', tr('', 'Stopped'), 'var(--er)'], ['notinst', tr('', 'Not installed'), 'var(--mu)']];
+  const filters = $('coresFilters');
+  if (filters) filters.innerHTML = chips.map(c => '<button type="button" class="mtb-eng-chip' + (coresFilter === c[0] ? ' on' : '') + '" data-cores-filter="' + c[0] + '"><i style="background:' + c[2] + '"></i>' + esc(c[1]) + '</button>').join('');
+  let total = 0, shown = 0, withCores = 0;
+  const html = (coresCache || []).map(g => {
+    const all = g.engines || [];
+    total += all.length;
+    const engines = all.filter(en => coresFilter === 'all' || coresEngineState(en) === coresFilter);
+    if (!engines.length) return '';
+    withCores++;
+    shown += engines.length;
+    const badge = g.status === 'online' ? '<span class="badge ok">' + esc(g.status) + '</span>' : '<span class="badge dim">' + esc(g.status || '—') + '</span>';
+    return '<div class="cores-agent"><div class="cores-agent-head"><b>' + esc(g.name) + '</b>' + badge + '<span class="cores-agent-n">' + esc(engines.length + ' ' + tr('', 'cores')) + '</span></div><div class="mtb-eng-tiles">' + engines.map(en => coresEngineCard(g.id, en)).join('') + '</div></div>';
+  }).join('');
+  const count = $('coresCount');
+  if (count) count.textContent = tr('', '{n} cores on {m} agents').replace('{n}', String(coresFilter === 'all' ? total : shown)).replace('{m}', String(withCores));
+  list.innerHTML = html || '<div class="ent-empty"><b>' + esc(tr('', 'No cores to show yet')) + '</b><span>' + esc(tr('', 'Cores appear here once they are provisioned for your topologies.')) + '</span></div>';
+}
+(function coresWire() {
+  const tab = $('tab-cores');
+  if (!tab) return;
+  tab.addEventListener('click', e => {
+    if (e.target.closest('[data-cores-refresh]')) { loadCores(true); return; }
+    const f = e.target.closest('[data-cores-filter]');
+    if (f) { coresFilter = f.getAttribute('data-cores-filter') || 'all'; renderCores(); return; }
+    const t = e.target.closest('[data-cores-toggle]');
+    if (t) {
+      t.disabled = true;
+      api('/api/ui/agents/' + encodeURIComponent(t.getAttribute('data-cores-agid')) + '/engines/' + encodeURIComponent(t.getAttribute('data-cores-eng')) + '/' + t.getAttribute('data-cores-to'), {}, 'POST')
+        .then(() => loadCores(true))
+        .catch(er => { t.disabled = false; toastErr(tr('', 'Cores'), (er && er.message) || 'HTTP ' + (er && er.status)); });
+    }
+  });
+  document.querySelectorAll('[data-tab="cores"]').forEach(b => {
+    const prev = b.onclick;
+    b.onclick = ev => { if (prev) prev.call(b, ev); loadCores(); };
+  });
+  if ((location.hash || '').indexOf('#t=cores') === 0) loadCores();
 })();
