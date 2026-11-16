@@ -480,7 +480,6 @@ const I18N = {
     topology_list_state: "Status",
     topology_list_actions: "Actions",
     topology_search_ph: "Search topology name, server or IP...",
-    topology_hero_sub: "Manage and monitor your network topologies.",
     topology_filter_dcs: "All datacenters",
     topology_view_label: "View",
     topology_view_list: "List view",
