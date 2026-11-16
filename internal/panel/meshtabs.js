@@ -923,6 +923,7 @@
       ov.querySelectorAll('.mtb-wline').forEach(function (ln, i2) { ln.classList.toggle('fill', i2 < wizStep - 1); });
       document.getElementById('mtbWizBack').hidden = wizStep === 1;
       document.getElementById('mtbWizNext').hidden = wizStep === 3;
+      document.getElementById('mtbWizNext').disabled = wizStep === 1 && !document.getElementById('mtbAgentLabel').value.trim();
       document.getElementById('mtbMint').hidden = wizStep !== 3;
       var pg = ov.querySelector('.mtb-wpage:not([hidden])');
       if (pg) { var f = pg.querySelector('input:not([type=hidden])'); if (f) f.focus(); }
@@ -977,6 +978,8 @@
     function nameOk() {
       var ok = document.getElementById('mtbNameOk');
       if (ok) ok.hidden = document.getElementById('mtbAgentLabel').value.trim().length < 2;
+      var nx = document.getElementById('mtbWizNext');
+      if (nx) nx.disabled = !document.getElementById('mtbAgentLabel').value.trim(); // no name → Next not clickable
     }
     document.getElementById('mtbAgentLabel').addEventListener('input', function () { nameOk(); wizSave(); });
     document.getElementById('mtbExpiry').addEventListener('input', wizSave);
