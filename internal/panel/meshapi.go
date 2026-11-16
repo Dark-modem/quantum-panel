@@ -48,6 +48,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/Dark-modem/quantum-panel/internal/store"
 )
@@ -277,6 +279,29 @@ func handleMeshDCList(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{"datacenters": nonNil(dcs)})
 }
 
+// meshNameValid bounds operator free-text names (round 4: datacenter and
+// server names had no length cap and accepted control characters; the PG
+// name ≤200 and topology ≤64 bounds already existed). Trims, rejects
+// control characters and invalid UTF-8, caps the length. Empty stays
+// allowed where it was before (the handlers decide).
+func meshNameValid(name string, max int) (string, bool) {
+	name = strings.TrimSpace(name)
+	if len(name) > max {
+		return name, false
+	}
+	if !utf8.ValidString(name) {
+		return name, false
+	}
+	for _, rn := range name {
+		if unicode.IsControl(rn) {
+			return name, false
+		}
+	}
+	return name, true
+}
+
+const meshNameMax = 200
+
 func handleMeshDCCreate(w http.ResponseWriter, r *http.Request) {
 	s := meshStoreOr503(w, r)
 	if s == nil {
@@ -293,6 +318,19 @@ func handleMeshDCCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	if body.Kind != "iran" && body.Kind != "foreign" {
 		writeAPIError(w, r, "E-IN-06", "kind must be iran or foreign")
+		return
+	}
+	name, ok := meshNameValid(body.Name, meshNameMax)
+	if !ok {
+		writeAPIError(w, r, "E-IN-06", "name must be at most 200 characters without control characters")
+		return
+	}
+	body.Name = name
+	// Round-4: the create path validates the coefficient HERE (clean 400
+	// E-IN-06) — the store's UpsertDatacenter keeps the same range check as
+	// the defense-in-depth chokepoint for non-HTTP callers.
+	if body.PriceCoefficient < 0 || body.PriceCoefficient > 1e6 {
+		writeAPIError(w, r, "E-IN-06", "price_coefficient must be 0-1000000 (0 = default 1.0)")
 		return
 	}
 	dcEn := strings.TrimSpace(body.DatacenterEN)
@@ -334,6 +372,12 @@ func handleMeshDCPatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if body.PriceCoefficient != nil {
+		// Round-4: a clean 400 at the handler — the store's identical range
+		// check surfaced here as E-SYS-01/5xx for what is a validation error.
+		if *body.PriceCoefficient < 0 || *body.PriceCoefficient > 1e6 {
+			writeAPIError(w, r, "E-IN-06", "price_coefficient must be 0-1000000")
+			return
+		}
 		if err := s.SetDatacenterPriceCoefficient(id, *body.PriceCoefficient); err != nil {
 			meshErr(w, r, err)
 			return
@@ -412,6 +456,12 @@ func handleMeshServerCreate(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, r, "E-IN-06", "role must be iran or foreign")
 		return
 	}
+	name, ok := meshNameValid(body.Name, meshNameMax)
+	if !ok {
+		writeAPIError(w, r, "E-IN-06", "name must be at most 200 characters without control characters")
+		return
+	}
+	body.Name = name
 	if len(body.Address) > 255 {
 		writeAPIError(w, r, "E-IN-06", "address too long")
 		return
@@ -452,7 +502,12 @@ func handleMeshServerPatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if body.Name != nil {
-		sv.Name = strings.TrimSpace(*body.Name)
+		patched, ok := meshNameValid(*body.Name, meshNameMax)
+		if !ok {
+			writeAPIError(w, r, "E-IN-06", "name must be at most 200 characters without control characters")
+			return
+		}
+		sv.Name = patched
 	}
 	if body.Address != nil {
 		if len(*body.Address) > 255 {

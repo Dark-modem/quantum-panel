@@ -539,7 +539,17 @@ func (c *agentConn) recordSessionV2() {
 
 // recordEngineCatalog persists the engine catalog the agent reported in
 // hello (PROTOCOL-REQUESTS R3): rich entries when present, else the id
-// list. Best effort like recordSessionV2.
+// list. Best effort like recordSessionV2. Round-4 input security: the
+// hello path had NO caps (bounded only by the 256 KiB WS envelope) while
+// the operator-side catalog route enforces ≤256 entries — apply the same
+// policy plus per-field string bounds.
+const (
+	maxHelloCatalogEntries = 256
+	maxHelloCatalogIDLen   = 128
+	maxHelloCatalogVerLen  = 128
+	maxHelloCatalogSchema  = 4 << 10
+)
+
 func (c *agentConn) recordEngineCatalog(h *agentHello) {
 	if len(h.Engines) == 0 && len(h.EngineCatalog) == 0 {
 		return
@@ -562,12 +572,27 @@ func (c *agentConn) recordEngineCatalog(h *agentHello) {
 		if e.ID == "" {
 			continue
 		}
-		entries = append(entries, catEntry{ID: e.ID, Version: e.Version, ParamsSchema: e.ParamsSchema})
+		schema := e.ParamsSchema
+		if len(schema) > maxHelloCatalogSchema {
+			schema = nil // an oversized schema is dropped, not truncated (must stay valid JSON)
+		}
+		entries = append(entries, catEntry{
+			ID:           capReportString(e.ID, maxHelloCatalogIDLen),
+			Version:      capReportString(e.Version, maxHelloCatalogVerLen),
+			ParamsSchema: schema,
+		})
+		if len(entries) >= maxHelloCatalogEntries {
+			break
+		}
 	}
 	if len(entries) == 0 {
 		for _, id := range h.EngineCatalog {
-			if id != "" {
-				entries = append(entries, catEntry{ID: id})
+			if id == "" {
+				continue
+			}
+			entries = append(entries, catEntry{ID: capReportString(id, maxHelloCatalogIDLen)})
+			if len(entries) >= maxHelloCatalogEntries {
+				break
 			}
 		}
 	}
