@@ -1655,7 +1655,8 @@ html[dir="rtl"] .topo-back .topo-back-ic { transform:scaleX(-1); }
 .topo-status-filter { position:relative; display:flex; align-items:center; flex:none; }
 .topo-filter-ic { position:absolute; inset-inline-start:10px; width:15px; height:15px; fill:none;
   stroke:var(--mu); stroke-width:2; stroke-linecap:round; opacity:.85; pointer-events:none; }
-.topo-status-filter .topo-filter { height:36px; width:auto; padding-inline-start:30px; padding-inline-end:12px; appearance:none; -webkit-appearance:none; background:var(--s1); }
+.topo-status-filter .topo-filter { height:36px; width:auto; padding-inline-start:30px; padding-inline-end:26px; appearance:none; -webkit-appearance:none;
+  background:var(--s1) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a1a1aa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center; }
 .topo-name::before { content:none; }
 .topo-name-ic { display:inline-flex; color:var(--ac); flex:none; }
 .topo-name-ic svg { width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
