@@ -768,6 +768,7 @@
     if (old) old.remove();
     var GLOBE = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.7 2.7 4 5.8 4 9s-1.3 6.3-4 9c-2.7-2.7-4-5.8-4-9s1.3-6.3 4-9z"/></svg>';
     var PLUS = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
+    var DCG = '<svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5.5" rx="8.5" ry="3"/><path d="M3.5 5.5v13c0 1.66 3.8 3 8.5 3s8.5-1.34 8.5-3v-13"/><path d="M3.5 12c0 1.66 3.8 3 8.5 3s8.5-1.34 8.5-3"/></svg>';
     var USER = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 19a6.5 6.5 0 0 1 13 0"/></svg>';
     var CHECK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>';
     var chips = [30, 90, 180, 365].map(function (d) {
@@ -817,9 +818,9 @@
       }).join('') +
       '</div></div>' +
       '<input type="hidden" id="mtbCountry" value=""></label>' +
-      '<label id="mtbDcRow">' + esc(L('agDc')) + ' ' +
-      '<span class="mtb-tip-i" data-tipopen data-tip="' + esc(L('agDcHint')) + '" aria-label="' + esc(L('agDcHint')) + '">!</span>' +
-      '<input id="mtbDc" class="quantum-input" list="mtbDcList" dir="ltr" placeholder="' + esc(L('agDcPh')) + '" autocomplete="off">' +
+      '<label id="mtbDcRow"><div class="mtb-field"><span class="mtb-field-ico">' + DCG + '</span>' +
+      '<input id="mtbDc" class="quantum-input" list="mtbDcList" dir="ltr" placeholder="' + esc(L('agDcPh')) + '" autocomplete="off" aria-label="' + esc(L('agDc')) + '">' +
+      '<button type="button" class="mtb-tip-i mtb-tip-infield" data-tipopen data-tip="' + esc(L('agDcHint')) + '" aria-label="' + esc(L('agDcHint')) + '">!</button></div>' +
       '<datalist id="mtbDcList"></datalist></label>' +
       '</div>' +
       '<div class="mtb-wpage" data-pg="3" hidden>' +
