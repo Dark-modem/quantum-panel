@@ -1870,7 +1870,7 @@ html[dir="rtl"] .topo-back .topo-back-ic { transform:scaleX(-1); }
 
 /* --- topology page, third mockup pass (2026-11-17) ---------------------- */
 /* hero: subtitle line back under the title, blue ring + soft glow on the card */
-.topo-hero { border:1px solid color-mix(in srgb, var(--ac) 28%, transparent); border-radius:14px;
+.topo-hero { border:1px solid color-mix(in srgb, var(--ac) 28%, transparent); border-radius:14px; padding:22px;
   box-shadow:0 0 0 1px color-mix(in srgb, var(--ac) 8%, transparent), 0 10px 34px color-mix(in srgb, var(--ac) 10%, transparent); }
 /* with-tunnels KPI: the mockup pairs the count with a blue chain link, not a green check */
 .topo-stat-ok .topo-stat-ic { background:color-mix(in srgb, var(--ac) 14%, transparent); color:var(--ac); }
