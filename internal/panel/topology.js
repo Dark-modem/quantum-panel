@@ -39,6 +39,15 @@ function topoMenusClose() {
   document.querySelectorAll('.topo-kebab[aria-expanded="true"]').forEach(b => b.setAttribute('aria-expanded', 'false'));
 }
 async function topologyPower(id, active) {
+  // The power switch reconfigures live tunnels — confirm before touching it.
+  const topo = topologyData.topologies.find(t => t.id === id);
+  const name = topo ? topo.name : '';
+  const ok = await entConfirm(
+    tr('', active ? 'Activate topology?' : 'Deactivate topology?'),
+    (name ? name + ' — ' : '') + tr('', active ? 'The tunnels in this topology will be connected.' : 'The tunnels in this topology will be disconnected.'),
+    tr('', active ? 'Activate' : 'Deactivate'),
+  );
+  if (!ok) return;
   try {
     const r = await api('/api/topologies/' + encodeURIComponent(id) + '/active', { active: !!active }, 'POST');
     const bad = (r.results || []).filter(x => !x.ok);
