@@ -2236,10 +2236,14 @@
       var tB = sb && sb.querySelector('[data-tab="tunnel"]');
       var aB = sb && sb.querySelector('[data-tab="magt"]');
       if (tB && aB) aB.insertAdjacentElement('afterend', tB);
+      var cB = sb && sb.querySelector('[data-tab="cores"]');
+      if (tB && cB) tB.insertAdjacentElement('afterend', cB); // Cores is 4th: right under Topology, above Tunnels
       var dr = document.getElementById('drawerNav');
       var dT = dr && dr.querySelector('[data-tab="tunnel"]');
       var dA = dr && dr.querySelector('[data-tab="magt"]');
       if (dT && dA) dA.insertAdjacentElement('afterend', dT);
+      var dC = dr && dr.querySelector('[data-tab="cores"]');
+      if (dT && dC) dT.insertAdjacentElement('afterend', dC);
     } catch (e) { /* non-fatal */ }
     try { injectSections(); } catch (e) { /* non-fatal */ }
     try { bindNav(); } catch (e) { /* non-fatal */ }
