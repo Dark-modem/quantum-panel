@@ -674,7 +674,7 @@
       '<span class="mtb-agdiv"></span>' +
       '<div class="mtb-agres disk"><span class="mtb-agico">' + MTB_ICO.drive + '</span><span class="mtb-agtx"><b id="agSumDisk">—</b><span>' + esc(L('agSumDisk')) + '</span></span></div>' +
       '<div class="mtb-agres ram"><span class="mtb-agico">' + MTB_ICO.ramstick + '</span><span class="mtb-agtx"><b id="agSumRam">—</b><span>' + esc(L('agSumRam')) + '</span></span></div>' +
-      '<div class="mtb-agres cores"><span class="mtb-agico">' + MTB_ICO.cpuchip + '</span><span class="mtb-agtx"><b id="agSumCores">—</b><span>' + esc(L('agSumCores')) + '</span></span></div>' +
+      '<div class="mtb-agres cores"><span class="mtb-agico">' + MTB_ICO.orbit + '</span><span class="mtb-agtx"><b id="agSumCores">—</b><span>' + esc(L('agSumCores')) + '</span></span></div>' +
       '<span class="mtb-agdiv"></span>' +
       stats +
       '</div></div>';
@@ -1284,6 +1284,7 @@
     file: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6"/></svg>',
     ramstick: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="9" rx="2"/><path d="M7 15v4M12 15v4M17 15v4"/><circle class="cx-led" cx="8" cy="10.5" r="1"/><circle class="cx-led" cx="12" cy="10.5" r="1"/><circle class="cx-led" cx="16" cy="10.5" r="1"/></svg>',
     cpuchip: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/><rect class="cx-core" x="10" y="10" width="4" height="4"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/></svg>',
+    orbit: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><ellipse cx="12" cy="12" rx="10" ry="4.2" transform="rotate(-30 12 12)"/></svg>',
     drive: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12H2"/><path d="M5.5 5h13L22 12v5a2 2 0 01-2 2H4a2 2 0 01-2-2v-5l3.5-7z"/><circle class="cx-led" cx="6" cy="16" r="1"/><circle class="cx-led" cx="10" cy="16" r="1"/></svg>',
     upgrade: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V5"/><path d="M7.5 9.5L12 5l4.5 4.5"/><path d="M5 20h14"/></svg>'
   };
