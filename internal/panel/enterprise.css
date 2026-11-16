@@ -1687,8 +1687,8 @@ html[dir="rtl"] .topo-back .topo-back-ic { transform:scaleX(-1); }
 /* ---- Topology page shell v4 ---- */
 .topo-title-row { display:flex; align-items:center; gap:10px; min-width:0; }
 .topo-title-row .tc-title { margin:0; }
-.topo-title-ico { display:inline-flex; color:var(--ac); }
-.topo-title-ico svg { width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.topo-title-ico { display:inline-flex; color:var(--ac); translate:0 -2px; }
+.topo-title-ico svg { width:26px; height:26px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
 .topo-chip { height:22px; min-width:24px; padding:0 8px; font-size:12px; }
 .topo-stat { align-content:center; padding:12px 16px; gap:4px; }
 .topo-stat-v { font-size:24px; }
