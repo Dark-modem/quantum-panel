@@ -314,7 +314,7 @@ function goTab(name) {
   if (name === 'add-peer') { goTab('setup'); const c = $('setupAddPeerStep'); if (c && c.scrollIntoView) c.scrollIntoView({behavior: 'smooth', block: 'start'}); return; }
   // Bagher lives in Setup (create) and Tunnel (run) like every other tunnel.
   if (name === 'sshfwd' || name === 'bagher') { openBagherSetup(); return; }
-  ['dashboard','tunnel','cluster','setup','xray','logs','perf','watchdog','doctor','benchmark','spoof','update','settings','terminal'].forEach(t => { const el = $('tab-'+t); if (el) el.hidden = t !== name; });
+  ['dashboard','tunnel','cores','cluster','setup','xray','logs','perf','watchdog','doctor','benchmark','spoof','update','settings','terminal'].forEach(t => { const el = $('tab-'+t); if (el) el.hidden = t !== name; });
   const markTab = b => {
     const on = b.dataset.tab === name;
     b.classList.toggle('on', on);
@@ -485,6 +485,10 @@ const I18N = {
     topology_view_list: "List view",
     topology_view_grid: "Grid view",
     nav_topology: "Topology",
+    nav_cores: "Cores",
+    cores_title: "Cores",
+    cores_empty_t: "No cores to show yet",
+    cores_empty_d: "Cores appear here once they are provisioned for your topologies.",
     nav_agents: "Agents",
     agents_tokens_title: "Enrollment Tokens",
     agents_tokens_hint: "One token enrolls exactly one endpoint agent. The token is shown once — copy it and run the command on the endpoint server.",
