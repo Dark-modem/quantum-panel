@@ -26,7 +26,7 @@ func TestTopologyListSemanticTable(t *testing.T) {
 		t.Error("generated topology rows must remain inside the table body")
 	}
 	headers := regexp.MustCompile(`(?s)<th\b([^>]*)>(.*?)</th>`).FindAllStringSubmatch(table[1], -1)
-	want := []string{"", "Name", "Iran server", "Foreign server", "Tunnels", "Status", "Actions"}
+	want := []string{"", "Status", "Tunnels", "Foreign server", "Iran servers", "Name", "Actions"}
 	if len(headers) != len(want) {
 		t.Fatalf("got %d topology columns, want %d", len(headers), len(want))
 	}
@@ -139,12 +139,15 @@ func TestTopologyListSharedResponsiveColumns(t *testing.T) {
 		}
 	}
 	// Tunnels and Actions sit on fixed tracks so the headers stay over their
-	// cells no matter how the flexible name/server columns squeeze. The
-	// mockup redesign (2026-11-16) restored # and the two server columns;
-	// the direct action buttons (2026-11-16) widened Actions to fit the
-	// inline view/power/delete trio: 90px (Tunnels), 150px (Status), 104px (Actions).
-	if !regexp.MustCompile(`grid-template-columns\s*:[^}]*90px\s+150px\s+104px`).MatchString(shared[1]) {
-		t.Error("shared grid must keep fixed 90px (Tunnels), 150px (Status) and 104px (Actions) tracks")
+	// cells no matter how the flexible name/server columns squeeze. The third
+	// mockup pass (2026-11-17) reordered the columns to # / Status / Tunnels /
+	// Foreign / Iran / Name / Actions with the inline view/edit/copy/delete
+	// quartet plus the kebab: 150px (Status), 90px (Tunnels), 168px (Actions).
+	if !regexp.MustCompile(`grid-template-columns\s*:[^}]*150px\s+90px`).MatchString(shared[1]) {
+		t.Error("shared grid must keep fixed 150px (Status) and 90px (Tunnels) tracks")
+	}
+	if !regexp.MustCompile(`grid-template-columns\s*:[^}]*168px`).MatchString(shared[1]) {
+		t.Error("shared grid must keep the fixed 168px (Actions) track")
 	}
 
 	media := regexp.MustCompile(`@media\s*\(\s*max-width\s*:\s*799px\s*\)`).FindStringIndex(css)
