@@ -828,7 +828,6 @@
       '<label>' + esc(L('agentExpiry')) + ' <input id="mtbExpiry" type="number" min="1" max="3650" value="365" class="quantum-input" style="width:120px" dir="ltr"></label>' +
       '<div class="mtb-chips">' + chips + '</div>' +
       '</div>' +
-      '<p class="qs-hint mtb-formmsg" data-mtb-msg></p>' +
       '<div class="mtb-acts" id="mtbWizFoot">' +
       '<button type="button" class="quantum-btn quantum-btn-secondary" id="mtbWizBack" hidden>' + esc(L('agWizBack')) + '</button>' +
       '<button type="button" class="quantum-btn quantum-btn-primary mtb-wiz-next" id="mtbWizNext">' + esc(L('agWizNext')) + '</button>' +
@@ -931,22 +930,21 @@
     }
     function wizNext() {
       if (wizStep === 1 && !document.getElementById('mtbAgentLabel').value.trim()) {
-        ov.querySelector('[data-mtb-msg]').textContent = L('agNameReq');
+        mtbToast(L('agNameReq'), 'err');
         document.getElementById('mtbAgentLabel').focus();
         return;
       }
       if (wizStep === 2) {
         if (!((document.getElementById('mtbCountry') || {}).value)) {
-          ov.querySelector('[data-mtb-msg]').textContent = L('pickCountry');
+          mtbToast(L('pickCountry'), 'err');
           return;
         }
         if (!(document.getElementById('mtbDc') || {}).value.trim()) {
-          ov.querySelector('[data-mtb-msg]').textContent = L('agDcReq');
+          mtbToast(L('agDcReq'), 'err');
           document.getElementById('mtbDc').focus();
           return;
         }
       }
-      ov.querySelector('[data-mtb-msg]').textContent = '';
       wizStep = Math.min(3, wizStep + 1);
       wizSync();
       if (typeof wizSave === 'function') wizSave();
@@ -954,7 +952,6 @@
     document.getElementById('mtbWizNext').addEventListener('click', wizNext);
     document.getElementById('mtbWizBack').addEventListener('click', function () {
       wizStep = Math.max(1, wizStep - 1);
-      ov.querySelector('[data-mtb-msg]').textContent = '';
       wizSync();
       if (typeof wizSave === 'function') wizSave();
     });
@@ -1015,15 +1012,15 @@
       var country = '';
       if (role === 'foreign') {
         country = (document.getElementById('mtbCountry') || {}).value || '';
-        if (!country) { ov.querySelector('[data-mtb-msg]').textContent = L('pickCountry'); return; }
+        if (!country) { mtbToast(L('pickCountry'), 'err'); return; }
       }
       var label = document.getElementById('mtbAgentLabel').value.trim() || ('agent-' + Date.now() % 10000);
       var dc = (document.getElementById('mtbDc') || {}).value.trim();
-      if (!dc) { ov.querySelector('[data-mtb-msg]').textContent = L('agDcReq'); return; }
+      if (!dc) { mtbToast(L('agDcReq'), 'err'); return; }
       var days = Math.max(1, Math.min(3650, parseInt(document.getElementById('mtbExpiry').value, 10) || 365));
       apiSend('POST', 'api/agents/tokens', { role: role, label: label, expires_days: days, country: country, datacenter: dc }).then(function (r) {
         var tok = (r && (r.token || (r.data && r.data.token))) || '';
-        if (!tok) { ov.querySelector('[data-mtb-msg]').textContent = 'no token in response'; return; }
+        if (!tok) { mtbToast('no token in response', 'err'); return; }
         document.getElementById('mtbAgentForm').style.display = 'none';
         ov.querySelectorAll('.mtb-wstep').forEach(function (st2) { st2.classList.remove('on'); st2.classList.add('done'); st2.querySelector('.mtb-wstep-dot').innerHTML = CHECK; });
         ov.querySelectorAll('.mtb-wline').forEach(function (ln) { ln.classList.add('fill'); });
@@ -1044,7 +1041,7 @@
           });
         });
       }).catch(function (e2) {
-        ov.querySelector('[data-mtb-msg]').textContent = (e2.body && (e2.body.error || e2.body.message)) || ('HTTP ' + e2.status);
+        mtbToast((e2.body && (e2.body.error || e2.body.message)) || ('HTTP ' + e2.status), 'err');
       });
     });
   }
@@ -1286,15 +1283,16 @@
   };
   var MTB_HERO_LOGO = '<svg class="mtb-hero-logo" width="110" height="110" viewBox="0 0 100 100" fill="none" aria-hidden="true"><rect width="100" height="100" rx="22" fill="#090d16" stroke="rgba(56,189,248,0.25)" stroke-width="1.5"/><path d="M50 48 C42 38 26 32 12 42 C4 48 1 56 3 62 C6 60 12 54 20 55 C32 56 42 60 50 52 C58 60 68 56 80 55 C88 54 94 60 97 62 C99 56 96 48 88 42 C74 32 58 38 50 48 Z" fill="#38bdf8"/></svg>';
   var mtbToastBox = null;
-  function mtbToast(msg) {
+  function mtbToast(msg, kind) {
     if (!mtbToastBox) {
       mtbToastBox = document.createElement('div');
       mtbToastBox.className = 'mtb-toasts';
       document.body.appendChild(mtbToastBox);
     }
+    var isErr = kind === 'err';
     var el = document.createElement('div');
-    el.className = 'mtb-toast';
-    el.innerHTML = '<span class="mtb-toast-ico">' + MTB_ICO.okc + '</span><span class="mtb-toast-tx"></span>' +
+    el.className = 'mtb-toast' + (isErr ? ' err' : '');
+    el.innerHTML = '<span class="mtb-toast-ico">' + (isErr ? MTB_ICO.alerc : MTB_ICO.okc) + '</span><span class="mtb-toast-tx"></span>' +
       '<button type="button" class="mtb-toast-x" aria-label="\u00d7">\u00d7</button>' +
       '<span class="mtb-toast-bar"></span>';
     el.querySelector('.mtb-toast-tx').textContent = msg;
@@ -1596,7 +1594,6 @@
         '<span class="mtb-upd-k">' + LINK + esc(L('agUpdUrl')) + '</span>' +
         '<div class="mtb-field"><input id="mtbUpdUrl" class="quantum-input" value="' + esc(agLastUpdUrl) + '" dir="ltr" placeholder="https://.../quantum-agent-linux-' + esc(ag.arch || 'amd64') + '.tar.gz"><span class="mtb-field-end">' + EXT + '</span></div>' +
         '<div class="mtb-upd-info"><span class="mtb-upd-ico">' + INFO + '</span><span class="mtb-upd-info-tx">' + esc(L('agUpdHint')) + '</span></div>' +
-        '<p class="qs-hint mtb-formmsg" data-mtb-msg></p>' +
         '<div class="mtb-acts"><button type="button" class="quantum-btn quantum-btn-secondary" data-mtb-close>' + esc(L('cancel')) + '</button>' +
         '<button type="button" class="quantum-btn quantum-btn-primary" id="mtbUpdGo">' + UPGR + ' ' + esc(L('agUpdStart')) + '</button></div>' +
         '</div></div>';
@@ -1649,7 +1646,6 @@
         '<div class="mtb-wpage" data-pg="2" hidden>' +
         '<div class="mtb-ed-panel" id="mtbEdRev"></div>' +
         '</div>' +
-        '<p class="qs-hint mtb-formmsg" data-mtb-msg></p>' +
         '<div class="mtb-acts"><button type="button" class="quantum-btn quantum-btn-secondary mtb-ed-back" id="mtbEdBack" hidden>' + esc(L('agWizBack')) + '</button>' +
         '<button type="button" class="quantum-btn quantum-btn-primary" id="mtbEdNext">' + esc(L('agEdNext')) + '</button>' +
         '<button type="button" class="quantum-btn quantum-btn-primary" id="mtbAgSave" hidden>' + esc(L('agSave')) + '</button></div>' +
@@ -1673,7 +1669,7 @@
       }
       ov.querySelector('#mtbEdNext').addEventListener('click', function () {
         if (edStep === 1 && !ov.querySelector('#mtbAgName').value.trim()) {
-          ov.querySelector('[data-mtb-msg]').textContent = L('agNameK') + ' — ' + L('agSave');
+          mtbToast(L('agNameK') + ' — ' + L('agSave'), 'err');
           return;
         }
         var nm = ov.querySelector('#mtbAgName').value.trim() || '—';
@@ -1681,27 +1677,24 @@
         ov.querySelector('#mtbEdRev').innerHTML =
           '<div class="mtb-ed-rev-r"><span>' + esc(L('agNameK')) + '</span><b dir="ltr">' + esc(nm) + '</b></div>' +
           '<div class="mtb-ed-rev-r"><span>' + esc(L('agIPK')) + '</span><b dir="ltr">' + esc(pip) + '</b></div>';
-        ov.querySelector('[data-mtb-msg]').textContent = '';
         edStep = 2;
         edSync();
       });
       document.getElementById('mtbEdBack').addEventListener('click', function () {
         edStep = 1;
-        ov.querySelector('[data-mtb-msg]').textContent = '';
         edSync();
       });
       ov.querySelector('#mtbAgSave').addEventListener('click', function () {
         var nm = ov.querySelector('#mtbAgName').value.trim();
         var pip = ov.querySelector('#mtbAgIP').value.trim();
-        var msg = ov.querySelector('[data-mtb-msg]');
-        if (!nm) { msg.textContent = L('agNameK') + ' — ' + L('agSave'); return; }
+        if (!nm) { mtbToast(L('agNameK') + ' — ' + L('agSave'), 'err'); return; }
         apiSend('POST', 'api/ui/agents/' + encodeURIComponent(id) + '/rename', { name: nm }).then(function () {
           return apiSend('POST', 'api/ui/agents/' + encodeURIComponent(id) + '/public-ip', { public_ip: pip });
         }).then(function () {
           mtbToast(L('agEdSaved'));
           ov.remove(); renderAgtDetail(id);
         }).catch(function (e2) {
-          msg.textContent = (e2.body && (e2.body.error || e2.body.message)) || ('HTTP ' + e2.status);
+          mtbToast((e2.body && (e2.body.error || e2.body.message)) || ('HTTP ' + e2.status), 'err');
         });
       });
       edSync();
@@ -1732,7 +1725,6 @@
       '<p class="qs-hint mtb-del-type"><span class="mtb-del-type-i"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.001M12 12h.001M16 12h.001M7 16h10"/></svg></span>' + esc(L('agDelConfirm')) + '</p>' +
       '<div class="mtb-del-inwrap"><input id="mtbAgDelName" class="quantum-input" placeholder="' + esc(L('agDelPh')) + '" dir="ltr" autocomplete="off" spellcheck="false" aria-label="' + esc(L('agDelPh')) + '">' +
       '<button type="button" class="mtb-del-paste" id="mtbDelPaste" title="' + esc(L('agDelPaste')) + '" aria-label="' + esc(L('agDelPaste')) + '">' + PASTE + '</button></div>' +
-      '<p class="qs-hint mtb-formmsg" data-mtb-msg></p>' +
       '<div class="mtb-acts"><button type="button" class="quantum-btn quantum-btn-secondary" data-mtb-close>' + XSM + ' ' + esc(L('cancel')) + '</button>' +
       '<button type="button" class="quantum-btn quantum-btn-danger" id="mtbAgDelGo" disabled>' + TRASH + ' ' + esc(L('agActDel')) + '</button></div>' +
       '</div>';
@@ -1750,11 +1742,9 @@
     var copyTx = ov.querySelector('#mtbDelCopyTx');
     var delInp = ov.querySelector('#mtbAgDelName');
     var delGo = ov.querySelector('#mtbAgDelGo');
-    var delMsg = ov.querySelector('[data-mtb-msg]');
     delInp.addEventListener('input', function () {
       var ok = agName !== '' && delInp.value.trim() === agName;
-      delGo.disabled = !ok;
-      delMsg.textContent = (!ok && delInp.value.trim()) ? L('agDelNo') : '';
+      delGo.disabled = !ok; // the disabled Delete itself signals the mismatch
     });
     copyBtn.addEventListener('click', function () {
       navigator.clipboard.writeText(agName).catch(function () { /* clipboard blocked */ });
@@ -1765,15 +1755,14 @@
     });
     document.getElementById('mtbDelPaste').addEventListener('click', function () {
       var paste = function (t) {
-        if (!(t || '').trim()) { delMsg.textContent = L('agDelPasteErr'); delInp.focus(); return; }
+        if (!(t || '').trim()) { mtbToast(L('agDelPasteErr'), 'err'); delInp.focus(); return; }
         delInp.value = t.trim();
         delInp.dispatchEvent(new Event('input', { bubbles: true }));
-        delMsg.textContent = '';
         delInp.focus();
       };
-      if (!navigator.clipboard || !navigator.clipboard.readText) { delMsg.textContent = L('agDelPasteErr'); delInp.focus(); return; }
+      if (!navigator.clipboard || !navigator.clipboard.readText) { mtbToast(L('agDelPasteErr'), 'err'); delInp.focus(); return; }
       navigator.clipboard.readText().then(paste).catch(function () {
-        delMsg.textContent = L('agDelPasteErr');
+        mtbToast(L('agDelPasteErr'), 'err');
         delInp.focus();
       });
     });

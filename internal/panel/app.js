@@ -11490,6 +11490,8 @@ window.loadClusterStatus = loadClusterStatus;
     '.mtb-toast.in{opacity:1;transform:none}',
     '.mtb-toast.out{opacity:0;transform:translateY(-6px)}',
     '.mtb-toast-ico{width:26px;height:26px;border-radius:8px;background:color-mix(in srgb, var(--ok) 14%, transparent);color:var(--ok);display:inline-flex;align-items:center;justify-content:center;flex:none}',
+    '.mtb-toast.err{border-color:color-mix(in srgb, var(--er) 45%, transparent)}',
+    '.mtb-toast.err .mtb-toast-ico{background:color-mix(in srgb, var(--er) 14%, transparent);color:var(--er)}',
     '.mtb-toast-ico svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}',
     '.mtb-toast-tx{flex:1;font-size:12.5px;color:var(--tx);line-height:1.5;word-break:break-word;padding-inline-end:10px}',
     '.mtb-toast-x{flex:none;width:18px;height:18px;border:0;background:none;color:var(--tx2);cursor:pointer;font-size:14px;line-height:1;padding:0}',
@@ -11785,7 +11787,6 @@ window.loadClusterStatus = loadClusterStatus;
     '.mtb-dest-flag{margin-top:2px}',
     '.mtb-dest-dc{display:inline-flex;align-items:center;gap:4px;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
     '.mtb-dest-dc svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;opacity:.75;flex:none}',
-    '.qs-hint.mtb-formmsg{color:var(--er)}', // form messages are validation errors — red, not the gray hint gray
     '#mtbCountryRow{margin-top:14px}', // breathing room under the role cards (owner: collision)
     '#mtbDcRow{margin-top:12px}', // air under the country row (owner: collision)
     // agents-list first column: chip glyph before the agent name, server glyph before the datacenter
