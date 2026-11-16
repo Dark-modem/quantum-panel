@@ -1675,6 +1675,7 @@ html[dir="rtl"] .topo-back .topo-back-ic { transform:scaleX(-1); }
 .topo-list-row .topo-cell-name .topo-name { justify-content:center; margin-inline:auto; }
 .topo-list-row .topo-cell-region { text-align:center; }
 .topo-list-row .topo-cell-actions { justify-content:center; }
+.topo-list-row .topo-cell-actions .topo-actions { justify-content:center; }
 .topo-list-head th:last-child { text-align:center; }
 .topo-list-row { min-height:72px; }
 @media (max-width:799px) {
