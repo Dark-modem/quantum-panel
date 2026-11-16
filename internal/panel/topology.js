@@ -622,7 +622,7 @@ function topologyRender() {
             const g = groups.find(x => x.key === key);
             if (g) g.servers.push(s); else groups.push({ key, servers: [s] });
           });
-          const blocks = groups.map(g => `<div class="topo-server"><span class="topo-flag" aria-hidden="true">${topologyFlagSvg(flag)}</span><span class="topo-server-tx"><b>${esc(g.key)}<span class="topo-server-count">${esc(' · ' + String(g.servers.length) + ' ' + tr('', 'servers'))}</span></b>${g.servers.map(s => `<span class="topo-server-sub u-mono" dir="ltr">${esc(s.ip || '—')}</span>`).join('')}</span></div>`).join('');
+          const blocks = groups.map(g => `<div class="topo-server"><span class="topo-flag" aria-hidden="true">${topologyFlagSvg(flag)}</span><span class="topo-server-tx"><b>${esc(g.key)}<span class="topo-server-count">${esc(' · ' + String(g.servers.length) + ' ' + (g.servers.length === 1 ? tr('', 'server') : tr('', 'servers')))}</span></b>${g.servers.map(s => `<span class="topo-server-sub u-mono" dir="ltr">${esc(s.ip || '—')}</span>`).join('')}</span></div>`).join('');
           return `<div class="topo-server-stack">${blocks}</div>`;
         };
         return `<tr class="topo-list-row" role="row" tabindex="0" data-topo-id="${esc(t.id)}" aria-label="${esc(t.name)}">
