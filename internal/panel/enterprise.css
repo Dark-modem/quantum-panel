@@ -1241,11 +1241,8 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 /* Tunnels count sits centred under its header; Actions hugs the end edge in
    both header and rows so LTR and RTL align the same way. The actions column
    is 8px narrower than the row's inset so the buttons tuck into the corner. */
-.topo-list-head th:nth-child(5) { text-align:center; white-space:nowrap; }
-.topo-list-row .topo-cell-tunnels { text-align:center; }
-.topo-list-head th:nth-child(6) { text-align:center; }
-.topo-list-head th:nth-child(7) { text-align:end; }
 .topo-list-head th:nth-child(7),
+.topo-list-row .topo-cell-actions { justify-content:flex-end; }
 .topo-cell-actions { margin-inline-end:-8px; }
 .topo-list-row { min-height:76px; border-bottom:1px solid var(--ln); transition:background .15s; cursor:pointer; }
 .topo-list-row:last-child { border-bottom:0; }
