@@ -544,7 +544,6 @@ const I18N = {
     agents_close: "Close",
     topology_create: "Add topology",
     topology_hero_title: "Topologies",
-    topology_sub: "Manage and monitor your network topologies.",
     topology_stat_pairs: "Total topologies",
     topology_stat_with: "With tunnels",
     topology_stat_without: "Without tunnels",
