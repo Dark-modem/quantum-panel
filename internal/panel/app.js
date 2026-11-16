@@ -11786,6 +11786,7 @@ window.loadClusterStatus = loadClusterStatus;
     '.mtb-dest-dc{display:inline-flex;align-items:center;gap:4px;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
     '.mtb-dest-dc svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;opacity:.75;flex:none}',
     '.qs-hint.mtb-formmsg{color:var(--er)}', // form messages are validation errors — red, not the gray hint gray
+    '#mtbCountryRow{margin-top:14px}', // breathing room under the role cards (owner: collision)
     // agents-list first column: chip glyph before the agent name, server glyph before the datacenter
     '.mtb-ag-ic{display:inline-flex;color:var(--ac);flex:none}',
     '.mtb-ag-ic svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;opacity:.9;flex:none}',
