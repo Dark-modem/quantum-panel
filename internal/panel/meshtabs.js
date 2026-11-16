@@ -188,6 +188,7 @@
     roleIran: ['ایران', 'Iran'], roleForeign: ['خارج', 'Foreign'],
     agentCountry: ['کشور میزبان', 'Hosting country'],
     pickCountry: ['کشور میزبان را انتخاب کنید', 'Pick a hosting country'],
+    noneOpt: ['هیچ', 'None'],
     alertsOpen: ['هشدارهای باز', 'Open alerts'],
     alertsHistory: ['اعلان‌های اخیر', 'Recent notifications'],
     alertsNone: ['هیچ هشداری نیست — همه چیز آرام است.', 'No alerts — all quiet.'],
@@ -806,11 +807,11 @@
       '<label id="mtbCountryRow" style="display:none">' + esc(L('agentCountry')) + ' ' +
       '<div class="mtb-cdd" id="mtbCdd">' +
       '<button type="button" class="mtb-cdd-btn" id="mtbCddBtn">' +
-      '<span class="mtb-cdd-cur" id="mtbCddCur">\u2014</span>' +
+      '<span class="mtb-cdd-cur" id="mtbCddCur">' + esc(L('noneOpt')) + '</span>' +
       '<span class="mtb-cdd-arrow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span>' +
       '</button>' +
       '<div class="mtb-cdd-pop" id="mtbCddPop" hidden>' +
-      '<button type="button" class="mtb-cdd-opt" data-cc="">\u2014</button>' +
+      '<button type="button" class="mtb-cdd-opt" data-cc="">' + esc(L('noneOpt')) + '</button>' +
       Object.keys(COUNTRIES).map(function (cc) {
         return '<button type="button" class="mtb-cdd-opt" data-cc="' + cc + '">' + flagImg(cc) + ' ' + esc(CN(cc)) + '</button>';
       }).join('') +
@@ -870,7 +871,6 @@
         c.classList.toggle('on', (c.querySelector('input[name="mtbRole"]') || {}).value !== 'foreign' ? !foreign : foreign);
       });
       var row = document.getElementById('mtbCountryRow');
-      if (row) row.style.display = foreign ? '' : 'none';
       var fl = document.getElementById('mtbCountryFlag');
       if (fl) {
         var csel = document.getElementById('mtbCountry');
@@ -888,7 +888,7 @@
     var cdd = document.getElementById('mtbCdd');
     function setCountry(cc) {
       cInp.value = cc;
-      cddCur.innerHTML = cc ? (flagImg(cc) + ' ' + esc(CN(cc) || cc)) : '\u2014';
+      cddCur.innerHTML = cc ? (flagImg(cc) + ' ' + esc(CN(cc) || cc)) : esc(L('noneOpt'));
       cddPop.querySelectorAll('.mtb-cdd-opt').forEach(function (op) { op.classList.toggle('on', op.getAttribute('data-cc') === cc); });
       cddPop.hidden = true;
       if (typeof wizSave === 'function') wizSave();
@@ -934,8 +934,7 @@
         return;
       }
       if (wizStep === 2) {
-        var foreign2 = (ov.querySelector('input[name="mtbRole"]:checked') || {}).value === 'foreign';
-        if (foreign2 && !((document.getElementById('mtbCountry') || {}).value)) {
+        if (!((document.getElementById('mtbCountry') || {}).value)) {
           ov.querySelector('[data-mtb-msg]').textContent = L('pickCountry');
           return;
         }
