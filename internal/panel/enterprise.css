@@ -1666,7 +1666,6 @@ html[dir="rtl"] .topo-back .topo-back-ic { transform:scaleX(-1); }
 .topo-list-head th { font-size:12px; color:var(--mu); }
 /* narrow columns center their content in BOTH the header and the cells, so
    labels sit exactly over their values; Actions is end-aligned on both sides */
-.topo-list-head th:nth-child(2), .topo-list-head th:nth-child(3), .topo-list-head th:nth-child(4), .topo-list-head th:nth-child(5) { text-align:center; }
 .topo-list-head th:nth-child(4) .topo-th, .topo-list-head th:nth-child(5) .topo-th { justify-content:center; }
 .topo-list-head th:last-child .topo-th { justify-content:center; }
 .topo-list-row .topo-cell-tunnels, .topo-list-row .topo-cell-state { text-align:center; }
