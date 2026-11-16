@@ -1233,7 +1233,7 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
    three tracks are pure fr (minmax(0,…) strips content-based minimums, the
    usual source of header/body drift); Tunnels and Actions are fixed so the
    header can never drift against a row. */
-.topo-list-head, .topo-list-row { display:grid; grid-template-columns:44px minmax(0,1.5fr) minmax(0,1.25fr) minmax(0,1.25fr) 90px 150px 72px; gap:14px; align-items:center; padding:14px 18px; }
+.topo-list-head, .topo-list-row { display:grid; grid-template-columns:28px minmax(0,1.5fr) minmax(0,1.25fr) minmax(0,1.25fr) 90px 150px 72px; gap:14px; align-items:center; padding:14px 18px; }
 .topo-list-head { background:var(--s2); border-bottom:1px solid var(--ln); }
 .topo-list-head th { min-width:0; padding:0; color:var(--mu); font-size:var(--fs-caption); font-weight:650; text-align:start; text-transform:uppercase; letter-spacing:.07em; }
 /* Persian is a joined script: letter-spacing and uppercase only break it. */
