@@ -1510,14 +1510,19 @@ $('tab-tunnel').addEventListener('click', e => {
       pop.classList.remove('hidden');
       const r = target.getBoundingClientRect();
       const ph = pop.offsetHeight || 130, pw = pop.offsetWidth || 172;
+      // The pop is position:fixed, but the glassy .tunnel-card ancestor has a
+      // backdrop-filter — that makes the CARD the containing block, so fixed
+      // coordinates are card-relative. Clamp inside the real containing block
+      // (offsetParent; the viewport when there is none), never the window.
+      const host = pop.offsetParent;
+      const hr = host ? host.getBoundingClientRect()
+        : { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight };
       let top = r.bottom + 6;
-      if (top + ph > window.innerHeight - 8) top = Math.max(8, r.top - ph - 6);
-      pop.style.top = top + 'px';
-      pop.style.right = 'auto';
-      // end-align the pop with the kebab (kebab sits at the row's end edge),
-      // then clamp inside the viewport
+      if (top + ph > hr.bottom - 8) top = Math.max(hr.top + 8, r.top - ph - 6);
       let left = document.documentElement.dir === 'rtl' ? r.left : r.right - pw;
-      pop.style.left = Math.min(Math.max(8, left), window.innerWidth - pw - 8) + 'px';
+      left = Math.min(Math.max(hr.left + 8, left), hr.right - pw - 8);
+      pop.style.top = (host ? top - hr.top : top) + 'px';
+      pop.style.left = (host ? left - hr.left : left) + 'px';
       target.setAttribute('aria-expanded', 'true');
     }
     return;
