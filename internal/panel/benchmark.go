@@ -297,6 +297,14 @@ func probePing(ctx context.Context, host string, count int) (avgRTT, minRTT, max
 	if host == "" {
 		return 0, 0, 0, 100.0, 0, fmt.Errorf("empty host")
 	}
+	// Round-4 input security: the host slot is argv (no shell), but the
+	// benchmark's target_host override feeds this directly from the
+	// request body — a value starting with '-' would be parsed by ping as
+	// OPTIONS in the host position (e.g. a flood/timeout flag). Only real
+	// hostnames / IPs belong here.
+	if strings.HasPrefix(host, "-") {
+		return 0, 0, 0, 100.0, 0, fmt.Errorf("invalid host")
+	}
 
 	cmd := exec.CommandContext(ctx, "ping", "-c", strconv.Itoa(count), "-W", "2", host)
 	out, err := cmd.CombinedOutput()

@@ -680,6 +680,15 @@ func (c *agentConn) handleAck(data json.RawMessage) {
 	if json.Unmarshal(data, &ack) != nil || ack.Revision == "" {
 		return
 	}
+	// Round-4 input security: an ack is agent-owned input bounded only by
+	// the 256 KiB WS envelope before this point — both the legacy registry
+	// (LastAck/LastError/AppliedRevision) and the store's v2 mirror
+	// (AckDesiredV2 stores the error verbatim in last_error + last_ack)
+	// would otherwise persist envelope-sized strings. Same bounds as the
+	// v2 report path (revision ≤128, error ≤512) plus the round-2 secret
+	// redaction on the error text.
+	ack.Revision = capReportString(ack.Revision, 128)
+	ack.Error = redactErrorText(capReportString(ack.Error, maxReportString))
 	matched := false
 	err := agentRegistryUpdate(c.id, func(rec *agentRecord) {
 		if rec.Desired == nil || rec.Desired.Revision != ack.Revision {

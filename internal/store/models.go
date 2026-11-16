@@ -3,6 +3,8 @@ package store
 import (
 	"database/sql"
 	"errors"
+	"fmt"
+	"math"
 	"time"
 )
 
@@ -139,6 +141,17 @@ func now() int64 { return time.Now().Unix() }
 
 // UpsertDatacenter inserts or updates by name.
 func (s *Store) UpsertDatacenter(dc Datacenter) (int64, error) {
+	// Round-4 input security: the PATCH path validated the coefficient in
+	// SetDatacenterPriceCoefficient, but the CREATE/upsert path did not —
+	// a negative or absurd coefficient poisoned billing from the create
+	// side (0 = unset for the enroll find-or-create path → default 1.0,
+	// the same value handleMeshDCCreate substitutes).
+	if math.IsNaN(dc.PriceCoefficient) || dc.PriceCoefficient < 0 || dc.PriceCoefficient > 1e6 {
+		return 0, fmt.Errorf("price coefficient out of range")
+	}
+	if dc.PriceCoefficient == 0 {
+		dc.PriceCoefficient = 1.0
+	}
 	if dc.CreatedAt == 0 {
 		dc.CreatedAt = now()
 	}
