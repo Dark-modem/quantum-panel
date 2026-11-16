@@ -1683,6 +1683,10 @@ html[dir="rtl"] .topo-back .topo-back-ic { transform:scaleX(-1); }
    tracks are content-bounded and space-between spreads the slack as gaps */
 .topo-list-row .topo-cell-actions .topo-actions { justify-content:center; }
 .topo-list-head th:last-child { text-align:center; }
+/* the Tunnels column carries a bare count — center it in its track (a lone
+   start-hung number in a 90px field reads lopsided) */
+.topo-list-head th:nth-of-type(5) { text-align:center; }
+.topo-list-row .topo-cell-tunnels { text-align:center; }
 .topo-list-row { min-height:72px; }
 @media (max-width:799px) {
   .topo-searchbox { max-width:none; }
