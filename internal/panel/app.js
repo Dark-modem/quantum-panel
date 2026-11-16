@@ -11665,7 +11665,7 @@ window.loadClusterStatus = loadClusterStatus;
     '.mtb-field-ok{position:absolute;inset-inline-end:42px;width:20px;height:20px;color:var(--ok);display:inline-flex;pointer-events:none}',
     '.mtb-field-ok svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}',
     '.mtb-tip-row{margin-top:8px}',
-    '.mtb-tip-i{position:relative;z-index:0;width:22px;height:22px;color:#fff;font-size:12px;font-weight:700;cursor:help;display:inline-flex;align-items:center;justify-content:center;padding:0}',
+    '.mtb-tip-i{position:relative;z-index:0;width:22px;height:22px;color:#fff;font-size:12px;font-weight:700;cursor:help;display:inline-flex;align-items:center;justify-content:center;padding:0;vertical-align:middle}',
     '.mtb-tip-i::before{content:"";position:absolute;inset:0;background:var(--ac);clip-path:polygon(30% 0,70% 0,100% 30%,100% 70%,70% 100%,30% 100%,0 70%,0 30%);filter:drop-shadow(0 0 4px color-mix(in srgb, var(--ac) 45%, transparent));z-index:-1}',
     '.mtb-tip-i::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 8px);inset-inline-start:0;z-index:9;width:max-content;max-width:280px;background:var(--s1);border:1px solid color-mix(in srgb, var(--ac) 30%, var(--ln));border-radius:10px;padding:8px 10px;font-size:12px;font-weight:400;line-height:1.5;color:var(--tx);text-align:start;white-space:normal;opacity:0;pointer-events:none;transform:translateY(4px);transition:opacity .2s,transform .2s;box-shadow:0 10px 24px rgba(0,0,0,.4)}',
     '.mtb-tip-i:hover::after,.mtb-tip-i.tipopen::after{opacity:1;transform:none}',

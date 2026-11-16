@@ -827,8 +827,7 @@
       '<datalist id="mtbDcList"></datalist></label>' +
       '</div>' +
       '<div class="mtb-wpage" data-pg="3" hidden>' +
-      '<div class="mtb-tip-row"><button type="button" class="mtb-tip-i" data-tipopen data-tip="' + esc(L('agTtlHint')) + '" aria-label="' + esc(L('agTtlHint')) + '">!</button></div>' +
-      '<label>' + esc(L('agentExpiry')) + ' <input id="mtbExpiry" type="number" min="1" max="3650" value="365" class="quantum-input" style="width:120px" dir="ltr"></label>' +
+      '<label>' + '<button type="button" class="mtb-tip-i" data-tipopen data-tip="' + esc(L('agTtlHint')) + '" aria-label="' + esc(L('agTtlHint')) + '">!</button> ' + esc(L('agentExpiry')) + ' <input id="mtbExpiry" type="number" min="1" max="3650" value="365" class="quantum-input" style="width:120px" dir="ltr"></label>' +
       '<div class="mtb-chips">' + chips + '</div>' +
       '</div>' +
       '<div class="mtb-acts" id="mtbWizFoot">' +
