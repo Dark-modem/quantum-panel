@@ -1509,7 +1509,7 @@
       var tunChipHtml = '<div class="mtb-eng-filters">' + tunChips.map(function (c) {
         return '<button type="button" class="mtb-eng-chip' + (tunFilter === c.k ? ' on' : '') + '" data-tunfilter="' + c.k + '"><i style="background:' + c.dot + '"></i>' + esc(c.lbl) + '</button>';
       }).join('') + '</div>';
-      html += '<div class="tunnel-card"><div class="tc-header dcard-head"><p class="tc-title dcard-title">' + MTB_ICO.gear + esc(L('agEngT')) + '</p></div>' +
+      html += '<div class="tunnel-card"><div class="tc-header dcard-head"><p class="tc-title dcard-title">' + MTB_ICO.orbit + esc(L('agEngT')) + '</p></div>' +
         engChipHtml + '<div class="mtb-eng-tiles">' + engCards + '</div></div>';
 
       // tunnels table
