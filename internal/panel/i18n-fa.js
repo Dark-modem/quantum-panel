@@ -708,8 +708,6 @@ window.FA_TEXT = {
  "Showing {a} to {b} of {c} topologies": "نمایش {a} تا {b} از {c} توپولوژی",
  "server": "سرور",
  "servers": "سرور",
- "Duplicate topology": "تکرار توپولوژی",
- "Topology duplicated": "توپولوژی تکرار شد",
  "Activate": "فعال‌سازی",
  "Activate topology?": "فعال‌سازی توپولوژی؟",
  "Deactivate topology?": "غیرفعال‌سازی توپولوژی؟",
