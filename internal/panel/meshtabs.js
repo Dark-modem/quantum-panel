@@ -874,6 +874,7 @@
         c.classList.toggle('on', (c.querySelector('input[name="mtbRole"]') || {}).value !== 'foreign' ? !foreign : foreign);
       });
       var row = document.getElementById('mtbCountryRow');
+      if (row) row.style.display = foreign ? '' : 'none'; // the hosting country applies to FOREIGN agents only
       var fl = document.getElementById('mtbCountryFlag');
       if (fl) {
         var csel = document.getElementById('mtbCountry');
@@ -938,12 +939,13 @@
         return;
       }
       if (wizStep === 2) {
-        if (!((document.getElementById('mtbCountry') || {}).value)) {
-          mtbToast(L('pickCountry'), 'err');
+        var foreignRole = (ov.querySelector('input[name="mtbRole"]:checked') || {}).value === 'foreign';
+        if (foreignRole && !((document.getElementById('mtbCountry') || {}).value)) {
+          ov.querySelector('[data-mtb-msg]').textContent = L('pickCountry');
           return;
         }
         if (!(document.getElementById('mtbDc') || {}).value.trim()) {
-          mtbToast(L('agDcReq'), 'err');
+          ov.querySelector('[data-mtb-msg]').textContent = L('agDcReq');
           document.getElementById('mtbDc').focus();
           return;
         }
