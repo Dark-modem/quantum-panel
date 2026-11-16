@@ -1664,15 +1664,8 @@ html[dir="rtl"] .topo-back .topo-back-ic { transform:scaleX(-1); }
 .topo-cell-region .topo-flag-svg { width:27px; height:19px; }
 .topo-state-pill.st-none { color:var(--mu); border-color:var(--ln2); background:var(--s2); }
 .topo-list-head th { font-size:12px; color:var(--mu); }
-/* narrow columns center their content in BOTH the header and the cells, so
-   labels sit exactly over their values; Actions is end-aligned on both sides */
-.topo-list-head th:nth-child(4) .topo-th, .topo-list-head th:nth-child(5) .topo-th { justify-content:center; }
-.topo-list-head th:last-child .topo-th { justify-content:center; }
-.topo-list-row .topo-cell-tunnels, .topo-list-row .topo-cell-state { text-align:center; }
-.topo-list-row .topo-cell-tunnels .topo-count, .topo-list-row .topo-cell-state .topo-state-pill { margin-inline:auto; }
-.topo-list-row .topo-cell-name .topo-name { justify-content:center; margin-inline:auto; }
-.topo-list-row .topo-cell-region { text-align:center; }
-.topo-list-row .topo-cell-actions { justify-content:center; }
+/* all columns start-aligned (header over cell content, mockup style) — the
+   tracks are content-bounded and space-between spreads the slack as gaps */
 .topo-list-row .topo-cell-actions .topo-actions { justify-content:center; }
 .topo-list-head th:last-child { text-align:center; }
 .topo-list-row { min-height:72px; }
