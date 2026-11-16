@@ -26,7 +26,7 @@ func TestTopologyListSemanticTable(t *testing.T) {
 		t.Error("generated topology rows must remain inside the table body")
 	}
 	headers := regexp.MustCompile(`(?s)<th\b([^>]*)>(.*?)</th>`).FindAllStringSubmatch(table[1], -1)
-	want := []string{"#", "Topology name", "Iran server", "Foreign server", "Tunnels", "Status", "Actions"}
+	want := []string{"", "Topology name", "Iran server", "Foreign server", "Tunnels", "Status", "Actions"}
 	if len(headers) != len(want) {
 		t.Fatalf("got %d topology columns, want %d", len(headers), len(want))
 	}
