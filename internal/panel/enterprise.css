@@ -1233,7 +1233,7 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
    three tracks are pure fr (minmax(0,…) strips content-based minimums, the
    usual source of header/body drift); Tunnels and Actions are fixed so the
    header can never drift against a row. */
-.topo-list-head, .topo-list-row { display:grid; grid-template-columns:28px minmax(0,1.5fr) minmax(0,1.25fr) minmax(0,1.25fr) 90px 150px 72px; gap:14px; align-items:center; padding:14px 18px; }
+.topo-list-head, .topo-list-row { display:grid; grid-template-columns:28px minmax(0,1.5fr) minmax(0,1.25fr) minmax(0,1.25fr) 90px 150px 104px; gap:14px; align-items:center; padding:14px 18px; }
 .topo-list-head { background:var(--s2); border-bottom:1px solid var(--ln); }
 .topo-list-head th { min-width:0; padding:0; color:var(--mu); font-size:var(--fs-caption); font-weight:650; text-align:start; text-transform:uppercase; letter-spacing:.07em; }
 /* Persian is a joined script: letter-spacing and uppercase only break it. */
@@ -1267,6 +1267,16 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 .topo-actions .quantum-btn { height:30px; min-height:30px; padding:0 12px; border-radius:999px; font-size:var(--fs-caption); white-space:nowrap; gap:6px; }
 .topo-actions .topo-view .topo-icon, .topo-actions .topo-delete .topo-icon { width:14px; height:14px; }
 .topo-delete-wrap { display:inline-flex; }
+/* direct action buttons (desktop): view / power / delete sit inline; the kebab menu is mobile-only */
+.topo-actions-inline { display:none; align-items:center; gap:6px; }
+.topo-inline-btn { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:8px; border:1px solid var(--ln); background:transparent; color:var(--tx2); cursor:pointer; transition:color .15s ease, border-color .15s ease, background .15s ease; }
+.topo-inline-btn svg { width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; flex:none; }
+.topo-inline-btn:hover { color:var(--tx); border-color:var(--ac-b30); background:var(--s3); }
+.topo-inline-btn.topo-delete { color:var(--er); border-color:color-mix(in srgb, var(--er) 35%, transparent); }
+.topo-inline-btn.topo-delete:hover { color:var(--er); background:color-mix(in srgb, var(--er) 12%, transparent); border-color:var(--er); }
+.topo-inline-btn[disabled] { opacity:.45; cursor:not-allowed; }
+.topo-inline-btn[disabled]:hover { color:var(--er); background:transparent; border-color:color-mix(in srgb, var(--er) 35%, transparent); }
+@media(min-width:800px){ .topo-list-row .topo-menu { display:none; } .topo-list-row .topo-actions-inline { display:inline-flex; } }
 /* status pill: a small ellipse carrying the pair's health */
 .topo-state-pill { display:inline-flex; align-items:center; gap:6px; padding:3px 12px;
   border-radius:999px; border:1px solid; font-size:var(--fs-caption); font-weight:650; }

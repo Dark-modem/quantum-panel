@@ -141,9 +141,10 @@ func TestTopologyListSharedResponsiveColumns(t *testing.T) {
 	// Tunnels and Actions sit on fixed tracks so the headers stay over their
 	// cells no matter how the flexible name/server columns squeeze. The
 	// mockup redesign (2026-11-16) restored # and the two server columns;
-	// the fixed trio settled at 90px (Tunnels), 150px (Status), 72px (Actions).
-	if !regexp.MustCompile(`grid-template-columns\s*:[^}]*90px\s+150px\s+72px`).MatchString(shared[1]) {
-		t.Error("shared grid must keep fixed 90px (Tunnels), 150px (Status) and 72px (Actions) tracks")
+	// the direct action buttons (2026-11-16) widened Actions to fit the
+	// inline view/power/delete trio: 90px (Tunnels), 150px (Status), 104px (Actions).
+	if !regexp.MustCompile(`grid-template-columns\s*:[^}]*90px\s+150px\s+104px`).MatchString(shared[1]) {
+		t.Error("shared grid must keep fixed 90px (Tunnels), 150px (Status) and 104px (Actions) tracks")
 	}
 
 	media := regexp.MustCompile(`@media\s*\(\s*max-width\s*:\s*799px\s*\)`).FindStringIndex(css)
