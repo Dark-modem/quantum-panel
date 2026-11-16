@@ -1669,13 +1669,13 @@ html[dir="rtl"] .topo-back .topo-back-ic { transform:scaleX(-1); }
    labels sit exactly over their values; Actions is end-aligned on both sides */
 .topo-list-head th:nth-child(2), .topo-list-head th:nth-child(3), .topo-list-head th:nth-child(4), .topo-list-head th:nth-child(5) { text-align:center; }
 .topo-list-head th:nth-child(4) .topo-th, .topo-list-head th:nth-child(5) .topo-th { justify-content:center; }
-.topo-list-head th:last-child .topo-th { justify-content:flex-end; }
+.topo-list-head th:last-child .topo-th { justify-content:center; }
 .topo-list-row .topo-cell-tunnels, .topo-list-row .topo-cell-state { text-align:center; }
 .topo-list-row .topo-cell-tunnels .topo-count, .topo-list-row .topo-cell-state .topo-state-pill { margin-inline:auto; }
 .topo-list-row .topo-cell-name .topo-name { justify-content:center; margin-inline:auto; }
 .topo-list-row .topo-cell-region { text-align:center; }
-.topo-list-row .topo-cell-actions { justify-content:flex-end; }
-.topo-list-head th:last-child { text-align:end; }
+.topo-list-row .topo-cell-actions { justify-content:center; }
+.topo-list-head th:last-child { text-align:center; }
 .topo-list-row { min-height:72px; }
 @media (max-width:799px) {
   .topo-searchbox { max-width:none; }
