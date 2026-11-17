@@ -1946,3 +1946,15 @@ html[dir="rtl"] .topo-back .topo-back-ic { transform:scaleX(-1); }
 .topo-mem-dc { color:var(--mu); font-size:12px; min-width:0; overflow-wrap:anywhere; }
 .topo-mem-x { margin-inline-start:auto; width:26px; height:26px; border-radius:7px; border:1px solid var(--ln); background:transparent; color:var(--tx2); cursor:pointer; font-size:14px; line-height:1; }
 .topo-mem-x:hover { color:var(--er); border-color:color-mix(in srgb, var(--er) 45%, transparent); }
+
+/* the topology detail's head card: the agent-detail card's look — rounded,
+   a blue bubble tucked in the corner, a soft blue mist over the base */
+.tunnel-card.topo-detail-head-card { position:relative; overflow:hidden; border-radius:14px;
+  background:
+    radial-gradient(circle at 16% 22%, color-mix(in srgb, var(--ac) 9%, transparent) 0%, transparent 56%),
+    radial-gradient(circle at 88% 92%, color-mix(in srgb, var(--ac) 6%, transparent) 0%, transparent 52%),
+    var(--s2); }
+.tunnel-card.topo-detail-head-card::after { content:""; position:absolute; width:90px; height:90px; border-radius:50%;
+  top:-28px; inset-inline-start:-28px; pointer-events:none;
+  background:radial-gradient(circle at 35% 35%, color-mix(in srgb, var(--ac) 22%, transparent) 0%, color-mix(in srgb, var(--ac) 7%, transparent) 72%); }
+.tunnel-card.topo-detail-head-card .topo-head-row { position:relative; z-index:1; }
