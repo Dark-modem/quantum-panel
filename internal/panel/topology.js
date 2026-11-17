@@ -444,39 +444,6 @@ function topologyGraph(topo, tunnels) {
   // server nodes per side, stacked; each tunnel cable connects the node pair
   // its own endpoints name (local_ip/remote_ip), falling back to the first
   // node of the side when the pair is unresolved.
-  let W, H, n = tunnels.length;
-  const colH = list => list.length * (NH + GAP) - GAP;
-  const iranH = colH(iranServers), foreignH = colH(foreignServers);
-  let geo = {};
-  if (vert) {
-    W = 520;
-    const gapY = n ? 64 + (n - 1) * 30 + 52 : 76;
-    const iy0 = 22;
-    const fy0 = iy0 + iranH + gapY;
-    H = Math.max(fy0 + foreignH + 34, 380);
-    geo = {
-      iran: { x: W / 2 - NW / 2, y: iy0, list: iranServers },
-      foreign: { x: W / 2 - NW / 2, y: fy0, list: foreignServers },
-      W, H,
-    };
-  } else {
-    W = 900;
-    H = Math.max(Math.max(iranH, foreignH) + 60, 258);
-    const fX = rtl ? 22 : W - 22 - NW;
-    const iX = rtl ? W - 22 - NW : 22;
-    const iy0 = (H - iranH) / 2, fy0 = (H - foreignH) / 2;
-    geo = {
-      iran: { x: iX, y: iy0, list: iranServers },
-      foreign: { x: fX, y: fy0, list: foreignServers },
-      W, H,
-    };
-  }
-  const nodeY = (col, i) => col.y + i * (NH + GAP);
-  // resolve a tunnel's endpoint node indexes (by endpoint ip, fallback 0)
-  const pickIdx = (col, list, ip) => {
-    const i = list.findIndex(s => s.ip && ip && s.ip === ip);
-    return i >= 0 ? i : 0;
-  };
   const agentTuns = topo ? topoAgentTunnels(topo) : [];
   const stOf = s => ['healthy', 'ok', 'up', 'connected'].includes(String(s || '')) ? 'ok'
     : String(s || '') === 'down' ? 'err' : String(s || '') === 'disabled' ? 'off' : 'warn';
@@ -516,6 +483,39 @@ function topologyGraph(topo, tunnels) {
     `</g>`;
   }).join('');
   const label = st => st === 'ok' ? tr('', 'Connected') : st === 'err' ? tr('', 'Stopped') : st === 'off' ? tr('', 'Disabled') : tr('', 'Unverified');
+  let W, H, n = tunnels.length + agentTuns.length;
+  const colH = list => list.length * (NH + GAP) - GAP;
+  const iranH = colH(iranServers), foreignH = colH(foreignServers);
+  let geo = {};
+  if (vert) {
+    W = 520;
+    const gapY = n ? 64 + (n - 1) * 30 + 52 : 76;
+    const iy0 = 22;
+    const fy0 = iy0 + iranH + gapY;
+    H = Math.max(fy0 + foreignH + 34, 380);
+    geo = {
+      iran: { x: W / 2 - NW / 2, y: iy0, list: iranServers },
+      foreign: { x: W / 2 - NW / 2, y: fy0, list: foreignServers },
+      W, H,
+    };
+  } else {
+    W = 900;
+    H = Math.max(Math.max(iranH, foreignH) + 60, 258);
+    const fX = rtl ? 22 : W - 22 - NW;
+    const iX = rtl ? W - 22 - NW : 22;
+    const iy0 = (H - iranH) / 2, fy0 = (H - foreignH) / 2;
+    geo = {
+      iran: { x: iX, y: iy0, list: iranServers },
+      foreign: { x: fX, y: fy0, list: foreignServers },
+      W, H,
+    };
+  }
+  const nodeY = (col, i) => col.y + i * (NH + GAP);
+  // resolve a tunnel's endpoint node indexes (by endpoint ip, fallback 0)
+  const pickIdx = (col, list, ip) => {
+    const i = list.findIndex(s => s.ip && ip && s.ip === ip);
+    return i >= 0 ? i : 0;
+  };
   const cables = tunnels.map((t, i) => {
     const st = stateOf(t);
     const sw = weightOf(t);
@@ -917,7 +917,7 @@ function topologyRender() {
     tl.innerHTML = agentRows.length
       ? '<div class="topo-tl">' + agentRows.map(tn => {
           const st = stOf(tn.state);
-          const lat = tn.latency != null && tn.latency >= 0 ? tn.latency + ' ms' : '\u2014';
+          const lat = tn.latency != null && tn.latency >= 0 ? Math.round(tn.latency) + ' ms' : '\u2014';
           return '<button type="button" class="topo-tl-row" data-topo-agent="' + esc(tn.agentId) + '">' +
             '<span class="topo-tl-dot ' + st + '"></span>' +
             '<b>' + esc(tn.key || '') + '</b>' +
