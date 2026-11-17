@@ -616,6 +616,17 @@ function topologyGraph(topo, tunnels) {
 // ===== topology members: agents (=servers) join/leave the topology ========
 // The established tunnels of the open topology, from the agent layer: every
 // member agent reports the tunnels it actually runs for this topology.
+// The tunnel set a topology DISPLAYS with: the panel inventory tunnels bound
+// to it plus the tunnels its member agents actually report running (deduped
+// by id/key). Display paths use this; the attach picker keeps the raw
+// inventory (it must only offer truly unassigned tunnels).
+function topoAllTunnels(topo) {
+  const inv = topologyExistingTunnels(topo);
+  const seen = {};
+  inv.forEach(t => { seen[t.id || t.name || ''] = true; });
+  const extra = topoAgentTunnels(topo).filter(tn => !seen[tn.key]);
+  return inv.concat(extra);
+}
 function topoAgentTunnels(topo) {
   // both endpoints report the same tunnel rows — dedupe by tunnel_key so a
   // tunnel renders once regardless of how many of its agents reported it
@@ -759,7 +770,7 @@ function topologyRender() {
     if (pill && topo) {
       // the health counts BOTH sources: the panel inventory and the tunnels
       // the member agents actually report running for this topology
-      const own = topologyExistingTunnels(topo).concat(topoAgentTunnels(topo));
+      const own = topoAllTunnels(topo);
       const health = topologyHealthOf(topo, own);
       const cls = !own.length ? 'st-none' : 'st-' + health;
       pill.className = 'topo-state-pill ' + cls;
@@ -781,7 +792,7 @@ function topologyRender() {
   if ($('topoStatPairs')) {
     let tunnelTotal = 0, withT = 0;
     topologyData.topologies.forEach(t => {
-      const own = topologyExistingTunnels(t);
+      const own = topologyAllTunnels(t);
       tunnelTotal += own.length;
       if (own.length) withT++;
     });
@@ -843,7 +854,7 @@ function topologyRender() {
   renderTopoMembers(topo);
   $('topologiesList').innerHTML = visible.length
     ? visible.map((t, i) => {
-        const tunnels = topologyExistingTunnels(t);
+        const tunnels = topologyAllTunnels(t);
         const remaining = tunnels.length;
         const endpoints = topologyEndpointPair(t);
         const deleteTitle = remaining ? topologyDeleteNotice(remaining) : tr('', 'Delete topology');
@@ -937,7 +948,7 @@ function topologyRender() {
   if (act && deact) {
     // The header's power toggle mirrors the row menu: a pair whose tunnels are
     // not up offers the green Activate; a live pair offers the red Deactivate.
-    const powering = topologyHealthOf(topo, cables) !== 'ok';
+    const powering = topologyHealthOf(topo, topoAllTunnels(topo)) !== 'ok';
     act.hidden = !powering;
     deact.hidden = powering;
   }
