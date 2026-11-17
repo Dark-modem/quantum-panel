@@ -2005,13 +2005,14 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
   background:color-mix(in srgb, var(--tx) 2.5%, transparent); }
 /* the topology list page styles .topo-stat as a mini-card of its own — the
    strip's segments must stay bare inside the one unified box */
-.topo-head-stats .topo-stat { display:flex; align-items:center; gap:10px; padding:2px 16px;
-  border:none; border-radius:0; background:transparent; }
 .topo-head-stats .topo-stat-tx { display:flex; flex-direction:column; align-items:flex-start; gap:3px; min-width:0; flex:none; }
-/* the four logical sections each take a fair share of the strip's width and
-   spread their segments inside it — no dead space at the strip's end; thin
-   lines separate the sections, not the segments of one section */
-.topo-head-stats .topo-stat-group { display:flex; align-items:stretch; justify-content:space-evenly; flex:1 1 auto; min-width:0; }
+/* the four logical sections each take a fair share of the strip's width; a
+   side's count and datacenter sit TIGHT and centered so the pair reads as one
+   section, and the thin lines between groups mark the section boundaries */
+.topo-head-stats .topo-stat { display:flex; align-items:center; gap:10px; padding:2px 10px;
+  border:none; border-radius:0; background:transparent; }
+.topo-head-stats .topo-stat-group { display:flex; align-items:stretch; justify-content:center; gap:14px; flex:1 1 auto; min-width:0; }
+.topo-head-stats .topo-stat-group + .topo-stat-group { border-inline-start:1px solid var(--ln2); }
 .topo-head-stats .topo-stat-group + .topo-stat-group { border-inline-start:1px solid var(--ln2); }
 @media(max-width:799px) {
   .topo-head-stats .topo-stat-group { flex:none; flex-wrap:wrap; }
