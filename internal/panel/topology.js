@@ -403,14 +403,11 @@ function topologyGraph(topo, tunnels) {
   const foreignIp = topo.role === 'foreign' ? topo.local_ip : topo.remote_ip;
   const rtl = typeof currentLang !== 'undefined' && currentLang === 'fa';
   const vert = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 799px)').matches;
-  // Per-side SERVER lists (every server the side has, from the agents' own
-  // reports), each carrying its datacenter and address — the map shows them
-  // all, exactly like the topologies list does.
+  // Per-side server lists (every server the side has, from the agents' own
+  // reports), each carrying its datacenter, address and live status.
   const sideServers = side => {
     const list = (topoSideServers(topo, side) || []).slice();
     if (!list.length) {
-      // no resolved servers yet: one honest placeholder node from the
-      // topology's own endpoint
       list.push({
         name: '', dc: '', cc: side === 'iran' ? 'IR' : String(topo.country || '').toUpperCase(),
         ip: side === 'iran' ? iranIp : foreignIp,
@@ -421,7 +418,7 @@ function topologyGraph(topo, tunnels) {
   const iranServers = sideServers('iran');
   const foreignServers = sideServers('foreign');
   // Tunnel states map onto the four states the backend really carries:
-  // healthy → connected; unknown → unverified; down → stopped; disabled → out of service.
+  // healthy → connected; unknown → unverified/pending; down → stopped; disabled → out of service.
   const stateOf = t => {
     const s = String(t.state || '');
     return ['healthy', 'ok', 'up', 'connected'].includes(s) ? 'ok'
@@ -429,177 +426,190 @@ function topologyGraph(topo, tunnels) {
       : s === 'disabled' ? 'off' : 'warn';
   };
   const stateLabel = st => st === 'ok' ? tr('', 'Connected') : st === 'err' ? tr('', 'Stopped') : st === 'off' ? tr('', 'Disabled') : tr('', 'Unverified');
-  const kinds = tunnels.map(stateOf);
-  const nodeKind = !tunnels.length ? '' : kinds.every(k => k === 'ok') ? 'ok' : kinds.every(k => k === 'err') ? 'err' : kinds.some(k => k === 'err') ? 'err' : 'warn';
-  // Line width follows the tunnel's real weight when the backend provides it.
+  const nodeKind = !tunnels.length ? '' : (() => {
+    const ks = tunnels.map(t => stateOf(t));
+    return ks.every(k => k === 'ok') ? 'ok' : ks.every(k => k === 'err') ? 'err' : ks.some(k => k === 'err') ? 'err' : 'warn';
+  })();
+  // The line width follows the tunnel's REAL weight share when the backend
+  // provides it (weight_pct 0-100), else the honest default.
   const weightOf = t => {
+    const wp = Number(t.weightPct);
+    if (isFinite(wp) && wp > 0) return Math.max(2, Math.min(6.5, 2 + wp / 100 * 4.5));
     const w = Number(t.weight);
-    return isFinite(w) && w > 0 ? Math.max(2, Math.min(6, 1.6 + w / 8)) : 3;
+    if (isFinite(w) && w > 0) return Math.max(2, Math.min(6.5, 1.8 + w / 8));
+    return 3;
   };
   const tDot = (cx, cy, kind) => `<circle class="cl-dot ${kind}" cx="${cx}" cy="${cy}" r="5"/>`;
+  const tJunction = (cx, cy, kind) => `<circle class="topo-junction ${kind}" cx="${cx}" cy="${cy}" r="3.5"/>`;
   const tTxt = (x, y, cls, s2, anchor) => `<text class="${cls}" x="${x}" y="${y}"${anchor ? ` text-anchor="${anchor}"` : ''}>${text(s2)}</text>`;
   const tFlag = (flag, x, y) => topologyFlagSvg(flag, `x="${x}" y="${y}"`);
-  const NW = 248, NH = 104, GAP = 16;
-  const iranFlag = 'ir';
-  // server nodes per side, stacked; each tunnel cable connects the node pair
-  // its own endpoints name (local_ip/remote_ip), falling back to the first
-  // node of the side when the pair is unresolved.
-  const agentTuns = topo ? topoAgentTunnels(topo) : [];
-  const stOf = s => ['healthy', 'ok', 'up', 'connected'].includes(String(s || '')) ? 'ok'
-    : String(s || '') === 'down' ? 'err' : String(s || '') === 'disabled' ? 'off' : 'warn';
-  const findNode = (list, name) => {
-    const i = list.findIndex(s => s.name && name && s.name === name);
-    return i >= 0 ? i : 0;
-  };
-  const stLabel = st => st === 'ok' ? tr('', 'Connected') : st === 'err' ? tr('', 'Stopped') : st === 'off' ? tr('', 'Disabled') : tr('', 'Unverified');
-  const label = st => st === 'ok' ? tr('', 'Connected') : st === 'err' ? tr('', 'Stopped') : st === 'off' ? tr('', 'Disabled') : tr('', 'Unverified');
-  let W, H, n = tunnels.length + agentTuns.length;
-  const colH = list => list.length * (NH + GAP) - GAP;
-  const iranH = colH(iranServers), foreignH = colH(foreignServers);
+  const NW = 236, NH = 96, GAP = 12, HDR = 34;
+  const agentTuns = topoAgentTunnels(topo);
+  // geometry: two column containers (Iran servers / Foreign servers), the
+  // server cards stacked inside, vertically centered against each other
+  let W, H;
   let geo = {};
   if (vert) {
     W = 520;
-    const gapY = n ? 64 + (n - 1) * 30 + 52 : 76;
-    const iy0 = 22;
-    const fy0 = iy0 + iranH + gapY;
-    H = Math.max(fy0 + foreignH + 34, 380);
+    const iH = HDR + iranServers.length * (NH + GAP) + 10;
+    const fH = HDR + foreignServers.length * (NH + GAP) + 10;
+    const fY = 14 + iH + (n_() ? 74 : 84);
+    H = Math.max(fY + fH + 30, 420);
     geo = {
-      iran: { x: W / 2 - NW / 2, y: iy0, list: iranServers },
-      foreign: { x: W / 2 - NW / 2, y: fy0, list: foreignServers },
+      iran: { x: 16, y: 14, w: W - 32, list: iranServers },
+      foreign: { x: 16, y: fY, w: W - 32, list: foreignServers },
       W, H,
     };
+    function n_() { return tunnels.length + agentTuns.length; }
   } else {
     W = 900;
-    H = Math.max(Math.max(iranH, foreignH) + 60, 258);
-    const fX = rtl ? 22 : W - 22 - NW;
-    const iX = rtl ? W - 22 - NW : 22;
-    const iy0 = (H - iranH) / 2, fy0 = (H - foreignH) / 2;
+    const rows = Math.max(iranServers.length, foreignServers.length);
+    const CW = 296;
+    H = Math.max(HDR + rows * (NH + GAP) + 30, 268);
+    const fX = rtl ? 16 : W - 16 - CW;
+    const iX = rtl ? W - 16 - CW : 16;
     geo = {
-      iran: { x: iX, y: iy0, list: iranServers },
-      foreign: { x: fX, y: fy0, list: foreignServers },
+      iran: { x: iX, y: 14, w: CW, list: iranServers },
+      foreign: { x: fX, y: 14, w: CW, list: foreignServers },
+      cols: CW,
       W, H,
     };
   }
-  const nodeY = (col, i) => col.y + i * (NH + GAP);
-  // One wire per server PAIR: every tunnel between an Iran server and a
-  // foreign server collapses into a single cable whose thickness follows the
-  // tunnel count and whose label reads the count. The per-tunnel detail
-  // lives in the established list under the map.
-  const pairs = {};
+  const nodeY = (col, i) => col.y + HDR + i * (NH + GAP);
+  // resolve every tunnel to its (iran node, foreign node) pair: the agent
+  // rows match by the server name, the inventory rows by the endpoint ip,
+  // falling back to the side's first node when unresolved
+  const resolve = t => {
+    const row = agentTuns.find(tn => tn.key === t.id) || null;
+    const localIp = topo.role === 'foreign' ? t.remote_ip : t.local_ip;
+    const remoteIp = topo.role === 'foreign' ? t.local_ip : t.remote_ip;
+    const ii = row ? findNodeIdx(iranServers, row.localName, localIp) : findNodeIdx(iranServers, '', localIp);
+    const fi = row ? findNodeIdx(foreignServers, row.remoteName, remoteIp) : findNodeIdx(foreignServers, '', remoteIp);
+    return { row, ii, fi };
+  };
+  function findNodeIdx(list, name, ip) {
+    let i = list.findIndex(x => x.name && name && x.name === name);
+    if (i < 0 && ip) i = list.findIndex(x => x.ip && x.ip === ip);
+    return i >= 0 ? i : 0;
+  }
+  // the established tunnels from BOTH layers: the agent rows first (what the
+  // member agents actually run, resolved by the server name), then any
+  // inventory tunnels not covered (resolved by the endpoint ip)
+  const resolved = [];
+  const seenIds = {};
   agentTuns.forEach(tn => {
-    const k = (tn.localName || '?') + '|' + (tn.remoteName || '?');
-    const p = pairs[k] || (pairs[k] = { local: tn.localName || '?', remote: tn.remoteName || '?', n: 0, ok: 0, down: 0 });
-    p.n++;
-    const st = stOf(tn.state);
-    if (st === 'ok') p.ok++;
-    if (st === 'err') p.down++;
+    resolved.push({
+      t: { id: tn.key, name: tn.key, engine: tn.engine, state: tn.state, weightPct: tn.weightPct },
+      id: tn.key, name: tn.key, engine: tn.engine, state: stateOf(tn), weightPct: tn.weightPct,
+      ii: findNodeIdx(iranServers, tn.localName, null), fi: findNodeIdx(foreignServers, tn.remoteName, null),
+      agentId: tn.agentId,
+    });
+    seenIds[tn.key] = true;
   });
-  const pairList = Object.keys(pairs).map(k => pairs[k]);
-  // One wire per server PAIR. The wires through a node fan out around its
-  // center (ordered by the opposite column) so parallel cables read
-  // separately and cross as little as the geometry allows.
-  const wires = pairList.map(p => ({ p, ii: findNode(iranServers, p.local), fi: findNode(foreignServers, p.remote) }));
-  const srcSlots = {}, dstSlots = {};
-  wires.forEach(w => {
-    (srcSlots[w.ii] = srcSlots[w.ii] || []).push(w);
-    (dstSlots[w.fi] = dstSlots[w.fi] || []).push(w);
+  tunnels.forEach(t => {
+    if (seenIds[t.id] || seenIds[t.name]) return;
+    const localIp = topo.role === 'foreign' ? t.remote_ip : t.local_ip;
+    const remoteIp = topo.role === 'foreign' ? t.local_ip : t.remote_ip;
+    resolved.push({
+      t, id: t.id, name: t.name, engine: t.engine, st: stateOf(t), weightPct: null,
+      ii: findNodeIdx(iranServers, '', localIp), fi: findNodeIdx(foreignServers, '', remoteIp),
+      agentId: null,
+    });
   });
-  wires.forEach(w => {
-    w.sIdx = srcSlots[w.ii].indexOf(w);
-    w.sK = srcSlots[w.ii].length;
-    w.dIdx = dstSlots[w.fi].indexOf(w);
-    w.dK = dstSlots[w.fi].length;
+  // lanes: the tunnels sharing a node pair spread around the pair's center;
+  // the cross-column cables alternate their bow so the crossing point never
+  // reads as a junction
+  const byPair = {};
+  resolved.forEach(r => {
+    const k = r.ii + '>' + r.fi;
+    (byPair[k] = byPair[k] || []).push(r);
   });
-  const pairWires = wires.map(w => {
-    const p = w.p;
-    const kind = p.ok > 0 ? 'ok' : p.down > 0 ? 'err' : 'idle';
-    const sw = Math.max(2, Math.min(5.5, 2 + p.n * 0.9));
-    let d;
-    if (vert) {
-      const x1 = geo.iran.x + NW / 2 + (w.sIdx - (w.sK - 1) / 2) * 18;
-      const y1 = nodeY(geo.iran, w.ii) + NH;
-      const x2 = geo.foreign.x + NW / 2 + (w.dIdx - (w.dK - 1) / 2) * 18;
-      const y2 = nodeY(geo.foreign, w.fi);
-      const midY = (y1 + y2) / 2;
-      d = `M ${x1.toFixed(1)} ${y1} C ${x1.toFixed(1)} ${midY}, ${x2.toFixed(1)} ${midY}, ${x2.toFixed(1)} ${y2}`;
+  Object.values(byPair).forEach(list => list.forEach((r, k) => { r.lane = k - (list.length - 1) / 2; }));
+  const crossParity = {};
+  resolved.forEach(r => {
+    if (r.ii !== r.fi) {
+      const k = Math.min(r.ii, r.fi) + '>' + Math.max(r.ii, r.fi);
+      crossParity[k] = (crossParity[k] || 0) + 1;
+      r.bow = (crossParity[k] % 2 === 1) ? -1 : 1;
     } else {
-      const y1 = nodeY(geo.iran, w.ii) + NH / 2 + (w.sIdx - (w.sK - 1) / 2) * 22;
-      const y2 = nodeY(geo.foreign, w.fi) + NH / 2 + (w.dIdx - (w.dK - 1) / 2) * 22;
-      const x1 = geo.iran.x + NW, x2 = geo.foreign.x;
-      const dx = Math.max(50, (x2 - x1) / 2);
-      d = `M ${x1},${y1.toFixed(1)} C ${x1 + dx},${y1.toFixed(1)} ${x2 - dx},${y2.toFixed(1)} ${x2},${y2.toFixed(1)}`;
+      r.bow = 0;
     }
-    return `<g data-topology-pair="${text(p.local)}|${text(p.remote)}" class="cl-e ${kind} topo-cable" tabindex="0" role="img" aria-label="${text(p.local)} → ${text(p.remote)}: ${text(p.n + ' ' + tr('', p.n === 1 ? 'tunnel' : 'tunnels'))}">` +
-      `<title>${text(p.local)} → ${text(p.remote)}: ${text(p.n + ' ' + tr('', p.n === 1 ? 'tunnel' : 'tunnels'))}</title>` +
+  });
+  const cables = resolved.map(r => {
+    const st = r.st || stateOf(r.t || {});
+    const sw = weightOf({ weightPct: r.weightPct, weight: r.t ? r.t.weight : null });
+    const y1 = nodeY(geo.iran, r.ii) + NH / 2 + r.lane * 14;
+    const y2 = nodeY(geo.foreign, r.fi) + NH / 2 + r.lane * 14;
+    const x1 = geo.iran.x + NW, x2 = geo.foreign.x;
+    const dx = Math.max(50, (x2 - x1) / 2);
+    const sag = r.bow * 26;
+    const d = `M ${x1},${y1.toFixed(1)} C ${x1 + dx},${(y1 + sag).toFixed(1)} ${x2 - dx},${(y2 + sag).toFixed(1)} ${x2},${y2.toFixed(1)}`;
+    const nm = agentTuns.find(tn => tn.key === t.id);
+    return `<g data-topology-cable="${text(t.id)}" data-topo-agent="${text(nm ? nm.agentId : '')}" class="cl-e ${st} topo-cable" tabindex="0" role="button" aria-label="${text(t.name)} · ${text(label(st))}">` +
+      `<title>${text(t.name)} · ${text(t.engine)} · ${text(label(st))}</title>` +
       `<path class="cl-e-hit" d="${d}"/>` +
+      tJunction(x1, y1.toFixed(1), st) +
+      tJunction(x2, y2.toFixed(1), st) +
       `<path class="cl-e-line" style="stroke-width:${sw}" d="${d}"/>` +
-      (p.ok > 0 ? `<path class="cl-e-flow" d="${d}"/>` : '') +
+      (st === 'ok' ? `<path class="cl-e-flow" d="${d}"/>` : '') +
     `</g>`;
   }).join('');
-  // resolve a tunnel's endpoint node indexes (by endpoint ip, fallback 0)
-  const pickIdx = (col, list, ip) => {
-    const i = list.findIndex(s => s.ip && ip && s.ip === ip);
-    return i >= 0 ? i : 0;
-  };
   const cc = String(topo.country || '').toLowerCase();
   const countryLabel = (TOPO_COUNTRIES.find(c => c[0] === cc) || ['', tr('', 'Other')])[1];
-  // server cards in the cluster map's language: cl-n cards (rounded, solid
-  // fill), a status dot, a bright title and dim sub-lines; the first node of
-  // the iran column carries the accent hub ring.
-  const node = (x, y, caption, title, info, flag, accent) => {
-    const m = rtl && !vert;
+  // server cards in the cluster map's language: cl-n cards with the flag, the
+  // bold server name, the datacenter (cc) and the mono address; the Iran cards
+  // wear a soft blue border, the foreign a turquoise one; the status dot only
+  // when the backend reported the server's own state
+  const node = (col, i, s, side) => {
+    const x = col.x + 12, y = nodeY(col, i), w = (col.w || NW) - 24, m = rtl && !vert;
+    const accent = side === 'iran';
+    const agRow = (window.__topoAgents || []).find(a => a.server && a.server.name === s.name);
+    const status = agRow ? agRow.status : '';
+    const info = { name: s.name, dc: s.dc, cc: s.cc || (side === 'iran' ? 'IR' : String(topo.country || '').toUpperCase()), ip: s.ip || (side === 'iran' ? iranIp : foreignIp) };
+    const title = s.name || (side === 'iran' ? tr('', 'Iran server') : countryLabel);
+    const flag = side === 'iran' ? 'ir' : topo.country;
     const head = m
-      ? tDot(x + NW - 20, y + 21, nodeKind || 'off') + tFlag(flag, x + NW - 58, y + 13) + tTxt(x + NW - 64, y + 26, 'cl-t2', caption, 'start')
-      : tDot(x + 20, y + 21, nodeKind || 'off') + tFlag(flag, x + 42, y + 13) + tTxt(x + 68, y + 26, 'cl-t2', caption);
+      ? (status ? tDot(x + w - 18, y + 19, status === 'online' ? 'ok' : 'err') : '') + tFlag(flag, x + w - 56, y + 12) + tTxt(x + w - 62, y + 23, 'cl-t2', side === 'iran' ? tr('', 'Iran server') : countryLabel, 'start')
+      : (status ? tDot(x + 18, y + 19, status === 'online' ? 'ok' : 'err') : '') + tFlag(flag, x + 42, y + 12) + tTxt(x + 68, y + 23, 'cl-t2', side === 'iran' ? tr('', 'Iran server') : countryLabel);
     const row = (cls, val, yy) => m
-      ? tTxt(x + NW - 16, y + yy, cls, val, 'start')
-      : tTxt(x + 16, y + yy, cls, val);
-    return `<g class="cl-n ${accent ? 'hubbox topo-hub' : ''}" role="img" aria-label="${text(title)} · ${text(info.ip)}"><title>${text(title)} · ${text(info.ip)}</title>` +
-    `<rect class="cl-n-bg" x="${x}" y="${y}" width="${NW}" height="${NH}" rx="12"/>` +
+      ? tTxt(x + w - 14, y + yy, cls, val, 'start')
+      : tTxt(x + 14, y + yy, cls, val);
+    return `<g class="cl-n ${accent ? 'topo-node-iran' : 'topo-node-foreign'}" data-agview="${text(agRow ? agRow.id : '')}" data-server-name="${text(s.name || '')}" role="button" tabindex="0" aria-label="${text(title)} · ${text(info.ip)}"><title>${text(title)} · ${text(info.ip)}</title>` +
+    `<rect class="cl-n-bg" x="${x}" y="${y}" width="${w}" height="${NH}" rx="12"/>` +
     head +
-    row('cl-t1', title, 50) +
-    row('cl-t2', info.name || title, 69) +
-    row('cl-t2', info.dc ? (info.dc + (info.cc ? ' (' + info.cc + ')' : '')) : '—', 86) +
-    row('cl-t2', info.ip, 100) +
+    row('cl-t1', title, 46) +
+    row('cl-t2', info.dc ? (info.dc + (info.cc ? ' (' + info.cc + ')' : '')) : (side === 'iran' ? tr('', 'Iran') : topoCountryName(topo.country) || '—'), 65) +
+    row('topo-ip', info.ip, 83) +
     `</g>`;
   };
-  const pieces = [];
-  if (!n) {
-    if (vert) {
-      pieces.push(`<path class="cl-e idle topo-idle-line" d="M ${geo.iran.x + NW / 2} ${geo.iran.y + iranH} L ${geo.iran.x + NW / 2} ${geo.foreign.y}"/>`);
-    } else {
-      const x1 = geo.iran.x + NW, x2 = geo.foreign.x;
-      const cy = (geo.iran.y + iranH / 2 + geo.foreign.y + foreignH / 2) / 2;
-      pieces.push(`<path class="cl-e idle topo-idle-line" d="M ${x1} ${cy.toFixed(1)} L ${x2} ${cy.toFixed(1)}"/>`);
-    }
-  }
+  const iranNodes = iranServers.map((s, i) => node(geo.iran, i, s, 'iran'));
+  const foreignNodes = foreignServers.map((s, i) => node(geo.foreign, i, s, 'foreign'));
+  // the column containers with the headers + the live counts
+  const colBox = (col, side, list) => {
+    const w = col.w || NW, h = HDR + list.length * (NH + GAP) + 8;
+    const lbl = side === 'iran' ? tr('', 'IRAN SERVERS') : tr('', 'FOREIGN SERVERS');
+    const m = rtl && !vert;
+    const x = col.x - 12, y = col.y - 8;
+    return `<g class="topo-colbox ${side}"><rect class="topo-col-bg" x="${x}" y="${y}" width="${w + 24}" height="${h}" rx="16"/>` +
+      tTxt(m ? x + w + 12 - 14 : x + 14, y + 20, 'cl-t2 topo-col-cap', lbl + ' · ' + list.length, m ? 'start' : undefined) + `</g>`;
+  };
+  const colBoxes = [];
+  colBoxes.push(colBox(geo.iran, 'iran', iranServers));
+  colBoxes.push(colBox(geo.foreign, 'foreign', foreignServers));
   const legend = `<div class="cl-legend">` +
     `<span><i class="ok"></i>${esc(tr('', 'Connected'))}</span>` +
     `<span><i class="warn"></i>${esc(tr('', 'Unverified'))}</span>` +
     `<span><i class="err"></i>${esc(tr('', 'Stopped'))}</span>` +
     `<span><i class="off"></i>${esc(tr('', 'Disabled'))}</span>` +
     `</div>`;
-  const dcLabel = s => topoIsFa() ? (s.dc || s.dcEn || '') : (s.dcEn || s.dc || '');
-  // every node IS one of the agents' servers: the bright title is the real
-  // server name (tehran-2, frankfurt-1, ...), the small caption names the side
-  const iranNodes = iranServers.map((s, i) => node(
-    vert ? geo.iran.x : geo.iran.x, vert ? geo.iran.y + i * (NH + GAP) : nodeY(geo.iran, i),
-    tr('', 'Iran server'), s.name || tr('', 'Iran server'),
-    { name: s.name, dc: dcLabel(s), cc: s.cc || 'IR', ip: s.ip || iranIp }, iranFlag, i === 0));
-  const foreignNodes = foreignServers.map((s, i) => node(
-    vert ? geo.foreign.x : geo.foreign.x, vert ? geo.foreign.y + i * (NH + GAP) : nodeY(geo.foreign, i),
-    countryLabel, s.name || countryLabel,
-    { name: s.name, dc: dcLabel(s), cc: s.cc || topo.country, ip: s.ip || foreignIp }, topo.country, false));
   return `<div class="topo-map"><div class="topo-map-scroll">` +
     `<svg class="topo-graph" viewBox="0 0 ${geo.W} ${Math.round(geo.H)}" role="img" aria-label="${text(tr('', 'Topology connections'))}" dir="ltr">` +
-    pieces.join('') + pairWires +
-    iranNodes.join('') + foreignNodes.join('') +
+    colBoxes.join('') + cables + iranNodes.join('') + foreignNodes.join('') +
     `</svg></div>` +
     `<div class="topo-tip" hidden></div>` +
     legend +
     `</div>`;
 }
-
 
 // ===== topology members: agents (=servers) join/leave the topology ========
 // The established tunnels of the open topology, from the agent layer: every
