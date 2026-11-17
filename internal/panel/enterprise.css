@@ -2003,3 +2003,39 @@ html[dir="rtl"] .topo-back .topo-back-ic { transform:scaleX(-1); }
 .topo-attach-inline .quantum-input { height:36px; min-height:36px; max-width:210px; border-radius:10px; }
 .topo-attach-inline .quantum-btn { min-height:36px; border-radius:10px; display:inline-flex; align-items:center; gap:7px; }
 .topo-attach-inline .topo-act-ic { width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+
+/* --- topology map v4: the two-column network visualization ---------------- */
+/* the subtle grid + soft depth behind the whole map */
+.topo-map { position:relative; }
+.topo-map-scroll { position:relative;
+  background-image:
+    radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--ac) 5%, transparent) 0%, transparent 60%),
+    linear-gradient(color-mix(in srgb, var(--tx) 3%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--tx) 3%, transparent) 1px, transparent 1px);
+  background-size: 100% 100%, 28px 28px, 28px 28px;
+  border-radius:16px; }
+/* the two column containers with their headers */
+.topo-col-bg { fill:color-mix(in srgb, var(--s1) 72%, transparent); stroke:var(--ln); stroke-width:1; }
+.topo-col-cap { fill:var(--mu); font-size:12px; font-weight:700; letter-spacing:1.2px; }
+/* the server cards: the iran side wears a soft blue border, the foreign a
+   turquoise one; the hover brightens the border with a very soft blue glow */
+.topo-node-iran > .cl-n-bg { stroke:color-mix(in srgb, var(--ac) 42%, transparent); }
+.topo-node-foreign > .cl-n-bg { stroke:color-mix(in srgb, var(--info) 42%, transparent); }
+.topo-node-iran:hover > .cl-n-bg, .topo-node-iran:focus-visible > .cl-n-bg,
+.topo-node-foreign:hover > .cl-n-bg, .topo-node-foreign:focus-visible > .cl-n-bg {
+  stroke:var(--ac); stroke-width:2;
+  filter:drop-shadow(0 0 10px color-mix(in srgb, var(--ac) 22%, transparent));
+  cursor:pointer; }
+.topo-ip { fill:var(--tx2); font-size:12px; font-family:var(--font-mono, monospace); font-variant-numeric:tabular-nums; }
+/* the small clear connection dots at both ends of every tunnel line */
+.topo-junction { stroke:var(--s1); stroke-width:1.5; }
+.topo-junction.ok { fill:var(--ok); } .topo-junction.warn { fill:var(--wr); }
+.topo-junction.err { fill:var(--er); } .topo-junction.off { fill:var(--mu); }
+.topo-junction.idle { fill:var(--mu); }
+/* the wire colors follow the tunnel state, never the server state */
+.topo-cable .cl-e-line { fill:none; stroke-linecap:round; opacity:.9; }
+.topo-cable.topo-warn .cl-e-line { stroke:var(--wr); stroke-dasharray:10 7; }
+.topo-cable.topo-err .cl-e-line { stroke:var(--er); stroke-dasharray:2 7; stroke-linecap:round; }
+.topo-cable.topo-off .cl-e-line { stroke:var(--mu); stroke-dasharray:2 7; opacity:.6; }
+.topo-cable.topo-idle .cl-e-line { stroke:var(--mu); stroke-dasharray:8 8; opacity:.55; }
+@media(max-width:799px) { .topo-map-scroll { background-size:100% 100%, 22px 22px, 22px 22px; } }
