@@ -595,6 +595,23 @@ function topologyRender() {
   const inTunnel = typeof _tunnelDetail !== 'undefined' && _tunnelDetail !== null;
   $('topologyListCard').hidden = !!topo || inTunnel;
   $('topologyDetailCard').hidden = !topo || inTunnel;
+  // the head card: the topology's own name + health pill + the actions
+  const headCard = $('topologyHeadCard');
+  if (headCard) {
+    headCard.hidden = !topo || inTunnel;
+    const hn = $('topologyHeadName');
+    if (hn) hn.textContent = topo ? topo.name : '—';
+    const pill = $('topologyHeadPill');
+    if (pill && topo) {
+      const own = topologyExistingTunnels(topo);
+      const health = topologyHealthOf(topo, own);
+      const cls = !own.length ? 'st-none' : 'st-' + health;
+      pill.className = 'topo-state-pill ' + cls;
+      const lbl = !own.length ? tr('', 'No tunnels') : tr('', health === 'ok' ? 'Active' : health === 'down' ? 'Down' : 'Unknown');
+      const tx = $('topologyHeadPillTx');
+      if (tx) tx.textContent = lbl;
+    }
+  }
   $('topologySetupBack').hidden = !topo;
   $('rscBanner').classList.toggle('td-hide', !inTunnel);
   $('dialCard').classList.toggle('td-hide', !inTunnel);

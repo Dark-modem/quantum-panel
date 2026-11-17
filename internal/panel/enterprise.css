@@ -1940,3 +1940,9 @@ html[dir="rtl"] .topo-back .topo-back-ic { transform:scaleX(-1); }
   .topo-graph { min-width:0; width:100%; }
   .topo-map-add { top:auto; inset-inline-start:50%; }
 }
+
+/* topology detail: the head card carries the topology's name and its actions */
+.topo-detail-head-card { margin-bottom:14px; }
+.topo-head-row { display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; }
+.topo-head-id { display:flex; align-items:center; gap:12px; min-width:0; }
+.topo-head-id .tc-title { margin:0; }
