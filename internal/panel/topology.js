@@ -757,7 +757,9 @@ function topologyRender() {
     if (hn) hn.textContent = topo ? topo.name : '—';
     const pill = $('topologyHeadPill');
     if (pill && topo) {
-      const own = topologyExistingTunnels(topo);
+      // the health counts BOTH sources: the panel inventory and the tunnels
+      // the member agents actually report running for this topology
+      const own = topologyExistingTunnels(topo).concat(topoAgentTunnels(topo));
       const health = topologyHealthOf(topo, own);
       const cls = !own.length ? 'st-none' : 'st-' + health;
       pill.className = 'topo-state-pill ' + cls;
