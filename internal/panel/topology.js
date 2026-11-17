@@ -792,7 +792,7 @@ function topologyRender() {
   if ($('topoStatPairs')) {
     let tunnelTotal = 0, withT = 0;
     topologyData.topologies.forEach(t => {
-      const own = topologyAllTunnels(t);
+      const own = topoAllTunnels(t);
       tunnelTotal += own.length;
       if (own.length) withT++;
     });
@@ -854,7 +854,7 @@ function topologyRender() {
   renderTopoMembers(topo);
   $('topologiesList').innerHTML = visible.length
     ? visible.map((t, i) => {
-        const tunnels = topologyAllTunnels(t);
+        const tunnels = topoAllTunnels(t);
         const remaining = tunnels.length;
         const endpoints = topologyEndpointPair(t);
         const deleteTitle = remaining ? topologyDeleteNotice(remaining) : tr('', 'Delete topology');
