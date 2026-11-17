@@ -99,6 +99,26 @@ func GenerateTopology(req TopoGenRequest) (*topoGenResult, error) {
 		return nil, err
 	}
 
+	// The DC invariant (owner rule, 2026-11-17): a topology spans exactly one
+	// Iran datacenter and one foreign datacenter. Many servers within those
+	// DCs are fine; a second DC on either side is a configuration error.
+	singleDC := func(svs []store.Server, side string) error {
+		seen := map[int64]bool{}
+		for _, sv := range svs {
+			seen[sv.DatacenterID] = true
+		}
+		if len(seen) > 1 {
+			return fmt.Errorf("the %s side must stay within one datacenter (got %d)", side, len(seen))
+		}
+		return nil
+	}
+	if err := singleDC(iran, "iran"); err != nil {
+		return nil, err
+	}
+	if err := singleDC(foreign, "foreign"); err != nil {
+		return nil, err
+	}
+
 	topo, err := s.UpsertTopology(store.Topology{
 		Name: req.Name, Enabled: req.Enabled,
 		HealthCheck: string(req.HealthCheck), Failover: string(req.Failover),

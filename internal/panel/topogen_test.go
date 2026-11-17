@@ -9,6 +9,7 @@ package panel
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/Dark-modem/quantum-panel/internal/store"
@@ -216,5 +217,41 @@ func TestTopogenValidation(t *testing.T) {
 		EngineParams: []json.RawMessage{json.RawMessage(`{"port":1}`)},
 	}); err != nil {
 		t.Fatalf("matching params refused: %v", err)
+	}
+}
+
+func TestTopogenRejectsTwoDatacentersOnOneSide(t *testing.T) {
+	withMeshStore(t)
+	s := meshStoreMust(t)
+	// two Iran DCs, one server each; one foreign DC
+	var iranIDs []int64
+	for i := 0; i < 2; i++ {
+		dc, err := s.UpsertDatacenter(store.Datacenter{Kind: "iran", Name: fmt.Sprintf("dc-iran-%d", i)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		id, err := s.UpsertServer(store.Server{Name: fmt.Sprintf("ir-%d", i), Role: "iran", DatacenterID: dc})
+		if err != nil {
+			t.Fatal(err)
+		}
+		iranIDs = append(iranIDs, id)
+	}
+	dc, err := s.UpsertDatacenter(store.Datacenter{Kind: "foreign", Name: "dc-fx"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	fx, err := s.UpsertServer(store.Server{Name: "fx-0", Role: "foreign", DatacenterID: dc})
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := GenerateTopology(TopoGenRequest{
+		Name: "two-dc-iran", IranServers: iranIDs, ForeignServers: []int64{fx},
+		TunnelsPerPair: 1, Engines: []string{"matrix"}, Enabled: true,
+	})
+	if err == nil {
+		t.Fatalf("a topology spanning two Iran DCs must be rejected, got topology %d", res.TopologyID)
+	}
+	if !strings.Contains(err.Error(), "one datacenter") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
