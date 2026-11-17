@@ -378,88 +378,170 @@ function topologyGraph(topo, tunnels) {
   const text = value => esc(String(value || '—'));
   const iran = topo.role === 'foreign' ? topo.remote_ip : topo.local_ip;
   const foreign = topo.role === 'foreign' ? topo.local_ip : topo.remote_ip;
-  // The connection strip from the classic server view: every tunnel is a
-  // straight horizontal beam between the two cards — a thin base wire with
-  // evenly spaced beacon dots in the tunnel's health color, a marching pulse
-  // on live ones, and a halo'd name above each beam. The svg never stretches
-  // past its natural width, so cards and beams keep their proportions.
-  const W = 840, NW = 260, NH = 104, ix = 40, fx = W - 40 - NW;
-  const n = tunnels.length;
-  const step = n > 1 ? Math.min(30, 96 / (n - 1)) : 0;
-  const H = n ? Math.max(250, 170 + (n - 1) * step + 80) : 210;
-  const cy = H / 2;
+  const rtl = typeof currentLang !== 'undefined' && currentLang === 'fa';
+  const vert = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 799px)').matches;
+  // Per-side identity: the real server name / datacenter come from the agents'
+  // own reports (topoSideServers), never invented by the UI.
+  const sideInfo = side => {
+    const list = topoSideServers(topo, side) || [];
+    const s0 = list[0] || {};
+    return {
+      name: s0.name || '',
+      dc: topoDcName(topo, side) || '',
+      cc: side === 'iran' ? 'ir' : (String(topo.country || '').toLowerCase() || ''),
+    };
+  };
+  const iranInfo = sideInfo('iran');
+  const foreignInfo = sideInfo('foreign');
+  // Tunnel states map onto the four states the backend really carries:
+  // healthy → connected; unknown → unverified; down → stopped; disabled → out of service.
   const stateOf = t => {
     const s = String(t.state || '');
     return ['healthy', 'ok', 'up', 'connected'].includes(s) ? 'ok'
-      : ['down', 'err', 'stopped'].includes(s) ? 'err' : 'warn';
+      : s === 'down' ? 'err'
+      : s === 'disabled' ? 'off' : 'warn';
   };
+  const stateLabel = st => st === 'ok' ? tr('', 'Connected') : st === 'err' ? tr('', 'Stopped') : st === 'off' ? tr('', 'Disabled') : tr('', 'Unverified');
   const kinds = tunnels.map(stateOf);
-  const nodeKind = !n ? '' : kinds.every(k => k === 'ok') ? 'ok' : kinds.every(k => k === 'err') ? 'err' : 'warn';
+  const nodeKind = !tunnels.length ? '' : kinds.every(k => k === 'ok') ? 'ok' : kinds.every(k => k === 'err') ? 'err' : kinds.some(k => k === 'err') ? 'err' : 'warn';
+  // Bezier tunnel lines: one independent path per tunnel, spread vertically
+  // (horizontally on mobile) so parallel cables never overlap. A real weight
+  // thickens the line; without one every cable keeps the same honest width.
+  const weightOf = t => {
+    const w = Number(t.weight);
+    return isFinite(w) && w > 0 ? Math.max(2, Math.min(6, 1.6 + w / 8)) : 3;
+  };
+  const USERW = 172, USERH = 92, NW = 248, NH = 118;
+  let W, H, n = tunnels.length;
+  let geo = {};
+  if (vert) {
+    W = 520;
+    H = Math.max(430, 120 + USERH + 60 + NH + 70 + NH + 40 + (n ? (n - 1) * 26 + 30 : 0));
+    const fy = 24 + USERH + 56 + NH + (n ? 70 + (n - 1) * 26 + 46 : 84);
+    H = Math.max(H, fy + NH + 36);
+    geo = {
+      user: { x: W / 2 - USERW / 2, y: 24 },
+      iran: { x: W / 2 - NW / 2, y: 24 + USERH + 56 },
+      foreign: { x: W / 2 - NW / 2, y: fy },
+      W, H,
+    };
+  } else {
+    W = 900;
+    H = Math.max(300, 200 + (n ? (n - 1) * 34 + 60 : 0));
+    const ix = rtl ? W - 24 - USERW - NW - 70 : 24;
+    const fx = rtl ? 24 : W - 24 - NW;
+    geo = {
+      user: { x: rtl ? fx + NW + 46 : 24, y: 36 },
+      iran: { x: ix + (rtl ? 0 : USERW + 56), y: 60 },
+      foreign: { x: fx, y: 60 },
+      W, H,
+    };
+  }
   const cables = tunnels.map((t, i) => {
-    const y = (cy + (i - (n - 1) / 2) * step).toFixed(1);
-    const d = `M ${ix + NW} ${y} L ${fx} ${y}`;
     const st = stateOf(t);
-    return `<g data-topology-cable="${text(t.id)}" class="topo-cable topo-${st}">` +
+    const sw = weightOf(t);
+    let d, lx, ly;
+    if (vert) {
+      const gap = (n - 1) * 26;
+      const span = (W - 2 * 40 - NW) || 1;
+      const off = n > 1 ? (i - (n - 1) / 2) * 26 : 0;
+      const x1 = geo.iran.x + NW / 2 + off * 0.55, y1 = geo.iran.y + NH;
+      const x2 = geo.foreign.x + NW / 2 + off * 0.55, y2 = geo.foreign.y;
+      const midY = (y1 + y2) / 2;
+      d = `M ${x1.toFixed(1)} ${y1} C ${(x1 - off * 0.6).toFixed(1)} ${midY}, ${(x2 + off * 0.6).toFixed(1)} ${midY}, ${x2.toFixed(1)} ${y2}`;
+      lx = W / 2; ly = midY;
+    } else {
+      const step = n > 1 ? Math.min(34, 110 / (n - 1)) : 0;
+      const cy = (geo.iran.y + NH / 2 + (i - (n - 1) / 2) * step);
+      const x1 = geo.iran.x + NW, x2 = geo.foreign.x;
+      const mid = (x1 + x2) / 2;
+      d = `M ${x1} ${cy.toFixed(1)} C ${mid} ${(cy - 16).toFixed(1)}, ${mid} ${(cy + 16).toFixed(1)}, ${x2} ${cy.toFixed(1)}`;
+      lx = mid; ly = cy - 14;
+    }
+    return `<g data-topology-cable="${text(t.id)}" data-topo-view-tunnel="${text(t.id)}" class="topo-cable topo-${st}" tabindex="0" role="button" aria-label="${text(t.name)} · ${text(stateLabel(st))}">` +
       `<path class="topo-e-hit" d="${d}"/>` +
-      `<path class="topo-e-wire" d="${d}"/>` +
+      `<path class="topo-e-wire" style="stroke-width:${sw}" d="${d}"/>` +
       `<path class="topo-e-dots" d="${d}"/>` +
       (st === 'ok' ? `<path class="topo-e-pulse" d="${d}"/>` : '') +
-      `<text class="topo-e-tag" x="${W / 2}" y="${(Number(y) - 12).toFixed(1)}">${text(t.name)} · ${text(t.engine)}</text>` +
-      `<title>${text(t.name)} · ${text(t.state)}</title>` +
+      `<text class="topo-e-tag" x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle">${text(t.name)} · ${text(t.engine)}</text>` +
+      `<text class="topo-e-state" x="${lx.toFixed(1)}" y="${(ly + 14).toFixed(1)}" text-anchor="middle">${text(stateLabel(st))}</text>` +
     `</g>`;
   }).join('');
   const cc = String(topo.country || '').toLowerCase();
-  const countryLabel = (TOPO_COUNTRIES.find(c => c[0] === cc) || ['', 'Other'])[1];
-  const top = cy - NH / 2;
-  // RTL pages read from the right, so the home (Iran) card sits on the right
-  // and the foreign card opposite; LTR keeps Iran on the left. The cables are
-  // symmetric between the two facing edges, so only the cards trade places.
-  const rtl = typeof currentLang !== 'undefined' && currentLang === 'fa';
-  const iranX = rtl ? fx : ix, foreignX = rtl ? ix : fx;
-  // No tunnels means there is no health to show: the dot stays hidden and a
-  // quiet dashed placeholder links the pair instead of an empty void.
-  // LTR cards flow from the left edge; RTL cards mirror — the status dot and
-  // flag start at the right edge, every text anchors its right edge there and
-  // the rack moves to the opposite corner, so Persian reads naturally.
-  const dot = (x, m) => nodeKind ? `<circle class="topo-dot ${nodeKind}" cx="${m ? x + NW - 20 : x + 20}" cy="${top + 27}" r="5"/>` : '';
-  const node = (x, caption, title, ip, flag) => {
-    const m = rtl;
+  const countryLabel = (TOPO_COUNTRIES.find(c => c[0] === cc) || ['', tr('', 'Other')])[1];
+  const USERS_IC_INNER = '<circle cx="10" cy="8.4" r="3.4"/><path d="M3.6 18.4c.8-3.1 3.3-4.8 6.4-4.8s5.6 1.7 6.4 4.8"/><circle cx="16.9" cy="9.3" r="2.6"/><path d="M15.4 13.9c2.4.3 4.3 1.7 5 4.2"/>';
+  const dot = (x, y, m) => nodeKind ? `<circle class="topo-dot ${nodeKind}" cx="${m ? x + NW - 20 : x + 20}" cy="${y + 26}" r="5"/>` : '';
+  // node(): a server card inside the map — flag chip, caption, real server
+  // name, datacenter, IP. Iran is the accent-framed hub; the foreign card
+  // mirrors it. RTL flips the internal anchors, never the data.
+  const node = (g, caption, title, info, flag, accent) => {
+    const x = g.x, y = g.y, m = rtl && !vert;
     const head = m
-      ? dot(x, true) +
-        topologyFlagSvg(flag, `x="${x + NW - 54}" y="${top + 20}"`) +
-        `<text class="topo-cap" x="${x + NW - 58}" y="${top + 31}" text-anchor="start" style="direction:rtl">${caption}</text>`
-      : dot(x) +
-        topologyFlagSvg(flag, `x="${nodeKind ? x + 34 : x + 20}" y="${top + 20}"`) +
-        `<text class="topo-cap" x="${nodeKind ? x + 62 : x + 48}" y="${top + 31}">${caption}</text>`;
-    return `<g class="topo-node"><title>${text(title)} · ${text(ip)}</title>` +
-    `<rect class="topo-n-bg" x="${x}" y="${top}" width="${NW}" height="${NH}" rx="12"/>` +
+      ? dot(x, y, true) +
+        topologyFlagSvg(flag, `x="${x + NW - 56}" y="${y + 16}"`) +
+        `<text class="topo-cap" x="${x + NW - 62}" y="${y + 27}" text-anchor="start" style="direction:rtl">${text(caption)}</text>`
+      : dot(x, y, false) +
+        topologyFlagSvg(flag, `x="${x + 40}" y="${y + 16}"`) +
+        `<text class="topo-cap" x="${x + 68}" y="${y + 27}">${text(caption)}</text>`;
+    const row = (cls, val, yy) => m
+      ? `<text class="${cls}" x="${x + NW - 16}" y="${y + yy}" text-anchor="start" style="direction:rtl">${text(val)}</text>`
+      : `<text class="${cls}" x="${x + 16}" y="${y + yy}">${text(val)}</text>`;
+    return `<g class="topo-node ${accent ? 'topo-node-accent' : ''}"><title>${text(title)} · ${text(info.ip)}</title>` +
+    `<rect class="topo-n-bg" x="${x}" y="${y}" width="${NW}" height="${NH}" rx="14"/>` +
     head +
-    (m
-      ? `<text class="topo-t1" x="${x + NW - 18}" y="${top + 60}" text-anchor="start" style="direction:rtl">${text(title)}</text>` +
-        `<text class="topo-ip" x="${x + NW - 18}" y="${top + 84}" text-anchor="start" style="direction:rtl">${text(ip)}</text>`
-      : `<text class="topo-t1" x="${x + 18}" y="${top + 60}">${text(title)}</text>` +
-        `<text class="topo-ip" x="${x + 18}" y="${top + 84}">${text(ip)}</text>`) +
-    // A little rack at the card's end; its LEDs mirror the tunnel health.
-    `<g class="topo-srv led-${nodeKind || 'off'}" transform="translate(${m ? x + 18 : x + NW - 42} ${top + 34})">` +
-    `<rect x="0" y="0" width="24" height="36" rx="6"/>` +
-    `<path d="M8 9h11M8 18h11M8 27h11"/>` +
-    `<circle cx="4.5" cy="9" r="1.5"/><circle cx="4.5" cy="18" r="1.5"/><circle cx="4.5" cy="27" r="1.5"/>` +
-    `</g>` +
+    row('topo-t1', title, 56) +
+    row('topo-t2', info.name || title, 76) +
+    row('topo-t2', info.dc ? (info.dc + (info.cc ? ' (' + info.cc.toUpperCase() + ')' : '')) : '—', 94) +
+    row('topo-ip', info.ip, 112 - (vert ? 0 : 0)) +
     `</g>`;
   };
-  return `<div class="topo-map"><div class="topo-map-scroll">` +
-    `<svg class="topo-graph" viewBox="0 0 ${W} ${H}" role="img" aria-label="${text(tr('', 'Topology connections'))}" dir="ltr">` +
-    (n ? '' : `<g class="topo-cable topo-idle"><path class="topo-e-wire" d="M ${ix + NW} ${cy} L ${fx} ${cy}"/><path class="topo-e-dots" d="M ${ix + NW} ${cy} L ${fx} ${cy}"/></g>` +
-      `<text class="topo-empty" x="${W / 2}" y="${cy - 12}" text-anchor="middle">${text(tr('', 'No tunnel attached yet'))}</text>`) +
-    cables +
-    node(iranX, esc(tr('', 'Iran')), tr('', 'Iran server'), iran, 'ir') +
-    node(foreignX, esc(tr('', countryLabel)), tr('', 'Foreign server'), foreign, topo.country) +
-    `</svg></div>` +
-    `<div class="cl-legend">` +
+  const usersNode = g => `<g class="topo-node topo-node-users"><title>${text(tr('', 'Users'))}</title>` +
+    `<rect class="topo-n-bg" x="${g.x}" y="${g.y}" width="${USERW}" height="${USERH}" rx="14"/>` +
+    (nodeKind ? `<circle class="topo-dot ok" cx="${g.x + USERW - 18}" cy="${g.y + 20}" r="5"/>` : '') +
+    (rtl && !vert
+      ? `<g class="topo-users-ic" transform="translate(${g.x + USERW - 46} ${g.y + 12})">${USERS_IC_INNER}</g>` +
+        `<text class="topo-t1" x="${g.x + USERW - 54}" y="${g.y + 34}" text-anchor="start" style="direction:rtl">${text(tr('', 'Users'))}</text>` +
+        `<text class="topo-t2" x="${g.x + USERW - 18}" y="${g.y + 58}" text-anchor="start" style="direction:rtl">${text(tr('', 'Connect to this hub'))}</text>`
+      : `<g class="topo-users-ic" transform="translate(${g.x + 14} ${g.y + 12})">${USERS_IC_INNER}</g>` +
+        `<text class="topo-t1" x="${g.x + 50}" y="${g.y + 34}">${text(tr('', 'Users'))}</text>` +
+        `<text class="topo-t2" x="${g.x + 14}" y="${g.y + 58}">${text(tr('', 'Connect to this hub'))}</text>`) +
+    `</g>`;
+  // wire the pieces: users → iran green lead, iran ↔ foreign tunnel cables
+  const leads = [];
+  if (vert) {
+    const ux = geo.user.x + USERW / 2, uy = geo.user.y + USERH;
+    const ix2 = geo.iran.x + NW / 2, iy2 = geo.iran.y;
+    leads.push(`<path class="topo-lead" d="M ${ux} ${uy} C ${ux} ${(uy + 28)}, ${ix2} ${(iy2 - 28)}, ${ix2} ${iy2}"/>`);
+  } else {
+    const m = rtl;
+    const ux = m ? geo.user.x : geo.user.x + USERW;
+    const uy = geo.user.y + USERH / 2;
+    const ix = m ? geo.iran.x + NW : geo.iran.x;
+    const iy = geo.iran.y + NH / 2;
+    leads.push(`<path class="topo-lead" d="M ${ux} ${uy} C ${(ux + (m ? -30 : 30)).toFixed(1)} ${uy}, ${(ix + (m ? 34 : -34)).toFixed(1)} ${iy}, ${ix} ${iy}"/>`);
+  }
+  const emptyMid = !n ? `<text class="topo-empty" x="${vert ? W / 2 : (geo.iran.x + NW + geo.foreign.x) / 2}" y="${vert ? (geo.iran.y + NH + geo.foreign.y) / 2 + 4 : geo.iran.y + NH / 2 - 14}" text-anchor="middle">${text(tr('', 'No tunnel attached yet'))}</text>` : '';
+  const legend = `<div class="cl-legend">` +
     `<span><i class="ok"></i>${esc(tr('', 'Connected'))}</span>` +
     `<span><i class="warn"></i>${esc(tr('', 'Unverified'))}</span>` +
     `<span><i class="err"></i>${esc(tr('', 'Stopped'))}</span>` +
-    `</div></div>`;
+    `<span><i class="off"></i>${esc(tr('', 'Disabled'))}</span>` +
+    `</div>`;
+  return `<div class="topo-map"><div class="topo-map-scroll">` +
+    `<svg class="topo-graph" viewBox="0 0 ${geo.W} ${geo.H}" role="img" aria-label="${text(tr('', 'Topology connections'))}" dir="ltr">` +
+    leads.join('') +
+    (n ? '' : `<g class="topo-cable topo-idle"><path class="topo-e-wire" d="${vert ? `M ${geo.iran.x + NW / 2} ${geo.iran.y + NH} L ${geo.iran.x + NW / 2} ${geo.foreign.y}` : `M ${geo.iran.x + NW} ${geo.iran.y + NH / 2} L ${geo.foreign.x} ${geo.iran.y + NH / 2}`}"/></g>`) +
+    emptyMid +
+    cables +
+    node(geo.iran, tr('', 'Iran hub'), tr('', 'Iran hub'), { name: iranInfo.name, dc: iranInfo.dc, cc: 'IR', ip: iran }, 'ir', true) +
+    node(geo.foreign, countryLabel, tr('', 'Foreign server'), { name: foreignInfo.name, dc: foreignInfo.dc, cc: topoDcCc(topo, 'foreign'), ip: foreign }, topo.country, false) +
+    usersNode(geo.user) +
+    `</svg>` +
+    (!n ? `<button type="button" class="quantum-btn quantum-btn-secondary topo-map-add" data-topo-map-add style="${vert ? 'top:' + (geo.iran.y + NH + 40) + 'px;' : ''}"><svg class="topo-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>${esc(tr('', 'Add tunnel'))}</span></button>` : '') +
+    `</div>` +
+    `<div class="topo-tip" hidden></div>` +
+    legend +
+    `</div>`;
 }
 
 async function topologyReload() {
@@ -1617,6 +1699,38 @@ $('topologyDeleteBtn').onclick = () => { const t = topologyCurrent(); if (t) top
 $('topologySetupBack').onclick = topologyResume;
 $('tunnelsAddBtn').onclick = topologyNewTunnel;
 $('topologyAddTunnelBtn').onclick = topologyNewTunnel;
+// The live map: a hover tooltip with the tunnel's real facts, and the
+// inline add-tunnel button for the no-tunnel state.
+(function () {
+  const box = $('topologyGraph');
+  if (!box) return;
+  box.addEventListener('mousemove', e => {
+    const g = e.target.closest && e.target.closest('[data-topology-cable]');
+    const tip = box.querySelector('.topo-tip');
+    if (!tip) return;
+    const t = g ? (topologyData.tunnels || []).find(x => String(x.id) === g.getAttribute('data-topology-cable')) : null;
+    const topo = topologyCurrent();
+    if (!g || !t || !topo) { tip.hidden = true; return; }
+    const st = String(t.state || '');
+    const label = ['healthy', 'ok', 'up', 'connected'].includes(st) ? tr('', 'Connected') : st === 'down' ? tr('', 'Stopped') : st === 'disabled' ? tr('', 'Disabled') : tr('', 'Unverified');
+    const iranName = (topoSideServers(topo, 'iran')[0] || {}).name || '';
+    const frnName = (topoSideServers(topo, 'foreign')[0] || {}).name || '';
+    tip.innerHTML = '<b>' + esc(t.name || '') + '</b><br>' +
+      esc(tr('', 'Engine')) + ': ' + esc(t.engine || '—') + '<br>' +
+      esc(tr('', 'Weight')) + ': ' + esc(t.weight != null ? String(t.weight) : '—') + '<br>' +
+      esc(tr('', 'Status')) + ': ' + esc(label) + '<br>' +
+      '<span class="u-mono">' + esc(iranName || topo.local_ip || '') + ' ↔ ' + esc(frnName || topo.remote_ip || '') + '</span>';
+    const host = box.querySelector('.topo-map') || box;
+    const r = host.getBoundingClientRect();
+    tip.style.left = (e.clientX - r.left) + 'px';
+    tip.style.top = (e.clientY - r.top) + 'px';
+    tip.hidden = false;
+  });
+  box.addEventListener('mouseleave', () => { const tip = box.querySelector('.topo-tip'); if (tip) tip.hidden = true; });
+  box.addEventListener('click', e => {
+    if (e.target.closest('[data-topo-map-add]')) { topologyNewTunnel(); }
+  });
+})();
 $('topoWizX').onclick = topoWizCancel;
 $('topoWizBack').onclick = topoWizBack;
 $('topoWizNext').onclick = topoWizNext;
