@@ -2008,12 +2008,13 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 .topo-head-stats .topo-stat-tx { display:flex; flex-direction:column; align-items:flex-start; gap:3px; min-width:0; flex:none; }
 /* the four logical sections each take a fair share of the strip's width; a
    side's count and datacenter sit TIGHT and centered so the pair reads as one
-   section, and the thin lines between groups mark the section boundaries */
-.topo-head-stats .topo-stat { display:flex; align-items:center; gap:10px; padding:2px 10px;
-  border:none; border-radius:0; background:transparent; }
+   section, and the thin lines between groups mark the section boundaries.
+   The rules carry the strip's id: `#tab-tunnel .topo-stat` (the list page's
+   tweak) is an id rule too and would otherwise out-specify these. */
 .topo-head-stats .topo-stat-group { display:flex; align-items:stretch; justify-content:center; gap:14px; flex:1 1 auto; min-width:0; }
 .topo-head-stats .topo-stat-group + .topo-stat-group { border-inline-start:1px solid var(--ln2); }
-.topo-head-stats .topo-stat-group + .topo-stat-group { border-inline-start:1px solid var(--ln2); }
+#topologyHeadStats .topo-stat-group .topo-stat { display:flex; align-items:center; gap:10px; padding:2px 10px;
+  border:none; border-radius:0; background:transparent; }
 @media(max-width:799px) {
   .topo-head-stats .topo-stat-group { flex:none; flex-wrap:wrap; }
 }
@@ -2031,7 +2032,7 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 .topo-head-stats .topo-stat-tx .topo-stat-dc { font-size:16px; font-weight:700; color:var(--tx); line-height:1.15; }
 /* the uptime pulse breathes a little more before its text and wears green —
    the healthy color the percentage itself is made of */
-.topo-head-stats .topo-stat.upt { gap:16px; }
+#topologyHeadStats .topo-stat-group .topo-stat.upt { gap:16px; }
 .topo-head-stats .topo-stat-ic.upt { background:color-mix(in srgb, var(--ok) 13%, transparent); color:var(--ok); }
 .topo-stat-mini { display:flex; flex-direction:column; gap:4px; margin-inline-start:8px; }
 .topo-stat-k { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--dim); white-space:nowrap; }
