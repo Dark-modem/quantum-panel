@@ -1938,5 +1938,3 @@ html[dir="rtl"] .topo-back .topo-back-ic { transform:scaleX(-1); }
    red when it is live (Deactivate) — same language as the row power button */
 .topo-act.topo-act-green { color:var(--ok); border:1px solid color-mix(in srgb, var(--ok) 45%, transparent); background:color-mix(in srgb, var(--ok) 10%, transparent); }
 .topo-act.topo-act-green:hover { color:var(--ok); border-color:var(--ok); background:color-mix(in srgb, var(--ok) 18%, transparent); }
-.topo-act.topo-act-red { color:var(--er); border:1px solid color-mix(in srgb, var(--er) 45%, transparent); background:color-mix(in srgb, var(--er) 10%, transparent); }
-.topo-act.topo-act-red:hover { color:var(--er); border-color:var(--er); background:color-mix(in srgb, var(--er) 18%, transparent); }

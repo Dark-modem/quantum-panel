@@ -776,16 +776,13 @@ function topologyRender() {
   }
   // The header's power toggle mirrors the row menu: a pair whose tunnels are
   // not up offers Activate, a live pair offers Deactivate.
-  const act = $('topologyActivateBtn');
-  if (act) {
+  const act = $('topologyActivateBtn'), deact = $('topologyDeactivateBtn');
+  if (act && deact) {
     // The header's power toggle mirrors the row menu: a pair whose tunnels are
-    // not up offers Activate (green — go turn it on), a live pair offers
-    // Deactivate (red — go turn it off).
-    const lbl = $('topologyActivateLbl') || act;
+    // not up offers the green Activate; a live pair offers the red Deactivate.
     const powering = topologyHealthOf(topo, cables) !== 'ok';
-    lbl.textContent = tr('', powering ? 'Activate' : 'Deactivate');
-    act.classList.toggle('topo-act-green', powering);
-    act.classList.toggle('topo-act-red', !powering);
+    act.hidden = !powering;
+    deact.hidden = powering;
   }
   // Do not overwrite a form the user is currently editing.
   if (!$('topologySettings').contains(document.activeElement)) {
@@ -1736,7 +1733,11 @@ $('topoEditCancel').onclick = topoEditClose;
 $('topoEditX').onclick = topoEditClose;
 $('topologyActivateBtn').onclick = () => {
   const t = topologyCurrent(); if (!t) return;
-  topologyPower(t.id, topologyHealthOf(t, topologyExistingTunnels(t)) !== 'ok');
+  topologyPower(t.id, true);
+};
+$('topologyDeactivateBtn').onclick = () => {
+  const t = topologyCurrent(); if (!t) return;
+  topologyPower(t.id, false);
 };
 $('topologyDeleteBtn').onclick = () => { const t = topologyCurrent(); if (t) topologyDelete(t.id); };
 $('topologySetupBack').onclick = topologyResume;
