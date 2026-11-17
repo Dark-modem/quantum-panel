@@ -730,6 +730,34 @@ document.addEventListener('click', e => {
   }
 });
 
+// fillHeadCard paints the detail head card's name/pill/actions — called from
+// topologyRender AND directly after topoDcLoad completes, so the health pill
+// never lags the agent-layer tunnel data.
+function fillHeadCard(topo) {
+  const hn = $('topologyHeadName');
+  if (hn) hn.textContent = topo ? topo.name : '—';
+  const pill = $('topologyHeadPill');
+  if (!pill || !topo) return;
+  // the health counts BOTH sources: the panel inventory and the tunnels
+  // the member agents actually report running for this topology
+  const own = topoAllTunnels(topo);
+  const health = topologyHealthOf(topo, own);
+  const cls = !own.length ? 'st-none' : 'st-' + health;
+  pill.className = 'topo-state-pill ' + cls;
+  const lbl = !own.length ? tr('', 'No tunnels') : tr('', health === 'ok' ? 'Active' : health === 'down' ? 'Down' : 'Unknown');
+  const tx = $('topologyHeadPillTx');
+  if (tx) tx.textContent = lbl;
+  // The delete guard (owner rule): a topology can only be deleted while it
+  // is powered off or holds no tunnels at all — otherwise the button is
+  // disabled with the reason on its title.
+  const del = $('topologyDeleteBtn');
+  if (del) {
+    const canDelete = topo.Disabled === true || !own.length;
+    del.disabled = !canDelete;
+    del.title = canDelete ? '' : tr('', 'The topology must be off or empty before it can be deleted');
+  }
+}
+
 async function topologyReload() {
   if (topologyLoading) return;
   topologyLoading = true;
@@ -742,6 +770,7 @@ async function topologyReload() {
     if (topologySelected && !topologyCurrent()) topologySelected = null;
     topologyLoadedOnce = true;
     await topoDcLoad(topologyCurrent());
+    fillHeadCard(topologyCurrent());
     topologyRender();
     renderTunnelsList();
   } catch(e) {
@@ -783,23 +812,8 @@ function topologyRender() {
   $('topologyDetailCard').hidden = !topo || inTunnel;
   // the head card: the topology's own name + health pill + the actions
   const headCard = $('topologyHeadCard');
-  if (headCard) {
-    headCard.hidden = !topo || inTunnel;
-    const hn = $('topologyHeadName');
-    if (hn) hn.textContent = topo ? topo.name : '—';
-    const pill = $('topologyHeadPill');
-    if (pill && topo) {
-      // the health counts BOTH sources: the panel inventory and the tunnels
-      // the member agents actually report running for this topology
-      const own = topoAllTunnels(topo);
-      const health = topologyHealthOf(topo, own);
-      const cls = !own.length ? 'st-none' : 'st-' + health;
-      pill.className = 'topo-state-pill ' + cls;
-      const lbl = !own.length ? tr('', 'No tunnels') : tr('', health === 'ok' ? 'Active' : health === 'down' ? 'Down' : 'Unknown');
-      const tx = $('topologyHeadPillTx');
-      if (tx) tx.textContent = lbl;
-    }
-  }
+  if (headCard) headCard.hidden = !topo || inTunnel;
+  fillHeadCard(topo);
   $('topologySetupBack').hidden = !topo;
   $('rscBanner').classList.toggle('td-hide', !inTunnel);
   $('dialCard').classList.toggle('td-hide', !inTunnel);
@@ -965,16 +979,6 @@ function topologyRender() {
   }
   // The header's power toggle mirrors the row menu: a pair whose tunnels are
   // not up offers Activate, a live pair offers Deactivate.
-  // The delete guard (owner rule): a topology can only be deleted while it
-  // is powered off or holds no tunnels at all — otherwise the button is
-  // disabled with the reason on its title.
-  const del = $('topologyDeleteBtn');
-  if (del && topo) {
-    const tunnelsNow = topoAllTunnels(topo);
-    const canDelete = topo.Disabled === true || !tunnelsNow.length;
-    del.disabled = !canDelete;
-    del.title = canDelete ? '' : tr('', 'The topology must be off or empty before it can be deleted');
-  }
   const act = $('topologyActivateBtn'), deact = $('topologyDeactivateBtn');
   if (act && deact) {
     // The header's power toggle mirrors the row menu: a pair whose tunnels are
