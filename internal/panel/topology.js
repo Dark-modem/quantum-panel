@@ -1979,8 +1979,12 @@ $('topologyAddTunnelBtn').onclick = topologyNewTunnel;
     tip.innerHTML = html;
     const host = box.querySelector('.topo-map') || box;
     const r = host.getBoundingClientRect();
-    tip.style.left = (e.clientX - r.left) + 'px';
-    tip.style.top = (e.clientY - r.top) + 'px';
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    tip.style.left = x + 'px';
+    // near the top edge the window flips below the cursor instead of leaving the card
+    const below = y < 190;
+    tip.classList.toggle('below', below);
+    tip.style.top = below ? (y + 14) + 'px' : y + 'px';
     tip.hidden = false;
   });
   box.addEventListener('mouseleave', () => { const tip = box.querySelector('.topo-tip'); if (tip) tip.hidden = true; });
