@@ -545,8 +545,8 @@ function topologyGraph(topo, tunnels) {
     const sag = r.bow * 26;
     const d = `M ${x1},${y1.toFixed(1)} C ${x1 + dx},${(y1 + sag).toFixed(1)} ${x2 - dx},${(y2 + sag).toFixed(1)} ${x2},${y2.toFixed(1)}`;
     const nm = agentTuns.find(tn => tn.key === t.id);
-    return `<g data-topology-cable="${text(t.id)}" data-topo-agent="${text(nm ? nm.agentId : '')}" class="cl-e ${st} topo-cable" tabindex="0" role="button" aria-label="${text(t.name)} · ${text(label(st))}">` +
-      `<title>${text(t.name)} · ${text(t.engine)} · ${text(label(st))}</title>` +
+    return `<g data-topology-cable="${text(t.id)}" data-topo-agent="${text(nm ? nm.agentId : '')}" class="cl-e ${st} topo-cable" tabindex="0" role="button" aria-label="${text(t.name)} · ${text(stateLabel(st))}">` +
+      `<title>${text(t.name)} · ${text(t.engine)} · ${text(stateLabel(st))}</title>` +
       `<path class="cl-e-hit" d="${d}"/>` +
       tJunction(x1, y1.toFixed(1), st) +
       tJunction(x2, y2.toFixed(1), st) +
