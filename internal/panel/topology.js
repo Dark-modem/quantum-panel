@@ -753,6 +753,27 @@ function topologyRender() {
   if (!topo) return;
   const cables = (topo.tunnel_ids || []).map(id => topologyData.tunnels.find(t => t.id === id) || {id, name: id, engine: '—', state: 'down'});
   $('topologyGraph').innerHTML = topologyGraph(topo, cables);
+  // the established tunnels between this pair, listed under the map
+  const tl = $('topologyTunnelList');
+  if (tl) {
+    const label = st => st === 'ok' ? tr('', 'Connected') : st === 'err' ? tr('', 'Stopped') : st === 'off' ? tr('', 'Disabled') : tr('', 'Unverified');
+    tl.innerHTML = cables.length
+      ? '<div class="topo-tl">' + cables.map(t => {
+          const st = ['healthy', 'ok', 'up', 'connected'].includes(String(t.state || '')) ? 'ok'
+            : String(t.state || '') === 'down' ? 'err'
+            : String(t.state || '') === 'disabled' ? 'off' : 'warn';
+          const lat = t.latency_ms != null && t.latency_ms >= 0 ? t.latency_ms + ' ms' : '—';
+          return '<button type="button" class="topo-tl-row" data-topo-view-tunnel="' + esc(t.id) + '">' +
+            '<span class="topo-tl-dot ' + st + '"></span>' +
+            '<b>' + esc(t.name || '') + '</b>' +
+            '<span class="topo-tl-eng">' + esc(t.engine || '') + '</span>' +
+            '<span class="topo-tl-lat u-mono">' + esc(lat) + '</span>' +
+            '<span class="topo-tl-st">' + esc(label(st)) + '</span>' +
+            '<span class="topo-tl-go">' + esc(tr('', 'View')) + ' ←</span>' +
+            '</button>';
+        }).join('') + '</div>'
+      : '';
+  }
   // The header's power toggle mirrors the row menu: a pair whose tunnels are
   // not up offers Activate, a live pair offers Deactivate.
   const act = $('topologyActivateBtn');
