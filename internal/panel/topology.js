@@ -617,7 +617,14 @@ function topologyGraph(topo, tunnels) {
 // The established tunnels of the open topology, from the agent layer: every
 // member agent reports the tunnels it actually runs for this topology.
 function topoAgentTunnels(topo) {
-  return (window.__topoTunnels || []).filter(tn => !!tn.key);
+  // both endpoints report the same tunnel rows — dedupe by tunnel_key so a
+  // tunnel renders once regardless of how many of its agents reported it
+  const seen = {};
+  return (window.__topoTunnels || []).filter(tn => {
+    if (!tn.key || seen[tn.key]) return false;
+    seen[tn.key] = true;
+    return true;
+  });
 }
 function topoDcReset() { topoDcLoaded = false; topoServersByTopo = {}; }
 function renderTopoMembers(topo) {
