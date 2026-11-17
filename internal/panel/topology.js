@@ -645,7 +645,7 @@ function renderTopoMembers(topo) {
     '<span class="badge ' + (a.status === 'online' ? 'ok' : 'dim') + '">' + esc(a.status || '\\u2014') + '</span>' +
     '<b>' + esc(a.name || '') + '</b>' +
     (a.server && a.server.datacenter ? '<span class="topo-mem-dc">' + esc(topoIsFa() ? (a.server.datacenter || '') : (a.server.datacenter_en || a.server.datacenter || '')) + '</span>' : '') +
-    '<button type="button" class="topo-mem-x" data-mem-remove="' + side + '" data-mem-agent="' + esc(a.id) + '" aria-label="' + esc(tr('', 'Remove')) + '" title="' + esc(tr('', 'Remove')) + '">\\u00d7</button></div>';
+    '<button type="button" class="topo-mem-x" data-mem-remove="' + side + '" data-mem-agent="' + esc(a.id) + '" aria-label="' + esc(tr('', 'Remove')) + '" title="' + esc(tr('', 'Remove')) + '">\×</button></div>';
   const sideBlock = (side, lbl) => {
     const list = members(side);
     return '<div class="topo-mem-side"><div class="topo-mem-side-h"><b>' + esc(lbl) + '</b>' +
@@ -667,7 +667,7 @@ function topoMembersPickOpen(side) {
     ov = document.createElement('div');
     ov.id = 'topoMemPick';
     ov.className = 'ent-modal';
-    ov.innerHTML = '<div class="ent-card cores-pick-card"><div class="cores-pick-head"><b></b><button type="button" class="mtb-toast-x" data-mem-pick-close>\\u00d7</button></div>' +
+    ov.innerHTML = '<div class="ent-card cores-pick-card"><div class="cores-pick-head"><b></b><button type="button" class="mtb-toast-x" data-mem-pick-close>\×</button></div>' +
       '<div class="cores-pick-list"></div><div class="cores-pick-foot"><button type="button" class="quantum-btn quantum-btn-primary" data-mem-pick-go>' + esc(tr('', 'Add')) + '</button>' +
       '<button type="button" class="quantum-btn quantum-btn-secondary" data-mem-pick-close>' + esc(tr('', 'Cancel')) + '</button></div></div>';
     document.body.appendChild(ov);
