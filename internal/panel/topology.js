@@ -430,12 +430,13 @@ function topologyGraph(topo, tunnels) {
   } else {
     W = 900;
     H = Math.max(258, 170 + (n ? (n - 1) * 34 + 40 : 0));
-    const fx = rtl ? 22 : W - 22 - NW;
-    const ix = rtl ? W - 22 - NW : 22;
+    const uX = rtl ? W - 22 - 178 : 22;
+    const iX = rtl ? uX - 70 - NW : 22 + 178 + 70;
+    const fX = rtl ? 22 : W - 22 - NW;
     geo = {
-      user: { x: rtl ? W - 22 - 178 : 22, y: (H - 72) / 2, w: 178, h: 72 },
-      iran: { x: ix, y: (H - NH) / 2, w: NW, h: NH },
-      foreign: { x: fx, y: (H - NH) / 2, w: NW, h: NH },
+      user: { x: uX, y: (H - 72) / 2, w: 178, h: 72 },
+      iran: { x: iX, y: (H - NH) / 2, w: NW, h: NH },
+      foreign: { x: fX, y: (H - NH) / 2, w: NW, h: NH },
       W, H,
     };
   }
