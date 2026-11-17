@@ -1332,10 +1332,10 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 .topo-act-danger:hover, .topo-act-danger:focus-visible { background:var(--er-fill); color:var(--tx); }
 /* Back pill in the topology header (Arvan-style): quiet ghost pill with a
    direction-aware arrow — points back toward the reading start. */
-.topo-back { display:inline-flex; align-items:center; gap:8px; min-height:34px; padding:0 16px; border:1px solid var(--ln2); border-radius:999px; background:transparent; color:var(--tx2); font-size:var(--fs-small); }
+.topo-back { display:inline-flex; align-items:center; gap:8px; color:var(--ac); background:color-mix(in srgb, var(--ac) 12%, transparent); border:1px solid color-mix(in srgb, var(--ac) 38%, transparent); }
 .topo-back .topo-back-ic { width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; flex:none; }
-.topo-back:hover, .topo-back:focus-visible { border-color:var(--ac); color:var(--tx); background:var(--ac-soft); }
-html[dir="rtl"] .topo-back .topo-back-ic { transform:scaleX(-1); }
+.topo-back:hover, .topo-back:focus-visible { color:var(--ac); background:color-mix(in srgb, var(--ac) 20%, transparent); border-color:var(--ac); }
+html[dir="rtl"] .is-rtl .topo-back .topo-back-ic { transform:scaleX(-1); }
 .topo-attach { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
 .topo-attach select { min-width:180px; max-width:360px; }
 .topo-binding { display:flex; flex-wrap:wrap; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--ln); }
