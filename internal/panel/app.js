@@ -502,6 +502,7 @@ const I18N = {
     cores_refresh: "Refresh",
     topo_tunnels_t: "Established tunnels",
     topology_map_t: "Topology map",
+    topology_map_sub: "Iran ↔ Foreign server connections",
     nav_agents: "Agents",
     agents_tokens_title: "Enrollment Tokens",
     agents_tokens_hint: "One token enrolls exactly one endpoint agent. The token is shown once — copy it and run the command on the endpoint server.",
