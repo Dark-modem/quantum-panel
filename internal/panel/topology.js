@@ -532,14 +532,15 @@ function topologyGraph(topo, tunnels) {
     `<span><i class="err"></i>${esc(tr('', 'Stopped'))}</span>` +
     `<span><i class="off"></i>${esc(tr('', 'Disabled'))}</span>` +
     `</div>`;
+  const dcLabel = s => topoIsFa() ? (s.dc || s.dcEn || '') : (s.dcEn || s.dc || '');
   const iranNodes = iranServers.map((s, i) => node(
     vert ? geo.iran.x : geo.iran.x, vert ? geo.iran.y + i * (NH + GAP) : nodeY(geo.iran, i),
     i === 0 ? tr('', 'Iran hub') : (s.name || tr('', 'Iran hub')), tr('', 'Iran hub'),
-    { name: s.name, dc: s.dc, cc: s.cc || 'IR', ip: s.ip || iranIp }, iranFlag, i === 0));
+    { name: s.name, dc: dcLabel(s), cc: s.cc || 'IR', ip: s.ip || iranIp }, iranFlag, i === 0));
   const foreignNodes = foreignServers.map((s, i) => node(
     vert ? geo.foreign.x : geo.foreign.x, vert ? geo.foreign.y + i * (NH + GAP) : nodeY(geo.foreign, i),
     i === 0 ? countryLabel : (s.name || countryLabel), tr('', 'Foreign server'),
-    { name: s.name, dc: s.dc, cc: s.cc || topo.country, ip: s.ip || foreignIp }, topo.country, false));
+    { name: s.name, dc: dcLabel(s), cc: s.cc || topo.country, ip: s.ip || foreignIp }, topo.country, false));
   return `<div class="topo-map"><div class="topo-map-scroll">` +
     `<svg class="topo-graph" viewBox="0 0 ${geo.W} ${Math.round(geo.H)}" role="img" aria-label="${text(tr('', 'Topology connections'))}" dir="ltr">` +
     pieces.join('') + cables +
