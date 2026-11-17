@@ -388,7 +388,7 @@ function topologyGraph(topo, tunnels) {
     return {
       name: s0.name || '',
       dc: topoDcName(topo, side) || '',
-      cc: side === 'iran' ? 'ir' : (String(topo.country || '').toLowerCase() || ''),
+      cc: side === 'iran' ? 'IR' : (String(topo.country || '').toUpperCase() || ''),
     };
   };
   const iranInfo = sideInfo('iran');
@@ -404,36 +404,38 @@ function topologyGraph(topo, tunnels) {
   const stateLabel = st => st === 'ok' ? tr('', 'Connected') : st === 'err' ? tr('', 'Stopped') : st === 'off' ? tr('', 'Disabled') : tr('', 'Unverified');
   const kinds = tunnels.map(stateOf);
   const nodeKind = !tunnels.length ? '' : kinds.every(k => k === 'ok') ? 'ok' : kinds.every(k => k === 'err') ? 'err' : kinds.some(k => k === 'err') ? 'err' : 'warn';
-  // Bezier tunnel lines: one independent path per tunnel, spread vertically
-  // (horizontally on mobile) so parallel cables never overlap. A real weight
-  // thickens the line; without one every cable keeps the same honest width.
+  // Bezier tunnel lines in the cluster map's language: solid rounded lines
+  // whose width follows the tunnel's real weight, a flowing dash on live
+  // ones, one independent path per tunnel spread so they never overlap.
   const weightOf = t => {
     const w = Number(t.weight);
     return isFinite(w) && w > 0 ? Math.max(2, Math.min(6, 1.6 + w / 8)) : 3;
   };
-  const USERW = 172, USERH = 92, NW = 248, NH = 118;
+  const tDot = (cx, cy, kind) => `<circle class="cl-dot ${kind}" cx="${cx}" cy="${cy}" r="5"/>`;
+  const tTxt = (x, y, cls, s, anchor) => `<text class="${cls}" x="${x}" y="${y}"${anchor ? ` text-anchor="${anchor}"` : ''}>${text(s)}</text>`;
+  const tFlag = (flag, x, y) => topologyFlagSvg(flag, `x="${x}" y="${y}"`);
+  const NW = 248, NH = 104;
   let W, H, n = tunnels.length;
   let geo = {};
   if (vert) {
     W = 520;
-    H = Math.max(430, 120 + USERH + 60 + NH + 70 + NH + 40 + (n ? (n - 1) * 26 + 30 : 0));
-    const fy = 24 + USERH + 56 + NH + (n ? 70 + (n - 1) * 26 + 46 : 84);
-    H = Math.max(H, fy + NH + 36);
+    const fy = 150 + NH + (n ? 64 + (n - 1) * 30 + 52 : 76);
+    H = Math.max(fy + NH + 34, 460);
     geo = {
-      user: { x: W / 2 - USERW / 2, y: 24 },
-      iran: { x: W / 2 - NW / 2, y: 24 + USERH + 56 },
-      foreign: { x: W / 2 - NW / 2, y: fy },
+      user: { x: W / 2 - 190 / 2, y: 22, w: 190, h: 64 },
+      iran: { x: W / 2 - NW / 2, y: 150, w: NW, h: NH },
+      foreign: { x: W / 2 - NW / 2, y: fy, w: NW, h: NH },
       W, H,
     };
   } else {
     W = 900;
-    H = Math.max(300, 200 + (n ? (n - 1) * 34 + 60 : 0));
-    const ix = rtl ? W - 24 - USERW - NW - 70 : 24;
-    const fx = rtl ? 24 : W - 24 - NW;
+    H = Math.max(258, 170 + (n ? (n - 1) * 34 + 40 : 0));
+    const fx = rtl ? 22 : W - 22 - NW;
+    const ix = rtl ? W - 22 - NW : 22;
     geo = {
-      user: { x: rtl ? fx + NW + 46 : 24, y: 36 },
-      iran: { x: ix + (rtl ? 0 : USERW + 56), y: 60 },
-      foreign: { x: fx, y: 60 },
+      user: { x: rtl ? W - 22 - 178 : 22, y: (H - 72) / 2, w: 178, h: 72 },
+      iran: { x: ix, y: (H - NH) / 2, w: NW, h: NH },
+      foreign: { x: fx, y: (H - NH) / 2, w: NW, h: NH },
       W, H,
     };
   }
@@ -442,85 +444,88 @@ function topologyGraph(topo, tunnels) {
     const sw = weightOf(t);
     let d, lx, ly;
     if (vert) {
-      const gap = (n - 1) * 26;
-      const span = (W - 2 * 40 - NW) || 1;
-      const off = n > 1 ? (i - (n - 1) / 2) * 26 : 0;
-      const x1 = geo.iran.x + NW / 2 + off * 0.55, y1 = geo.iran.y + NH;
-      const x2 = geo.foreign.x + NW / 2 + off * 0.55, y2 = geo.foreign.y;
+      const off = n > 1 ? (i - (n - 1) / 2) * 30 : 0;
+      const x1 = geo.iran.x + NW / 2 + off * 0.5, y1 = geo.iran.y + NH;
+      const x2 = geo.foreign.x + NW / 2 + off * 0.5, y2 = geo.foreign.y;
       const midY = (y1 + y2) / 2;
-      d = `M ${x1.toFixed(1)} ${y1} C ${(x1 - off * 0.6).toFixed(1)} ${midY}, ${(x2 + off * 0.6).toFixed(1)} ${midY}, ${x2.toFixed(1)} ${y2}`;
+      d = `M ${x1.toFixed(1)} ${y1} C ${(x1 - off * 0.55).toFixed(1)} ${midY}, ${(x2 + off * 0.55).toFixed(1)} ${midY}, ${x2.toFixed(1)} ${y2}`;
       lx = W / 2; ly = midY;
     } else {
-      const step = n > 1 ? Math.min(34, 110 / (n - 1)) : 0;
-      const cy = (geo.iran.y + NH / 2 + (i - (n - 1) / 2) * step);
+      const step = n > 1 ? Math.min(34, 104 / (n - 1)) : 0;
+      const cy = geo.iran.y + NH / 2 + (i - (n - 1) / 2) * step;
       const x1 = geo.iran.x + NW, x2 = geo.foreign.x;
-      const mid = (x1 + x2) / 2;
-      d = `M ${x1} ${cy.toFixed(1)} C ${mid} ${(cy - 16).toFixed(1)}, ${mid} ${(cy + 16).toFixed(1)}, ${x2} ${cy.toFixed(1)}`;
-      lx = mid; ly = cy - 14;
+      const dx = Math.max(40, (x2 - x1) / 2);
+      d = `M ${x1},${cy.toFixed(1)} C ${x1 + dx},${cy.toFixed(1)} ${x2 - dx},${cy.toFixed(1)} ${x2},${cy.toFixed(1)}`;
+      lx = (x1 + x2) / 2; ly = cy - 12;
     }
-    return `<g data-topology-cable="${text(t.id)}" data-topo-view-tunnel="${text(t.id)}" class="topo-cable topo-${st}" tabindex="0" role="button" aria-label="${text(t.name)} · ${text(stateLabel(st))}">` +
-      `<path class="topo-e-hit" d="${d}"/>` +
-      `<path class="topo-e-wire" style="stroke-width:${sw}" d="${d}"/>` +
-      `<path class="topo-e-dots" d="${d}"/>` +
-      (st === 'ok' ? `<path class="topo-e-pulse" d="${d}"/>` : '') +
-      `<text class="topo-e-tag" x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle">${text(t.name)} · ${text(t.engine)}</text>` +
-      `<text class="topo-e-state" x="${lx.toFixed(1)}" y="${(ly + 14).toFixed(1)}" text-anchor="middle">${text(stateLabel(st))}</text>` +
+    return `<g data-topology-cable="${text(t.id)}" data-topo-view-tunnel="${text(t.id)}" class="cl-e ${st} topo-cable" tabindex="0" role="button" aria-label="${text(t.name)} · ${text(stateLabel(st))}">` +
+      `<title>${text(t.name)} · ${text(t.engine)} · ${text(stateLabel(st))}</title>` +
+      `<path class="cl-e-hit" d="${d}"/>` +
+      `<path class="cl-e-line" style="stroke-width:${sw}" d="${d}"/>` +
+      (st === 'ok' ? `<path class="cl-e-flow" d="${d}"/>` : '') +
+      `<text class="cl-t-share" x="${lx.toFixed(1)}" y="${ly.toFixed(1)}">${text(t.name)} · ${text(t.engine)}</text>` +
+      `<text class="cl-t-share" x="${lx.toFixed(1)}" y="${(ly + 14).toFixed(1)}">${text(stateLabel(st))}</text>` +
     `</g>`;
   }).join('');
   const cc = String(topo.country || '').toLowerCase();
   const countryLabel = (TOPO_COUNTRIES.find(c => c[0] === cc) || ['', tr('', 'Other')])[1];
-  const USERS_IC_INNER = '<circle cx="10" cy="8.4" r="3.4"/><path d="M3.6 18.4c.8-3.1 3.3-4.8 6.4-4.8s5.6 1.7 6.4 4.8"/><circle cx="16.9" cy="9.3" r="2.6"/><path d="M15.4 13.9c2.4.3 4.3 1.7 5 4.2"/>';
-  const dot = (x, y, m) => nodeKind ? `<circle class="topo-dot ${nodeKind}" cx="${m ? x + NW - 20 : x + 20}" cy="${y + 26}" r="5"/>` : '';
-  // node(): a server card inside the map — flag chip, caption, real server
-  // name, datacenter, IP. Iran is the accent-framed hub; the foreign card
-  // mirrors it. RTL flips the internal anchors, never the data.
+  // nodes in the cluster map's language: cl-n cards (rounded, solid fill),
+  // a status dot, a bright title and dim sub-lines; the hub gets hubbox.
   const node = (g, caption, title, info, flag, accent) => {
-    const x = g.x, y = g.y, m = rtl && !vert;
+    const x = g.x, y = g.y, w = g.w || NW, h = g.h || NH, m = rtl && !vert;
     const head = m
-      ? dot(x, y, true) +
-        topologyFlagSvg(flag, `x="${x + NW - 56}" y="${y + 16}"`) +
-        `<text class="topo-cap" x="${x + NW - 62}" y="${y + 27}" text-anchor="start" style="direction:rtl">${text(caption)}</text>`
-      : dot(x, y, false) +
-        topologyFlagSvg(flag, `x="${x + 40}" y="${y + 16}"`) +
-        `<text class="topo-cap" x="${x + 68}" y="${y + 27}">${text(caption)}</text>`;
+      ? tDot(x + w - 20, y + 21, nodeKind || 'off') + tFlag(flag, x + w - 58, y + 13) + tTxt(x + w - 64, y + 26, 'cl-t2', caption, 'start')
+      : tDot(x + 20, y + 21, nodeKind || 'off') + tFlag(flag, x + 42, y + 13) + tTxt(x + 68, y + 26, 'cl-t2', caption);
     const row = (cls, val, yy) => m
-      ? `<text class="${cls}" x="${x + NW - 16}" y="${y + yy}" text-anchor="start" style="direction:rtl">${text(val)}</text>`
-      : `<text class="${cls}" x="${x + 16}" y="${y + yy}">${text(val)}</text>`;
-    return `<g class="topo-node ${accent ? 'topo-node-accent' : ''}"><title>${text(title)} · ${text(info.ip)}</title>` +
-    `<rect class="topo-n-bg" x="${x}" y="${y}" width="${NW}" height="${NH}" rx="14"/>` +
+      ? tTxt(x + w - 16, y + yy, cls, val, 'start')
+      : tTxt(x + 16, y + yy, cls, val);
+    return `<g class="cl-n ${accent ? 'hubbox topo-hub' : ''}" role="img" aria-label="${text(title)} · ${text(info.ip)}"><title>${text(title)} · ${text(info.ip)}</title>` +
+    `<rect class="cl-n-bg" x="${x}" y="${y}" width="${w}" height="${h}" rx="12"/>` +
     head +
-    row('topo-t1', title, 56) +
-    row('topo-t2', info.name || title, 76) +
-    row('topo-t2', info.dc ? (info.dc + (info.cc ? ' (' + info.cc.toUpperCase() + ')' : '')) : '—', 94) +
-    row('topo-ip', info.ip, 112 - (vert ? 0 : 0)) +
+    row('cl-t1', title, 50) +
+    row('cl-t2', info.name || title, 69) +
+    row('cl-t2', info.dc ? (info.dc + (info.cc ? ' (' + info.cc + ')' : '')) : '—', 86) +
+    row('cl-t2', info.ip, 100 - (h > NH ? 0 : 0)) +
     `</g>`;
   };
-  const usersNode = g => `<g class="topo-node topo-node-users"><title>${text(tr('', 'Users'))}</title>` +
-    `<rect class="topo-n-bg" x="${g.x}" y="${g.y}" width="${USERW}" height="${USERH}" rx="14"/>` +
-    (nodeKind ? `<circle class="topo-dot ok" cx="${g.x + USERW - 18}" cy="${g.y + 20}" r="5"/>` : '') +
-    (rtl && !vert
-      ? `<g class="topo-users-ic" transform="translate(${g.x + USERW - 46} ${g.y + 12})">${USERS_IC_INNER}</g>` +
-        `<text class="topo-t1" x="${g.x + USERW - 54}" y="${g.y + 34}" text-anchor="start" style="direction:rtl">${text(tr('', 'Users'))}</text>` +
-        `<text class="topo-t2" x="${g.x + USERW - 18}" y="${g.y + 58}" text-anchor="start" style="direction:rtl">${text(tr('', 'Connect to this hub'))}</text>`
-      : `<g class="topo-users-ic" transform="translate(${g.x + 14} ${g.y + 12})">${USERS_IC_INNER}</g>` +
-        `<text class="topo-t1" x="${g.x + 50}" y="${g.y + 34}">${text(tr('', 'Users'))}</text>` +
-        `<text class="topo-t2" x="${g.x + 14}" y="${g.y + 58}">${text(tr('', 'Connect to this hub'))}</text>`) +
+  const USERS_IC_INNER = '<circle cx="10" cy="8.4" r="3.4"/><path d="M3.6 18.4c.8-3.1 3.3-4.8 6.4-4.8s5.6 1.7 6.4 4.8"/><circle cx="16.9" cy="9.3" r="2.6"/><path d="M15.4 13.9c2.4.3 4.3 1.7 5 4.2"/>';
+  const usersNode = g => `<g class="cl-n topo-users" role="img" aria-label="${text(tr('', 'Users'))}"><title>${text(tr('', 'Users'))}</title>` +
+    `<rect class="cl-n-bg" x="${g.x}" y="${g.y}" width="${g.w}" height="${g.h}" rx="12"/>` +
+    (m0(g) ? tTxt(g.x + g.w - 16, g.y + 26, 'cl-t1', tr('', 'Users'), 'start') : tTxt(g.x + 16, g.y + 26, 'cl-t1', tr('', 'Users'))) +
+    (m0(g) ? tTxt(g.x + g.w - 16, g.y + 46, 'cl-t2', tr('', 'Connect to this hub'), 'start') : tTxt(g.x + 16, g.y + 46, 'cl-t2', tr('', 'Connect to this hub'))) +
+    `<g class="topo-users-ic" transform="translate(${m0(g) ? g.x + 14 : g.x + g.w - 34} ${g.y + g.h / 2 - 11})">${USERS_IC_INNER}</g>` +
+    (nodeKind ? tDot(m0(g) ? g.x + g.w - 20 : g.x + 20, g.y + 14, 'ok') : '') +
     `</g>`;
-  // wire the pieces: users → iran green lead, iran ↔ foreign tunnel cables
-  const leads = [];
+  function m0(g) { return rtl && !vert; }
+  // leads + cables + the dashed idle placeholder with an add node on it
+  const pieces = [];
   if (vert) {
-    const ux = geo.user.x + USERW / 2, uy = geo.user.y + USERH;
+    const ux = geo.user.x + geo.user.w / 2, uy = geo.user.y + geo.user.h;
     const ix2 = geo.iran.x + NW / 2, iy2 = geo.iran.y;
-    leads.push(`<path class="topo-lead" d="M ${ux} ${uy} C ${ux} ${(uy + 28)}, ${ix2} ${(iy2 - 28)}, ${ix2} ${iy2}"/>`);
+    pieces.push(`<path class="cl-e ok topo-lead" d="M ${ux} ${uy} C ${ux} ${(uy + 26)}, ${ix2} ${(iy2 - 26)}, ${ix2} ${iy2}" style="stroke-width:2.5"/>` + (nodeKind ? '' : ''));
   } else {
-    const m = rtl;
-    const ux = m ? geo.user.x : geo.user.x + USERW;
-    const uy = geo.user.y + USERH / 2;
+    const m = m0(geo);
+    const ux = m ? geo.user.x : geo.user.x + geo.user.w;
+    const uy = geo.user.y + geo.user.h / 2;
     const ix = m ? geo.iran.x + NW : geo.iran.x;
     const iy = geo.iran.y + NH / 2;
-    leads.push(`<path class="topo-lead" d="M ${ux} ${uy} C ${(ux + (m ? -30 : 30)).toFixed(1)} ${uy}, ${(ix + (m ? 34 : -34)).toFixed(1)} ${iy}, ${ix} ${iy}"/>`);
+    const dx = Math.max(24, Math.abs(ix - ux) / 2);
+    pieces.push(`<path class="cl-e ok topo-lead" d="M ${ux},${uy.toFixed(1)} C ${ux + (m ? -dx : dx)},${uy.toFixed(1)} ${ix + (m ? dx : -dx)},${iy.toFixed(1)} ${ix},${iy.toFixed(1)}" style="stroke-width:2.5"/>`);
   }
-  const emptyMid = !n ? `<text class="topo-empty" x="${vert ? W / 2 : (geo.iran.x + NW + geo.foreign.x) / 2}" y="${vert ? (geo.iran.y + NH + geo.foreign.y) / 2 + 4 : geo.iran.y + NH / 2 - 14}" text-anchor="middle">${text(tr('', 'No tunnel attached yet'))}</text>` : '';
+  if (!n) {
+    if (vert) {
+      pieces.push(`<path class="cl-e idle topo-idle-line" d="M ${geo.iran.x + NW / 2} ${geo.iran.y + NH} L ${geo.iran.x + NW / 2} ${geo.foreign.y}"/>`);
+      pieces.push(`<g class="cl-n add" data-topo-map-add role="button" tabindex="0" aria-label="${text(tr('', 'Add tunnel'))}"><title>${text(tr('', 'Add tunnel'))}</title>` +
+        `<rect class="cl-n-bg" x="${W / 2 - 90}" y="${(geo.iran.y + NH + geo.foreign.y) / 2 - 19}" width="180" height="38" rx="12"/>` +
+        tTxt(W / 2, (geo.iran.y + NH + geo.foreign.y) / 2 + 5, 'cl-t1 cl-tc', '+ ' + tr('', 'Add tunnel'), 'middle') + `</g>`);
+    } else {
+      const x1 = geo.iran.x + NW, x2 = geo.foreign.x, cy = geo.iran.y + NH / 2;
+      pieces.push(`<path class="cl-e idle topo-idle-line" d="M ${x1} ${cy} L ${x2} ${cy}"/>`);
+      pieces.push(`<g class="cl-n add" data-topo-map-add role="button" tabindex="0" aria-label="${text(tr('', 'Add tunnel'))}"><title>${text(tr('', 'Add tunnel'))}</title>` +
+        `<rect class="cl-n-bg" x="${(x1 + x2) / 2 - 90}" y="${cy - 19}" width="180" height="38" rx="12"/>` +
+        tTxt((x1 + x2) / 2, cy + 5, 'cl-t1 cl-tc', '+ ' + tr('', 'Add tunnel'), 'middle') + `</g>`);
+    }
+  }
   const legend = `<div class="cl-legend">` +
     `<span><i class="ok"></i>${esc(tr('', 'Connected'))}</span>` +
     `<span><i class="warn"></i>${esc(tr('', 'Unverified'))}</span>` +
@@ -528,17 +533,12 @@ function topologyGraph(topo, tunnels) {
     `<span><i class="off"></i>${esc(tr('', 'Disabled'))}</span>` +
     `</div>`;
   return `<div class="topo-map"><div class="topo-map-scroll">` +
-    `<svg class="topo-graph" viewBox="0 0 ${geo.W} ${geo.H}" role="img" aria-label="${text(tr('', 'Topology connections'))}" dir="ltr">` +
-    leads.join('') +
-    (n ? '' : `<g class="topo-cable topo-idle"><path class="topo-e-wire" d="${vert ? `M ${geo.iran.x + NW / 2} ${geo.iran.y + NH} L ${geo.iran.x + NW / 2} ${geo.foreign.y}` : `M ${geo.iran.x + NW} ${geo.iran.y + NH / 2} L ${geo.foreign.x} ${geo.iran.y + NH / 2}`}"/></g>`) +
-    emptyMid +
-    cables +
+    `<svg class="topo-graph" viewBox="0 0 ${geo.W} ${Math.round(geo.H)}" role="img" aria-label="${text(tr('', 'Topology connections'))}" dir="ltr">` +
+    pieces.join('') + cables +
     node(geo.iran, tr('', 'Iran hub'), tr('', 'Iran hub'), { name: iranInfo.name, dc: iranInfo.dc, cc: 'IR', ip: iran }, 'ir', true) +
     node(geo.foreign, countryLabel, tr('', 'Foreign server'), { name: foreignInfo.name, dc: foreignInfo.dc, cc: topoDcCc(topo, 'foreign'), ip: foreign }, topo.country, false) +
     usersNode(geo.user) +
-    `</svg>` +
-    (!n ? `<button type="button" class="quantum-btn quantum-btn-secondary topo-map-add" data-topo-map-add style="${vert ? 'top:' + (geo.iran.y + NH + 40) + 'px;' : ''}"><svg class="topo-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>${esc(tr('', 'Add tunnel'))}</span></button>` : '') +
-    `</div>` +
+    `</svg></div>` +
     `<div class="topo-tip" hidden></div>` +
     legend +
     `</div>`;
