@@ -772,7 +772,8 @@ function fillHeadStats(topo) {
       '<span class="topo-stat-ic ' + (side === 'iran' ? 'iran' : 'alt') + '">' + icServer + '</span>' +
       '<div class="topo-stat-tx"><b>' + list.length + '</b><span>' + esc(tr('', side === 'iran' ? 'Iran servers' : 'Foreign servers')) + '</span></div></div>' +
       '<div class="topo-stat"><span class="topo-stat-flag">' + topologyFlagSvg(cc) + '</span>' +
-      '<div class="topo-stat-tx"><span class="topo-stat-dc">' + esc(dcTxt ? dcTxt + ' (' + cc + ')' : cc) + '</span></div></div>';
+      '<div class="topo-stat-tx"><span class="topo-stat-dc">' + esc(dcTxt ? dcTxt + ' (' + cc + ')' : cc) + '</span>' +
+      '<span>' + esc(tr('', 'Datacenter')) + '</span></div></div>';
   };
   const own = topoAllTunnels(topo);
   const isOk = t => ['healthy', 'ok', 'up', 'connected'].includes(String(t.state || ''));

@@ -14,6 +14,8 @@ window.FA_TEXT = {
  "Tunnels": "تونل‌ها",
  "Healthy": "سالم",
  "Faulty": "مشکل‌دار",
+ "Datacenter": "دیتاسنتر",
+ "Datacenters": "دیتاسنترها",
  "Overall uptime": "پایداری کلی",
  "Agents online": "ایجنت‌های آنلاین",
  "Agent tunnels active": "تونل‌های فعال ایجنت",

@@ -2026,7 +2026,9 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 .topo-stat-tx { display:flex; flex-direction:column; gap:3px; min-width:0; }
 .topo-stat-tx b { font-size:19px; font-weight:700; line-height:1; color:var(--tx); }
 .topo-stat-tx span { font-size:12px; color:var(--dim); white-space:nowrap; }
-.topo-stat-dc { font-size:13px; font-weight:600; color:var(--tx2); }
+/* the datacenter value matches its neighbor's two-line rhythm: bold value on
+   top, the small dim label under it */
+.topo-head-stats .topo-stat-tx .topo-stat-dc { font-size:16px; font-weight:700; color:var(--tx); line-height:1.15; }
 .topo-stat-mini { display:flex; flex-direction:column; gap:4px; margin-inline-start:8px; }
 .topo-stat-k { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--dim); white-space:nowrap; }
 .topo-stat-k i { width:7px; height:7px; border-radius:50%; background:var(--ok); flex:none; }
