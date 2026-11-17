@@ -1740,6 +1740,7 @@
               <span class="topo-state-pill st-none" id="topologyHeadPill"><i aria-hidden="true"></i><span id="topologyHeadPillTx">—</span></span>
             </div>
             <div class="topo-detail-actions" role="group" aria-label="Topology actions">
+              <button type="button" id="topologyAddTunnelBtn" class="quantum-btn quantum-btn-primary" data-i18n="tunnels_new">New Tunnel</button>
               <button type="button" id="topologyActivateBtn" class="topo-act topo-act-accent"><svg class="topo-act-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8"/><path d="M6.3 6.3a8.5 8.5 0 1011.4 0"/></svg><span id="topologyActivateLbl">Activate</span></button>
               <button type="button" id="topologyEditBtn" class="topo-act"><svg class="topo-act-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19.5 8.5l-4-4L4 16v4z"/></svg><span data-i18n="Edit">Edit</span></button>
               <button type="button" id="topologyDeleteBtn" class="topo-act topo-act-danger"><svg class="topo-act-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg><span data-i18n="Delete">Delete</span></button>
@@ -1754,7 +1755,6 @@
           <div id="topologyGraph"></div>
           <div class="qs-hint" data-i18n="topology_cables">Each cable represents one tunnel between the two servers.</div>
           <div id="topologyTunnelList"></div>
-          <button type="button" id="topologyAddTunnelBtn" class="quantum-btn quantum-btn-primary" data-i18n="tunnels_new">New Tunnel</button>
           <div class="topo-attach u-mt-12"><label for="topologyAttachSelect" data-i18n="topology_attach">Attach an existing tunnel</label><select id="topologyAttachSelect" class="quantum-input"></select><button type="button" id="topologyAttachBtn" class="quantum-btn quantum-btn-secondary" data-i18n="topology_attach_btn">Attach tunnel</button></div>
           <div id="topologyBoundList" class="u-mt-8"></div>
         </div>
@@ -1785,7 +1785,6 @@
           <div class="qs-hint u-mt-8" data-i18n="tunnels_hint2">Click a tunnel's name to open its full settings — status details, carrier, health and every action.</div>
         </div>
         <!-- empty / hint slot for the tunnels table (no tunnel status card in list mode) -->
-        <div id="tunnelsEmpty"></div>
         <!-- Matrix tunnel detail (View on the Matrix row): content rendered from /api/matrix/status -->
         <div class="tunnel-card" id="matrixDetailCard" hidden>
           <div class="tc-header"><p class="tc-title">Matrix tunnel</p><span class="status-indicator" id="mxDot"><span class="dot"></span><span id="mxDotTxt">—</span></span></div>

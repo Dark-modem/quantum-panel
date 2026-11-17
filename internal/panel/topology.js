@@ -619,7 +619,6 @@ function topologyRender() {
   const error = $('topologyError'); if (error) { error.hidden = true; error.textContent = ''; }
   $('tunnelsAddBtn').disabled = !topo || !topo.local_ip || !topo.remote_ip;
   $('topologyAddTunnelBtn').disabled = !topo || !topo.local_ip || !topo.remote_ip;
-  $('tunnelsEmpty').hidden = !topo || inTunnel;
   if (!topo) $('tunnelsListCard').hidden = true;
   // KPI strip: three numbers the page can actually prove from its own data —
   // the server pairs on this panel and how many of them carry tunnels —
@@ -796,7 +795,6 @@ function topologyRender() {
   $('topologyAttachSelect').innerHTML = `<option value="">${esc(tr('', 'Select an existing tunnel'))}</option>`
     + candidates.map(t => `<option value="${esc(t.id)}">${esc(t.name)} · ${esc(t.engine)}</option>`).join('');
   $('topologyBoundList').innerHTML = cables.map(t => `<div class="topo-binding"><b>${esc(t.name)}</b><span>${esc(t.state)}</span><button type="button" class="quantum-btn quantum-btn-ghost" data-topo-detach="${esc(t.id)}">${esc(tr('', 'Detach from topology'))}</button><button type="button" class="quantum-btn quantum-btn-secondary" data-topo-view-tunnel="${esc(t.id)}">${esc(tr('', 'View'))}</button></div>`).join('');
-  $('tunnelsEmpty').innerHTML = cables.length ? '' : `<p class="qs-hint">${esc(tr('', 'Attach an existing tunnel or add a new tunnel for this server pair.'))}</p>`;
 }
 function topologyChooseRole(role) {
   $('topologyRole').value = role;
