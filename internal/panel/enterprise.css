@@ -1929,7 +1929,7 @@ html[dir="rtl"] .topo-back .topo-back-ic { transform:scaleX(-1); }
 .topo-node-accent > .topo-n-bg { stroke:color-mix(in srgb, var(--ac) 55%, transparent); filter:drop-shadow(0 0 14px color-mix(in srgb, var(--ac) 20%, transparent)); }
 .topo-node-accent:hover > .topo-n-bg { stroke:var(--ac); }
 .topo-users-ic { fill:none; stroke:var(--tx2); stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
-.topo-map-add { position:absolute; inset-inline-start:50%; transform:translateX(-50%); margin-inline-start:0; }
+.topo-map-add { position:absolute; top:50%; inset-inline-start:50%; transform:translate(-50%, -50%); margin-inline-start:0; }
 .topo-map { --tip-x:0px; --tip-y:0px; }
 .topo-tip { position:absolute; z-index:30; max-width:260px; padding:8px 10px; border-radius:10px; border:1px solid var(--ln);
   background:color-mix(in srgb, var(--s1) 92%, transparent); color:var(--tx); font-size:12px; line-height:1.5; pointer-events:none;
