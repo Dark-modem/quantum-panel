@@ -2008,8 +2008,14 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 .topo-head-stats .topo-stat { display:flex; align-items:center; gap:10px; padding:2px 16px;
   border:none; border-radius:0; background:transparent; }
 .topo-head-stats .topo-stat-tx { display:flex; flex-direction:column; align-items:flex-start; gap:3px; min-width:0; flex:none; }
-.topo-head-stats .topo-stat:first-child { padding-inline-start:10px; }
-.topo-head-stats .topo-stat + .topo-stat { border-inline-start:1px solid var(--ln2); }
+/* the four logical sections each take a fair share of the strip's width and
+   spread their segments inside it — no dead space at the strip's end; thin
+   lines separate the sections, not the segments of one section */
+.topo-head-stats .topo-stat-group { display:flex; align-items:stretch; justify-content:space-evenly; flex:1 1 auto; min-width:0; }
+.topo-head-stats .topo-stat-group + .topo-stat-group { border-inline-start:1px solid var(--ln2); }
+@media(max-width:799px) {
+  .topo-head-stats .topo-stat-group { flex:none; flex-wrap:wrap; }
+}
 .topo-stat-ic { width:34px; height:34px; border-radius:10px; display:inline-flex; align-items:center; justify-content:center; flex:none;
   background:color-mix(in srgb, var(--ac) 13%, transparent); color:var(--ac); }
 .topo-stat-ic.alt { background:color-mix(in srgb, var(--info) 13%, transparent); color:var(--info); }

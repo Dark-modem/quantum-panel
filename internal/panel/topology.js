@@ -779,17 +779,24 @@ function fillHeadStats(topo) {
   const good = own.filter(isOk).length;
   const bad = own.length - good;
   const pct = own.length ? (Math.round(good / own.length * 1000) / 10) + '%' : '—';
+  // the four logical sections (each side's servers+datacenter, the tunnels,
+  // the uptime) each take a fair share of the strip's whole width, so no
+  // dead space is left at its end
   host.innerHTML =
-    sideStat('iran') +
-    sideStat('foreign') +
-    '<div class="topo-stat"><span class="topo-stat-ic">' + icLink + '</span>' +
-      '<div class="topo-stat-tx"><b>' + own.length + '</b><span>' + esc(tr('', 'Tunnels')) + '</span></div>' +
-      '<div class="topo-stat-mini">' +
-        '<span class="topo-stat-k"><i></i>' + esc(good + ' ' + tr('', 'Healthy')) + '</span>' +
-        '<span class="topo-stat-k er"><i></i>' + esc(bad + ' ' + tr('', 'Faulty')) + '</span>' +
-      '</div></div>' +
-    '<div class="topo-stat"><span class="topo-stat-ic alt">' + icPulse + '</span>' +
-      '<div class="topo-stat-tx"><b>' + pct + '</b><span>' + esc(tr('', 'Overall uptime')) + '</span></div></div>';
+    '<div class="topo-stat-group">' + sideStat('iran') + '</div>' +
+    '<div class="topo-stat-group">' + sideStat('foreign') + '</div>' +
+    '<div class="topo-stat-group">' +
+      '<div class="topo-stat"><span class="topo-stat-ic">' + icLink + '</span>' +
+        '<div class="topo-stat-tx"><b>' + own.length + '</b><span>' + esc(tr('', 'Tunnels')) + '</span></div>' +
+        '<div class="topo-stat-mini">' +
+          '<span class="topo-stat-k"><i></i>' + esc(good + ' ' + tr('', 'Healthy')) + '</span>' +
+          '<span class="topo-stat-k er"><i></i>' + esc(bad + ' ' + tr('', 'Faulty')) + '</span>' +
+        '</div></div>' +
+    '</div>' +
+    '<div class="topo-stat-group">' +
+      '<div class="topo-stat"><span class="topo-stat-ic alt">' + icPulse + '</span>' +
+        '<div class="topo-stat-tx"><b>' + pct + '</b><span>' + esc(tr('', 'Overall uptime')) + '</span></div></div>' +
+    '</div>';
 }
 
 async function topologyReload() {
