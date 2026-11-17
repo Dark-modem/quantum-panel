@@ -2003,9 +2003,13 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
   margin-top:14px; padding:10px 8px; row-gap:10px;
   border:1px solid var(--ln); border-radius:12px;
   background:color-mix(in srgb, var(--tx) 2.5%, transparent); }
-.topo-stat { display:flex; align-items:center; gap:10px; padding:2px 16px; }
-.topo-stat:first-child { padding-inline-start:10px; }
-.topo-stat + .topo-stat { border-inline-start:1px solid var(--ln2); }
+/* the topology list page styles .topo-stat as a mini-card of its own — the
+   strip's segments must stay bare inside the one unified box */
+.topo-head-stats .topo-stat { display:flex; align-items:center; gap:10px; padding:2px 16px;
+  border:none; border-radius:0; background:transparent; }
+.topo-head-stats .topo-stat-tx { display:flex; flex-direction:column; align-items:flex-start; gap:3px; min-width:0; flex:none; }
+.topo-head-stats .topo-stat:first-child { padding-inline-start:10px; }
+.topo-head-stats .topo-stat + .topo-stat { border-inline-start:1px solid var(--ln2); }
 .topo-stat-ic { width:34px; height:34px; border-radius:10px; display:inline-flex; align-items:center; justify-content:center; flex:none;
   background:color-mix(in srgb, var(--ac) 13%, transparent); color:var(--ac); }
 .topo-stat-ic.alt { background:color-mix(in srgb, var(--info) 13%, transparent); color:var(--info); }
