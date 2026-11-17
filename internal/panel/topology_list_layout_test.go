@@ -82,12 +82,12 @@ func TestTopologyListSemanticTable(t *testing.T) {
 		`topologyFlagSvg(flag)`,                // embedded SVG flag per server column
 		`tabindex="0"`,                         // rows are keyboard reachable
 		`$('topologiesList').addEventListener`, // whole-row click opens the topology
-		`toastWarn(tr('', 'Delete topology'), topologyDeleteNotice(remaining))`, // delete explains blocked state
-		`quantum-btn-danger topo-delete`,                                        // delete is a danger button, never disabled
-		`let topologyLoadedOnce = false`,                                        // first-load gate: skeleton instead of empty-state flash
-		`if (!topologyLoadedOnce) topologyRender()`,                             // first load paints the skeleton immediately
-		`topologyLoading && !topologyLoadedOnce`,                                // skeleton branch replaces the "No topology yet" row
-		`${skel(2)}`,                                                            // skeleton rows reuse the shared skel() helper
+		`toastWarn(tr('', 'Delete topology'), tr('', 'The topology must be off or empty before it can be deleted'))`, // delete explains the off-or-empty rule
+		`quantum-btn-danger topo-delete`,            // delete is a danger button, never disabled
+		`let topologyLoadedOnce = false`,            // first-load gate: skeleton instead of empty-state flash
+		`if (!topologyLoadedOnce) topologyRender()`, // first load paints the skeleton immediately
+		`topologyLoading && !topologyLoadedOnce`,    // skeleton branch replaces the "No topology yet" row
+		`${skel(2)}`,                                // skeleton rows reuse the shared skel() helper
 	} {
 		if !strings.Contains(js, want) {
 			t.Errorf("topology.js lacks %q", want)

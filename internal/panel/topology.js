@@ -957,6 +957,16 @@ function topologyRender() {
   }
   // The header's power toggle mirrors the row menu: a pair whose tunnels are
   // not up offers Activate, a live pair offers Deactivate.
+  // The delete guard (owner rule): a topology can only be deleted while it
+  // is powered off or holds no tunnels at all — otherwise the button is
+  // disabled with the reason on its title.
+  const del = $('topologyDeleteBtn');
+  if (del && topo) {
+    const tunnelsNow = topoAllTunnels(topo);
+    const canDelete = topo.Disabled === true || !tunnelsNow.length;
+    del.disabled = !canDelete;
+    del.title = canDelete ? '' : tr('', 'The topology must be off or empty before it can be deleted');
+  }
   const act = $('topologyActivateBtn'), deact = $('topologyDeactivateBtn');
   if (act && deact) {
     // The header's power toggle mirrors the row menu: a pair whose tunnels are
@@ -1063,11 +1073,12 @@ async function topologyDetach(id) {
 }
 async function topologyDelete(id) {
   const topo = topologyData.topologies.find(t => t.id === id);
-  const remaining = topologyExistingTunnelCount(topo);
-  if (remaining) {
-    // The delete button is never disabled; existing tunnels block the deletion
-    // with a visible warning instead of a silent no-op.
-    toastWarn(tr('', 'Delete topology'), topologyDeleteNotice(remaining));
+  const tunnelsNow = topo ? topoAllTunnels(topo) : [];
+  const off = !topo || topo.Disabled === true;
+  if (tunnelsNow.length && !off) {
+    // The owner rule: delete needs the topology powered off or empty. A live
+    // topology answers with a visible warning instead of a silent no-op.
+    toastWarn(tr('', 'Delete topology'), tr('', 'The topology must be off or empty before it can be deleted'));
     return;
   }
   if (!await entConfirm(tr('', 'Delete topology?'), tr('', 'This empty topology will be removed.'), tr('', 'Delete topology'))) return;

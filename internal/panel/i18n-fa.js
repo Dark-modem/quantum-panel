@@ -3045,6 +3045,7 @@ window.FA_TEXT = {
  "No agents on this side yet": "هنوز ایجنتی در این سمت نیست",
  "Agent added to the topology": "ایجنت به توپولوژی اضافه شد",
  "Agent removed": "ایجنت حذف شد",
+ "The topology must be off or empty before it can be deleted": "برای حذف، توپولوژی باید خاموش یا بدون تانل باشد",
  "{n} cores on {m} agents": "{n} هسته روی {m} ایجنت",
  "{n} of {m} agents": "{n} از {m} ایجنت",
  "{n} outdated": "{n} قدیمی",
