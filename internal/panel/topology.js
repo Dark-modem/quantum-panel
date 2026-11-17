@@ -778,9 +778,14 @@ function topologyRender() {
   // not up offers Activate, a live pair offers Deactivate.
   const act = $('topologyActivateBtn');
   if (act) {
-    // The button carries an icon + label span; only the label may change.
+    // The header's power toggle mirrors the row menu: a pair whose tunnels are
+    // not up offers Activate (green — go turn it on), a live pair offers
+    // Deactivate (red — go turn it off).
     const lbl = $('topologyActivateLbl') || act;
-    lbl.textContent = tr('', topologyHealthOf(topo, cables) !== 'ok' ? 'Activate' : 'Deactivate');
+    const powering = topologyHealthOf(topo, cables) !== 'ok';
+    lbl.textContent = tr('', powering ? 'Activate' : 'Deactivate');
+    act.classList.toggle('topo-act-green', powering);
+    act.classList.toggle('topo-act-red', !powering);
   }
   // Do not overwrite a form the user is currently editing.
   if (!$('topologySettings').contains(document.activeElement)) {
