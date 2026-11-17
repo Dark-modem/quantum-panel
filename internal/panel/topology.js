@@ -481,34 +481,48 @@ function topologyGraph(topo, tunnels) {
     };
   }
   const nodeY = (col, i) => col.y + i * (NH + GAP);
-  const agentCables = agentTuns.map((tn, i) => {
+  // One wire per server PAIR: every tunnel between an Iran server and a
+  // foreign server collapses into a single cable whose thickness follows the
+  // tunnel count and whose label reads the count. The per-tunnel detail
+  // lives in the established list under the map.
+  const pairs = {};
+  agentTuns.forEach(tn => {
+    const k = (tn.localName || '?') + '|' + (tn.remoteName || '?');
+    const p = pairs[k] || (pairs[k] = { local: tn.localName || '?', remote: tn.remoteName || '?', n: 0, ok: 0, down: 0 });
+    p.n++;
     const st = stOf(tn.state);
-    const sw = tn.weightPct != null && tn.weightPct > 0 ? Math.max(2, Math.min(6, 2 + tn.weightPct / 100 * 6)) : 3;
+    if (st === 'ok') p.ok++;
+    if (st === 'err') p.down++;
+  });
+  const pairList = Object.keys(pairs).map(k => pairs[k]);
+  const pairWires = pairList.map((p, i) => {
+    const ii = findNode(iranServers, p.local);
+    const fi = findNode(foreignServers, p.remote);
+    const allUp = p.down === 0 && p.ok === p.n;
+    const kind = p.ok > 0 ? 'ok' : p.down > 0 ? 'err' : 'idle';
+    const sw = Math.max(2, Math.min(7, 2 + p.n * 1.2));
+    const lbl = p.n + ' ' + tr('', p.n === 1 ? 'tunnel' : 'tunnels');
     let d, lx, ly;
     if (vert) {
-      const ii = findNode(iranServers, tn.localName);
-      const fi = findNode(foreignServers, tn.remoteName);
       const x1 = geo.iran.x + NW / 2 + (ii - (iranServers.length - 1) / 2) * 18, y1 = nodeY(geo.iran, ii) + NH;
       const x2 = geo.foreign.x + NW / 2 + (fi - (foreignServers.length - 1) / 2) * 18, y2 = nodeY(geo.foreign, fi);
       const midY = (y1 + y2) / 2;
       d = `M ${x1.toFixed(1)} ${y1} C ${x1.toFixed(1)} ${midY}, ${x2.toFixed(1)} ${midY}, ${x2.toFixed(1)} ${y2}`;
       lx = W / 2; ly = midY;
     } else {
-      const ii = findNode(iranServers, tn.localName);
-      const fi = findNode(foreignServers, tn.remoteName);
       const y1 = nodeY(geo.iran, ii) + NH / 2, y2 = nodeY(geo.foreign, fi) + NH / 2;
       const x1 = geo.iran.x + NW, x2 = geo.foreign.x;
       const dx = Math.max(40, (x2 - x1) / 2);
       d = `M ${x1},${y1.toFixed(1)} C ${x1 + dx},${y1.toFixed(1)} ${x2 - dx},${y2.toFixed(1)} ${x2},${y2.toFixed(1)}`;
       lx = (x1 + x2) / 2; ly = (y1 + y2) / 2 - 12;
     }
-    return `<g data-topology-cable="${text(tn.key)}" data-topo-agent="${text(tn.agentId)}" class="cl-e ${st} topo-cable" tabindex="0" role="button" aria-label="${text(tn.key)} · ${text(stLabel(st))}">` +
-      `<title>${text(tn.key)} · ${text(tn.engine)} · ${text(stLabel(st))}</title>` +
+    return `<g data-topology-pair="${text(p.local)}|${text(p.remote)}" class="cl-e ${kind} topo-cable" tabindex="0" role="img" aria-label="${text(p.local)} → ${text(p.remote)}: ${text(lbl)}">` +
+      `<title>${text(p.local)} → ${text(p.remote)}: ${text(lbl)}</title>` +
       `<path class="cl-e-hit" d="${d}"/>` +
       `<path class="cl-e-line" style="stroke-width:${sw}" d="${d}"/>` +
-      (st === 'ok' ? `<path class="cl-e-flow" d="${d}"/>` : '') +
-      `<text class="cl-t-share" x="${lx.toFixed(1)}" y="${ly.toFixed(1)}">${text(tn.key)} · ${text(tn.engine)}</text>` +
-      `<text class="cl-t-share" x="${lx.toFixed(1)}" y="${(ly + 14).toFixed(1)}">${text(stLabel(st))}</text>` +
+      (p.ok > 0 ? `<path class="cl-e-flow" d="${d}"/>` : '') +
+      `<text class="cl-t-share" x="${lx.toFixed(1)}" y="${ly.toFixed(1)}">${text(lbl)}</text>` +
+      `<text class="cl-t-share" x="${lx.toFixed(1)}" y="${(ly + 14).toFixed(1)}">${text(allUp ? tr('', 'All connected') : (p.ok > 0 ? tr('', 'Partly connected') : tr('', 'Down')))}</text>` +
     `</g>`;
   }).join('');
   // resolve a tunnel's endpoint node indexes (by endpoint ip, fallback 0)
@@ -604,7 +618,7 @@ function topologyGraph(topo, tunnels) {
     { name: s.name, dc: dcLabel(s), cc: s.cc || topo.country, ip: s.ip || foreignIp }, topo.country, false));
   return `<div class="topo-map"><div class="topo-map-scroll">` +
     `<svg class="topo-graph" viewBox="0 0 ${geo.W} ${Math.round(geo.H)}" role="img" aria-label="${text(tr('', 'Topology connections'))}" dir="ltr">` +
-    pieces.join('') + cables + agentCables +
+    pieces.join('') + pairWires +
     iranNodes.join('') + foreignNodes.join('') +
     `</svg></div>` +
     `<div class="topo-tip" hidden></div>` +
@@ -1941,21 +1955,38 @@ $('topologyAddTunnelBtn').onclick = topologyNewTunnel;
   const box = $('topologyGraph');
   if (!box) return;
   box.addEventListener('mousemove', e => {
-    const g = e.target.closest && e.target.closest('[data-topology-cable]');
+    const pairEl = e.target.closest && e.target.closest('[data-topology-pair]');
+    const g = pairEl || (e.target.closest && e.target.closest('[data-topology-cable]'));
     const tip = box.querySelector('.topo-tip');
     if (!tip) return;
-    const t = g ? (topologyData.tunnels || []).find(x => String(x.id) === g.getAttribute('data-topology-cable')) : null;
     const topo = topologyCurrent();
-    if (!g || !t || !topo) { tip.hidden = true; return; }
-    const st = String(t.state || '');
-    const label = ['healthy', 'ok', 'up', 'connected'].includes(st) ? tr('', 'Connected') : st === 'down' ? tr('', 'Stopped') : st === 'disabled' ? tr('', 'Disabled') : tr('', 'Unverified');
-    const iranName = (topoSideServers(topo, 'iran')[0] || {}).name || '';
-    const frnName = (topoSideServers(topo, 'foreign')[0] || {}).name || '';
-    tip.innerHTML = '<b>' + esc(t.name || '') + '</b><br>' +
-      esc(tr('', 'Engine')) + ': ' + esc(t.engine || '—') + '<br>' +
-      esc(tr('', 'Weight')) + ': ' + esc(t.weight != null ? String(t.weight) : '—') + '<br>' +
-      esc(tr('', 'Status')) + ': ' + esc(label) + '<br>' +
-      '<span class="u-mono">' + esc(iranName || topo.local_ip || '') + ' ↔ ' + esc(frnName || topo.remote_ip || '') + '</span>';
+    if (!g || !topo) { tip.hidden = true; return; }
+    const label = st => st === 'ok' ? tr('', 'Connected') : st === 'err' ? tr('', 'Stopped') : st === 'off' ? tr('', 'Disabled') : tr('', 'Unverified');
+    const stOf = s => ['healthy', 'ok', 'up', 'connected'].includes(String(s || '')) ? 'ok'
+      : String(s || '') === 'down' ? 'err' : String(s || '') === 'disabled' ? 'off' : 'warn';
+    const rows = topoAgentTunnels(topo);
+    let html = '';
+    if (pairEl) {
+      // a pair wire: every tunnel between the two servers, with its state
+      const pair = (g.getAttribute('data-topology-pair') || '').split('|');
+      const mine = rows.filter(tn => tn.localName === pair[0] && tn.remoteName === pair[1]);
+      html = '<b>' + esc(pair[0] + ' → ' + pair[1]) + '</b><br>' +
+        (mine.length ? mine.map(tn => esc(tn.key.replace('tun-' + topo.name + '-', '')) + ' · ' + esc(tn.engine || '') + ' · ' + esc(label(stOf(tn.state)))).join('<br>')
+          : esc(tr('', 'No tunnels')));
+    } else {
+      const t = (topologyData.tunnels || []).find(x => String(x.id) === g.getAttribute('data-topology-cable'));
+      if (!t) { tip.hidden = true; return; }
+      const st = String(t.state || '');
+      const stLabel = ['healthy', 'ok', 'up', 'connected'].includes(st) ? tr('', 'Connected') : st === 'down' ? tr('', 'Stopped') : st === 'disabled' ? tr('', 'Disabled') : tr('', 'Unverified');
+      const iranName = (topoSideServers(topo, 'iran')[0] || {}).name || '';
+      const frnName = (topoSideServers(topo, 'foreign')[0] || {}).name || '';
+      html = '<b>' + esc(t.name || '') + '</b><br>' +
+        esc(tr('', 'Engine')) + ': ' + esc(t.engine || '—') + '<br>' +
+        esc(tr('', 'Weight')) + ': ' + esc(t.weight != null ? String(t.weight) : '—') + '<br>' +
+        esc(tr('', 'Status')) + ': ' + esc(stLabel) + '<br>' +
+        '<span class="u-mono">' + esc(iranName || topo.local_ip || '') + ' ↔ ' + esc(frnName || topo.remote_ip || '') + '</span>';
+    }
+    tip.innerHTML = html;
     const host = box.querySelector('.topo-map') || box;
     const r = host.getBoundingClientRect();
     tip.style.left = (e.clientX - r.left) + 'px';
