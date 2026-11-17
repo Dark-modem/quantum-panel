@@ -1978,10 +1978,6 @@ html[dir="rtl"] .topo-back .topo-back-ic { transform:scaleX(-1); }
 .topo-head-namerow { display:flex; align-items:center; gap:8px; min-width:0; }
 .topo-head-name { margin:0; font-family:var(--font-mono, monospace); font-size:24px; font-weight:700; letter-spacing:-0.2px;
   direction:ltr; text-align:start; min-width:0; overflow-wrap:anywhere; }
-.topo-copy { width:30px; height:30px; border-radius:8px; border:1px solid var(--ln); background:transparent; color:var(--tx2);
-  display:inline-flex; align-items:center; justify-content:center; cursor:pointer; flex:none; transition:color .15s ease, border-color .15s ease; }
-.topo-copy svg { width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
-.topo-copy:hover { color:var(--tx); border-color:var(--ac-b30, var(--ln2)); }
 /* the action buttons: one height, one radius, a constant gap; the power
    toggle is neutral dark with a soft yellow icon (reversible, never red) */
 .topo-detail-actions .quantum-btn, .topo-detail-actions .topo-act { min-height:36px; border-radius:10px; }
