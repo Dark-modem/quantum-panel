@@ -1745,10 +1745,15 @@
                   <button type="button" class="topo-copy" id="topologyCopyBtn" aria-label="Copy topology name" title="Copy topology name"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
                 </div>
                 <span class="topo-state-pill st-none" id="topologyHeadPill"><i aria-hidden="true"></i><span id="topologyHeadPillTx">—</span></span>
+                <p class="topo-head-sub" id="topologyHeadSub"></p>
               </div>
             </div>
             <div class="topo-detail-actions" role="group" aria-label="Topology actions">
               <button type="button" id="topologyAddTunnelBtn" class="quantum-btn quantum-btn-primary" data-i18n="tunnels_new">New Tunnel</button>
+              <div class="topo-attach-inline">
+                <select id="topologyAttachSelect" class="quantum-input" aria-label="Select an existing tunnel"></select>
+                <button type="button" id="topologyAttachBtn" class="quantum-btn quantum-btn-secondary"><svg class="topo-act-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 13.5l5-5"/><path d="M11 7l1.8-1.8a3.6 3.6 0 0 1 5.1 5.1L16 12.2"/><path d="M13 17l-1.8 1.8a3.6 3.6 0 0 1-5.1-5.1L8 12.2"/></svg><span data-i18n="topology_attach_btn">Attach tunnel</span></button>
+              </div>
               <span class="topo-act-sep" aria-hidden="true"></span>
               <button type="button" id="topologyActivateBtn" class="topo-act topo-act-green" hidden><svg class="topo-act-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8"/><path d="M6.3 6.3a8.5 8.5 0 1011.4 0"/></svg><span data-i18n="Activate">Activate</span></button>
               <button type="button" id="topologyDeactivateBtn" class="topo-act topo-act-power" hidden><svg class="topo-act-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8"/><path d="M6.3 6.3a8.5 8.5 0 1011.4 0"/></svg><span data-i18n="Deactivate">Deactivate</span></button>
@@ -1765,7 +1770,6 @@
           <div class="qs-hint" data-i18n="topology_cables">Each cable represents one tunnel between the two servers.</div>
           <div id="topologyTunnelList"></div>
           <div id="topoMembersCard"></div>
-          <div class="topo-attach u-mt-12"><label for="topologyAttachSelect" data-i18n="topology_attach">Attach an existing tunnel</label><select id="topologyAttachSelect" class="quantum-input"></select><button type="button" id="topologyAttachBtn" class="quantum-btn quantum-btn-secondary" data-i18n="topology_attach_btn">Attach tunnel</button></div>
           <div id="topologyBoundList" class="u-mt-8"></div>
         </div>
         <div class="tunnel-card rsc-banner" id="rscBanner" hidden role="alert">

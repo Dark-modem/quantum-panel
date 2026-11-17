@@ -727,6 +727,12 @@ function fillHeadCard(topo) {
   const lbl = !own.length ? tr('', 'No tunnels') : tr('', health === 'ok' ? 'Active' : health === 'down' ? 'Down' : 'Unknown');
   const tx = $('topologyHeadPillTx');
   if (tx) tx.textContent = lbl;
+  // the sub-line: how many servers each side carries (the members' real data)
+  const sub = $('topologyHeadSub');
+  if (sub) {
+    const i = topoSideServers(topo, 'iran').length, f2 = topoSideServers(topo, 'foreign').length;
+    sub.textContent = tr('', 'Mesh with {i} servers in Iran and {f} abroad').replace('{i}', String(i)).replace('{f}', String(f2));
+  }
   // The delete guard (owner rule): a topology can only be deleted while it
   // is powered off or holds no tunnels at all — otherwise the button is
   // disabled with the reason on its title.
