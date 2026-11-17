@@ -452,6 +452,35 @@ function topologyGraph(topo, tunnels) {
     return i >= 0 ? i : 0;
   };
   const stLabel = st => st === 'ok' ? tr('', 'Connected') : st === 'err' ? tr('', 'Stopped') : st === 'off' ? tr('', 'Disabled') : tr('', 'Unverified');
+  const label = st => st === 'ok' ? tr('', 'Connected') : st === 'err' ? tr('', 'Stopped') : st === 'off' ? tr('', 'Disabled') : tr('', 'Unverified');
+  let W, H, n = tunnels.length + agentTuns.length;
+  const colH = list => list.length * (NH + GAP) - GAP;
+  const iranH = colH(iranServers), foreignH = colH(foreignServers);
+  let geo = {};
+  if (vert) {
+    W = 520;
+    const gapY = n ? 64 + (n - 1) * 30 + 52 : 76;
+    const iy0 = 22;
+    const fy0 = iy0 + iranH + gapY;
+    H = Math.max(fy0 + foreignH + 34, 380);
+    geo = {
+      iran: { x: W / 2 - NW / 2, y: iy0, list: iranServers },
+      foreign: { x: W / 2 - NW / 2, y: fy0, list: foreignServers },
+      W, H,
+    };
+  } else {
+    W = 900;
+    H = Math.max(Math.max(iranH, foreignH) + 60, 258);
+    const fX = rtl ? 22 : W - 22 - NW;
+    const iX = rtl ? W - 22 - NW : 22;
+    const iy0 = (H - iranH) / 2, fy0 = (H - foreignH) / 2;
+    geo = {
+      iran: { x: iX, y: iy0, list: iranServers },
+      foreign: { x: fX, y: fy0, list: foreignServers },
+      W, H,
+    };
+  }
+  const nodeY = (col, i) => col.y + i * (NH + GAP);
   const agentCables = agentTuns.map((tn, i) => {
     const st = stOf(tn.state);
     const sw = tn.weightPct != null && tn.weightPct > 0 ? Math.max(2, Math.min(6, 2 + tn.weightPct / 100 * 6)) : 3;
@@ -482,35 +511,6 @@ function topologyGraph(topo, tunnels) {
       `<text class="cl-t-share" x="${lx.toFixed(1)}" y="${(ly + 14).toFixed(1)}">${text(stLabel(st))}</text>` +
     `</g>`;
   }).join('');
-  const label = st => st === 'ok' ? tr('', 'Connected') : st === 'err' ? tr('', 'Stopped') : st === 'off' ? tr('', 'Disabled') : tr('', 'Unverified');
-  let W, H, n = tunnels.length + agentTuns.length;
-  const colH = list => list.length * (NH + GAP) - GAP;
-  const iranH = colH(iranServers), foreignH = colH(foreignServers);
-  let geo = {};
-  if (vert) {
-    W = 520;
-    const gapY = n ? 64 + (n - 1) * 30 + 52 : 76;
-    const iy0 = 22;
-    const fy0 = iy0 + iranH + gapY;
-    H = Math.max(fy0 + foreignH + 34, 380);
-    geo = {
-      iran: { x: W / 2 - NW / 2, y: iy0, list: iranServers },
-      foreign: { x: W / 2 - NW / 2, y: fy0, list: foreignServers },
-      W, H,
-    };
-  } else {
-    W = 900;
-    H = Math.max(Math.max(iranH, foreignH) + 60, 258);
-    const fX = rtl ? 22 : W - 22 - NW;
-    const iX = rtl ? W - 22 - NW : 22;
-    const iy0 = (H - iranH) / 2, fy0 = (H - foreignH) / 2;
-    geo = {
-      iran: { x: iX, y: iy0, list: iranServers },
-      foreign: { x: fX, y: fy0, list: foreignServers },
-      W, H,
-    };
-  }
-  const nodeY = (col, i) => col.y + i * (NH + GAP);
   // resolve a tunnel's endpoint node indexes (by endpoint ip, fallback 0)
   const pickIdx = (col, list, ip) => {
     const i = list.findIndex(s => s.ip && ip && s.ip === ip);
