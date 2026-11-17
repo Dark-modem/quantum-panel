@@ -1944,25 +1944,37 @@ $('topologyAddTunnelBtn').onclick = topologyNewTunnel;
       : String(s || '') === 'down' ? 'err' : String(s || '') === 'disabled' ? 'off' : 'warn';
     const rows = topoAgentTunnels(topo);
     let html = '';
+    const pillOf = st => '<span class="topo-tip-pill ' + stOf(st) + '"><i></i>' + esc(label(st)) + '</span>';
+    const shortKey = k => String(k || '').replace('tun-' + topo.name + '-', '');
     if (pairEl) {
-      // a pair wire: every tunnel between the two servers, with its state
+      // a pair wire: every tunnel between the two servers, each in its own row
       const pair = (g.getAttribute('data-topology-pair') || '').split('|');
       const mine = rows.filter(tn => tn.localName === pair[0] && tn.remoteName === pair[1]);
-      html = '<b>' + esc(pair[0] + ' → ' + pair[1]) + '</b><br>' +
-        (mine.length ? mine.map(tn => esc(tn.key.replace('tun-' + topo.name + '-', '')) + ' · ' + esc(tn.engine || '') + ' · ' + esc(label(stOf(tn.state)))).join('<br>')
-          : esc(tr('', 'No tunnels')));
+      html = '<div class="topo-tip-h"><b>' + esc(pair[0] + ' → ' + pair[1]) + '</b>' +
+        '<span class="topo-tip-count">' + esc(mine.length + ' ' + tr('', mine.length === 1 ? 'tunnel' : 'tunnels')) + '</span></div>' +
+        '<div class="topo-tip-rows">' +
+        (mine.length ? mine.map(tn => '<div class="topo-tip-row">' +
+            '<span class="topo-tip-dot ' + stOf(tn.state) + '"></span>' +
+            '<span class="topo-tip-key"><bdi dir="ltr">' + esc(shortKey(tn.key)) + '</bdi></span>' +
+            '<span class="topo-tip-eng">' + esc(tn.engine || '') + '</span>' +
+            pillOf(tn.state) +
+            (tn.latency != null && tn.latency >= 0 ? '<span class="topo-tip-lat">' + esc(Math.round(tn.latency) + ' ms') + '</span>' : '') +
+            '</div>').join('')
+          : '<div class="topo-tip-none">' + esc(tr('', 'No tunnels')) + '</div>') +
+        '</div>';
     } else {
       const t = (topologyData.tunnels || []).find(x => String(x.id) === g.getAttribute('data-topology-cable'));
       if (!t) { tip.hidden = true; return; }
       const st = String(t.state || '');
-      const stLabel = ['healthy', 'ok', 'up', 'connected'].includes(st) ? tr('', 'Connected') : st === 'down' ? tr('', 'Stopped') : st === 'disabled' ? tr('', 'Disabled') : tr('', 'Unverified');
       const iranName = (topoSideServers(topo, 'iran')[0] || {}).name || '';
       const frnName = (topoSideServers(topo, 'foreign')[0] || {}).name || '';
-      html = '<b>' + esc(t.name || '') + '</b><br>' +
-        esc(tr('', 'Engine')) + ': ' + esc(t.engine || '—') + '<br>' +
-        esc(tr('', 'Weight')) + ': ' + esc(t.weight != null ? String(t.weight) : '—') + '<br>' +
-        esc(tr('', 'Status')) + ': ' + esc(stLabel) + '<br>' +
-        '<span class="u-mono">' + esc(iranName || topo.local_ip || '') + ' ↔ ' + esc(frnName || topo.remote_ip || '') + '</span>';
+      html = '<div class="topo-tip-h"><b>' + esc(shortKey(t.id)) + '</b></div>' +
+        '<div class="topo-tip-rows"><div class="topo-tip-row">' +
+        '<span class="topo-tip-dot ' + stOf(t.state) + '"></span>' +
+        '<span class="topo-tip-eng">' + esc(t.engine || '') + '</span>' +
+        pillOf(t.state) +
+        '<span class="topo-tip-lat">' + esc(t.latency_ms != null && t.latency_ms >= 0 ? Math.round(t.latency_ms) + ' ms' : '—') + '</span>' +
+        '</div><div class="topo-tip-path u-mono">' + esc(iranName || topo.local_ip || '') + ' → ' + esc(frnName || topo.remote_ip || '') + '</div></div>';
     }
     tip.innerHTML = html;
     const host = box.querySelector('.topo-map') || box;
