@@ -932,7 +932,7 @@ function topologyRender() {
   const assigned = new Set(topologyData.topologies.flatMap(t => t.tunnel_ids || []));
   if (!topo) return;
   const cables = (topo.tunnel_ids || []).map(id => topologyData.tunnels.find(t => t.id === id) || {id, name: id, engine: '—', state: 'down'});
-  $('topologyGraph').innerHTML = topologyGraph(topo, cables);
+  if (topo) $('topologyGraph').innerHTML = topologyGraph(topo, cables); else $('topologyGraph').innerHTML = '';
   // the established tunnels between this pair, listed under the map
   const tl = $('topologyTunnelList');
   if (tl) {
