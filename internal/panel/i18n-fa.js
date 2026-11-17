@@ -3045,6 +3045,7 @@ window.FA_TEXT = {
  "No agents on this side yet": "هنوز ایجنتی در این سمت نیست",
  "Agent added to the topology": "ایجنت به توپولوژی اضافه شد",
  "Agent removed": "ایجنت حذف شد",
+ "Name copied": "نام کپی شد",
  "All connected": "همه متصل",
  "Partly connected": "بخشی متصل",
  "{n} tunnels": "{n} تانل",

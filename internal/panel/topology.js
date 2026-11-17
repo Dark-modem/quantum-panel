@@ -1923,6 +1923,10 @@ $('topologyDeactivateBtn').onclick = () => {
   const t = topologyCurrent(); if (!t) return;
   topologyPower(t.id, false);
 };
+$('topologyCopyBtn').onclick = () => {
+  const t = topologyCurrent(); if (!t) return;
+  copyTextSafe(t.name, tr('', 'Name copied'));
+};
 $('topologyDeleteBtn').onclick = () => { const t = topologyCurrent(); if (t) topologyDelete(t.id); };
 $('topologySetupBack').onclick = topologyResume;
 $('tunnelsAddBtn').onclick = topologyNewTunnel;

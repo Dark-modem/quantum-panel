@@ -1735,18 +1735,26 @@
         </div>
                 <div class="tunnel-card topo-detail-head-card" id="topologyHeadCard" hidden>
           <div class="topo-head-row">
+            <button type="button" id="topologyBackBtn" class="quantum-btn topo-back"><svg class="topo-back-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg><span data-i18n="topology_back">Back to the list</span></button>
+            <span class="topo-head-sep" aria-hidden="true"></span>
             <div class="topo-head-id">
               <span class="topo-head-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="5" cy="6" r="2.5"/><circle cx="19" cy="6" r="2.5"/><circle cx="12" cy="19" r="2.5"/><path d="M7.5 6h9M6.3 8l4.7 8.8M17.7 8l-4.7 8.8"/></svg></span>
-              <p class="tc-title" id="topologyHeadName">—</p>
-              <span class="topo-state-pill st-none" id="topologyHeadPill"><i aria-hidden="true"></i><span id="topologyHeadPillTx">—</span></span>
+              <div class="topo-head-namewrap">
+                <div class="topo-head-namerow">
+                  <p class="tc-title topo-head-name" id="topologyHeadName">—</p>
+                  <button type="button" class="topo-copy" id="topologyCopyBtn" aria-label="Copy topology name" title="Copy topology name"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+                </div>
+                <span class="topo-state-pill st-none" id="topologyHeadPill"><i aria-hidden="true"></i><span id="topologyHeadPillTx">—</span></span>
+              </div>
             </div>
             <div class="topo-detail-actions" role="group" aria-label="Topology actions">
               <button type="button" id="topologyAddTunnelBtn" class="quantum-btn quantum-btn-primary" data-i18n="tunnels_new">New Tunnel</button>
-              <button type="button" id="topologyActivateBtn" class="topo-act topo-act-green"><svg class="topo-act-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8"/><path d="M6.3 6.3a8.5 8.5 0 1011.4 0"/></svg><span data-i18n="Activate">Activate</span></button>
-              <button type="button" id="topologyDeactivateBtn" class="topo-act topo-act-danger" hidden><svg class="topo-act-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8"/><path d="M6.3 6.3a8.5 8.5 0 1011.4 0"/></svg><span data-i18n="Deactivate">Deactivate</span></button>
+              <span class="topo-act-sep" aria-hidden="true"></span>
+              <button type="button" id="topologyActivateBtn" class="topo-act topo-act-green" hidden><svg class="topo-act-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8"/><path d="M6.3 6.3a8.5 8.5 0 1011.4 0"/></svg><span data-i18n="Activate">Activate</span></button>
+              <button type="button" id="topologyDeactivateBtn" class="topo-act topo-act-power" hidden><svg class="topo-act-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8"/><path d="M6.3 6.3a8.5 8.5 0 1011.4 0"/></svg><span data-i18n="Deactivate">Deactivate</span></button>
               <button type="button" id="topologyEditBtn" class="topo-act"><svg class="topo-act-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19.5 8.5l-4-4L4 16v4z"/></svg><span data-i18n="Edit">Edit</span></button>
+              <span class="topo-act-sep" aria-hidden="true"></span>
               <button type="button" id="topologyDeleteBtn" class="topo-act topo-act-danger"><svg class="topo-act-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg><span data-i18n="Delete">Delete</span></button>
-              <button type="button" id="topologyBackBtn" class="quantum-btn topo-back"><svg class="topo-back-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg><span data-i18n="topology_back">Back to the list</span></button>
             </div>
           </div>
         </div>
