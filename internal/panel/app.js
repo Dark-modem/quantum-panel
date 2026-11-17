@@ -12591,7 +12591,7 @@ function coresEngineCard(g) {
     '<div class="cores-card-main"><b>' + esc(disp) + '</b>' +
     (g.latest ? '<span class="cores-ver"><bdi dir="ltr">' + esc(g.latest) + '</bdi></span>' : '') +
     buildLine + '</div>' +
-    '<div class="cores-card-side"><span class="cores-stat">' + esc(tr('', '{n} of {m} agents').replace('{n}', String(installed)).replace('{m}', String((coresCache || []).length))) + '</span>' +
+    '<div class="cores-card-side"><span class="cores-stat">' + esc(tr('', '{n} of {m} agents').replace('{n}', String(installed)).replace('{m}', String((window.__coresAgents || []).length))) + '</span>' +
     (stale ? '<span class="cores-stale">' + esc(tr('', '{n} outdated').replace('{n}', String(stale))) + '</span>' : '') +
     '<div class="cores-acts">' +
     '<button type="button" class="quantum-btn quantum-btn-primary" data-cores-pick="' + esc(g.engine) + '">' + esc(tr('', 'Install on agents')) + '</button>' +
@@ -12615,7 +12615,7 @@ function renderCores() {
     return true;
   });
   const count = $('coresCount');
-  if (count) count.textContent = tr('', '{n} cores on {m} agents').replace('{n}', String(all.length)).replace('{m}', String(all.reduce((acc, g) => acc + (Object.keys(g.installed || {}).length ? 1 : 0), 0)));
+  if (count) count.textContent = tr('', '{n} cores on {m} agents').replace('{n}', String(all.length)).replace('{m}', String((window.__coresAgents || []).length));
   list.innerHTML = groups.length
     ? '<div class="cores-grid">' + groups.map(coresEngineCard).join('') + '</div>'
     : '<div class="ent-empty"><b>' + esc(tr('', 'No cores to show yet')) + '</b><span>' + esc(tr('', 'Cores appear here once they are provisioned for your topologies.')) + '</span></div>';
