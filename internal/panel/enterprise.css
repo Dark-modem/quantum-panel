@@ -1980,11 +1980,12 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 .topo-head-name { margin:0; font-family:var(--font-mono, monospace); font-size:24px; font-weight:700; letter-spacing:-0.2px;
   direction:ltr; text-align:start; min-width:0; overflow-wrap:anywhere; }
 /* the action buttons: one height, one radius, a constant gap; the power
-   toggle is neutral dark with a soft yellow icon (reversible, never red) */
+   toggle is neutral dark whose ring wears the icon's yellow (reversible,
+   never red) — the same icon+ring treatment the Edit button got */
 .topo-detail-actions .quantum-btn, .topo-detail-actions .topo-act { min-height:36px; border-radius:10px; }
 .topo-detail-actions .topo-act-ic { width:15px; height:15px; }
-.topo-act-power { color:var(--tx); background:var(--s2); border:1px solid var(--ln); }
-.topo-act-power:hover { color:var(--tx); border-color:var(--ln2); background:color-mix(in srgb, var(--tx) 6%, var(--s2)); }
+.topo-act-power { color:var(--tx); background:var(--s2); border:1px solid color-mix(in srgb, var(--wr) 45%, transparent); }
+.topo-act-power:hover { color:var(--tx); border-color:var(--wr); background:color-mix(in srgb, var(--wr) 10%, transparent); }
 .topo-act-power .topo-act-ic { color:var(--wr); }
 @media(max-width:799px) {
   .topo-head-row { flex-wrap:wrap; row-gap:10px; }
