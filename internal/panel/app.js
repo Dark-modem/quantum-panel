@@ -500,6 +500,7 @@ const I18N = {
     cores_empty_t: "No cores to show yet",
     cores_empty_d: "Cores appear here once they are provisioned for your topologies.",
     cores_refresh: "Refresh",
+    topo_tunnels_t: "Established tunnels",
     topology_map_t: "Topology map",
     nav_agents: "Agents",
     agents_tokens_title: "Enrollment Tokens",

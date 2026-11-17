@@ -1763,10 +1763,19 @@
           <div class="tc-header u-flex-wrap-gap8"><p class="tc-title" data-i18n="topology_map_t">Topology map</p></div>
           <div id="topologyGraph"></div>
           <div class="qs-hint" data-i18n="topology_cables">Each cable represents one tunnel between the two servers.</div>
-          <div id="topologyTunnelList"></div>
-          <div id="topoMembersCard"></div>
-          <div id="topologyBoundList" class="u-mt-8"></div>
         </div>
+        <div class="tunnel-card" id="topologyTunnelsCard" hidden>
+          <div class="tc-header u-flex-wrap-gap8">
+            <p class="tc-title" data-i18n="topo_tunnels_t">Established tunnels</p>
+            <span class="badge dim" id="topologyTunnelsCount">—</span>
+            <span class="u-flex-1"></span>
+            <button type="button" class="quantum-btn quantum-btn-primary u-btn-30" id="topologyAddTunnelBtn2" hidden>+ <span data-i18n="tunnels_new">New Tunnel</span></button>
+          </div>
+          <div id="topologyTunnelList"></div>
+          <div class="qs-hint u-mt-8" data-i18n="topology_cables">Each cable represents one tunnel between the two servers.</div>
+        </div>
+        <div class="tunnel-card" id="topoMembersCard"></div>
+        <div id="topologyBoundList" class="u-mt-8"></div>
         <div class="tunnel-card rsc-banner" id="rscBanner" hidden role="alert">
           <span class="rsc-ic warn" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg></span>
           <div class="rsc-ban-t"><b data-i18n="rsc_ban_t">This server cannot connect to its peer</b><span data-i18n="rsc_ban_d">Ping works but every TCP connection is dropped on the way. A one-click fix reverses the connection direction.</span></div>

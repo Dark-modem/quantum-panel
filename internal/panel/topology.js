@@ -986,9 +986,6 @@ function topologyRender() {
     topoCountryMount('topologyCountryDD', 'topologyCountry', tr('', 'Foreign server country'), 'topologyCountryLbl');
     topologyChooseRole(topo.role || 'iran');
   }
-  const candidates = topologyData.tunnels.filter(t => !assigned.has(t.id) && (!t.remote_ip || t.remote_ip === topo.remote_ip || (t.remote_ips || []).includes(topo.remote_ip)));
-  $('topologyAttachSelect').innerHTML = `<option value="">${esc(tr('', 'Select an existing tunnel'))}</option>`
-    + candidates.map(t => `<option value="${esc(t.id)}">${esc(t.name)} · ${esc(t.engine)}</option>`).join('');
   $('topologyBoundList').innerHTML = cables.map(t => `<div class="topo-binding"><b>${esc(t.name)}</b><span>${esc(t.state)}</span><button type="button" class="quantum-btn quantum-btn-ghost" data-topo-detach="${esc(t.id)}">${esc(tr('', 'Detach from topology'))}</button><button type="button" class="quantum-btn quantum-btn-secondary" data-topo-view-tunnel="${esc(t.id)}">${esc(tr('', 'View'))}</button></div>`).join('');
 }
 function topologyChooseRole(role) {
@@ -1057,14 +1054,6 @@ function topologyDcMatches(t) {
     const dc = topoIsFa() ? (s.dc || s.dcEn) : (s.dcEn || s.dc);
     return dc === topologyDcFilter;
   }));
-}
-async function topologyAttach() {
-  const topo = topologyCurrent(), id = $('topologyAttachSelect').value;
-  if (!topo || !id) return;
-  try {
-    await api('/api/topologies/' + encodeURIComponent(topo.id), {tunnel_ids: [...(topo.tunnel_ids || []), id]}, 'PATCH');
-    await topologyReload();
-  } catch(e) { toastErr(tr('', 'Topology save failed'), e.message); }
 }
 async function topologyDetach(id) {
   const topo = topologyCurrent(); if (!topo) return;
@@ -1921,7 +1910,6 @@ async function topoCreateFinish() {
 $('topologyCreateBtn').onclick = topologyCreate;
 $('topologyBackBtn').onclick = topologyBack;
 $('topologySaveBtn').onclick = topologySave;
-$('topologyAttachBtn').onclick = topologyAttach;
 $('topologyEditBtn').onclick = topoEditOpen;
 $('topoEditCancel').onclick = topoEditClose;
 $('topoEditX').onclick = topoEditClose;
