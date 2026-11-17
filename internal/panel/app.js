@@ -12525,14 +12525,15 @@ window.loadClusterStatus = loadClusterStatus;
 })();
 
 // ===== Cores: the global core catalog, managed from one page ===========
-// The page lists every core TYPE once (the artifact catalog joined with
-// what the agents report), and manages it globally: install on agents,
+// The page lists every core TYPE once — the union of the artifact catalog,
+// what the agents report in hello, and the full engine enumeration each
+// agent's page carries — and manages it globally: install on agents,
 // re-sync (update) installed ones. Per-agent detail stays on the agents'
-// own pages — this page is the catalog, not a per-agent dump.
+// own pages; this page is the catalog, not a per-agent dump.
 let coresCache = null;
 let coresFilter = 'all';
 let coresLoading = false;
-let coresPick = null; // { engine, disp, latest }
+let coresPick = null; // { engine, disp }
 const CORES_ENGINE_IMG = { aestun: 'img/engines/aestun.png', rakhsh: 'img/engines/rakhsh.png', gost: 'img/engines/gost.png', xray: 'img/engines/xray.svg', wireguard: 'img/engines/wireguard.png', rathole: 'img/engines/rathole.png', wst: 'img/engines/wstunnel.png', wstunnel: 'img/engines/wstunnel.png', tinc: 'img/engines/tinc.svg', hysteria: 'img/engines/hysteria.png', singbox: 'img/engines/singbox.png', midos: 'img/engines/midos.png', dagger: 'img/engines/dagger.png', pengo: 'img/engines/pengo.png', backhaul: 'img/engines/backhaul.png', backpack: 'img/engines/backpack.png', narnia: 'img/engines/narnia.png', waterwall: 'img/engines/waterwall.png', wattunnel: 'img/engines/wattunnel.png', udp2raw: 'img/engines/udp2raw.png', paqet: 'img/engines/paqet.png', frp: 'img/engines/frp.png', easytier: 'img/engines/easytier.png', chisel: 'img/engines/chisel.png' };
 const CORES_ENGINE_NAME = { aestun: 'AESTun', rakhsh: 'Rakhsh', matrix: 'Matrix', frp: 'FRP', backhaul: 'Backhaul', gost: 'Gost', xray: 'Xray', wireguard: 'WireGuard', wst: 'wstunnel', wstunnel: 'wstunnel', chisel: 'Chisel', rathole: 'Rathole', tinc: 'Tinc', backpack: 'BackPack', dagger: 'DaggerConnect', easytier: 'EasyTier', hysteria: 'Hysteria', midos: 'Midos', narnia: 'Narnia', paqet: 'Paqet', pengo: 'Pengo', singbox: 'sing-box', spoof: 'Spoof', udp2raw: 'udp2raw', waterwall: 'WaterWall', wattunnel: 'WatTunnel' };
 const CORES_CUBE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l8 4.5v9L12 20l-8-4.5v-9L12 2z"/><path d="M4 6.5l8 4.5 8-4.5M12 11v9"/></svg>';
@@ -12546,21 +12547,37 @@ async function loadCores(force) {
   try {
     const d = await api('/api/ui/engines');
     window.__coresAgents = ((d && d.agents) || []);
-    const ags = ((d && d.agents) || []);
     const arts = ((d && d.artifacts) || []);
-    // catalog: one entry per engine id — the artifact catalog feeds the
-    // latest version; the agents' own reports fill in what is installed.
     const byEngine = {};
     arts.forEach(a => {
-      const g = byEngine[a.engine] || (byEngine[a.engine] = { engine: a.engine, latest: '', builds: [], installed: {} });
+      const g = byEngine[a.engine] || (byEngine[a.engine] = { engine: a.engine, latest: '', builds: [], installed: {}, detail: {} });
       if (!g.builds.some(b => b.goarch === a.goarch && b.version === a.version)) g.builds.push({ goarch: a.goarch, goos: a.goos, version: a.version, size: a.size, artifact: a.artifact });
       if (!g.latest || String(a.version).localeCompare(String(g.latest), 'en', { numeric: true }) > 0) g.latest = a.version;
     });
-    ags.forEach(a => {
+    window.__coresAgents.forEach(a => {
       (a.engines || []).forEach(e => {
-        const g = byEngine[e.id] || (byEngine[e.id] = { engine: e.id, latest: '', builds: [], installed: {} });
+        const g = byEngine[e.id] || (byEngine[e.id] = { engine: e.id, latest: '', builds: [], installed: {}, detail: {} });
         g.installed[a.id] = { name: a.name, version: e.version || '', status: a.status || '', arch: a.arch || '' };
-        if (!g.latest || String(e.version || '').localeCompare(String(g.latest), 'en', { numeric: true }) > 0) g.latest = e.version || g.latest;
+        if (e.version && (!g.latest || String(e.version).localeCompare(String(g.latest), 'en', { numeric: true }) > 0)) g.latest = e.version;
+      });
+    });
+    // the full 25-core enumeration lives on the agents' pages — merge it so
+    // the catalog carries every core the panel knows, installed or not
+    const details = await Promise.all(window.__coresAgents.map(a => api('/api/ui/agents/' + encodeURIComponent(a.id)).catch(() => null)));
+    details.filter(Boolean).forEach(det => {
+      const ag = det.agent || {};
+      (det.engines || []).forEach(en => {
+        const g = byEngine[en.engine] || (byEngine[en.engine] = { engine: en.engine, latest: '', builds: [], installed: {}, detail: {} });
+        g.detail = g.detail || {};
+        g.detail[ag.id] = {
+          name: ag.name || a_name(ag),
+          status: ag.status || '',
+          installed: !!en.installed,
+          enabled: !!en.enabled,
+          version: en.version || '',
+          health: en.health || '',
+        };
+        if (en.installed && en.version && (!g.latest || String(en.version).localeCompare(String(g.latest), 'en', { numeric: true }) > 0)) g.latest = en.version;
       });
     });
     coresCache = Object.keys(byEngine).sort((x, y) => (CORES_ENGINE_NAME[x] || x).localeCompare(CORES_ENGINE_NAME[y] || y)).map(k => byEngine[k]);
@@ -12572,18 +12589,22 @@ async function loadCores(force) {
     if (rf) rf.disabled = false;
   }
 }
-function coresAgentIds(engine) {
-  const g = (coresCache || []).find(x => x.engine === engine);
-  return g ? Object.keys(g.installed || {}) : [];
+function a_name(ag) { return ag.name || ''; }
+function coresInstalled(g) {
+  const det = g.detail || {};
+  return Object.keys(det).filter(id => det[id].installed).length;
+}
+function coresStale(g) {
+  const det = g.detail || {};
+  return Object.keys(det).filter(id => det[id].installed && det[id].version && g.latest && det[id].version !== g.latest).length;
 }
 function coresEngineCard(g) {
   const disp = CORES_ENGINE_NAME[g.engine] || g.engine || '';
   const img = CORES_ENGINE_IMG[g.engine] ? '<img src="' + CORES_ENGINE_IMG[g.engine] + '" alt="' + esc(disp) + '" draggable="false">' : CORES_CUBE;
-  const ids = Object.keys(g.installed || {});
-  const installed = ids.length;
-  const archs = g.builds.map(b => '<span class="cores-arch">' + esc(b.goos + '/' + b.goarch) + '</span>').join('');
-  const stale = ids.filter(id => g.installed[id].version && g.latest && g.installed[id].version !== g.latest).length;
-  const buildLine = g.builds.length
+  const installed = coresInstalled(g);
+  const stale = coresStale(g);
+  const archs = (g.builds || []).map(b => '<span class="cores-arch">' + esc(b.goos + '/' + b.goarch) + '</span>').join('');
+  const buildLine = (g.builds || []).length
     ? '<span class="cores-builds">' + archs + '</span>'
     : '<span class="cores-builds cores-none">' + esc(tr('', 'No artifact builds yet')) + '</span>';
   return '<div class="cores-card">' +
@@ -12606,12 +12627,12 @@ function renderCores() {
   if (filters) filters.innerHTML = chips.map(c => '<button type="button" class="mtb-eng-chip' + (coresFilter === c[0] ? ' on' : '') + '" data-cores-filter="' + c[0] + '">' + esc(c[1]) + '</button>').join('');
   const all = coresCache || [];
   const groups = all.filter(g => {
-    const ids = Object.keys(g.installed || {});
-    const stale = ids.filter(id => g.installed[id].version && g.latest && g.installed[id].version !== g.latest).length;
-    if (coresFilter === 'installed') return ids.length > 0;
-    if (coresFilter === 'unused') return ids.length === 0;
+    const installed = coresInstalled(g);
+    const stale = coresStale(g);
+    if (coresFilter === 'installed') return installed > 0;
+    if (coresFilter === 'unused') return installed === 0;
     if (coresFilter === 'stale') return stale > 0;
-    if (coresFilter === 'fresh') return ids.length > 0 && stale === 0;
+    if (coresFilter === 'fresh') return installed > 0 && stale === 0;
     return true;
   });
   const count = $('coresCount');
@@ -12625,14 +12646,13 @@ function coresPickerOpen(engine) {
   if (!g) return;
   const disp = CORES_ENGINE_NAME[g.engine] || g.engine || '';
   coresPick = { engine: g.engine, disp };
-  const ags = (coresCache || []).length ? Object.keys(g.installed || {}).map(id => ({ id, ...g.installed[id] })) : [];
-  // the full agent roster comes from the catalog's agent set; agents without
-  // this core are the install targets — include them from the last cache
-  const roster = (window.__coresAgents || []);
-  const rows = roster.map(a => {
-    const inst = g.installed[a.id];
-    const state = inst ? (inst.version || tr('', 'installed')) : tr('', 'Not installed');
-    return '<label class="cores-pick-row"><input type="checkbox" value="' + esc(a.id) + '"' + (inst ? ' checked' : '') + '><b>' + esc(a.name) + '</b><span class="cores-pick-state">' + esc(state) + '</span></label>';
+  const det = g.detail || {};
+  const rows = (window.__coresAgents || []).map(a => {
+    const d = det[a.id] || {};
+    const state = d.installed
+      ? (d.enabled ? tr('', 'Running') : tr('', 'Stopped')) + (d.version ? ' · ' + d.version : '')
+      : tr('', 'Not installed');
+    return '<label class="cores-pick-row"><input type="checkbox" value="' + esc(a.id) + '"><b>' + esc(a.name) + '</b><span class="cores-pick-state">' + esc(state) + '</span></label>';
   }).join('') || '<div class="ent-empty"><b>' + esc(tr('', 'No agents enrolled yet')) + '</b></div>';
   let ov = document.getElementById('coresPickModal');
   if (!ov) {
@@ -12665,7 +12685,8 @@ async function coresPickInstall() {
 async function coresUpdateAll(engine) {
   const g = (coresCache || []).find(x => x.engine === engine);
   if (!g) return;
-  const stale = Object.keys(g.installed || {}).filter(id => g.installed[id].version && g.latest && g.installed[id].version !== g.latest);
+  const det = g.detail || {};
+  const stale = Object.keys(det).filter(id => det[id].installed && det[id].version && g.latest && det[id].version !== g.latest);
   if (!stale.length) return;
   const results = await Promise.allSettled(stale.map(id =>
     api('/api/ui/agents/' + encodeURIComponent(id) + '/engines/' + encodeURIComponent(engine) + '/enable', {}, 'POST')));
@@ -12694,3 +12715,4 @@ async function coresUpdateAll(engine) {
   });
   if ((location.hash || '').indexOf('#t=cores') === 0) loadCores();
 })();
+
