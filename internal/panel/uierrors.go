@@ -130,6 +130,11 @@ var uiErrCatalog = map[string]uiErrEntry{
 		uiErrText{"The weight write would touch tunnels of another topology.", "نوشتن وزن به تونل‌های توپولوژی دیگری برخورد می‌کند."},
 		uiErrText{"The tunnel belongs to a different topology than the request path.", "تونل به توپولوژی دیگری تعلق دارد."},
 		uiErrText{"Use the tunnel's own topology endpoint.", "از نشانی توپولوژی خود تونل استفاده کنید."}},
+	"E-TOPOLOGY-DC-CONFLICT": {409,
+		uiErrText{"One datacenter per side", "یک دیتاسنتر برای هر طرف"},
+		uiErrText{"The topology would mix several datacenters on one side (see details).", "توپولوژی چند دیتاسنتر را در یک طرف ترکیب می‌کند (در details)."},
+		uiErrText{"A topology spans exactly one Iran datacenter and one foreign datacenter; many servers within those DCs are fine.", "هر توپولوژی دقیقاً یک دیتاسنتر ایران و یک دیتاسنتر خارج دارد؛ چند سرور در همان دیتاسنترها مجاز است."},
+		uiErrText{"Detach the offending tunnels named in details.tunnels (or move them to a topology of their own datacenter), then retry.", "تونل‌های معرفی‌شده در details.tunnels را جدا کنید (یا به توپولوژیِ دیتاسنتر خودشان ببرید) و دوباره تلاش کنید."}},
 	"E-CONFIRM-REQUIRED": {409,
 		uiErrText{"Confirmation required", "نیاز به تأیید دارد"},
 		uiErrText{"The destructive call arrived without its confirmation token (or the token expired/was used).", "فرایند مخرب بدون توکن تأیید (یا با توکن منقضی/مصرف‌شده) رسید."},
@@ -155,6 +160,7 @@ var uiDetailAllowed = map[string]bool{
 	"alternatives": true,
 	"arch":         true, "module": true, "op": true, "field": true,
 	"retry_after_s": true, "raw": true, "reason": true, "role": true,
+	"side": true, "datacenters": true,
 }
 
 var uiSecretLike = regexp.MustCompile(`(?i)(key|token|secret|password|passwd|psk|auth|cookie|credential|pin\b)`)
