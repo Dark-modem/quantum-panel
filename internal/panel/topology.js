@@ -521,8 +521,6 @@ function topologyGraph(topo, tunnels) {
       `<path class="cl-e-hit" d="${d}"/>` +
       `<path class="cl-e-line" style="stroke-width:${sw}" d="${d}"/>` +
       (p.ok > 0 ? `<path class="cl-e-flow" d="${d}"/>` : '') +
-      `<text class="cl-t-share" x="${lx.toFixed(1)}" y="${ly.toFixed(1)}">${text(lbl)}</text>` +
-      `<text class="cl-t-share" x="${lx.toFixed(1)}" y="${(ly + 14).toFixed(1)}">${text(allUp ? tr('', 'All connected') : (p.ok > 0 ? tr('', 'Partly connected') : tr('', 'Down')))}</text>` +
     `</g>`;
   }).join('');
   // resolve a tunnel's endpoint node indexes (by endpoint ip, fallback 0)
@@ -530,39 +528,6 @@ function topologyGraph(topo, tunnels) {
     const i = list.findIndex(s => s.ip && ip && s.ip === ip);
     return i >= 0 ? i : 0;
   };
-  const cables = tunnels.map((t, i) => {
-    const st = stateOf(t);
-    const sw = weightOf(t);
-    const localIp = topo.role === 'foreign' ? t.remote_ip : t.local_ip;
-    const remoteIp = topo.role === 'foreign' ? t.local_ip : t.remote_ip;
-    const ii = pickIdx(geo.iran, iranServers, localIp);
-    const fi = pickIdx(geo.foreign, foreignServers, remoteIp);
-    let d, lx, ly;
-    if (vert) {
-      const x1 = geo.iran.x + NW / 2 + (ii - (iranServers.length - 1) / 2) * 18;
-      const y1 = nodeY(geo.iran, ii) + NH;
-      const x2 = geo.foreign.x + NW / 2 + (fi - (foreignServers.length - 1) / 2) * 18;
-      const y2 = nodeY(geo.foreign, fi);
-      const midY = (y1 + y2) / 2;
-      d = `M ${x1.toFixed(1)} ${y1} C ${x1.toFixed(1)} ${midY}, ${x2.toFixed(1)} ${midY}, ${x2.toFixed(1)} ${y2}`;
-      lx = W / 2; ly = midY;
-    } else {
-      const y1 = nodeY(geo.iran, ii) + NH / 2;
-      const y2 = nodeY(geo.foreign, fi) + NH / 2;
-      const x1 = geo.iran.x + NW, x2 = geo.foreign.x;
-      const dx = Math.max(40, (x2 - x1) / 2);
-      d = `M ${x1},${y1.toFixed(1)} C ${x1 + dx},${y1.toFixed(1)} ${x2 - dx},${y2.toFixed(1)} ${x2},${y2.toFixed(1)}`;
-      lx = (x1 + x2) / 2; ly = (y1 + y2) / 2 - 12;
-    }
-    return `<g data-topology-cable="${text(t.id)}" data-topo-view-tunnel="${text(t.id)}" class="cl-e ${st} topo-cable" tabindex="0" role="button" aria-label="${text(t.name)} · ${text(stateLabel(st))}">` +
-      `<title>${text(t.name)} · ${text(t.engine)} · ${text(stateLabel(st))}</title>` +
-      `<path class="cl-e-hit" d="${d}"/>` +
-      `<path class="cl-e-line" style="stroke-width:${sw}" d="${d}"/>` +
-      (st === 'ok' ? `<path class="cl-e-flow" d="${d}"/>` : '') +
-      `<text class="cl-t-share" x="${lx.toFixed(1)}" y="${ly.toFixed(1)}">${text(t.name)} · ${text(t.engine)}</text>` +
-      `<text class="cl-t-share" x="${lx.toFixed(1)}" y="${(ly + 14).toFixed(1)}">${text(stateLabel(st))}</text>` +
-    `</g>`;
-  }).join('');
   const cc = String(topo.country || '').toLowerCase();
   const countryLabel = (TOPO_COUNTRIES.find(c => c[0] === cc) || ['', tr('', 'Other')])[1];
   // server cards in the cluster map's language: cl-n cards (rounded, solid
