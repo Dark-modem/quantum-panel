@@ -1735,6 +1735,7 @@
         </div>
                 <div class="tunnel-card topo-detail-head-card" id="topologyHeadCard" hidden>
           <div class="topo-head-row">
+            <button type="button" id="topologyBackBtn" class="quantum-btn topo-back"><svg class="topo-back-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg><span data-i18n="topology_back">Back to the list</span></button>
             <div class="topo-head-id">
               <p class="tc-title" id="topologyHeadName">—</p>
               <span class="topo-state-pill st-none" id="topologyHeadPill"><i aria-hidden="true"></i><span id="topologyHeadPillTx">—</span></span>
@@ -1749,9 +1750,7 @@
           </div>
         </div>
         <div class="tunnel-card" id="topologyDetailCard" hidden>
-          <div class="tc-header">
-            <button type="button" id="topologyBackBtn" class="quantum-btn topo-back"><svg class="topo-back-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg><span data-i18n="topology_back">Back to the list</span></button>
-          </div>
+          
           <div class="tc-header u-flex-wrap-gap8"><p class="tc-title" data-i18n="topology_map_t">Topology map</p></div>
           <div id="topologyGraph"></div>
           <div class="qs-hint" data-i18n="topology_cables">Each cable represents one tunnel between the two servers.</div>
