@@ -654,7 +654,7 @@ function topoAgentTunnels(topo) {
 function topoDcReset() { topoDcLoaded = false; topoServersByTopo = {}; }
 function renderTopoMembers(topo) {
   const card = $('topoMembersCard');
-  if (!card) return;
+  if (!card || !topo) { if (card) card.innerHTML = ''; return; }
   const ags = window.__topoAgents || [];
   const members = side => ags.filter(a => a.role === side && (a.topologies || []).includes(topo.name));
   const memRow = (a, side) => '<div class="topo-mem-row">' +
