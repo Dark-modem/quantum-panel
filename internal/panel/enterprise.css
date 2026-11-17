@@ -1958,3 +1958,5 @@ html[dir="rtl"] .topo-back .topo-back-ic { transform:scaleX(-1); }
   top:-28px; inset-inline-start:-28px; pointer-events:none;
   background:radial-gradient(circle at 35% 35%, color-mix(in srgb, var(--ac) 22%, transparent) 0%, color-mix(in srgb, var(--ac) 7%, transparent) 72%); }
 .tunnel-card.topo-detail-head-card .topo-head-row { position:relative; z-index:1; }
+.topo-head-ic { width:20px; height:20px; display:inline-flex; color:var(--ac); flex:none; }
+.topo-head-ic svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
