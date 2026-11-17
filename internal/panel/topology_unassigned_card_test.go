@@ -15,7 +15,7 @@ func TestTopologyUnassignedCardRemoved(t *testing.T) {
 			t.Fatal(err)
 		}
 		sources[name] = string(data)
-		for _, id := range []string{"topologyUnassignedCard", "topologyUnassigned"} {
+		for _, id := range []string{"topologyUnassignedCard", "topologyUnassigned", "topologyAttachSelect", "topologyAttachBtn"} {
 			if strings.Contains(string(data), id) {
 				t.Errorf("%s still contains removed overview element %s", name, id)
 			}
@@ -23,13 +23,19 @@ func TestTopologyUnassignedCardRemoved(t *testing.T) {
 	}
 
 	html := sources["index.html"]
-	if !regexp.MustCompile(`<select\b[^>]*\bid="topologyAttachSelect"`).MatchString(html) {
-		t.Error("existing-tunnel attachment dropdown must remain")
+	// the attach-existing flow (dropdown + button) was removed by owner order
+	// (2026-11-18): tunnels are born into their topology and detach lives on
+	// the bound list; the dropdown must NOT come back.
+	if regexp.MustCompile(`<select[^>]*id="topologyAttachSelect"`).MatchString(html) {
+		t.Error("removed attach dropdown must not return")
+	}
+	if strings.Contains(html, `id="topologyAttachBtn"`) {
+		t.Error("removed attach button must not return")
 	}
 	for _, id := range []string{
 		"topologyListCard", "topologyDetailCard", "topologyGraph", "topologiesList",
 		"topologyCreateBtn", "topologyBackBtn", "topologySaveBtn",
-		"topologySettings", "topologyAttachBtn", "topologyBoundList", "topologyAddTunnelBtn",
+		"topologySettings", "topologyBoundList", "topologyAddTunnelBtn",
 	} {
 		if !strings.Contains(html, `id="`+id+`"`) {
 			t.Errorf("removing the overview card must preserve %s", id)
@@ -38,7 +44,6 @@ func TestTopologyUnassignedCardRemoved(t *testing.T) {
 
 	js := sources["topology.js"]
 	for _, fragment := range []string{
-		"$('topologyAttachSelect').innerHTML", "$('topologyAttachSelect').value",
 		"$('topologyGraph').innerHTML", "data-topo-open", "data-topo-delete",
 		"data-topo-detach", "data-topo-view-tunnel",
 	} {
