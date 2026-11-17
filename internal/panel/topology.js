@@ -589,16 +589,10 @@ function topologyGraph(topo, tunnels) {
   if (!n) {
     if (vert) {
       pieces.push(`<path class="cl-e idle topo-idle-line" d="M ${geo.iran.x + NW / 2} ${geo.iran.y + iranH} L ${geo.iran.x + NW / 2} ${geo.foreign.y}"/>`);
-      pieces.push(`<g class="cl-n add" data-topo-map-add role="button" tabindex="0" aria-label="${text(tr('', 'Add tunnel'))}"><title>${text(tr('', 'Add tunnel'))}</title>` +
-        `<rect class="cl-n-bg" x="${W / 2 - 90}" y="${(geo.iran.y + iranH + geo.foreign.y) / 2 - 19}" width="180" height="38" rx="12"/>` +
-        tTxt(W / 2, (geo.iran.y + iranH + geo.foreign.y) / 2 + 5, 'cl-t1 cl-tc', '+ ' + tr('', 'Add tunnel'), 'middle') + `</g>`);
     } else {
       const x1 = geo.iran.x + NW, x2 = geo.foreign.x;
       const cy = (geo.iran.y + iranH / 2 + geo.foreign.y + foreignH / 2) / 2;
       pieces.push(`<path class="cl-e idle topo-idle-line" d="M ${x1} ${cy.toFixed(1)} L ${x2} ${cy.toFixed(1)}"/>`);
-      pieces.push(`<g class="cl-n add" data-topo-map-add role="button" tabindex="0" aria-label="${text(tr('', 'Add tunnel'))}"><title>${text(tr('', 'Add tunnel'))}</title>` +
-        `<rect class="cl-n-bg" x="${(x1 + x2) / 2 - 90}" y="${cy.toFixed(1) - 19}" width="180" height="38" rx="12"/>` +
-        tTxt((x1 + x2) / 2, (cy + 5).toFixed(1), 'cl-t1 cl-tc', '+ ' + tr('', 'Add tunnel'), 'middle') + `</g>`);
     }
   }
   const legend = `<div class="cl-legend">` +
@@ -1995,7 +1989,6 @@ $('topologyAddTunnelBtn').onclick = topologyNewTunnel;
   });
   box.addEventListener('mouseleave', () => { const tip = box.querySelector('.topo-tip'); if (tip) tip.hidden = true; });
   box.addEventListener('click', e => {
-    if (e.target.closest('[data-topo-map-add]')) { topologyNewTunnel(); }
   });
 })();
 $('topoWizX').onclick = topoWizCancel;
