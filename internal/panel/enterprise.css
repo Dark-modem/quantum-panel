@@ -1999,8 +1999,8 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
    under the identity row, holding each side's server count and datacenter
    with its flag, the tunnel total split healthy/faulty, and the overall
    uptime share; thin lines separate the segments inside the box ------------ */
-.topo-head-stats { position:relative; z-index:1; display:flex; align-items:center; flex-wrap:wrap;
-  margin-top:14px; padding:10px 8px; row-gap:10px;
+.topo-head-stats { position:relative; z-index:1; display:flex; align-items:stretch; flex-wrap:wrap;
+  margin-top:14px; padding:6px 8px; row-gap:10px;
   border:1px solid var(--ln); border-radius:12px;
   background:color-mix(in srgb, var(--tx) 2.5%, transparent); }
 /* the topology list page styles .topo-stat as a mini-card of its own — the
