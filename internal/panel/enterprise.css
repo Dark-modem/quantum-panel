@@ -1995,13 +1995,16 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
   .topo-head-sep { display:none; }
 }
 
-/* --- head-card stat strip (the owner's mockup): each side's server count and
-   datacenter with its flag, the tunnel total split healthy/faulty, and the
-   overall uptime share ------------------------------------------------------ */
+/* --- head-card stat strip (the owner's mockup): ONE full-width unified box
+   under the identity row, holding each side's server count and datacenter
+   with its flag, the tunnel total split healthy/faulty, and the overall
+   uptime share; thin lines separate the segments inside the box ------------ */
 .topo-head-stats { position:relative; z-index:1; display:flex; align-items:center; flex-wrap:wrap;
-  margin-top:14px; padding-top:12px; border-top:1px solid var(--ln); row-gap:10px; }
+  margin-top:14px; padding:10px 8px; row-gap:10px;
+  border:1px solid var(--ln); border-radius:12px;
+  background:color-mix(in srgb, var(--tx) 2.5%, transparent); }
 .topo-stat { display:flex; align-items:center; gap:10px; padding:2px 16px; }
-.topo-stat:first-child { padding-inline-start:2px; }
+.topo-stat:first-child { padding-inline-start:10px; }
 .topo-stat + .topo-stat { border-inline-start:1px solid var(--ln2); }
 .topo-stat-ic { width:34px; height:34px; border-radius:10px; display:inline-flex; align-items:center; justify-content:center; flex:none;
   background:color-mix(in srgb, var(--ac) 13%, transparent); color:var(--ac); }
