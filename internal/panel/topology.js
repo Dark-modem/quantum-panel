@@ -429,7 +429,7 @@ function topologyGraph(topo, tunnels) {
     W = 900;
     H = Math.max(258, 170 + (n ? (n - 1) * 34 + 40 : 0));
     const fX = rtl ? 22 : W - 22 - NW;
-    const iX = rtl ? 22 : W - 22 - NW;
+    const iX = rtl ? W - 22 - NW : 22;
     geo = {
       iran: { x: iX, y: (H - NH) / 2, w: NW, h: NH },
       foreign: { x: fX, y: (H - NH) / 2, w: NW, h: NH },
