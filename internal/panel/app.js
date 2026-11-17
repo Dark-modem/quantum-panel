@@ -12536,6 +12536,7 @@ let coresLoading = false;
 let coresPick = null; // { engine, disp }
 const CORES_ENGINE_IMG = { aestun: 'img/engines/aestun.png', rakhsh: 'img/engines/rakhsh.png', gost: 'img/engines/gost.png', xray: 'img/engines/xray.svg', wireguard: 'img/engines/wireguard.png', rathole: 'img/engines/rathole.png', wst: 'img/engines/wstunnel.png', wstunnel: 'img/engines/wstunnel.png', tinc: 'img/engines/tinc.svg', hysteria: 'img/engines/hysteria.png', singbox: 'img/engines/singbox.png', midos: 'img/engines/midos.png', dagger: 'img/engines/dagger.png', pengo: 'img/engines/pengo.png', backhaul: 'img/engines/backhaul.png', backpack: 'img/engines/backpack.png', narnia: 'img/engines/narnia.png', waterwall: 'img/engines/waterwall.png', wattunnel: 'img/engines/wattunnel.png', udp2raw: 'img/engines/udp2raw.png', paqet: 'img/engines/paqet.png', frp: 'img/engines/frp.png', easytier: 'img/engines/easytier.png', chisel: 'img/engines/chisel.png' };
 const CORES_ENGINE_NAME = { aestun: 'AESTun', rakhsh: 'Rakhsh', matrix: 'Matrix', frp: 'FRP', backhaul: 'Backhaul', gost: 'Gost', xray: 'Xray', wireguard: 'WireGuard', wst: 'wstunnel', wstunnel: 'wstunnel', chisel: 'Chisel', rathole: 'Rathole', tinc: 'Tinc', backpack: 'BackPack', dagger: 'DaggerConnect', easytier: 'EasyTier', hysteria: 'Hysteria', midos: 'Midos', narnia: 'Narnia', paqet: 'Paqet', pengo: 'Pengo', singbox: 'sing-box', spoof: 'Spoof', udp2raw: 'udp2raw', waterwall: 'WaterWall', wattunnel: 'WatTunnel' };
+const CORES_ALIAS = { wst: 'wstunnel' };
 const CORES_CUBE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l8 4.5v9L12 20l-8-4.5v-9L12 2z"/><path d="M4 6.5l8 4.5 8-4.5M12 11v9"/></svg>';
 async function loadCores(force) {
   const list = $('coresList');
@@ -12550,13 +12551,15 @@ async function loadCores(force) {
     const arts = ((d && d.artifacts) || []);
     const byEngine = {};
     arts.forEach(a => {
-      const g = byEngine[a.engine] || (byEngine[a.engine] = { engine: a.engine, latest: '', builds: [], installed: {}, detail: {} });
+      const engKey = CORES_ALIAS[a.engine] || a.engine;
+      const g = byEngine[engKey] || (byEngine[engKey] = { engine: a.engine, latest: '', builds: [], installed: {}, detail: {} });
       if (!g.builds.some(b => b.goarch === a.goarch && b.version === a.version)) g.builds.push({ goarch: a.goarch, goos: a.goos, version: a.version, size: a.size, artifact: a.artifact });
       if (!g.latest || String(a.version).localeCompare(String(g.latest), 'en', { numeric: true }) > 0) g.latest = a.version;
     });
     window.__coresAgents.forEach(a => {
       (a.engines || []).forEach(e => {
-        const g = byEngine[e.id] || (byEngine[e.id] = { engine: e.id, latest: '', builds: [], installed: {}, detail: {} });
+        const engKey = CORES_ALIAS[e.id] || e.id;
+        const g = byEngine[engKey] || (byEngine[engKey] = { engine: e.id, latest: '', builds: [], installed: {}, detail: {} });
         g.installed[a.id] = { name: a.name, version: e.version || '', status: a.status || '', arch: a.arch || '' };
         if (e.version && (!g.latest || String(e.version).localeCompare(String(g.latest), 'en', { numeric: true }) > 0)) g.latest = e.version;
       });
@@ -12567,7 +12570,8 @@ async function loadCores(force) {
     details.filter(Boolean).forEach(det => {
       const ag = det.agent || {};
       (det.engines || []).forEach(en => {
-        const g = byEngine[en.engine] || (byEngine[en.engine] = { engine: en.engine, latest: '', builds: [], installed: {}, detail: {} });
+        const engKey = CORES_ALIAS[en.engine] || en.engine;
+        const g = byEngine[engKey] || (byEngine[engKey] = { engine: en.engine, latest: '', builds: [], installed: {}, detail: {} });
         g.detail = g.detail || {};
         g.detail[ag.id] = {
           name: ag.name || a_name(ag),
