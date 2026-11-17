@@ -685,6 +685,7 @@ function topologyRender() {
     next.disabled = topoPage >= pages;
     cur.disabled = pages <= 1;
   }
+  if (typeof topTitleSync === 'function') { try { topTitleSync(); } catch (e) {} }
   $('topologiesList').innerHTML = visible.length
     ? visible.map((t, i) => {
         const tunnels = topologyExistingTunnels(t);

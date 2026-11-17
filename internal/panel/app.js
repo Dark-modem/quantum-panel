@@ -279,6 +279,16 @@ function topTitleSync(id) {
   const nid = id || ((location.hash.match(/t=([a-z]+)/) || [])[1]) || 'dashboard';
   const ni = document.querySelector('.sidebar-nav .nav-item[data-tab="' + nid + '"]');
   const lbl = ni ? (ni.querySelector('span[data-i18n]') || ni.querySelector('span:not([class*="badge"])')) : null;
+  if (nid === 'tunnel' && typeof topologySelected !== 'undefined' && topologySelected) {
+    // a topology is open: breadcrumb like the agents' — section ‹ topology name
+    const topo = typeof topologyCurrent === 'function' ? topologyCurrent() : null;
+    if (topo && topo.name) {
+      h1.innerHTML = '<span class="mtb-bc"><a href="#t=tunnel" data-bc-back class="mtb-bc-link"></a><span class="mtb-bc-sep"> ‹ </span><span class="mtb-bc-cur"></span></span>';
+      h1.querySelector('.mtb-bc-link').textContent = lbl ? lbl.textContent : 'Topology';
+      h1.querySelector('.mtb-bc-cur').textContent = topo.name;
+      return;
+    }
+  }
   if (nid === 'magt' && window.mtbAgtDetail) {
     h1.innerHTML = '<span class="mtb-bc"><a href="#t=magt" data-bc-back class="mtb-bc-link"></a><span class="mtb-bc-sep"> \u2039 </span><span class="mtb-bc-cur"></span></span>';
     h1.querySelector('.mtb-bc-link').textContent = lbl ? lbl.textContent : 'Agents';
