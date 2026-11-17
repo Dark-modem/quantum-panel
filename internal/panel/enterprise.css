@@ -2029,6 +2029,10 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 /* the datacenter value matches its neighbor's two-line rhythm: bold value on
    top, the small dim label under it */
 .topo-head-stats .topo-stat-tx .topo-stat-dc { font-size:16px; font-weight:700; color:var(--tx); line-height:1.15; }
+/* the uptime pulse breathes a little more before its text and wears green —
+   the healthy color the percentage itself is made of */
+.topo-head-stats .topo-stat.upt { gap:16px; }
+.topo-head-stats .topo-stat-ic.upt { background:color-mix(in srgb, var(--ok) 13%, transparent); color:var(--ok); }
 .topo-stat-mini { display:flex; flex-direction:column; gap:4px; margin-inline-start:8px; }
 .topo-stat-k { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--dim); white-space:nowrap; }
 .topo-stat-k i { width:7px; height:7px; border-radius:50%; background:var(--ok); flex:none; }

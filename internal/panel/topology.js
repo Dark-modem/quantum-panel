@@ -795,7 +795,7 @@ function fillHeadStats(topo) {
         '</div></div>' +
     '</div>' +
     '<div class="topo-stat-group">' +
-      '<div class="topo-stat"><span class="topo-stat-ic alt">' + icPulse + '</span>' +
+      '<div class="topo-stat upt"><span class="topo-stat-ic upt">' + icPulse + '</span>' +
         '<div class="topo-stat-tx"><b>' + pct + '</b><span>' + esc(tr('', 'Overall uptime')) + '</span></div></div>' +
     '</div>';
 }
