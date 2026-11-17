@@ -1994,7 +1994,6 @@ html[dir="rtl"] .topo-back .topo-back-ic { transform:scaleX(-1); }
 }
 .topo-detail-actions .topo-act-danger { background:color-mix(in srgb, var(--er) 10%, transparent); border:1px solid color-mix(in srgb, var(--er) 40%, transparent); }
 .topo-detail-actions .topo-act-danger:hover { background:color-mix(in srgb, var(--er) 18%, transparent); }
-.topo-head-sub { margin:2px 0 0; color:var(--mu); font-size:12.5px; }
 .topo-attach-inline { display:flex; align-items:center; gap:8px; }
 .topo-attach-inline .quantum-input { height:36px; min-height:36px; max-width:210px; border-radius:10px; }
 .topo-attach-inline .quantum-btn { min-height:36px; border-radius:10px; display:inline-flex; align-items:center; gap:7px; }

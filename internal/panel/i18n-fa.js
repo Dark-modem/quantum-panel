@@ -3049,7 +3049,6 @@ window.FA_TEXT = {
  "All connected": "همه متصل",
  "Partly connected": "بخشی متصل",
  "{n} tunnels": "{n} تانل",
- "Mesh with {i} servers in Iran and {f} abroad": "مش با {i} سرور در ایران و {f} سرور خارج",
  "tunnel": "تانل",
  "tunnels": "تانل",
  "The topology must be off or empty before it can be deleted": "برای حذف، توپولوژی باید خاموش یا بدون تانل باشد",
