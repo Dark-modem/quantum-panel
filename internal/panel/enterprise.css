@@ -1993,6 +1993,29 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
   .topo-act-sep { display:none; }
   .topo-head-sep { display:none; }
 }
+
+/* --- head-card stat strip (the owner's mockup): each side's server count and
+   datacenter with its flag, the tunnel total split healthy/faulty, and the
+   overall uptime share ------------------------------------------------------ */
+.topo-head-stats { position:relative; z-index:1; display:flex; align-items:center; flex-wrap:wrap;
+  margin-top:14px; padding-top:12px; border-top:1px solid var(--ln); row-gap:10px; }
+.topo-stat { display:flex; align-items:center; gap:10px; padding:2px 16px; }
+.topo-stat:first-child { padding-inline-start:2px; }
+.topo-stat + .topo-stat { border-inline-start:1px solid var(--ln2); }
+.topo-stat-ic { width:34px; height:34px; border-radius:10px; display:inline-flex; align-items:center; justify-content:center; flex:none;
+  background:color-mix(in srgb, var(--ac) 13%, transparent); color:var(--ac); }
+.topo-stat-ic.alt { background:color-mix(in srgb, var(--info) 13%, transparent); color:var(--info); }
+.topo-stat-ic svg { width:17px; height:17px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.topo-stat-flag { display:inline-flex; flex:none; color:var(--tx); }
+.topo-stat-flag svg { width:22px; height:15px; }
+.topo-stat-tx { display:flex; flex-direction:column; gap:3px; min-width:0; }
+.topo-stat-tx b { font-size:19px; font-weight:700; line-height:1; color:var(--tx); }
+.topo-stat-tx span { font-size:12px; color:var(--dim); white-space:nowrap; }
+.topo-stat-dc { font-size:13px; font-weight:600; color:var(--tx2); }
+.topo-stat-mini { display:flex; flex-direction:column; gap:4px; margin-inline-start:8px; }
+.topo-stat-k { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--dim); white-space:nowrap; }
+.topo-stat-k i { width:7px; height:7px; border-radius:50%; background:var(--ok); flex:none; }
+.topo-stat-k.er i { background:var(--er); }
 .topo-detail-actions .topo-act-danger { background:color-mix(in srgb, var(--er) 10%, transparent); border:1px solid color-mix(in srgb, var(--er) 40%, transparent); }
 .topo-detail-actions .topo-act-danger:hover { background:color-mix(in srgb, var(--er) 18%, transparent); }
 .topo-attach-inline { display:flex; align-items:center; gap:8px; }

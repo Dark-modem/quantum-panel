@@ -748,6 +748,50 @@ function fillHeadCard(topo) {
   }
 }
 
+// fillHeadStats paints the head card's bottom stat strip (the owner's mockup):
+// each side's server count and datacenter with its flag, the tunnel total
+// split into healthy/faulty, and the topology's overall uptime — the healthy
+// share of its tunnels (the one honest percentage the live states can give).
+function fillHeadStats(topo) {
+  const host = $('topologyHeadStats');
+  if (!host) return;
+  if (!topo) { host.innerHTML = ''; return; }
+  const icServer = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="7" rx="2"/><rect x="2" y="13" width="20" height="7" rx="2"/><path d="M6 7.5h.01M6 16.5h.01"/></svg>';
+  const icLink = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 13.5l5-5"/><path d="M11 7l1.8-1.8a3.6 3.6 0 0 1 5.1 5.1L16 12.2"/><path d="M13 17l-1.8 1.8a3.6 3.6 0 0 1-5.1-5.1L8 12.2"/></svg>';
+  const icPulse = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>';
+  const sideStat = side => {
+    const list = topoSideServers(topo, side);
+    const cc = topoDcCc(topo, side);
+    const dcs = [];
+    list.forEach(s => {
+      const nm = topoIsFa() ? (s.dc || s.dcEn || '') : (s.dcEn || s.dc || '');
+      if (nm && dcs.indexOf(nm) < 0) dcs.push(nm);
+    });
+    const dcTxt = dcs.length ? dcs[0] + (dcs.length > 1 ? ' +' + (dcs.length - 1) : '') : '';
+    return '<div class="topo-stat">' +
+      '<span class="topo-stat-ic ' + (side === 'iran' ? 'iran' : 'alt') + '">' + icServer + '</span>' +
+      '<div class="topo-stat-tx"><b>' + list.length + '</b><span>' + esc(tr('', side === 'iran' ? 'Iran servers' : 'Foreign servers')) + '</span></div></div>' +
+      '<div class="topo-stat"><span class="topo-stat-flag">' + topologyFlagSvg(cc) + '</span>' +
+      '<div class="topo-stat-tx"><span class="topo-stat-dc">' + esc(dcTxt ? dcTxt + ' (' + cc + ')' : cc) + '</span></div></div>';
+  };
+  const own = topoAllTunnels(topo);
+  const isOk = t => ['healthy', 'ok', 'up', 'connected'].includes(String(t.state || ''));
+  const good = own.filter(isOk).length;
+  const bad = own.length - good;
+  const pct = own.length ? (Math.round(good / own.length * 1000) / 10) + '%' : '—';
+  host.innerHTML =
+    sideStat('iran') +
+    sideStat('foreign') +
+    '<div class="topo-stat"><span class="topo-stat-ic">' + icLink + '</span>' +
+      '<div class="topo-stat-tx"><b>' + own.length + '</b><span>' + esc(tr('', 'Tunnels')) + '</span></div>' +
+      '<div class="topo-stat-mini">' +
+        '<span class="topo-stat-k"><i></i>' + esc(good + ' ' + tr('', 'Healthy')) + '</span>' +
+        '<span class="topo-stat-k er"><i></i>' + esc(bad + ' ' + tr('', 'Faulty')) + '</span>' +
+      '</div></div>' +
+    '<div class="topo-stat"><span class="topo-stat-ic alt">' + icPulse + '</span>' +
+      '<div class="topo-stat-tx"><b>' + pct + '</b><span>' + esc(tr('', 'Overall uptime')) + '</span></div></div>';
+}
+
 async function topologyReload() {
   if (topologyLoading) return;
   topologyLoading = true;
@@ -761,6 +805,7 @@ async function topologyReload() {
     topologyLoadedOnce = true;
     await topoDcLoad(topologyCurrent());
     fillHeadCard(topologyCurrent());
+    fillHeadStats(topologyCurrent());
     topologyRender();
     renderTunnelsList();
   } catch(e) {
@@ -810,6 +855,7 @@ function topologyRender() {
   const headCard = $('topologyHeadCard');
   if (headCard) headCard.hidden = !topo || inTunnel;
   fillHeadCard(topo);
+  fillHeadStats(topo);
   $('topologySetupBack').hidden = !topo;
   $('rscBanner').classList.toggle('td-hide', !inTunnel);
   $('dialCard').classList.toggle('td-hide', !inTunnel);
