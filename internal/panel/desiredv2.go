@@ -120,6 +120,15 @@ func compileDesiredV2(s *store.Store, ag store.Agent) (desired *protocol.Desired
 		return nil, "no enabled tunnels reference this server yet", warnings, nil
 	}
 
+	// Phase 31 (contract §2.6, UI-API-REQUESTS §10.4): stamp the artifact
+	// engines' tunnel params with the LATEST artifact version for this
+	// agent's arch. A newly uploaded artifact then changes the desired
+	// document → the push reaches the agent → the tunnels restart (artifact
+	// engines never live-reload) → the restart re-resolves the signed
+	// manifest and downloads the new version. Stored engine_params are
+	// never modified; the stamp is derived per compile.
+	stampArtifactVersions(s, specs, agentArchForArtifacts(ag))
+
 	// Engines (Phase 11): a tunnel's engine is always enabled; the
 	// per-agent DESIRED flags (the enable/disable endpoints) also enable
 	// engines with no tunnels yet — matrix is desired-on by default.
@@ -265,6 +274,85 @@ func compileDesiredV2(s *store.Store, ag store.Agent) (desired *protocol.Desired
 		}
 	}
 	return desired, "", warnings, nil
+}
+
+// agentArchForArtifacts resolves the arch an agent's artifacts resolve
+// against (the enable handler's same default).
+func agentArchForArtifacts(ag store.Agent) string {
+	if strings.TrimSpace(ag.Arch) == "" {
+		return "amd64"
+	}
+	return ag.Arch
+}
+
+// latestArtifactVersionFor picks the artifact version the agent's own
+// manifest resolution would download: highest version string for the
+// engine+arch, ties resolved to the newest upload (ListEngineArtifacts
+// is uploaded_at DESC — the same order the R5 manifest serves and the
+// agent's strict `>` walk keeps). "" = no artifact for that arch.
+func latestArtifactVersionFor(s *store.Store, engine, arch string) string {
+	arts, err := s.ListEngineArtifacts()
+	if err != nil {
+		return ""
+	}
+	return latestArtifactVersionIn(arts, engine, arch)
+}
+
+func latestArtifactVersionIn(arts []store.EngineArtifact, engine, arch string) string {
+	best := ""
+	for _, a := range arts {
+		if a.Engine != engine || a.Goarch != arch || a.Version == "" {
+			continue
+		}
+		if best == "" || a.Version > best {
+			best = a.Version
+		}
+	}
+	return best
+}
+
+// stampArtifactVersions is the phase-31 re-sync-on-enable lever (§2.6):
+// every artifact-engine tunnel spec whose operator params are a JSON
+// object gains `_artifact_version` = the latest artifact version for the
+// agent's arch. Params that are absent, invalid JSON, or not objects stay
+// untouched (the operator's params are opaque and never rewritten in the
+// store). The stamp is what makes a newly uploaded artifact change the
+// desired document — the minimal-revision rule then delivers the push and
+// the agent's restart re-resolves the manifest.
+func stampArtifactVersions(s *store.Store, specs []protocol.TunnelSpec, arch string) {
+	arts, err := s.ListEngineArtifacts()
+	if err != nil || len(arts) == 0 {
+		return
+	}
+	latest := map[string]string{}
+	for _, a := range arts {
+		if a.Goarch != arch || !uiArtifactEngines[a.Engine] {
+			continue
+		}
+		if v := latestArtifactVersionIn(arts, a.Engine, arch); v != "" {
+			latest[a.Engine] = v
+		}
+	}
+	if len(latest) == 0 {
+		return
+	}
+	for i := range specs {
+		version, ok := latest[specs[i].Engine]
+		if !ok || len(specs[i].EngineParams) == 0 {
+			continue
+		}
+		var fields map[string]any
+		if json.Unmarshal(specs[i].EngineParams, &fields) != nil || fields == nil {
+			continue // arrays/scalars stay untouched: only object params get the stamp
+		}
+		if s2, _ := fields["_artifact_version"].(string); s2 == version {
+			continue // already stamped at this version — keep the bytes stable
+		}
+		fields["_artifact_version"] = version
+		if b, merr := json.Marshal(fields); merr == nil {
+			specs[i].EngineParams = json.RawMessage(b)
+		}
+	}
 }
 
 // compileForwardRule maps one store forward rule to its wire form and
