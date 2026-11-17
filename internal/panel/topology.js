@@ -709,6 +709,19 @@ async function topoMemberRemove(side, agentId) {
   await topologyReload();
 }
 
+
+// The topbar breadcrumb's back link: while a topology is open on the tunnel
+// tab, clicking it closes the detail and paints the list — the native hash
+// jump alone leaves the detail view stuck on screen.
+document.addEventListener('click', e => {
+  const bcb = e.target.closest && e.target.closest('[data-bc-back]');
+  if (!bcb) return;
+  if (location.hash.indexOf('#t=tunnel') === 0 && typeof topologySelected !== 'undefined' && topologySelected) {
+    e.preventDefault();
+    topologyBack();
+  }
+});
+
 async function topologyReload() {
   if (topologyLoading) return;
   topologyLoading = true;
