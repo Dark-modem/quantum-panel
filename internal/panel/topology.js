@@ -512,7 +512,7 @@ function topologyGraph(topo, tunnels) {
       `<path class="cl-e-line" style="stroke-width:${sw}" d="${d}"/>` +
       (st === 'ok' ? `<path class="cl-e-flow" d="${d}"/>` : '') +
       `<text class="cl-t-share" x="${lx.toFixed(1)}" y="${ly.toFixed(1)}">${text(tn.key)} · ${text(tn.engine)}</text>` +
-      `<text class="cl-t-share" x="${lx.toFixed(1)}" y="${(ly + 14).toFixed(1)}">${text(label(st))}</text>` +
+      `<text class="cl-t-share" x="${lx.toFixed(1)}" y="${(ly + 14).toFixed(1)}">${text(stLabel(st))}</text>` +
     `</g>`;
   }).join('');
   const label = st => st === 'ok' ? tr('', 'Connected') : st === 'err' ? tr('', 'Stopped') : st === 'off' ? tr('', 'Disabled') : tr('', 'Unverified');
