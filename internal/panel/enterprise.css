@@ -1321,7 +1321,7 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 .topo-settings { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin:16px 0; }
 /* Detail header actions: one joined pill group — power toggle (accent),
    Edit, and a danger Delete, each icon + label, hovers tint inside the pill. */
-.topo-detail-actions { display:inline-flex; align-items:center; gap:2px; padding:3px; border:1px solid var(--ln2); border-radius:999px; background:var(--sunk, transparent); }
+.topo-detail-actions { display:inline-flex; align-items:center; gap:10px; }
 .topo-act { display:inline-flex; align-items:center; gap:7px; min-height:32px; padding:0 14px; border:0; border-radius:999px; background:transparent; color:var(--tx2); font-size:var(--fs-small); cursor:pointer; transition:background .15s ease, color .15s ease; }
 .topo-act:hover, .topo-act:focus-visible { background:var(--ac-soft); color:var(--tx); }
 .topo-act:focus-visible { outline:2px solid var(--ent-focus); outline-offset:1px; }
