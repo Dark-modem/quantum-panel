@@ -1327,6 +1327,7 @@
       '<span class="mtb-hero-doc-tx"><b>' + esc(opts.docQ) + '</b><span>' + esc(L('heroDocS')) + '</span></span></div>' +
       '</div></div>';
   }
+  window.openAgtDetail = openAgtDetail;
   function openAgtDetail(id) {
     agtView = { view: 'detail', id: id };
     renderAgtDetail(id);

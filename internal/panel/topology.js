@@ -11,7 +11,7 @@ let topologyDcFilter = 'all';
 let topoPage = 1;
 const TOPO_PAGE_SIZE = 10;
 function topoIsFa() { return typeof currentLang !== 'undefined' && currentLang === 'fa'; }
-async function topoDcLoad() {
+async function topoDcLoad(topo) {
   if (topoDcLoaded) return;
   topoDcLoaded = true;
   try {
@@ -19,6 +19,28 @@ async function topoDcLoad() {
     window.__topoAgents = (ag.agents || []);
     const addr = {};
     ((sv && sv.servers) || []).forEach(s => { addr[s.id] = s.address || ''; });
+    // the established tunnels live in the agent layer: every member agent of
+    // the open topology reports the tunnels it actually runs for it
+    window.__topoTunnels = [];
+    const memberAgs = window.__topoAgents.filter(a => !topo || (a.topologies || []).includes(topo.name));
+    const detailRows = await Promise.all(memberAgs.map(a =>
+      api('/api/ui/agents/' + encodeURIComponent(a.id)).then(d2 => ({ agent: a, d: d2 })).catch(() => null)));
+    detailRows.filter(Boolean).forEach(({ agent, d }) => {
+      (d.tunnels || []).forEach(tn => {
+        if (topo && tn.topology && tn.topology !== topo.name) return;
+        window.__topoTunnels.push({
+          key: tn.tunnel_key || '',
+          engine: tn.engine || '',
+          state: tn.state || '',
+          weightPct: tn.weight_pct,
+          latency: tn.latency_ms,
+          today: tn.today_bytes,
+          localName: (tn.local && tn.local.name) || agent.name || '',
+          remoteName: (tn.remote && tn.remote.name) || '',
+          agentId: agent.id,
+        });
+      });
+    });
     (ag.agents || []).forEach(a => {
       const srv = a.server || {};
       if (!srv.id) return;
@@ -455,6 +477,45 @@ function topologyGraph(topo, tunnels) {
     const i = list.findIndex(s => s.ip && ip && s.ip === ip);
     return i >= 0 ? i : 0;
   };
+  const agentTuns = topo ? topoAgentTunnels(topo) : [];
+  const stOf = s => ['healthy', 'ok', 'up', 'connected'].includes(String(s || '')) ? 'ok'
+    : String(s || '') === 'down' ? 'err' : String(s || '') === 'disabled' ? 'off' : 'warn';
+  const findNode = (list, name) => {
+    const i = list.findIndex(s => s.name && name && s.name === name);
+    return i >= 0 ? i : 0;
+  };
+  const stLabel = st => st === 'ok' ? tr('', 'Connected') : st === 'err' ? tr('', 'Stopped') : st === 'off' ? tr('', 'Disabled') : tr('', 'Unverified');
+  const agentCables = agentTuns.map((tn, i) => {
+    const st = stOf(tn.state);
+    const sw = tn.weightPct != null && tn.weightPct > 0 ? Math.max(2, Math.min(6, 2 + tn.weightPct / 100 * 6)) : 3;
+    let d, lx, ly;
+    if (vert) {
+      const ii = findNode(iranServers, tn.localName);
+      const fi = findNode(foreignServers, tn.remoteName);
+      const x1 = geo.iran.x + NW / 2 + (ii - (iranServers.length - 1) / 2) * 18, y1 = nodeY(geo.iran, ii) + NH;
+      const x2 = geo.foreign.x + NW / 2 + (fi - (foreignServers.length - 1) / 2) * 18, y2 = nodeY(geo.foreign, fi);
+      const midY = (y1 + y2) / 2;
+      d = `M ${x1.toFixed(1)} ${y1} C ${x1.toFixed(1)} ${midY}, ${x2.toFixed(1)} ${midY}, ${x2.toFixed(1)} ${y2}`;
+      lx = W / 2; ly = midY;
+    } else {
+      const ii = findNode(iranServers, tn.localName);
+      const fi = findNode(foreignServers, tn.remoteName);
+      const y1 = nodeY(geo.iran, ii) + NH / 2, y2 = nodeY(geo.foreign, fi) + NH / 2;
+      const x1 = geo.iran.x + NW, x2 = geo.foreign.x;
+      const dx = Math.max(40, (x2 - x1) / 2);
+      d = `M ${x1},${y1.toFixed(1)} C ${x1 + dx},${y1.toFixed(1)} ${x2 - dx},${y2.toFixed(1)} ${x2},${y2.toFixed(1)}`;
+      lx = (x1 + x2) / 2; ly = (y1 + y2) / 2 - 12;
+    }
+    return `<g data-topology-cable="${text(tn.key)}" data-topo-agent="${text(tn.agentId)}" class="cl-e ${st} topo-cable" tabindex="0" role="button" aria-label="${text(tn.key)} · ${text(stLabel(st))}">` +
+      `<title>${text(tn.key)} · ${text(tn.engine)} · ${text(stLabel(st))}</title>` +
+      `<path class="cl-e-hit" d="${d}"/>` +
+      `<path class="cl-e-line" style="stroke-width:${sw}" d="${d}"/>` +
+      (st === 'ok' ? `<path class="cl-e-flow" d="${d}"/>` : '') +
+      `<text class="cl-t-share" x="${lx.toFixed(1)}" y="${ly.toFixed(1)}">${text(tn.key)} · ${text(tn.engine)}</text>` +
+      `<text class="cl-t-share" x="${lx.toFixed(1)}" y="${(ly + 14).toFixed(1)}">${text(label(st))}</text>` +
+    `</g>`;
+  }).join('');
+  const label = st => st === 'ok' ? tr('', 'Connected') : st === 'err' ? tr('', 'Stopped') : st === 'off' ? tr('', 'Disabled') : tr('', 'Unverified');
   const cables = tunnels.map((t, i) => {
     const st = stateOf(t);
     const sw = weightOf(t);
@@ -543,7 +604,7 @@ function topologyGraph(topo, tunnels) {
     { name: s.name, dc: dcLabel(s), cc: s.cc || topo.country, ip: s.ip || foreignIp }, topo.country, false));
   return `<div class="topo-map"><div class="topo-map-scroll">` +
     `<svg class="topo-graph" viewBox="0 0 ${geo.W} ${Math.round(geo.H)}" role="img" aria-label="${text(tr('', 'Topology connections'))}" dir="ltr">` +
-    pieces.join('') + cables +
+    pieces.join('') + cables + agentCables +
     iranNodes.join('') + foreignNodes.join('') +
     `</svg></div>` +
     `<div class="topo-tip" hidden></div>` +
@@ -553,6 +614,11 @@ function topologyGraph(topo, tunnels) {
 
 
 // ===== topology members: agents (=servers) join/leave the topology ========
+// The established tunnels of the open topology, from the agent layer: every
+// member agent reports the tunnels it actually runs for this topology.
+function topoAgentTunnels(topo) {
+  return (window.__topoTunnels || []).filter(tn => !!tn.key);
+}
 function topoDcReset() { topoDcLoaded = false; topoServersByTopo = {}; }
 function renderTopoMembers(topo) {
   const card = $('topoMembersCard');
@@ -636,7 +702,7 @@ async function topologyReload() {
     topologyData = { topologies: r.topologies || [], tunnels: r.tunnels || [] };
     if (topologySelected && !topologyCurrent()) topologySelected = null;
     topologyLoadedOnce = true;
-    await topoDcLoad();
+    await topoDcLoad(topologyCurrent());
     topologyRender();
     renderTunnelsList();
   } catch(e) {
@@ -837,20 +903,21 @@ function topologyRender() {
   // the established tunnels between this pair, listed under the map
   const tl = $('topologyTunnelList');
   if (tl) {
+    const agentRows = topo ? topoAgentTunnels(topo) : [];
     const label = st => st === 'ok' ? tr('', 'Connected') : st === 'err' ? tr('', 'Stopped') : st === 'off' ? tr('', 'Disabled') : tr('', 'Unverified');
-    tl.innerHTML = cables.length
-      ? '<div class="topo-tl">' + cables.map(t => {
-          const st = ['healthy', 'ok', 'up', 'connected'].includes(String(t.state || '')) ? 'ok'
-            : String(t.state || '') === 'down' ? 'err'
-            : String(t.state || '') === 'disabled' ? 'off' : 'warn';
-          const lat = t.latency_ms != null && t.latency_ms >= 0 ? t.latency_ms + ' ms' : '—';
-          return '<button type="button" class="topo-tl-row" data-topo-view-tunnel="' + esc(t.id) + '">' +
+    const stOf = s => ['healthy', 'ok', 'up', 'connected'].includes(String(s || '')) ? 'ok'
+      : String(s || '') === 'down' ? 'err' : String(s || '') === 'disabled' ? 'off' : 'warn';
+    tl.innerHTML = agentRows.length
+      ? '<div class="topo-tl">' + agentRows.map(tn => {
+          const st = stOf(tn.state);
+          const lat = tn.latency != null && tn.latency >= 0 ? tn.latency + ' ms' : '\u2014';
+          return '<button type="button" class="topo-tl-row" data-topo-agent="' + esc(tn.agentId) + '">' +
             '<span class="topo-tl-dot ' + st + '"></span>' +
-            '<b>' + esc(t.name || '') + '</b>' +
-            '<span class="topo-tl-eng">' + esc(t.engine || '') + '</span>' +
+            '<b>' + esc(tn.key || '') + '</b>' +
+            '<span class="topo-tl-eng">' + esc(tn.engine || '') + '</span>' +
             '<span class="topo-tl-lat u-mono">' + esc(lat) + '</span>' +
             '<span class="topo-tl-st">' + esc(label(st)) + '</span>' +
-            '<span class="topo-tl-go">' + esc(tr('', 'View')) + ' ←</span>' +
+            '<span class="topo-tl-go">' + esc(tr('', 'View')) + ' \u2190</span>' +
             '</button>';
         }).join('') + '</div>'
       : '';
@@ -1910,6 +1977,12 @@ $('tab-tunnel').addEventListener('click', e => {
   if (memGo) { topoMembersPickGo(); return; }
   const memX = target.closest ? target.closest('[data-mem-pick-close]') : null;
   if (memX) { const ov = document.getElementById('topoMemPick'); if (ov) ov.hidden = true; return; }
+  const agJump = target.closest ? target.closest('[data-topo-agent]') : null;
+  if (agJump) {
+    const id = agJump.getAttribute('data-topo-agent');
+    if (typeof openAgtDetail === 'function') { openAgtDetail(id); if (typeof goTab === 'function') goTab('magt'); }
+    return;
+  }
   if (target.dataset.topoViewTunnel) {
     const kind = topologyKind(target.dataset.topoViewTunnel);
     if (target.dataset.topoViewTunnel.startsWith('xray:')) { goTab('xray'); return; }
