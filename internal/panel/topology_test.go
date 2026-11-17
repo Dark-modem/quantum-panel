@@ -514,3 +514,43 @@ func TestTopologyInventoryMatrixOnlyAndRegistrationAlias(t *testing.T) {
 		t.Fatalf("inventory guessed DNS alias: %+v", got)
 	}
 }
+
+// The ownership invariant (owner rule, 2026-11-17): every tunnel in the
+// inventory belongs to exactly ONE topology — a second topology claiming the
+// same tunnel is a conflict, and the attach offers only unassigned tunnels.
+func TestTopologyTunnelOwnershipExclusive(t *testing.T) {
+	topologyFixture(t)
+	first := topologyCreated(t, `{"name":"topo-a","role":"iran","local_ip":"203.0.113.1","remote_ip":"203.0.113.2","tunnel_ids":["main"]}`)
+	second := topologyCreated(t, `{"name":"topo-b","role":"iran","local_ip":"203.0.113.1","remote_ip":"203.0.113.3","tunnel_ids":["peer:3"]}`)
+
+	// topology B claims "main", which topology A already owns: conflict.
+	w := topologyRequest(http.MethodPatch, second.ID, `{"tunnel_ids":["main","peer:3"]}`)
+	if w.Code != http.StatusConflict {
+		t.Fatalf("claiming an owned tunnel: status=%d body=%s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "already belongs to another topology") {
+		t.Fatalf("ownership conflict not explained: %s", w.Body.String())
+	}
+
+	// the ownership did not change: A still holds "main", B still "peer:3" only.
+	w = topologyRequest(http.MethodGet, "", "")
+	if w.Code != http.StatusOK {
+		t.Fatalf("get list: status=%d", w.Code)
+	}
+	var listed struct {
+		Topologies []Topology `json:"topologies"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &listed); err != nil {
+		t.Fatal(err)
+	}
+	byID := map[string]Topology{}
+	for _, tp := range listed.Topologies {
+		byID[tp.ID] = tp
+	}
+	if got, ok := byID[first.ID]; !ok || len(got.TunnelIDs) != 1 || got.TunnelIDs[0] != "main" {
+		t.Fatalf("first topology lost its tunnel: %+v", got.TunnelIDs)
+	}
+	if got, ok := byID[second.ID]; !ok || len(got.TunnelIDs) != 1 || got.TunnelIDs[0] != "peer:3" {
+		t.Fatalf("second topology changed after a rejected claim: %+v", got.TunnelIDs)
+	}
+}
