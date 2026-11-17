@@ -402,6 +402,7 @@ function topologyGraph(topo, tunnels) {
       : s === 'disabled' ? 'off' : 'warn';
   };
   const stateLabel = st => st === 'ok' ? tr('', 'Connected') : st === 'err' ? tr('', 'Stopped') : st === 'off' ? tr('', 'Disabled') : tr('', 'Unverified');
+  const nodeKind = !tunnels.length ? '' : kinds.every(k => k === 'ok') ? 'ok' : kinds.every(k => k === 'err') ? 'err' : kinds.some(k => k === 'err') ? 'err' : 'warn';
   // Bezier tunnel lines in the cluster map's language: solid rounded lines
   // whose width follows the tunnel's real weight, a flowing dash on live
   // ones, one independent path per tunnel spread so they never overlap.
