@@ -223,6 +223,12 @@ func (s *Store) AddTopologyMember(topologyID, serverID int64) error {
 	return err
 }
 
+// RemoveTopologyMember drops one server from a topology (idempotent).
+func (s *Store) RemoveTopologyMember(topologyID, serverID int64) error {
+	_, err := s.db.Exec(`DELETE FROM topology_members WHERE topology_id = ? AND server_id = ?`, topologyID, serverID)
+	return err
+}
+
 // TopologyMembers lists the member server ids of a topology.
 func (s *Store) TopologyMembers(topologyID int64) ([]int64, error) {
 	rows, err := s.db.Query(`SELECT server_id FROM topology_members WHERE topology_id = ? ORDER BY server_id`, topologyID)

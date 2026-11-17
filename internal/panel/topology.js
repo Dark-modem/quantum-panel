@@ -16,6 +16,7 @@ async function topoDcLoad() {
   topoDcLoaded = true;
   try {
     const [ag, sv] = await Promise.all([api('/api/ui/agents'), api('/api/mesh/servers')]);
+    window.__topoAgents = (ag.agents || []);
     const addr = {};
     ((sv && sv.servers) || []).forEach(s => { addr[s.id] = s.address || ''; });
     (ag.agents || []).forEach(a => {
@@ -517,6 +518,80 @@ function topologyGraph(topo, tunnels) {
     `</div>`;
 }
 
+
+// ===== topology members: agents (=servers) join/leave the topology ========
+function topoDcReset() { topoDcLoaded = false; topoServersByTopo = {}; }
+function renderTopoMembers(topo) {
+  const card = $('topoMembersCard');
+  if (!card) return;
+  const ags = window.__topoAgents || [];
+  const members = side => ags.filter(a => a.role === side && (a.topologies || []).includes(topo.name));
+  const memRow = (a, side) => '<div class="topo-mem-row">' +
+    '<span class="badge ' + (a.status === 'online' ? 'ok' : 'dim') + '">' + esc(a.status || '\u2014') + '</span>' +
+    '<b>' + esc(a.name || '') + '</b>' +
+    (a.server && a.server.datacenter ? '<span class="topo-mem-dc">' + esc(topoIsFa() ? (a.server.datacenter || '') : (a.server.datacenter_en || a.server.datacenter || '')) + '</span>' : '') +
+    '<button type="button" class="topo-mem-x" data-mem-remove="' + side + '" data-mem-agent="' + esc(a.id) + '" aria-label="' + esc(tr('', 'Remove')) + '" title="' + esc(tr('', 'Remove')) + '">\u00d7</button></div>';
+  const sideBlock = (side, lbl) => {
+    const list = members(side);
+    return '<div class="topo-mem-side"><div class="topo-mem-side-h"><b>' + esc(lbl) + '</b>' +
+      '<button type="button" class="quantum-btn quantum-btn-secondary u-btn-xs" data-mem-add="' + side + '">+ ' + esc(tr('', 'Add agent')) + '</button></div>' +
+      (list.length ? list.map(a => memRow(a, side)).join('') : '<div class="u-hint-12">' + esc(tr('', 'No agents on this side yet')) + '</div>') + '</div>';
+  };
+  card.innerHTML = '<div class="tc-header u-flex-wrap-gap8"><p class="tc-title" data-i18n="topo_members_t">' + esc(tr('', 'Agents on this topology')) + '</p></div>' +
+    '<div class="topo-mem-grid">' + sideBlock('iran', tr('', 'Iran side')) + sideBlock('foreign', tr('', 'Foreign side')) + '</div>';
+}
+function topoMembersPickOpen(side) {
+  const topo = topologyCurrent();
+  if (!topo) return;
+  const ags = (window.__topoAgents || []).filter(a => a.role === side && !(a.topologies || []).includes(topo.name));
+  const rows = ags.length ? ags.map(a => '<label class="cores-pick-row"><input type="checkbox" value="' + esc(a.id) + '"><b>' + esc(a.name) + '</b>' +
+    (a.server && a.server.datacenter ? '<span class="cores-pick-state">' + esc(topoIsFa() ? (a.server.datacenter || '') : (a.server.datacenter_en || a.server.datacenter || '')) + '</span>' : '') + '</label>').join('')
+    : '<div class="ent-empty"><b>' + esc(tr('', 'No agents on this side yet')) + '</b></div>';
+  let ov = document.getElementById('topoMemPick');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'topoMemPick';
+    ov.className = 'ent-modal';
+    ov.innerHTML = '<div class="ent-card cores-pick-card"><div class="cores-pick-head"><b></b><button type="button" class="mtb-toast-x" data-mem-pick-close>\u00d7</button></div>' +
+      '<div class="cores-pick-list"></div><div class="cores-pick-foot"><button type="button" class="quantum-btn quantum-btn-primary" data-mem-pick-go>' + esc(tr('', 'Add')) + '</button>' +
+      '<button type="button" class="quantum-btn quantum-btn-secondary" data-mem-pick-close>' + esc(tr('', 'Cancel')) + '</button></div></div>';
+    document.body.appendChild(ov);
+  }
+  ov.dataset.memSide = side;
+  ov.querySelector('.cores-pick-head b').textContent = (side === 'iran' ? tr('', 'Iran side') : tr('', 'Foreign side')) + ' \u2014 ' + tr('', 'Add agent');
+  ov.querySelector('.cores-pick-list').innerHTML = rows;
+  ov.hidden = false;
+}
+async function topoMembersPickGo() {
+  const ov = document.getElementById('topoMemPick');
+  if (!ov) return;
+  const topo = topologyCurrent();
+  const side = ov.dataset.memSide;
+  const ids = Array.from(ov.querySelectorAll('.cores-pick-row input:checked')).map(i => i.value);
+  if (!topo || !ids.length) { ov.hidden = true; return; }
+  const go = ov.querySelector('[data-mem-pick-go]');
+  go.disabled = true;
+  const results = await Promise.allSettled(ids.map(id =>
+    api('/api/ui/topologies/' + encodeURIComponent(topo.name) + '/members/add', { agent_id: id }, 'POST')));
+  const bad = results.filter(r => r.status === 'rejected');
+  if (bad.length) toastErr(tr('', 'Agents'), bad.map(r => (r.reason && r.reason.message) || 'HTTP ' + (r.reason && r.reason.status)).join(' · '));
+  else toastOk(tr('', 'Agents'), tr('', 'Agent added to the topology'));
+  go.disabled = false;
+  ov.hidden = true;
+  topoDcReset();
+  await topologyReload();
+}
+async function topoMemberRemove(side, agentId) {
+  const topo = topologyCurrent();
+  if (!topo) return;
+  try {
+    await api('/api/ui/topologies/' + encodeURIComponent(topo.name) + '/members/remove', { agent_id: agentId }, 'POST');
+    toastOk(tr('', 'Agents'), tr('', 'Agent removed'));
+  } catch (e) { toastErr(tr('', 'Agents'), e.message || 'HTTP ' + e.status); }
+  topoDcReset();
+  await topologyReload();
+}
+
 async function topologyReload() {
   if (topologyLoading) return;
   topologyLoading = true;
@@ -657,6 +732,7 @@ function topologyRender() {
     cur.disabled = pages <= 1;
   }
   if (typeof topTitleSync === 'function') { try { topTitleSync(); } catch (e) {} }
+  renderTopoMembers(topo);
   $('topologiesList').innerHTML = visible.length
     ? visible.map((t, i) => {
         const tunnels = topologyExistingTunnels(t);
@@ -1793,6 +1869,14 @@ $('tab-tunnel').addEventListener('click', e => {
   if (target.dataset.topoOpen) topologyOpen(target.dataset.topoOpen);
   if (target.dataset.topoDelete) topologyDelete(target.dataset.topoDelete);
   if (target.dataset.topoDetach) topologyDetach(target.dataset.topoDetach);
+  const memAdd = target.closest ? target.closest('[data-mem-add]') : null;
+  if (memAdd) { topoMembersPickOpen(memAdd.getAttribute('data-mem-add')); return; }
+  const memRm = target.closest ? target.closest('[data-mem-remove]') : null;
+  if (memRm) { topoMemberRemove(memRm.getAttribute('data-mem-remove'), memRm.getAttribute('data-mem-agent')); return; }
+  const memGo = target.closest ? target.closest('[data-mem-pick-go]') : null;
+  if (memGo) { topoMembersPickGo(); return; }
+  const memX = target.closest ? target.closest('[data-mem-pick-close]') : null;
+  if (memX) { const ov = document.getElementById('topoMemPick'); if (ov) ov.hidden = true; return; }
   if (target.dataset.topoViewTunnel) {
     const kind = topologyKind(target.dataset.topoViewTunnel);
     if (target.dataset.topoViewTunnel.startsWith('xray:')) { goTab('xray'); return; }

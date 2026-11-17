@@ -6,8 +6,10 @@ package panel
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/Dark-modem/quantum-panel/internal/store"
@@ -504,4 +506,115 @@ func handleUITopologyPorts(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	writeJSON(w, map[string]any{"topology_id": topoID, "servers": servers})
+}
+
+// ---- topology members: add/remove AGENTS (=their servers) on a topology --
+// The owner rule: agents ARE the servers; an agent may sit in several
+// topologies (many-to-many), while a tunnel belongs to exactly one.
+
+// uiTopoStoreID returns the mesh-store topology id for a panel topology name,
+// creating the row on first use so panel topologies gain memberships too.
+func uiTopoStoreID(s *store.Store, name string) (int64, error) {
+	if topos, err := s.ListTopologies(); err == nil {
+		for _, tp := range topos {
+			if strings.EqualFold(tp.Name, name) {
+				return tp.ID, nil
+			}
+		}
+	}
+	return s.UpsertTopology(store.Topology{Name: name, Enabled: true})
+}
+
+// uiTopoMemberBody is the add/remove members body (agent-scoped: the agent's
+// linked server is what joins a topology).
+type uiTopoMemberBody struct {
+	AgentID string `json:"agent_id"`
+}
+
+func handleUITopoMemberAdd(w http.ResponseWriter, r *http.Request) {
+	h, ok := uiOpen(w, r)
+	if !ok {
+		return
+	}
+	name := r.PathValue("name")
+	if strings.TrimSpace(name) == "" || len(name) > 120 {
+		uiErrWrite(w, r, "E-IN-04", map[string]any{"op": "topology member add"}, "invalid topology name")
+		return
+	}
+	var body uiTopoMemberBody
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10)).Decode(&body); err != nil {
+		uiErrWrite(w, r, "E-IN-06", map[string]any{"op": "topology member add"}, "body must be a JSON object with agent_id")
+		return
+	}
+	agents, err := h.ListAgents()
+	if err != nil {
+		uiErrWrite(w, r, "E-STORE", map[string]any{"op": "topology member add"}, err.Error())
+		return
+	}
+	var ag *store.Agent
+	for i := range agents {
+		if agents[i].ID == body.AgentID {
+			ag = &agents[i]
+			break
+		}
+	}
+	if ag == nil || ag.ServerID == 0 {
+		uiErrWrite(w, r, "E-IN-06", map[string]any{"op": "topology member add", "agent": body.AgentID}, "agent not found or has no linked server")
+		return
+	}
+	topoID, err := uiTopoStoreID(h.Store, name)
+	if err != nil {
+		uiErrWrite(w, r, "E-SYS-01", map[string]any{"op": "topology member add"}, err.Error())
+		return
+	}
+	if err := h.AddTopologyMember(topoID, ag.ServerID); err != nil {
+		uiErrWrite(w, r, "E-SYS-01", map[string]any{"op": "topology member add"}, err.Error())
+		return
+	}
+	meshAudit("panel", "mesh.topology.member.add", fmt.Sprintf(`{"topology":%q,"agent":%q,"server_id":%d}`, name, body.AgentID, ag.ServerID))
+	writeJSON(w, map[string]any{"status": "ok"})
+}
+
+func handleUITopoMemberRemove(w http.ResponseWriter, r *http.Request) {
+	h, ok := uiOpen(w, r)
+	if !ok {
+		return
+	}
+	name := r.PathValue("name")
+	if strings.TrimSpace(name) == "" || len(name) > 120 {
+		uiErrWrite(w, r, "E-IN-04", map[string]any{"op": "topology member remove"}, "invalid topology name")
+		return
+	}
+	var body uiTopoMemberBody
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10)).Decode(&body); err != nil {
+		uiErrWrite(w, r, "E-IN-06", map[string]any{"op": "topology member remove"}, "body must be a JSON object with agent_id")
+		return
+	}
+	agents, err := h.ListAgents()
+	if err != nil {
+		uiErrWrite(w, r, "E-STORE", map[string]any{"op": "topology member remove"}, err.Error())
+		return
+	}
+	var ag *store.Agent
+	for i := range agents {
+		if agents[i].ID == body.AgentID {
+			ag = &agents[i]
+			break
+		}
+	}
+	if ag == nil || ag.ServerID == 0 {
+		uiErrWrite(w, r, "E-IN-06", map[string]any{"op": "topology member remove", "agent": body.AgentID}, "agent not found or has no linked server")
+		return
+	}
+	topoID, err := uiTopoStoreID(h.Store, name)
+	if err != nil {
+		uiErrWrite(w, r, "E-SYS-01", map[string]any{"op": "topology member remove"}, err.Error())
+		return
+	}
+	if err := h.RemoveTopologyMember(topoID, ag.ServerID); err != nil {
+		uiErrWrite(w, r, "E-SYS-01", map[string]any{"op": "topology member remove"}, err.Error())
+		return
+	}
+	meshAudit("panel", "mesh.topology.member.remove", fmt.Sprintf(`{"topology":%q,"agent":%q,"server_id":%d}`, name, body.AgentID, ag.ServerID))
+	writeJSON(w, map[string]any{"status": "ok"})
 }
