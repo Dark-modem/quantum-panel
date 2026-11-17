@@ -2035,3 +2035,6 @@ html[dir="rtl"] .is-rtl .topo-back .topo-back-ic { transform:scaleX(-1); }
 .topo-cable.topo-off .cl-e-line { stroke:var(--mu); stroke-dasharray:2 7; opacity:.6; }
 .topo-cable.topo-idle .cl-e-line { stroke:var(--mu); stroke-dasharray:8 8; opacity:.55; }
 @media(max-width:799px) { .topo-map-scroll { background-size:100% 100%, 22px 22px, 22px 22px; } }
+/* the edit action wears the soft orange — the reversible middle operation */
+.topo-act.topo-act-orange { color:var(--orange); border:1px solid color-mix(in srgb, var(--orange) 40%, transparent); background:var(--orange-soft); }
+.topo-act.topo-act-orange:hover { color:var(--orange); border-color:var(--orange); background:color-mix(in srgb, var(--orange) 20%, transparent); }
