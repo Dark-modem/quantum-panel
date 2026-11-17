@@ -495,29 +495,42 @@ function topologyGraph(topo, tunnels) {
     if (st === 'err') p.down++;
   });
   const pairList = Object.keys(pairs).map(k => pairs[k]);
-  const pairWires = pairList.map((p, i) => {
-    const ii = findNode(iranServers, p.local);
-    const fi = findNode(foreignServers, p.remote);
-    const allUp = p.down === 0 && p.ok === p.n;
+  // One wire per server PAIR. The wires through a node fan out around its
+  // center (ordered by the opposite column) so parallel cables read
+  // separately and cross as little as the geometry allows.
+  const wires = pairList.map(p => ({ p, ii: findNode(iranServers, p.local), fi: findNode(foreignServers, p.remote) }));
+  const srcSlots = {}, dstSlots = {};
+  wires.forEach(w => {
+    (srcSlots[w.ii] = srcSlots[w.ii] || []).push(w);
+    (dstSlots[w.fi] = dstSlots[w.fi] || []).push(w);
+  });
+  wires.forEach(w => {
+    w.sIdx = srcSlots[w.ii].indexOf(w);
+    w.sK = srcSlots[w.ii].length;
+    w.dIdx = dstSlots[w.fi].indexOf(w);
+    w.dK = dstSlots[w.fi].length;
+  });
+  const pairWires = wires.map(w => {
+    const p = w.p;
     const kind = p.ok > 0 ? 'ok' : p.down > 0 ? 'err' : 'idle';
-    const sw = Math.max(2, Math.min(7, 2 + p.n * 1.2));
-    const lbl = p.n + ' ' + tr('', p.n === 1 ? 'tunnel' : 'tunnels');
-    let d, lx, ly;
+    const sw = Math.max(2, Math.min(5.5, 2 + p.n * 0.9));
+    let d;
     if (vert) {
-      const x1 = geo.iran.x + NW / 2 + (ii - (iranServers.length - 1) / 2) * 18, y1 = nodeY(geo.iran, ii) + NH;
-      const x2 = geo.foreign.x + NW / 2 + (fi - (foreignServers.length - 1) / 2) * 18, y2 = nodeY(geo.foreign, fi);
+      const x1 = geo.iran.x + NW / 2 + (w.sIdx - (w.sK - 1) / 2) * 18;
+      const y1 = nodeY(geo.iran, w.ii) + NH;
+      const x2 = geo.foreign.x + NW / 2 + (w.dIdx - (w.dK - 1) / 2) * 18;
+      const y2 = nodeY(geo.foreign, w.fi);
       const midY = (y1 + y2) / 2;
       d = `M ${x1.toFixed(1)} ${y1} C ${x1.toFixed(1)} ${midY}, ${x2.toFixed(1)} ${midY}, ${x2.toFixed(1)} ${y2}`;
-      lx = W / 2; ly = midY;
     } else {
-      const y1 = nodeY(geo.iran, ii) + NH / 2, y2 = nodeY(geo.foreign, fi) + NH / 2;
+      const y1 = nodeY(geo.iran, w.ii) + NH / 2 + (w.sIdx - (w.sK - 1) / 2) * 22;
+      const y2 = nodeY(geo.foreign, w.fi) + NH / 2 + (w.dIdx - (w.dK - 1) / 2) * 22;
       const x1 = geo.iran.x + NW, x2 = geo.foreign.x;
-      const dx = Math.max(40, (x2 - x1) / 2);
+      const dx = Math.max(50, (x2 - x1) / 2);
       d = `M ${x1},${y1.toFixed(1)} C ${x1 + dx},${y1.toFixed(1)} ${x2 - dx},${y2.toFixed(1)} ${x2},${y2.toFixed(1)}`;
-      lx = (x1 + x2) / 2; ly = (y1 + y2) / 2 - 12;
     }
-    return `<g data-topology-pair="${text(p.local)}|${text(p.remote)}" class="cl-e ${kind} topo-cable" tabindex="0" role="img" aria-label="${text(p.local)} → ${text(p.remote)}: ${text(lbl)}">` +
-      `<title>${text(p.local)} → ${text(p.remote)}: ${text(lbl)}</title>` +
+    return `<g data-topology-pair="${text(p.local)}|${text(p.remote)}" class="cl-e ${kind} topo-cable" tabindex="0" role="img" aria-label="${text(p.local)} → ${text(p.remote)}: ${text(p.n + ' ' + tr('', p.n === 1 ? 'tunnel' : 'tunnels'))}">` +
+      `<title>${text(p.local)} → ${text(p.remote)}: ${text(p.n + ' ' + tr('', p.n === 1 ? 'tunnel' : 'tunnels'))}</title>` +
       `<path class="cl-e-hit" d="${d}"/>` +
       `<path class="cl-e-line" style="stroke-width:${sw}" d="${d}"/>` +
       (p.ok > 0 ? `<path class="cl-e-flow" d="${d}"/>` : '') +
