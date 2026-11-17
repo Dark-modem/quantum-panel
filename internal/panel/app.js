@@ -283,7 +283,7 @@ function topTitleSync(id) {
     // a topology is open: breadcrumb like the agents' — section ‹ topology name
     const topo = typeof topologyCurrent === 'function' ? topologyCurrent() : null;
     if (topo && topo.name) {
-      h1.innerHTML = '<span class="mtb-bc"><a href="#t=tunnel" data-bc-back class="mtb-bc-link"></a><span class="mtb-bc-sep"> ‹ </span><span class="mtb-bc-cur"></span></span>';
+      h1.innerHTML = '<span class="mtb-bc"><a href="#t=tunnel" data-bc-topo-back class="mtb-bc-link"></a><span class="mtb-bc-sep"> ‹ </span><span class="mtb-bc-cur"></span></span>';
       h1.querySelector('.mtb-bc-link').textContent = lbl ? lbl.textContent : 'Topology';
       h1.querySelector('.mtb-bc-cur').textContent = topo.name;
       return;
