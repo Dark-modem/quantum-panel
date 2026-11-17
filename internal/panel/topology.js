@@ -800,6 +800,12 @@ function topologyRender() {
   const inTunnel = typeof _tunnelDetail !== 'undefined' && _tunnelDetail !== null;
   $('topologyListCard').hidden = !!topo || inTunnel;
   $('topologyDetailCard').hidden = !topo || inTunnel;
+  // the established-tunnels card: shown while a topology is open and it
+  // actually carries tunnels (the merged panel + agent-layer set)
+  const tunsCard = $('topologyTunnelsCard');
+  if (tunsCard) tunsCard.hidden = !topo || inTunnel || !topoAllTunnels(topo).length;
+  const tunsCount = $('topologyTunnelsCount');
+  if (tunsCount) tunsCount.textContent = topo ? String(topoAllTunnels(topo).length) : '—';
   // the head card: the topology's own name + health pill + the actions
   const headCard = $('topologyHeadCard');
   if (headCard) headCard.hidden = !topo || inTunnel;
