@@ -94,6 +94,8 @@ html{-webkit-text-size-adjust:100%;-moz-text-size-adjust:100%;text-size-adjust:1
   --wr-soft: color-mix(in srgb, var(--wr) 12%, transparent);
   --er-soft: color-mix(in srgb, var(--er) 12%, transparent);
   --info-soft: color-mix(in srgb, var(--info) 12%, transparent);
+  --orange: #f59e0b;
+  --orange-soft: color-mix(in srgb, var(--orange) 12%, transparent);
 
   /* Status colors */
   --ok: #22c55e;
@@ -246,6 +248,8 @@ body[data-t="dark"], body {
 
   /* Status colors are also text: >= 4.7:1 on their own 12% tint over #f2f2f2. */
   --ok: #166534;
+  --orange: #b45309;
+  --orange-soft: color-mix(in srgb, var(--orange) 16%, transparent);
   --wr: #854d0e;
   --er: #b91c1c;
   --info: #075985;

@@ -98,10 +98,13 @@ type PasarguardNode struct {
 
 // Agent is one enrolled endpoint agent.
 type Agent struct {
-	ID              string `json:"id"`
-	ServerID        int64  `json:"server_id"`
-	Name            string `json:"name"`
-	Role            string `json:"role"`
+	ID       string `json:"id"`
+	ServerID int64  `json:"server_id"`
+	Name     string `json:"name"`
+	Role     string `json:"role"`
+	// Country is the operator-chosen hosting country of a FOREIGN agent
+	// (ISO-3166 alpha-2, e.g. "DE"), picked when minting the enroll token.
+	Country         string `json:"country,omitempty"`
 	KeyHash         string `json:"-"`
 	Status          string `json:"status"`
 	Version         string `json:"version"`
@@ -123,6 +126,7 @@ type Agent struct {
 	DiskUsedGB       float64 `json:"disk_used_gb,omitempty"`
 	UptimeS          int64   `json:"uptime_s,omitempty"`
 	Virt             string  `json:"virt,omitempty"`
+	CPUModel         string  `json:"cpu_model,omitempty"`
 	PublicIPOverride string  `json:"public_ip_override,omitempty"`
 }
 
@@ -229,6 +233,12 @@ func (s *Store) UpsertTopology(t Topology) (int64, error) {
 func (s *Store) AddTopologyMember(topologyID, serverID int64) error {
 	_, err := s.db.Exec(`INSERT OR IGNORE INTO topology_members (topology_id, server_id) VALUES (?, ?)`,
 		topologyID, serverID)
+	return err
+}
+
+// RemoveTopologyMember drops one server from a topology (idempotent).
+func (s *Store) RemoveTopologyMember(topologyID, serverID int64) error {
+	_, err := s.db.Exec(`DELETE FROM topology_members WHERE topology_id = ? AND server_id = ?`, topologyID, serverID)
 	return err
 }
 
@@ -499,23 +509,23 @@ func (s *Store) PasarguardNodesForServer(serverID int64) ([]PasarguardNode, erro
 
 // UpsertAgent inserts or updates an enrolled agent by id.
 func (s *Store) UpsertAgent(a Agent) error {
-	_, err := s.db.Exec(`INSERT INTO agents (id, server_id, name, role, key_hash, status, version, hostname, public_ip, last_seen, applied_revision)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT(id) DO UPDATE SET server_id=excluded.server_id, name=excluded.name, role=excluded.role,
+	_, err := s.db.Exec(`INSERT INTO agents (id, server_id, name, role, country, key_hash, status, version, hostname, public_ip, last_seen, applied_revision)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(id) DO UPDATE SET server_id=excluded.server_id, name=excluded.name, role=excluded.role, country=excluded.country,
 		  key_hash=excluded.key_hash, status=excluded.status, version=excluded.version, hostname=excluded.hostname,
 		  public_ip=excluded.public_ip, last_seen=excluded.last_seen, applied_revision=excluded.applied_revision`,
-		a.ID, nullInt(a.ServerID), a.Name, a.Role, a.KeyHash, a.Status, a.Version, a.Hostname, a.PublicIP, a.LastSeen, a.AppliedRevision)
+		a.ID, nullInt(a.ServerID), a.Name, a.Role, a.Country, a.KeyHash, a.Status, a.Version, a.Hostname, a.PublicIP, a.LastSeen, a.AppliedRevision)
 	return err
 }
 
 // GetAgent returns one agent.
 func (s *Store) GetAgent(id string) (Agent, error) {
-	row := s.db.QueryRow(`SELECT id, COALESCE(server_id, 0), name, role, key_hash, status, version, hostname, public_ip, last_seen, applied_revision,
-		arch, os, cpu_cores, cpu_pct, load1, mem_total_mb, mem_used_mb, disk_total_gb, disk_used_gb, uptime_s, virt, public_ip_override
+	row := s.db.QueryRow(`SELECT id, COALESCE(server_id, 0), name, role, country, key_hash, status, version, hostname, public_ip, last_seen, applied_revision,
+		arch, os, cpu_cores, cpu_pct, load1, mem_total_mb, mem_used_mb, disk_total_gb, disk_used_gb, uptime_s, virt, public_ip_override, COALESCE(cpu_model, '')
 		FROM agents WHERE id = ?`, id)
 	var a Agent
-	err := row.Scan(&a.ID, &a.ServerID, &a.Name, &a.Role, &a.KeyHash, &a.Status, &a.Version, &a.Hostname, &a.PublicIP, &a.LastSeen, &a.AppliedRevision,
-		&a.Arch, &a.OS, &a.CPUCores, &a.CPUPct, &a.Load1, &a.MemTotalMB, &a.MemUsedMB, &a.DiskTotalGB, &a.DiskUsedGB, &a.UptimeS, &a.Virt, &a.PublicIPOverride)
+	err := row.Scan(&a.ID, &a.ServerID, &a.Name, &a.Role, &a.Country, &a.KeyHash, &a.Status, &a.Version, &a.Hostname, &a.PublicIP, &a.LastSeen, &a.AppliedRevision,
+		&a.Arch, &a.OS, &a.CPUCores, &a.CPUPct, &a.Load1, &a.MemTotalMB, &a.MemUsedMB, &a.DiskTotalGB, &a.DiskUsedGB, &a.UptimeS, &a.Virt, &a.PublicIPOverride, &a.CPUModel)
 	return a, wrapNotFound(err)
 }
 

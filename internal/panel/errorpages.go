@@ -126,9 +126,9 @@ func (ew *errorPageWriter) writeErrorPage(code int) {
 }
 
 // errorPageHTML builds the self-contained Persian error page: dark Quantum
-// branding (the tokens.css palette), dir=rtl, no external assets, no request
-// details. Links are built from the configured base path so they land on the
-// real pages no matter which path triggered the error.
+// branding (the panel palette + the mustache mark), dir=rtl, no external
+// assets, no request details. Links are built from the configured base path
+// so they land on the real pages no matter which path triggered the error.
 func errorPageHTML(code int, ref string) string {
 	meshHref := "/mesh"
 	homeHref := "/"
@@ -143,6 +143,7 @@ func errorPageHTML(code int, ref string) string {
 		expl = "درخواست انجام نشد. چند لحظه بعد دوباره تلاش کنید."
 	}
 	loginHref := strings.TrimSuffix(meshHref, "/mesh") + "/api/login"
+	logo := `<svg class="logo" width="92" height="92" viewBox="0 0 100 100" fill="none" aria-hidden="true"><rect width="100" height="100" rx="24" fill="#0b0e14" stroke="rgba(60,131,246,0.4)" stroke-width="1.5"/><path d="M50 48 C42 38 26 32 12 42 C4 48 1 56 3 62 C6 60 12 54 20 55 C32 56 42 60 50 52 C58 60 68 56 80 55 C88 54 94 60 97 62 C99 56 96 48 88 42 C74 32 58 38 50 48 Z" fill="#3c83f6"/></svg>`
 	return `<!DOCTYPE html>
 <html dir="rtl" lang="fa">
 <head>
@@ -159,7 +160,7 @@ func errorPageHTML(code int, ref string) string {
     align-items: center;
     justify-content: center;
     padding: 24px;
-    background: #09090b;
+    background: radial-gradient(720px 360px at 50% -60px, rgba(60, 131, 246, 0.14), transparent 70%) #09090b;
     color: #f4f4f5;
     font-family: Vazirmatn, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     line-height: 1.7;
@@ -167,23 +168,15 @@ func errorPageHTML(code int, ref string) string {
   }
   .card {
     width: 100%;
-    max-width: 460px;
-    background: #121214;
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    border-radius: 16px;
-    padding: 40px 32px 32px;
+    max-width: 480px;
+    background: #101114;
+    border: 1px solid rgba(60, 131, 246, 0.22);
+    border-radius: 18px;
+    padding: 36px 32px 30px;
     text-align: center;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
   }
-  .glyph {
-    width: 52px; height: 52px;
-    margin: 0 auto 20px;
-    border-radius: 14px;
-    background: rgba(56, 189, 248, 0.12);
-    border: 1px solid rgba(56, 189, 248, 0.3);
-    display: flex; align-items: center; justify-content: center;
-  }
-  .glyph svg { width: 28px; height: 28px; stroke: #38bdf8; fill: none; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+  .logo { width: 92px; height: 92px; border-radius: 24px; margin: 0 auto 20px; display: block; }
   h1 { font-size: 1.375rem; font-weight: 700; margin-bottom: 8px; }
   .code {
     display: inline-block;
@@ -202,14 +195,14 @@ func errorPageHTML(code int, ref string) string {
     display: inline-block;
     font-size: 0.875rem;
     font-weight: 600;
-    color: #071018;
-    background: #38bdf8;
+    color: #ffffff;
+    background: #3c83f6;
     border-radius: 10px;
     padding: 10px 22px;
     text-decoration: none;
     transition: background 0.15s ease;
   }
-  .home:hover, .home:focus-visible { background: #7dd3fc; outline: none; }
+  .home:hover, .home:focus-visible { background: #5c9bf8; outline: none; }
   .ref { margin-top: 24px; font-size: 0.75rem; color: #8e8e98; direction: ltr; unicode-bidi: embed; }
   .lform { display: none; flex-direction: column; gap: 10px; margin-bottom: 20px; }
   .lform.open { display: flex; }
@@ -223,22 +216,20 @@ func errorPageHTML(code int, ref string) string {
     padding: 10px 12px;
     text-align: right;
   }
-  .lform input:focus { outline: 2px solid #38bdf8; outline-offset: 1px; }
+  .lform input:focus { outline: 2px solid #3c83f6; outline-offset: 1px; }
   .lerr { font-size: 0.8125rem; color: #f87171; min-height: 1.2em; }
-  .alt { display: block; margin-top: 12px; font-size: 0.8125rem; color: #38bdf8; text-decoration: none; }
+  .alt { display: block; margin-top: 12px; font-size: 0.8125rem; color: #3c83f6; text-decoration: none; }
   .alt:hover { text-decoration: underline; }
   @media (max-width: 480px) {
     body { padding: 16px; align-items: flex-start; }
-    .card { padding: 32px 20px 24px; border-radius: 12px; }
+    .card { padding: 30px 20px 24px; border-radius: 14px; }
     h1 { font-size: 1.1875rem; }
   }
 </style>
 </head>
 <body>
   <main class="card" role="alert">
-    <div class="glyph" aria-hidden="true">
-      <svg viewBox="0 0 24 24"><path d="M12 2l7 4v6c0 4-3 7-7 10-4-3-7-6-7-10V6z"/><path d="M12 8v4"/><path d="M12 15.5v.5"/></svg>
-    </div>
+    ` + logo + `
     <h1>` + title + `</h1>
     <span class="code">` + fmt.Sprint(code) + `</span>
     <p class="desc">` + expl + `</p>` + func() string {
@@ -249,24 +240,27 @@ func errorPageHTML(code int, ref string) string {
       <div class="lerr" id="l-err"></div>
       <button class="home" type="submit">ورود</button>
     </form>
-    <a class="alt" href="` + meshHref + `">مدیریت مش (Mesh)</a>
+    <a class="alt" href="` + meshHref + `">پنل کوانتوم</a>
     <script>
     document.getElementById('lform').addEventListener('submit', function (ev) {
       ev.preventDefault();
       var u = document.getElementById('l-user').value;
       var p = document.getElementById('l-pass').value;
-      fetch(` + loginHref + `, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      fetch('` + loginHref + `', { method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: u, password: p }) })
         .then(function (r) {
-          if (!r.ok) throw new Error('نام کاربری یا گذرواژه نادرست است');
-          location.replace('` + meshHref + `');
+          return r.json().catch(function () { return {}; }).then(function (j) {
+            if (!r.ok) throw new Error(j.hint || j.error || 'نام کاربری یا گذرواژه نادرست است');
+            location.replace('` + meshHref + `');
+          });
         })
         .catch(function (e) { document.getElementById('l-err').textContent = e.message; });
     });
     </script>`
 		}
 		return `<a class="home" href="` + homeHref + `">بازگشت به داشبورد</a>
-    <a class="alt" href="` + meshHref + `">مدیریت مش (Mesh)</a>`
+    <a class="alt" href="` + meshHref + `">پنل کوانتوم</a>`
 	}() + `
     <div class="ref">` + ref + `</div>
   </main>

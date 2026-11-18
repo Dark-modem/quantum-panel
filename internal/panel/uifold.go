@@ -85,6 +85,8 @@ func registerUIFoldRoutes(mux *http.ServeMux, base string) {
 	mux.HandleFunc("PATCH "+base+"/api/ui/servers/{id}", requireAuth(requireCSRF(handleMeshServerPatch)))
 	mux.HandleFunc("DELETE "+base+"/api/ui/servers/{id}", requireAuth(requireCSRF(handleMeshServerDelete)))
 	mux.HandleFunc("POST "+base+"/api/ui/topologies/generate", requireAuth(requireCSRF(handleMeshTopoGenerate)))
+	mux.HandleFunc("POST "+base+"/api/ui/topologies/{name}/members/add", requireAuth(requireCSRF(handleUITopoMemberAdd)))
+	mux.HandleFunc("POST "+base+"/api/ui/topologies/{name}/members/remove", requireAuth(requireCSRF(handleUITopoMemberRemove)))
 	mux.HandleFunc("PATCH "+base+"/api/ui/topologies/{id}", requireAuth(requireCSRF(handleMeshTopoPatch)))
 	mux.HandleFunc("DELETE "+base+"/api/ui/topologies/{id}", requireAuth(requireCSRF(handleMeshTopoDelete)))
 }

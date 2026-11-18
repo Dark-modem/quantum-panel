@@ -45,12 +45,38 @@ func handleUIAgentsList(w http.ResponseWriter, r *http.Request) {
 		uiErrWrite(w, r, "E-STORE", map[string]any{"op": "list agents"}, err.Error())
 		return
 	}
+	// agent -> topology names (via the agent's server membership)
+	topoName := map[int64]string{}
+	if topos, err := h.ListTopologies(); err == nil {
+		for _, tp := range topos {
+			topoName[tp.ID] = tp.Name
+		}
+	}
+	serverTopos := map[int64][]int64{}
+	seenSrv := map[int64]bool{}
+	for _, a := range agents {
+		if a.ServerID == 0 || seenSrv[a.ServerID] {
+			continue
+		}
+		seenSrv[a.ServerID] = true
+		if ids, err := h.TopologyMemberships(a.ServerID); err == nil {
+			serverTopos[a.ServerID] = ids
+		}
+	}
 	out := []map[string]any{}
 	for _, a := range agents {
+		var agentTopos []string
+		for _, id := range serverTopos[a.ServerID] {
+			if nm, ok := topoName[id]; ok {
+				agentTopos = append(agentTopos, nm)
+			}
+		}
+		sort.Strings(agentTopos)
 		out = append(out, map[string]any{
-			"id": a.ID, "name": a.Name, "role": a.Role,
-			"status":  uiAgentStatus(a),
-			"version": a.Version, "arch": a.Arch,
+			"id": a.ID, "name": a.Name, "role": a.Role, "country": a.Country,
+			"topologies": agentTopos,
+			"status":     uiAgentStatus(a),
+			"version":    a.Version, "arch": a.Arch,
 			"last_seen": a.LastSeen,
 			"server":    h.uiServerRef(a.ServerID),
 			// UI-API-REQUESTS #3 (decided: option b): an UNLINKED agent is
@@ -126,6 +152,62 @@ func handleUIAgentDetail(w http.ResponseWriter, r *http.Request) {
 	// Topologies this agent is a member of, via its server.
 	topos := h.uiAgentTopologies(h.Store, ag, false)
 
+	// Tunnels terminating on this agent's server (compact rows, live state).
+	tunRows := []map[string]any{}
+	// serverID -> agent country (the servers table carries no country; the
+	// agent enrolled against it does) — feeds the destination flag cell.
+	tnCountry := map[int64]string{}
+	if ags, aerr := h.ListAgents(); aerr == nil {
+		for _, a2 := range ags {
+			if a2.ServerID != 0 {
+				tnCountry[a2.ServerID] = a2.Country
+			}
+		}
+	}
+	if ag.ServerID != 0 {
+		if allTopos, err := h.ListTopologies(); err == nil {
+			verdicts := uiVerdictsFn()
+			for _, tp := range allTopos {
+				tunnels, terr := h.ListTunnels(tp.ID)
+				if terr != nil {
+					continue
+				}
+				pcts := h.uiResolvedPercents(tp.ID, tunnels, verdicts)
+				lat := uiLatencyMap()
+				now := timeNowUnix()
+				for _, tn := range tunnels {
+					if tn.LocalServerID != ag.ServerID && tn.RemoteServerID != ag.ServerID {
+						continue
+					}
+					state := "unknown"
+					if !tn.Enabled {
+						state = "disabled"
+					} else if v, ok := verdicts[tn.TunnelKey]; ok {
+						state = v
+					}
+					usage, _, uerr := h.RangeUsageDetailed([]int64{tn.ID}, now-now%86400, now)
+					var todayBytes uint64
+					if uerr == nil {
+						todayBytes = usage.WireRx + usage.WireTx
+					}
+					row := map[string]any{
+						"tunnel_key": tn.TunnelKey, "engine": tn.Engine, "topology": tp.Name,
+						"local": h.uiServerRef(tn.LocalServerID), "remote": h.uiServerRef(tn.RemoteServerID),
+						"country": tnCountry[tn.RemoteServerID],
+						"state":   state, "latency_ms": lat[tn.TunnelKey],
+						"today_bytes": todayBytes,
+					}
+					// Only connected tunnels carry weight — a dropped tunnel
+					// shows «—» and its share flows to the surviving ones.
+					if p := pcts[tn.ID]; p > 0 {
+						row["weight_pct"] = p
+					}
+					tunRows = append(tunRows, row)
+				}
+			}
+		}
+	}
+
 	// Recent per-tunnel errors on this agent's tunnels (translated).
 	recent := []map[string]any{}
 	if ag.ServerID != 0 {
@@ -150,7 +232,7 @@ func handleUIAgentDetail(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, map[string]any{
 		"agent": map[string]any{
-			"id": ag.ID, "name": ag.Name, "role": ag.Role,
+			"id": ag.ID, "name": ag.Name, "role": ag.Role, "country": ag.Country,
 			"linked":  ag.ServerID != 0,
 			"status":  uiAgentStatus(ag),
 			"version": ag.Version, "arch": ag.Arch, "os": ag.OS,
@@ -162,9 +244,10 @@ func handleUIAgentDetail(w http.ResponseWriter, r *http.Request) {
 			"effective_public_ip": effective,
 			"cpu":                 cpu, "mem": mem, "disk": disk,
 			"uptime_s": ag.UptimeS, "virt": nilIfEmpty(ag.Virt),
-			"datacenter": dcName, "datacenter_en": dcEn,
+			"datacenter": dcName, "datacenter_en": dcEn, "cpu_model": nilIfEmpty(ag.CPUModel),
 		},
 		"topologies":    topos,
+		"tunnels":       tunRows,
 		"engines":       h.uiEngineList(ag, h.uiCatalogOf(ag.ID)),
 		"recent_errors": recent,
 	})
@@ -181,15 +264,61 @@ func (h uiStoreHandle) uiAgentTopologies(s *store.Store, ag store.Agent, withTun
 	if err != nil || len(members) == 0 {
 		return out
 	}
-	verdicts := uiTunnelVerdicts()
+	verdicts := uiVerdictsFn()
 	lat := uiLatencyMap()
 	now := timeNowUnix()
+	// serverID → agent country (the servers table carries no country; the
+	// agent enrolled against it does). Feeds the per-side diagram summary.
+	agentCountry := map[int64]string{}
+	if ags, aerr := h.ListAgents(); aerr == nil {
+		for _, a2 := range ags {
+			if a2.ServerID != 0 {
+				agentCountry[a2.ServerID] = a2.Country
+			}
+		}
+	}
 	for _, topoID := range members {
 		topo, err := h.GetTopology(topoID)
 		if err != nil {
 			continue
 		}
 		memberServers, _ := h.TopologyMembers(topoID)
+		// Per-side summary: distinct servers on the agent's side vs the
+		// peers' side, and the country representing each side (the client
+		// renders the flag; iran sides are always ir).
+		myServers, peerServers := 0, 0
+		peerRole, peerCountry := "", ""
+		for _, sid := range memberServers {
+			sv, serr := h.GetServer(sid)
+			if serr != nil {
+				continue
+			}
+			if sv.Role == ag.Role {
+				myServers++
+				continue
+			}
+			peerServers++
+			if peerRole == "" {
+				peerRole = sv.Role
+			}
+			if peerCountry == "" && agentCountry[sid] != "" {
+				peerCountry = agentCountry[sid]
+			}
+		}
+		if peerRole == "" {
+			if ag.Role == "iran" {
+				peerRole = "foreign"
+			} else {
+				peerRole = "iran"
+			}
+		}
+		if peerRole == "iran" && peerCountry == "" {
+			peerCountry = "ir"
+		}
+		myCountry := ag.Country
+		if ag.Role == "iran" {
+			myCountry = "ir"
+		}
 		peers := []map[string]any{}
 		tunnelCount := 0
 		for _, sid := range memberServers {
@@ -204,11 +333,14 @@ func (h uiStoreHandle) uiAgentTopologies(s *store.Store, ag store.Agent, withTun
 			"id": topo.ID, "name": topo.Name, "my_role": ag.Role,
 			"my_server": h.uiServerRef(ag.ServerID),
 			"peers":     peers, "enabled": topo.Enabled,
+			"members":   len(memberServers),
+			"my_side":   map[string]any{"role": ag.Role, "servers": myServers, "country": myCountry},
+			"peer_side": map[string]any{"role": peerRole, "servers": peerServers, "country": peerCountry},
 		}
 		if withTunnels {
 			tunnels, _ := h.ListTunnels(topoID)
 			rows := []map[string]any{}
-			pcts := h.uiResolvedPercents(topoID, tunnels)
+			pcts := h.uiResolvedPercents(topoID, tunnels, verdicts)
 			for _, t := range tunnels {
 				if t.LocalServerID != ag.ServerID && t.RemoteServerID != ag.ServerID {
 					continue
@@ -570,4 +702,54 @@ func atoiDefault(s string, d int64) int64 {
 		return d
 	}
 	return v
+}
+
+// handleUIAgentRename renames an agent (registry + store mirror).
+func handleUIAgentRename(w http.ResponseWriter, r *http.Request) {
+	h, ok := uiOpen(w, r)
+	if !ok {
+		return
+	}
+	id := r.PathValue("id")
+	var body struct {
+		Name string `json:"name"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10)).Decode(&body); err != nil {
+		uiErrWrite(w, r, "E-IN-04", map[string]any{"agent": id}, "bad body")
+		return
+	}
+	name := agentValidText(body.Name, 120)
+	if name == "" {
+		uiErrWrite(w, r, "E-IN-04", map[string]any{"agent": id}, "name required")
+		return
+	}
+	if err := agentRegistryRename(id, name); err != nil {
+		uiErrWrite(w, r, "E-NOTFOUND", map[string]any{"agent": id}, err.Error())
+		return
+	}
+	if err := h.SetAgentName(id, name); err != nil {
+		uiErrWrite(w, r, "E-STORE", map[string]any{"agent": id}, err.Error())
+		return
+	}
+	writeJSON(w, map[string]any{"ok": true, "name": name})
+}
+
+// handleUIAgentDelete removes the agent entirely: registry record (its
+// credential) + the store row. A live hub session for a now-unknown agent is
+// dropped by the hub on its next message.
+func handleUIAgentDelete(w http.ResponseWriter, r *http.Request) {
+	h, ok := uiOpen(w, r)
+	if !ok {
+		return
+	}
+	id := r.PathValue("id")
+	if err := agentRegistryDelete(id); err != nil {
+		uiErrWrite(w, r, "E-NOTFOUND", map[string]any{"agent": id}, err.Error())
+		return
+	}
+	if err := h.DeleteAgent(id); err != nil {
+		uiErrWrite(w, r, "E-STORE", map[string]any{"agent": id}, err.Error())
+		return
+	}
+	writeJSON(w, map[string]any{"ok": true})
 }

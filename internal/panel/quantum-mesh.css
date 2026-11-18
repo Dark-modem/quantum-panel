@@ -62,6 +62,9 @@
 }
 .topbar h1 { font-size: var(--fs-h1); font-weight: var(--fw-h1); color: var(--tx); margin: 0; }
 .topbar .spacer { flex: 1; }
+/* the title is the only flexible item: it truncates before any control clips */
+.topbar { flex-wrap: nowrap; }
+.topbar-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ---- responsive: the sidebar collapses under 900px ---------------------- */
 .menubtn { display: none; }
@@ -89,7 +92,10 @@
 /* wide tables scroll inside their card on phones instead of the page */
 .card > table, .card > div > table { display: block; overflow-x: auto; }
 .card h3 { font-size: var(--fs-h4); color: var(--tx); margin: 0 0 10px; font-weight: 600; }
-.kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin-bottom: 14px; }
+/* KPI strip: always a full, even row — 8 at desktop, 4 on a laptop, 2 on a phone.
+ * auto-fill left a ragged 6+2 tail that read as broken layout. */
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+@media (max-width: 900px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .kpi {
   background: var(--s1); border: 1px solid var(--s3); border-radius: 12px;
   padding: 12px 14px; cursor: pointer; text-align: start; color: var(--mu);
@@ -97,7 +103,7 @@
 }
 .kpi:hover { border-color: var(--ac-b30); }
 .kpi:focus-visible { outline: 2px solid var(--ac); outline-offset: 2px; }
-.kpi .kval { font-size: 1.45rem; font-weight: 700; color: var(--tx); font-variant-numeric: tabular-nums; unicode-bidi: plaintext; }
+.kpi .kval { font-size: 1.45rem; font-weight: 700; color: var(--tx); font-variant-numeric: tabular-nums; unicode-bidi: plaintext; line-height: 1.35; white-space: nowrap; }
 .kpi .kval small { font-size: .95rem; color: var(--mu); font-weight: 500; }
 .kpi .klbl { font-size: var(--fs-caption); color: var(--mu); margin-top: 2px; }
 .kpi.ok .kval { color: var(--ok); }
@@ -253,6 +259,49 @@ button.act.small, .btn.small { padding: 3px 9px; font-size: var(--fs-caption); }
 .wsum.bad { color: var(--er); }
 .wsum.good { color: var(--ok); }
 
+/* ---- phase 12: mobile top bar + compact KPIs ------------------------------ */
+@media (max-width: 560px) {
+  .topbar { gap: 2px; padding: 8px 8px; }
+  .topbar .spacer { flex: 0 1 auto; }
+  .iconbtn { width: 34px; height: 34px; }
+  .iconbtn svg { width: 17px; height: 17px; }
+  .langbtn { min-width: 32px; padding: 0 5px; }
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .kpi { padding: 10px; }
+  .kpi .kval { font-size: 1.12rem; }
+  .kpi .klbl { font-size: 11px; line-height: 1.5; }
+  .aggr { grid-template-columns: 1fr; }
+  .card { padding: 12px; }
+  .tblwrap th, .tblwrap td { padding: 6px 7px; }
+}
+@media (max-width: 1200px) { .hide-sm { display: none !important; } }
+/* Data-dense tables keep their column shape on a phone and scroll inside the
+ * card instead of collapsing to one character per line. */
+@media (max-width: 700px) {
+  #page-tunnels .tblwrap table { min-width: 620px; }
+  #page-audit .tblwrap table, #page-selfcheck .tblwrap table { min-width: 560px; }
+  #page-tunnels .tblwrap td, #page-tunnels .tblwrap th { white-space: nowrap; }
+}
+/* agents table on a phone: drop the DC column too (state/agent/engines/cpu/mem stay) */
+@media (max-width: 560px) {
+  #page-agents .tblwrap th:nth-child(4), #page-agents .tblwrap td:nth-child(4),
+  #page-agents .tblwrap th:nth-child(7), #page-agents .tblwrap td:nth-child(7),
+  #page-agents .tblwrap th:nth-child(8), #page-agents .tblwrap td:nth-child(8) { display: none; }
+  .kpi .ksub { font-size: 10px; }
+}
+
+/* ---- ports overview (topology detail) ------------------------------------ */
+.portlist { display: flex; flex-wrap: wrap; gap: 4px; }
+.portlist .pill { font-variant-numeric: tabular-nums; }
+
+/* ---- JSON preview (client config) ---------------------------------------- */
+.jsonpre {
+  background: var(--s2); border: 1px solid var(--s3); border-radius: 10px;
+  padding: 12px 14px; overflow: auto; max-height: 52vh;
+  direction: ltr; text-align: left; font-family: var(--font-mono);
+  font-size: var(--fs-small); line-height: 1.6; margin: 8px 0;
+}
+
 /* ---- print / misc ---------------------------------------------------------- */
 @media print { .side, .topbar button, #toasts { display: none !important; } }
 
@@ -322,7 +371,12 @@ button.act.small, .btn.small { padding: 3px 9px; font-size: var(--fs-caption); }
 
 /* ---- sticky-header tables + truncation ----------------------------------- */
 .tblwrap { overflow: auto; border: 1px solid var(--s3); border-radius: 10px; margin: 8px 0 14px; max-width: 100%; }
-.tblwrap table { margin: 0; border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; }
+/* Tables FIT their card: cells wrap instead of pushing a 9-column grid
+ * off the screen. Only mono/trunc cells ellipsize; the wrapper still
+ * scrolls for genuinely wide content (a 40-char tunnel key). */
+.tblwrap table { margin: 0; border-collapse: separate; border-spacing: 0; width: 100%; min-width: 0; table-layout: auto; }
+.tblwrap th, .tblwrap td { white-space: normal; overflow-wrap: anywhere; }
+.tblwrap .mono.trunc, .tblwrap .trunc { white-space: nowrap; }
 .tblwrap th {
   position: sticky; top: 0; z-index: 2;
   background: var(--s2);
@@ -347,10 +401,10 @@ td.num, th.num { text-align: end; font-variant-numeric: tabular-nums; unicode-bi
 .rng button.active { background: var(--ac-fill); color: var(--ac-on); font-weight: 700; }
 
 /* ---- KPI aggregate cards (dashboard) -------------------------------------- */
-.aggr { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; margin-bottom: 14px; }
+.aggr { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; margin-bottom: 14px; }
 .aggr .kpi { min-height: 84px; }
 .aggr .ksub { color: var(--mu); font-size: var(--fs-caption); margin-top: 4px; line-height: 1.6; }
-.aggr .ksub b { color: var(--tx); font-weight: 600; }
+.aggr .ksub b { color: var(--tx); font-weight: 600; display: inline-block; white-space: nowrap; unicode-bidi: plaintext; }
 .meter { height: 7px; border-radius: 999px; background: var(--s3); overflow: hidden; margin-top: 6px; }
 .meter i { display: block; height: 100%; background: var(--ok); border-radius: 999px; }
 .meter i.warn { background: var(--wr); }

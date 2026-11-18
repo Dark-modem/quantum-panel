@@ -26,8 +26,10 @@ func TestAppJSExtracted(t *testing.T) {
 	if !strings.Contains(string(html), `<script src="tunnel_overview.js"></script>`) {
 		t.Error("page must load selected tunnel overview module")
 	}
-	if strings.Count(string(html), "<script") != 5 { // theme, app, Matrix edit, topology and selected tunnel overview
-		t.Errorf("unexpected number of <script> tags: %d", strings.Count(string(html), "<script"))
+	// Five external modules (app, mesh tabs, Matrix edit, topology, selected
+	// tunnel overview) plus the two inline theme/boot scripts.
+	if n := strings.Count(string(html), "<script"); n != 7 {
+		t.Errorf("unexpected number of <script> tags: %d", n)
 	}
 	if strings.Contains(string(html), "async function api(") {
 		t.Error("UI code must live in app.js, not inline")

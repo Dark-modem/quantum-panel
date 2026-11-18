@@ -29,7 +29,7 @@ import (
 	"time"
 )
 
-//go:embed index.html app.js i18n-fa.js matrix_edit.js topology.js tunnel_overview.js fonts.css tokens.css base.css enterprise.css quantum-mesh.css favicon.png favicon.svg apple-touch-icon.png xterm.js xterm-fit.js xterm-search.js xterm.css fonts/vazirmatn.woff2 fonts/OFL.txt fonts/SOURCE.txt mesh.html mesh.js wizard.html wizard.js
+//go:embed index.html app.js i18n-fa.js meshtabs.js matrix_edit.js topology.js tunnel_overview.js fonts.css tokens.css base.css enterprise.css quantum-mesh.css favicon.png favicon.svg apple-touch-icon.png xterm.js xterm-fit.js xterm-search.js xterm.css fonts/vazirmatn.woff2 fonts/OFL.txt fonts/SOURCE.txt mesh.html mesh.js wizard.html wizard.js img/engines/*
 var panelFS embed.FS
 
 var configDir = "/etc/gre-panel"
@@ -744,6 +744,7 @@ func Main(args []string) int {
 	mux.HandleFunc("GET "+base+"/matrix_edit.js", serveAsset("matrix_edit.js", "text/javascript; charset=utf-8"))
 	mux.HandleFunc("GET "+base+"/app.js", serveAsset("app.js", "text/javascript; charset=utf-8"))
 	mux.HandleFunc("GET "+base+"/i18n-fa.js", serveAsset("i18n-fa.js", "text/javascript; charset=utf-8"))
+	mux.HandleFunc("GET "+base+"/meshtabs.js", serveAsset("meshtabs.js", "text/javascript; charset=utf-8"))
 	mux.HandleFunc("GET "+base+"/tokens.css", serveAsset("tokens.css", "text/css; charset=utf-8"))
 	mux.HandleFunc("GET "+base+"/fonts.css", serveAsset("fonts.css", "text/css; charset=utf-8"))
 	mux.HandleFunc("GET "+base+"/fonts/vazirmatn.woff2", serveAsset("fonts/vazirmatn.woff2", "font/woff2"))
@@ -753,6 +754,31 @@ func Main(args []string) int {
 	mux.HandleFunc("GET "+base+"/favicon.ico", serveAsset("favicon.png", "image/png"))
 	mux.HandleFunc("GET "+base+"/favicon.png", serveAsset("favicon.png", "image/png"))
 	mux.HandleFunc("GET "+base+"/favicon.svg", serveAsset("favicon.svg", "image/svg+xml"))
+	mux.HandleFunc("GET "+base+"/img/engines/gost.png", serveAsset("img/engines/gost.png", "image/png"))
+	mux.HandleFunc("GET "+base+"/img/engines/xray.svg", serveAsset("img/engines/xray.svg", "image/svg+xml"))
+	mux.HandleFunc("GET "+base+"/img/engines/wireguard.png", serveAsset("img/engines/wireguard.png", "image/png"))
+	mux.HandleFunc("GET "+base+"/img/engines/rathole.png", serveAsset("img/engines/rathole.png", "image/png"))
+	mux.HandleFunc("GET "+base+"/img/engines/wstunnel.png", serveAsset("img/engines/wstunnel.png", "image/png"))
+	mux.HandleFunc("GET "+base+"/img/engines/tinc.png", serveAsset("img/engines/tinc.png", "image/png"))
+	mux.HandleFunc("GET "+base+"/img/engines/tinc.svg", serveAsset("img/engines/tinc.svg", "image/svg+xml"))
+	mux.HandleFunc("GET "+base+"/img/engines/hysteria.png", serveAsset("img/engines/hysteria.png", "image/png"))
+	mux.HandleFunc("GET "+base+"/img/engines/singbox.png", serveAsset("img/engines/singbox.png", "image/png"))
+	mux.HandleFunc("GET "+base+"/img/engines/singbox.svg", serveAsset("img/engines/singbox.svg", "image/svg+xml"))
+	mux.HandleFunc("GET "+base+"/img/engines/midos.png", serveAsset("img/engines/midos.png", "image/png"))
+	mux.HandleFunc("GET "+base+"/img/engines/dagger.png", serveAsset("img/engines/dagger.png", "image/png"))
+	mux.HandleFunc("GET "+base+"/img/engines/pengo.png", serveAsset("img/engines/pengo.png", "image/png"))
+	mux.HandleFunc("GET "+base+"/img/engines/backhaul.png", serveAsset("img/engines/backhaul.png", "image/png"))
+	mux.HandleFunc("GET "+base+"/img/engines/backpack.png", serveAsset("img/engines/backpack.png", "image/png"))
+	mux.HandleFunc("GET "+base+"/img/engines/aestun.png", serveAsset("img/engines/aestun.png", "image/png"))
+	mux.HandleFunc("GET "+base+"/img/engines/rakhsh.png", serveAsset("img/engines/rakhsh.png", "image/png"))
+	mux.HandleFunc("GET "+base+"/img/engines/narnia.png", serveAsset("img/engines/narnia.png", "image/png"))
+	mux.HandleFunc("GET "+base+"/img/engines/waterwall.png", serveAsset("img/engines/waterwall.png", "image/png"))
+	mux.HandleFunc("GET "+base+"/img/engines/wattunnel.png", serveAsset("img/engines/wattunnel.png", "image/png"))
+	mux.HandleFunc("GET "+base+"/img/engines/udp2raw.png", serveAsset("img/engines/udp2raw.png", "image/png"))
+	mux.HandleFunc("GET "+base+"/img/engines/paqet.png", serveAsset("img/engines/paqet.png", "image/png"))
+	mux.HandleFunc("GET "+base+"/img/engines/frp.png", serveAsset("img/engines/frp.png", "image/png"))
+	mux.HandleFunc("GET "+base+"/img/engines/easytier.png", serveAsset("img/engines/easytier.png", "image/png"))
+	mux.HandleFunc("GET "+base+"/img/engines/chisel.png", serveAsset("img/engines/chisel.png", "image/png"))
 	mux.HandleFunc("GET "+base+"/apple-touch-icon.png", serveAsset("apple-touch-icon.png", "image/png"))
 	mux.HandleFunc("GET "+base+"/xterm.js", serveAsset("xterm.js", "text/javascript; charset=utf-8"))
 	mux.HandleFunc("GET "+base+"/xterm-fit.js", serveAsset("xterm-fit.js", "text/javascript; charset=utf-8"))
@@ -860,12 +886,10 @@ func Main(args []string) int {
 	registerMeshAlertRoutes(mux, base)
 	// Phase 9 TASK 2a: engine parameter templates (enginetemplates.go).
 	registerEngineTemplateRoutes(mux, base)
-	mux.HandleFunc("GET "+base+"/mesh", requireAuth(serveMeshPage))
 	mux.HandleFunc("GET "+base+"/mesh.js", serveAsset("mesh.js", "text/javascript; charset=utf-8"))
 	// Phase 7: the /mesh setup wizard (wizard.html + wizard.js, fa/en) —
 	// everything rides the existing mesh REST API; the page is just the
 	// guided flow over it.
-	mux.HandleFunc("GET "+base+"/mesh-wizard", requireAuth(serveWizardPage))
 	mux.HandleFunc("GET "+base+"/wizard.js", serveAsset("wizard.js", "text/javascript; charset=utf-8"))
 
 	mux.HandleFunc("GET "+base+"/api/update/peer", requireAuth(handleUpdatePeer))
@@ -1078,8 +1102,12 @@ var (
 func assetTag() string {
 	assetTagOnce.Do(func() {
 		h := sha256.New()
-		for _, f := range []string{"app.js", "i18n-fa.js", "tokens.css", "base.css", "enterprise.css",
-			"mesh.js", "quantum-mesh.css", "wizard.js"} {
+		// Every first-party asset that serveIndex tags with ?v= must be hashed
+		// here; otherwise edits to it keep the old tag and browsers serve the
+		// 24h-cached copy (meshtabs.js used to be missing: UI fixes looked
+		// absent until the cache expired).
+		for _, f := range []string{"app.js", "i18n-fa.js", "meshtabs.js", "topology.js", "tunnel_overview.js",
+			"matrix_edit.js", "tokens.css", "base.css", "enterprise.css", "mesh.js", "quantum-mesh.css", "wizard.js"} {
 			b, _ := panelFS.ReadFile(f)
 			h.Write(b)
 		}
@@ -1109,8 +1137,13 @@ func serveIndex(w http.ResponseWriter, r *http.Request) {
 	page = strings.ReplaceAll(page, `src="topology.js"`, `src="topology.js?v=`+assetTag()+`"`)
 	page = strings.ReplaceAll(page, `src="matrix_edit.js"`, `src="matrix_edit.js?v=`+assetTag()+`"`)
 	page = strings.ReplaceAll(page, `src="app.js"`, `src="app.js?v=`+assetTag()+`"`)
+	page = strings.ReplaceAll(page, `src="i18n-fa.js"`, `src="i18n-fa.js?v=`+assetTag()+`"`)
+	page = strings.ReplaceAll(page, `src="meshtabs.js"`, `src="meshtabs.js?v=`+assetTag()+`"`)
 	body := []byte(page)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	// The page carries the ?v= tags and its own CSS: it must revalidate so a
+	// rebuilt panel is visible on a normal reload, not served from a stale copy.
+	w.Header().Set("Cache-Control", "no-cache")
 	if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") && len(body) > 1024 {
 		var buf bytes.Buffer
 		gw := gzip.NewWriter(&buf)

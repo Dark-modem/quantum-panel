@@ -49,6 +49,29 @@ type engineParamTemplate struct {
 // engineParamTemplates is the FALLBACK table (panel-side; the agent
 // catalog's params_schema takes precedence when it carries fields).
 var engineParamTemplates = map[string][]engineParamField{
+
+	"rakhsh": {
+		{JSON: "version", LabelEn: "Release version", LabelFa: "نسخه", Kind: "string", Default: "v0.1.0", Required: true},
+		{JSON: "artifact", LabelEn: "Artifact name template", LabelFa: "قالب نام فایل", Kind: "string", Default: "rakhsh-{version}-x86_64-unknown-linux-musl", Required: true},
+		{JSON: "token", LabelEn: "Pre-shared key", LabelFa: "کلید مشترک (psk)", Kind: "secret", Generator: "secret32", Required: true, Hint: "generated in the browser; same value both ends"},
+		{JSON: "carrier", LabelEn: "Carrier", LabelFa: "حامل", Kind: "string", Default: "tcp", Hint: "tcp / tls / ws / quic / arq-udp"},
+		{JSON: "remote_identity", LabelEn: "Remote identity", LabelFa: "هویت مقصد", Kind: "string", Required: true},
+		{JSON: "remote_addr", LabelEn: "Foreign host", LabelFa: "هاست خارج", Kind: "string", Required: true},
+		{JSON: "remote_port", LabelEn: "Remote port", LabelFa: "پورت مقصد", Kind: "number", Default: "443", Required: true},
+		{JSON: "lanes", LabelEn: "Tunnel lanes", LabelFa: "لاین‌های تونل", Kind: "number", Default: "4"},
+	},
+	"aestun": {
+		{JSON: "version", LabelEn: "Artifact version", LabelFa: "نسخه", Kind: "string", Default: "1.0.0", Required: true},
+		{JSON: "artifact", LabelEn: "Artifact name template", LabelFa: "قالب نام فایل", Kind: "string", Default: "aestun-{version}-linux-{arch}.tar.gz", Required: true},
+		{JSON: "sha256_amd64", LabelEn: "sha256 (amd64)", LabelFa: "sha256 (amd64)", Kind: "secret", Required: true},
+		{JSON: "sha256_arm64", LabelEn: "sha256 (arm64)", LabelFa: "sha256 (arm64)", Kind: "secret", Required: true},
+		{JSON: "key", LabelEn: "Shared key", LabelFa: "کلید مشترک", Kind: "secret", Generator: "secret32", Required: true, Hint: "generated in the browser; same value both ends"},
+		{JSON: "cipher", LabelEn: "Cipher", LabelFa: "رمزنگاری", Kind: "string", Default: "aes-256-gcm", Required: true},
+		{JSON: "obfs", LabelEn: "Wire disguise", LabelFa: "استتار ترافیک", Kind: "string", Default: "quic", Required: true},
+		{JSON: "remote_addr", LabelEn: "Foreign host", LabelFa: "هاست خارج", Kind: "string", Required: true},
+		{JSON: "udp_port", LabelEn: "Carrier port (UDP)", LabelFa: "پورت حامل (UDP)", Kind: "number", Default: "443", Required: true},
+		{JSON: "tun_addr", LabelEn: "TUN address", LabelFa: "آدرس TUN", Kind: "string", Default: "10.8.0.2/24"},
+	},
 	"frp": {
 		{JSON: "server_side", LabelEn: "Server end (foreign name)", LabelFa: "سمت سرور (نام خارج)", Kind: "string", Required: true},
 		{JSON: "version", LabelEn: "Artifact version", LabelFa: "نسخه", Kind: "string", Default: "0.61.1", Required: true},

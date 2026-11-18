@@ -395,7 +395,7 @@ reconnect:
 				ws.Close()
 				goto reconnect
 			case <-tick.C:
-				rx += uint64(100000 + rng.Intn(50000))
+				rx += uint64(1200000 + rng.Intn(600000)) // demo scale: ~1.2GB/h per agent ≈ the backfilled history
 				tx += uint64(80000 + rng.Intn(40000))
 				// wire ≈ payload × ~1.08 (realistic overhead)
 				prx = uint64(float64(rx) / 1.08)

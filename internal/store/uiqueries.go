@@ -32,6 +32,13 @@ func (s *Store) UpdateAgentResources(agentID string, cpuCores int, cpuPct, load1
 	return err
 }
 
+// UpdateAgentCPUModel persists the CPU model string the agent reports
+// from /proc/cpuinfo (the model name usually carries the @ frequency).
+func (s *Store) UpdateAgentCPUModel(agentID, cpuModel string) error {
+	_, err := s.db.Exec(`UPDATE agents SET cpu_model=? WHERE id=?`, cpuModel, agentID)
+	return err
+}
+
 // SetAgentArchOS mirrors the hello identity into the store (it lived
 // only in the legacy registry before).
 func (s *Store) SetAgentArchOS(agentID, arch, osName string) error {

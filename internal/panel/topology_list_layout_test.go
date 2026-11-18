@@ -26,18 +26,27 @@ func TestTopologyListSemanticTable(t *testing.T) {
 		t.Error("generated topology rows must remain inside the table body")
 	}
 	headers := regexp.MustCompile(`(?s)<th\b([^>]*)>(.*?)</th>`).FindAllStringSubmatch(table[1], -1)
-	want := []string{"Name", "Iran", "Foreign", "Tunnels", "Status", "Actions"}
+	want := []string{"Name", "Status", "Tunnels", "Foreign server", "Iran servers", "", "Actions"}
 	if len(headers) != len(want) {
 		t.Fatalf("got %d topology columns, want %d", len(headers), len(want))
 	}
 	for i, header := range headers {
-		if !strings.Contains(header[1], `scope="col"`) || strings.TrimSpace(header[2]) != want[i] {
+		// the label must be present and in order; the th may also carry a glyph
+		// wrapper (svg + inner data-i18n span) around it
+		if !strings.Contains(header[1], `scope="col"`) || !strings.Contains(header[2], want[i]) {
 			t.Errorf("column %d must be a scoped %q header", i, want[i])
 		}
 	}
-	for _, id := range []string{"topologyListTable", "topologySearch", "topologyViewListBtn", "topologyViewGridBtn"} {
+	for _, id := range []string{"topologyListTable", "topologySearch"} {
 		if !strings.Contains(html, `id="`+id+`"`) {
 			t.Errorf("topology overview must keep %s on the list card", id)
+		}
+	}
+	// The list is the only topology view: the list/grid toggle that could turn
+	// rows into half-empty cards is gone for good.
+	for _, gone := range []string{"topologyViewListBtn", "topologyViewGridBtn"} {
+		if strings.Contains(html, gone) || strings.Contains(topologyListTestSource(t, "topology.js"), gone) {
+			t.Errorf("topology list must not keep the %s view toggle", gone)
 		}
 	}
 	if !strings.Contains(html, `id="topologyCountry"`) {
@@ -73,12 +82,12 @@ func TestTopologyListSemanticTable(t *testing.T) {
 		`topologyFlagSvg(flag)`,                // embedded SVG flag per server column
 		`tabindex="0"`,                         // rows are keyboard reachable
 		`$('topologiesList').addEventListener`, // whole-row click opens the topology
-		`toastWarn(tr('', 'Delete topology'), topologyDeleteNotice(remaining))`, // delete explains blocked state
-		`quantum-btn-danger topo-delete`,                                        // delete is a danger button, never disabled
-		`let topologyLoadedOnce = false`,                                        // first-load gate: skeleton instead of empty-state flash
-		`if (!topologyLoadedOnce) topologyRender()`,                             // first load paints the skeleton immediately
-		`topologyLoading && !topologyLoadedOnce`,                                // skeleton branch replaces the "No topology yet" row
-		`${skel(2)}`,                                                            // skeleton rows reuse the shared skel() helper
+		`toastWarn(tr('', 'Delete topology'), tr('', 'The topology must be off or empty before it can be deleted'))`, // delete explains the off-or-empty rule
+		`quantum-btn-danger topo-delete`,            // delete is a danger button, never disabled
+		`let topologyLoadedOnce = false`,            // first-load gate: skeleton instead of empty-state flash
+		`if (!topologyLoadedOnce) topologyRender()`, // first load paints the skeleton immediately
+		`topologyLoading && !topologyLoadedOnce`,    // skeleton branch replaces the "No topology yet" row
+		`${skel(2)}`,                                // skeleton rows reuse the shared skel() helper
 	} {
 		if !strings.Contains(js, want) {
 			t.Errorf("topology.js lacks %q", want)
@@ -102,8 +111,6 @@ func TestTopologyListModernChrome(t *testing.T) {
 		{"pill action buttons", `\.topo-actions\s+\.quantum-btn\s*\{[^}]*border-radius\s*:\s*999px`},
 		{"red danger delete button", `\.topo-actions\s+\.topo-delete\s*\{[^}]*border\s*:\s*1px\s+solid\s+var\(--er\)`},
 		{"search box styling", `\.topo-search\s*\{[^}]*min-height\s*:`},
-		{"view toggle active state", `\.topo-view-toggle\s+button\[aria-pressed="true"\]`},
-		{"grid card mode", `\.topo-list-table\.topo-grid\s+\.topo-list-row\s*\{[^}]*border-radius\s*:\s*var\(--r-md\)`},
 		{"subtle row hover", `\.topo-list-row:hover\s*\{[^}]*background\s*:\s*var\(--sunk\)\s*;?\s*\}`},
 		{"first-load skeleton bars", `\.topo-list-skel\s+\.ent-skel\s*\{[^}]*width\s*:\s*100%`},
 	} {
@@ -132,9 +139,15 @@ func TestTopologyListSharedResponsiveColumns(t *testing.T) {
 		}
 	}
 	// Tunnels and Actions sit on fixed tracks so the headers stay over their
-	// cells no matter how the flexible name/endpoints columns squeeze.
-	if !regexp.MustCompile(`grid-template-columns\s*:[^}]*64px\s+96px\s+56px`).MatchString(shared[1]) {
-		t.Error("shared grid must keep fixed 64px (Tunnels), 96px (Status) and 56px (Actions) tracks")
+	// cells no matter how the flexible name/server columns squeeze. The third
+	// mockup pass (2026-11-17) reordered the columns to # / Status / Tunnels /
+	// Foreign / Iran / Name / Actions with the inline view/edit/delete trio
+	// plus the kebab: 150px (Status), 90px (Tunnels), 136px (Actions).
+	if !regexp.MustCompile(`grid-template-columns\s*:[^}]*150px\s+90px`).MatchString(shared[1]) {
+		t.Error("shared grid must keep fixed 150px (Status) and 90px (Tunnels) tracks")
+	}
+	if !regexp.MustCompile(`grid-template-columns\s*:[^}]*136px`).MatchString(shared[1]) {
+		t.Error("shared grid must keep the fixed 136px (Actions) track")
 	}
 
 	media := regexp.MustCompile(`@media\s*\(\s*max-width\s*:\s*799px\s*\)`).FindStringIndex(css)

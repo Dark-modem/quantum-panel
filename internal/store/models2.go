@@ -484,8 +484,8 @@ func (s *Store) SetPasarguardCoefficient(id int64, coefficient float64) error {
 // ---- agents: v2 state + linking ------------------------------------------
 
 func (s *Store) ListAgents() ([]Agent, error) {
-	rows, err := s.db.Query(`SELECT id, COALESCE(server_id, 0), name, role, key_hash, status, version, hostname, public_ip, last_seen, applied_revision,
-		arch, os, cpu_cores, cpu_pct, load1, mem_total_mb, mem_used_mb, disk_total_gb, disk_used_gb, uptime_s, virt, public_ip_override
+	rows, err := s.db.Query(`SELECT id, COALESCE(server_id, 0), name, role, country, key_hash, status, version, hostname, public_ip, last_seen, applied_revision,
+		arch, os, cpu_cores, cpu_pct, load1, mem_total_mb, mem_used_mb, disk_total_gb, disk_used_gb, uptime_s, virt, public_ip_override, COALESCE(cpu_model, '')
 		FROM agents ORDER BY id`)
 	if err != nil {
 		return nil, err
@@ -494,8 +494,8 @@ func (s *Store) ListAgents() ([]Agent, error) {
 	var out []Agent
 	for rows.Next() {
 		var a Agent
-		if err := rows.Scan(&a.ID, &a.ServerID, &a.Name, &a.Role, &a.KeyHash, &a.Status, &a.Version, &a.Hostname, &a.PublicIP, &a.LastSeen, &a.AppliedRevision,
-			&a.Arch, &a.OS, &a.CPUCores, &a.CPUPct, &a.Load1, &a.MemTotalMB, &a.MemUsedMB, &a.DiskTotalGB, &a.DiskUsedGB, &a.UptimeS, &a.Virt, &a.PublicIPOverride); err != nil {
+		if err := rows.Scan(&a.ID, &a.ServerID, &a.Name, &a.Role, &a.Country, &a.KeyHash, &a.Status, &a.Version, &a.Hostname, &a.PublicIP, &a.LastSeen, &a.AppliedRevision,
+			&a.Arch, &a.OS, &a.CPUCores, &a.CPUPct, &a.Load1, &a.MemTotalMB, &a.MemUsedMB, &a.DiskTotalGB, &a.DiskUsedGB, &a.UptimeS, &a.Virt, &a.PublicIPOverride, &a.CPUModel); err != nil {
 			return nil, err
 		}
 		out = append(out, a)
@@ -812,4 +812,23 @@ func validJSONOrEmpty(s string) error {
 func validJSON(s string) error {
 	var v any
 	return json.Unmarshal([]byte(s), &v)
+}
+
+// SetAgentName renames an agent row (UI rename action).
+func (s *Store) SetAgentName(id, name string) error {
+	res, err := s.db.Exec(`UPDATE agents SET name = ? WHERE id = ?`, name, id)
+	if err != nil {
+		return err
+	}
+	return requireRow(res)
+}
+
+// DeleteAgent removes an agent row entirely (UI delete action; the registry
+// record and its credential are removed by the caller).
+func (s *Store) DeleteAgent(id string) error {
+	res, err := s.db.Exec(`DELETE FROM agents WHERE id = ?`, id)
+	if err != nil {
+		return err
+	}
+	return requireRow(res)
 }

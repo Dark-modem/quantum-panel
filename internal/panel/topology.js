@@ -1,9 +1,81 @@
 // A topology groups existing tunnels between a pair of servers. Only an empty
 // grouping can be deleted; tunnels and engines are never removed automatically.
 let topologyData = { topologies: [], tunnels: [] };
+// Per-side SERVER lists keyed by topology NAME: /api/ui/agents exposes each
+// agent's server (datacenter, datacenter_en) plus the topology names it
+// serves; /api/mesh/servers contributes the per-server address. A topology
+// side renders every server it has — one line per datacenter group.
+let topoServersByTopo = {};
+let topoDcLoaded = false;
+let topologyDcFilter = 'all';
+let topoPage = 1;
+const TOPO_PAGE_SIZE = 10;
+function topoIsFa() { return typeof currentLang !== 'undefined' && currentLang === 'fa'; }
+async function topoDcLoad(topo) {
+  if (topoDcLoaded) return;
+  topoDcLoaded = true;
+  try {
+    const [ag, sv] = await Promise.all([api('/api/ui/agents'), api('/api/mesh/servers')]);
+    window.__topoAgents = (ag.agents || []);
+    const addr = {};
+    ((sv && sv.servers) || []).forEach(s => { addr[s.id] = s.address || ''; });
+    // the established tunnels live in the agent layer: every member agent of
+    // the open topology reports the tunnels it actually runs for it
+    window.__topoTunnels = [];
+    const memberAgs = window.__topoAgents.filter(a => !topo || (a.topologies || []).includes(topo.name));
+    const detailRows = await Promise.all(memberAgs.map(a =>
+      api('/api/ui/agents/' + encodeURIComponent(a.id)).then(d2 => ({ agent: a, d: d2 })).catch(() => null)));
+    detailRows.filter(Boolean).forEach(({ agent, d }) => {
+      (d.tunnels || []).forEach(tn => {
+        if (topo && tn.topology && tn.topology !== topo.name) return;
+        window.__topoTunnels.push({
+          key: tn.tunnel_key || '',
+          engine: tn.engine || '',
+          state: tn.state || '',
+          weightPct: tn.weight_pct,
+          latency: tn.latency_ms,
+          today: tn.today_bytes,
+          localName: (tn.local && tn.local.name) || agent.name || '',
+          remoteName: (tn.remote && tn.remote.name) || '',
+          agentId: agent.id,
+        });
+      });
+    });
+    (ag.agents || []).forEach(a => {
+      const srv = a.server || {};
+      if (!srv.id) return;
+      const entry = {
+        dc: srv.datacenter || '',
+        dcEn: srv.datacenter_en || '',
+        cc: String(a.country || '').toUpperCase(),
+        ip: addr[srv.id] || '',
+        name: srv.name || a.name || '',
+      };
+      (a.topologies || []).forEach(name => {
+        const slot = topoServersByTopo[name] || (topoServersByTopo[name] = {});
+        const side = a.role === 'foreign' ? 'foreign' : 'iran';
+        const list = slot[side] || (slot[side] = []);
+        if (!list.some(x => x.name === entry.name)) list.push(entry);
+      });
+    });
+  } catch (e) { /* lists stay empty; the cells fall back to country names */ }
+}
+function topoSideServers(t, side) {
+  return (topoServersByTopo[t.name] && topoServersByTopo[t.name][side]) || [];
+}
+function topoDcName(t, side) {
+  const list = topoSideServers(t, side);
+  if (!list.length) return '';
+  const s = list[0];
+  return topoIsFa() ? (s.dc || s.dcEn) : (s.dcEn || s.dc);
+}
+function topoDcCc(t, side) {
+  if (side === 'iran') return 'IR';
+  const list = topoSideServers(t, side);
+  return (list[0] && list[0].cc) || String(t.country || '').toUpperCase();
+}
 let topologySelected = null;
 let topologySearchQuery = '';
-let topologyViewMode = 'list';
 let topologyBusy = false;
 let topologyLoading = false;
 // First /api/topologies round-trip: until it finishes the list shows skeleton
@@ -40,6 +112,15 @@ function topoMenusClose() {
   document.querySelectorAll('.topo-kebab[aria-expanded="true"]').forEach(b => b.setAttribute('aria-expanded', 'false'));
 }
 async function topologyPower(id, active) {
+  // The power switch reconfigures live tunnels — confirm before touching it.
+  const topo = topologyData.topologies.find(t => t.id === id);
+  const name = topo ? topo.name : '';
+  const ok = await entConfirm(
+    tr('', active ? 'Activate topology?' : 'Deactivate topology?'),
+    (name ? name + ' — ' : '') + tr('', active ? 'The tunnels in this topology will be connected.' : 'The tunnels in this topology will be disconnected.'),
+    tr('', active ? 'Activate' : 'Deactivate'),
+  );
+  if (!ok) return;
   try {
     const r = await api('/api/topologies/' + encodeURIComponent(id) + '/active', { active: !!active }, 'POST');
     const bad = (r.results || []).filter(x => !x.ok);
@@ -50,6 +131,13 @@ async function topologyPower(id, active) {
 }
 // Foreign endpoint country, chosen by the user (ISO 3166-1 alpha-2). The Iran
 // side is always the home server; an empty country falls back to a globe icon.
+const TOPO_MESH = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="6" r="2.5"/><circle cx="19" cy="6" r="2.5"/><circle cx="12" cy="19" r="2.5"/><path d="M7.5 6h9M6.3 8l4.7 8.8M17.7 8l-4.7 8.8"/></svg>';
+// English label of a topology's country ('' when unknown/Other) — fa mode
+// translates it through faText (the same phrase table the agents table uses).
+function topoCountryName(cc) {
+  const i = TOPO_COUNTRIES.findIndex(c => c[0] === String(cc || '').toLowerCase());
+  return i < 0 ? '' : TOPO_COUNTRIES[i][1];
+}
 const TOPO_COUNTRIES = [
   ['de', 'Germany'], ['fi', 'Finland'], ['nl', 'Netherlands'], ['fr', 'France'],
   ['gb', 'United Kingdom'], ['us', 'USA'], ['tr', 'Turkey'], ['ru', 'Russia'],
@@ -174,7 +262,11 @@ const TOPO_FLAG_GLOBE =
 function topologyFlagSvg(country, attrs) {
   const cc = String(country || '').toLowerCase();
   const innards = (/^[a-z]{2}$/.test(cc) && TOPO_FLAG_DRAW[cc]) || TOPO_FLAG_GLOBE;
-  return `<svg class="topo-flag-svg" viewBox="0 0 20 14" width="20" height="14"${attrs ? ' ' + attrs : ''} aria-hidden="true" focusable="false">` +
+  // a caller may size the flag through attrs — the hardcoded 20x14 must step
+  // aside then, because duplicate svg attributes resolve to the first pair
+  const hasW = !!attrs && /(^|\s)width=/.test(attrs);
+  const hasH = !!attrs && /(^|\s)height=/.test(attrs);
+  return `<svg class="topo-flag-svg" viewBox="0 0 20 14"${hasW ? '' : ' width="20"'}${hasH ? '' : ' height="14"'}${attrs ? ' ' + attrs : ''} aria-hidden="true" focusable="false">` +
     innards +
     '<rect x="0.5" y="0.5" width="19" height="13" rx="2.5" fill="none" stroke="currentColor" stroke-opacity=".3" stroke-width="1"/>' +
     '</svg>';
@@ -311,90 +403,483 @@ function topologyFilterRows(rows) {
 }
 function topologyGraph(topo, tunnels) {
   const text = value => esc(String(value || '—'));
-  const iran = topo.role === 'foreign' ? topo.remote_ip : topo.local_ip;
-  const foreign = topo.role === 'foreign' ? topo.local_ip : topo.remote_ip;
-  // The connection strip from the classic server view: every tunnel is a
-  // straight horizontal beam between the two cards — a thin base wire with
-  // evenly spaced beacon dots in the tunnel's health color, a marching pulse
-  // on live ones, and a halo'd name above each beam. The svg never stretches
-  // past its natural width, so cards and beams keep their proportions.
-  const W = 840, NW = 260, NH = 104, ix = 40, fx = W - 40 - NW;
-  const n = tunnels.length;
-  const step = n > 1 ? Math.min(30, 96 / (n - 1)) : 0;
-  const H = n ? Math.max(250, 170 + (n - 1) * step + 80) : 210;
-  const cy = H / 2;
+  const iranIp = topo.role === 'foreign' ? topo.remote_ip : topo.local_ip;
+  const foreignIp = topo.role === 'foreign' ? topo.local_ip : topo.remote_ip;
+  const rtl = typeof currentLang !== 'undefined' && currentLang === 'fa';
+  const vert = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 799px)').matches;
+  // Per-side server lists (every server the side has, from the agents' own
+  // reports), each carrying its datacenter, address and live status.
+  const sideServers = side => {
+    const list = (topoSideServers(topo, side) || []).slice();
+    if (!list.length) {
+      list.push({
+        name: '', dc: '', cc: side === 'iran' ? 'IR' : String(topo.country || '').toUpperCase(),
+        ip: side === 'iran' ? iranIp : foreignIp,
+      });
+    }
+    return list;
+  };
+  const iranServers = sideServers('iran');
+  const foreignServers = sideServers('foreign');
+  // Tunnel states map onto the four states the backend really carries:
+  // healthy → connected; unknown → unverified/pending; down → stopped; disabled → out of service.
   const stateOf = t => {
     const s = String(t.state || '');
     return ['healthy', 'ok', 'up', 'connected'].includes(s) ? 'ok'
-      : ['down', 'err', 'stopped'].includes(s) ? 'err' : 'warn';
+      : s === 'down' ? 'err'
+      : s === 'disabled' ? 'off' : 'warn';
   };
-  const kinds = tunnels.map(stateOf);
-  const nodeKind = !n ? '' : kinds.every(k => k === 'ok') ? 'ok' : kinds.every(k => k === 'err') ? 'err' : 'warn';
-  const cables = tunnels.map((t, i) => {
-    const y = (cy + (i - (n - 1) / 2) * step).toFixed(1);
-    const d = `M ${ix + NW} ${y} L ${fx} ${y}`;
-    const st = stateOf(t);
-    return `<g data-topology-cable="${text(t.id)}" class="topo-cable topo-${st}">` +
-      `<path class="topo-e-hit" d="${d}"/>` +
-      `<path class="topo-e-wire" d="${d}"/>` +
-      `<path class="topo-e-dots" d="${d}"/>` +
-      (st === 'ok' ? `<path class="topo-e-pulse" d="${d}"/>` : '') +
-      `<text class="topo-e-tag" x="${W / 2}" y="${(Number(y) - 12).toFixed(1)}">${text(t.name)} · ${text(t.engine)}</text>` +
-      `<title>${text(t.name)} · ${text(t.state)}</title>` +
+  const stateLabel = st => st === 'ok' ? tr('', 'Connected') : st === 'err' ? tr('', 'Stopped') : st === 'off' ? tr('', 'Disabled') : tr('', 'Unverified');
+  // The line width follows the tunnel's REAL weight share when the backend
+  // provides it (weight_pct 0-100), else the honest default.
+  const weightOf = t => {
+    const wp = Number(t.weightPct);
+    if (isFinite(wp) && wp > 0) return Math.max(2, Math.min(6.5, 2 + wp / 100 * 4.5));
+    const w = Number(t.weight);
+    if (isFinite(w) && w > 0) return Math.max(2, Math.min(6.5, 1.8 + w / 8));
+    return 3;
+  };
+  const tTxt = (x, y, cls, s2, anchor) => `<text class="${cls}" x="${x}" y="${y}"${anchor ? ` text-anchor="${anchor}"` : ''}>${text(s2)}</text>`;
+  const tFlag = (flag, attrs) => topologyFlagSvg(flag, attrs);
+  const NW = 236, NH = 140, GAP = 12, HDR = 46;
+  const agentTuns = topoAgentTunnels(topo);
+  // geometry: two column containers (Iran servers / Foreign servers), the
+  // server cards stacked inside, vertically centered against each other
+  let W, H;
+  let geo = {};
+  if (vert) {
+    W = 520;
+    const iH = HDR + iranServers.length * (NH + GAP) + 10;
+    const fH = HDR + foreignServers.length * (NH + GAP) + 10;
+    const fY = 14 + iH + (n_() ? 74 : 84);
+    H = Math.max(fY + fH + 30, 420);
+    geo = {
+      iran: { x: 16, y: 14, w: W - 32, list: iranServers },
+      foreign: { x: 16, y: fY, w: W - 32, list: foreignServers },
+      W, H,
+    };
+    function n_() { return tunnels.length + agentTuns.length; }
+  } else {
+    W = 940;
+    const rows = Math.max(iranServers.length, foreignServers.length);
+    const CW = 306;
+    H = Math.max(HDR + rows * (NH + GAP) + 30, 300);
+    const fX = rtl ? 16 : W - 16 - CW;
+    const iX = rtl ? W - 16 - CW : 16;
+    geo = {
+      iran: { x: iX, y: 14, w: CW, list: iranServers },
+      foreign: { x: fX, y: 14, w: CW, list: foreignServers },
+      cols: CW,
+      W, H,
+    };
+  }
+  const nodeY = (col, i) => col.y + HDR + i * (NH + GAP);
+  // resolve every tunnel to its (iran node, foreign node) pair: the agent
+  // rows match by the server name, the inventory rows by the endpoint ip,
+  // falling back to the side's first node when unresolved
+  function findNodeIdx(list, name, ip) {
+    let i = list.findIndex(x => x.name && name && x.name === name);
+    if (i < 0 && ip) i = list.findIndex(x => x.ip && x.ip === ip);
+    return i >= 0 ? i : 0;
+  }
+  // the established tunnels from BOTH layers: the agent rows first (what the
+  // member agents actually run, resolved by the server name), then any
+  // inventory tunnels not covered (resolved by the endpoint ip)
+  const resolved = [];
+  const seenIds = {};
+  agentTuns.forEach(tn => {
+    const ii = findNodeIdx(iranServers, tn.localName, null);
+    const fi = findNodeIdx(foreignServers, tn.remoteName, null);
+    resolved.push({
+      id: tn.key, name: tn.key, engine: tn.engine, st: stateOf(tn), weightPct: tn.weightPct,
+      ii, fi,
+      iranName: (iranServers[ii] || {}).name || '', foreignName: (foreignServers[fi] || {}).name || '',
+      agentId: tn.agentId,
+    });
+    seenIds[tn.key] = true;
+  });
+  tunnels.forEach(t => {
+    if (seenIds[t.id] || seenIds[t.name]) return;
+    const localIp = topo.role === 'foreign' ? t.remote_ip : t.local_ip;
+    const remoteIp = topo.role === 'foreign' ? t.local_ip : t.remote_ip;
+    const ii = findNodeIdx(iranServers, '', localIp), fi = findNodeIdx(foreignServers, '', remoteIp);
+    resolved.push({
+      id: t.id, name: t.name, engine: t.engine, st: stateOf(t), weightPct: null,
+      ii, fi,
+      iranName: (iranServers[ii] || {}).name || '', foreignName: (foreignServers[fi] || {}).name || '',
+      agentId: null,
+    });
+  });
+  // lanes: the tunnels sharing a node pair spread their bows so parallel
+  // cables read separately even though they share the glowing ports
+  const byPair = {};
+  resolved.forEach(r => {
+    const k = r.ii + '>' + r.fi;
+    (byPair[k] = byPair[k] || []).push(r);
+  });
+  Object.values(byPair).forEach(list => list.forEach((r, k) => { r.lane = k - (list.length - 1) / 2; }));
+  const crossParity = {};
+  resolved.forEach(r => {
+    if (r.ii !== r.fi) {
+      const k = Math.min(r.ii, r.fi) + '>' + Math.max(r.ii, r.fi);
+      crossParity[k] = (crossParity[k] || 0) + 1;
+      r.bow = (crossParity[k] % 2 === 1) ? -1 : 1;
+    } else {
+      r.bow = 0;
+    }
+  });
+  // ports: one glowing connector per server card, on the edge facing the
+  // other side; green while ANY of the card's tunnels works (the same
+  // optimism the health pill uses), else the worst state it carries
+  const portKind = {};
+  resolved.forEach(r => {
+    const rank = { off: 0, warn: 1, err: 2, ok: 3 };
+    const better = (a, b) => rank[a] > rank[b] ? a : b;
+    ['iran:' + r.ii, 'foreign:' + r.fi].forEach(k => {
+      portKind[k] = portKind[k] ? better(portKind[k], r.st) : r.st;
+    });
+  });
+  const cables = resolved.map(r => {
+    const st = r.st;
+    const sw = weightOf({ weightPct: r.weightPct });
+    let d;
+    if (vert) {
+      // the vertical stack: ports sit on the card's bottom/top edge, the
+      // cables run straight down with a slight lane spread
+      const x1 = geo.iran.x + geo.iran.w / 2 + r.lane * 16;
+      const y1 = nodeY(geo.iran, r.ii) + NH;
+      const x2 = geo.foreign.x + geo.foreign.w / 2 + r.lane * 16;
+      const y2 = nodeY(geo.foreign, r.fi);
+      const midY = (y1 + y2) / 2;
+      d = `M ${x1.toFixed(1)} ${y1} C ${x1.toFixed(1)} ${midY}, ${x2.toFixed(1)} ${midY}, ${x2.toFixed(1)} ${y2}`;
+    } else {
+      const y1 = nodeY(geo.iran, r.ii) + NH / 2;
+      const y2 = nodeY(geo.foreign, r.fi) + NH / 2;
+      const x1 = rtl ? geo.iran.x + 12 : geo.iran.x + geo.iran.w - 12;
+      const x2 = rtl ? geo.foreign.x + geo.foreign.w - 12 : geo.foreign.x + 12;
+      const dx = Math.max(70, (x2 - x1) * 0.42);
+      const sag = Math.max(-110, Math.min(110, r.bow * 36 + r.lane * 12));
+      d = `M ${x1},${y1.toFixed(1)} C ${x1 + dx},${(y1 + sag).toFixed(1)} ${x2 - dx},${(y2 + sag).toFixed(1)} ${x2},${y2.toFixed(1)}`;
+    }
+    return `<g data-topology-cable="${text(r.id)}" data-topo-iran="${text(r.iranName)}" data-topo-foreign="${text(r.foreignName)}" data-topo-agent="${text(r.agentId || '')}" class="cl-e ${st} topo-cable" tabindex="0" role="button" aria-label="${text(r.name)} · ${text(stateLabel(st))}">` +
+      `<title>${text(r.name)} · ${text(r.engine)} · ${text(stateLabel(st))}</title>` +
+      `<path class="cl-e-hit" d="${d}"/>` +
+      `<path class="cl-e-glow" style="stroke-width:${(sw * 2.8).toFixed(1)}" d="${d}"/>` +
+      `<path class="cl-e-line" style="stroke-width:${sw}" d="${d}"/>` +
+      (st === 'ok' ? `<path class="cl-e-flow" d="${d}"/>` : '') +
     `</g>`;
   }).join('');
   const cc = String(topo.country || '').toLowerCase();
-  const countryLabel = (TOPO_COUNTRIES.find(c => c[0] === cc) || ['', 'Other'])[1];
-  const top = cy - NH / 2;
-  // RTL pages read from the right, so the home (Iran) card sits on the right
-  // and the foreign card opposite; LTR keeps Iran on the left. The cables are
-  // symmetric between the two facing edges, so only the cards trade places.
-  const rtl = typeof currentLang !== 'undefined' && currentLang === 'fa';
-  const iranX = rtl ? fx : ix, foreignX = rtl ? ix : fx;
-  // No tunnels means there is no health to show: the dot stays hidden and a
-  // quiet dashed placeholder links the pair instead of an empty void.
-  // LTR cards flow from the left edge; RTL cards mirror — the status dot and
-  // flag start at the right edge, every text anchors its right edge there and
-  // the rack moves to the opposite corner, so Persian reads naturally.
-  const dot = (x, m) => nodeKind ? `<circle class="topo-dot ${nodeKind}" cx="${m ? x + NW - 20 : x + 20}" cy="${top + 27}" r="5"/>` : '';
-  const node = (x, caption, title, ip, flag) => {
-    const m = rtl;
-    const head = m
-      ? dot(x, true) +
-        topologyFlagSvg(flag, `x="${x + NW - 54}" y="${top + 20}"`) +
-        `<text class="topo-cap" x="${x + NW - 58}" y="${top + 31}" text-anchor="start" style="direction:rtl">${caption}</text>`
-      : dot(x) +
-        topologyFlagSvg(flag, `x="${nodeKind ? x + 34 : x + 20}" y="${top + 20}"`) +
-        `<text class="topo-cap" x="${nodeKind ? x + 62 : x + 48}" y="${top + 31}">${caption}</text>`;
-    return `<g class="topo-node"><title>${text(title)} · ${text(ip)}</title>` +
-    `<rect class="topo-n-bg" x="${x}" y="${top}" width="${NW}" height="${NH}" rx="12"/>` +
-    head +
-    (m
-      ? `<text class="topo-t1" x="${x + NW - 18}" y="${top + 60}" text-anchor="start" style="direction:rtl">${text(title)}</text>` +
-        `<text class="topo-ip" x="${x + NW - 18}" y="${top + 84}" text-anchor="start" style="direction:rtl">${text(ip)}</text>`
-      : `<text class="topo-t1" x="${x + 18}" y="${top + 60}">${text(title)}</text>` +
-        `<text class="topo-ip" x="${x + 18}" y="${top + 84}">${text(ip)}</text>`) +
-    // A little rack at the card's end; its LEDs mirror the tunnel health.
-    `<g class="topo-srv led-${nodeKind || 'off'}" transform="translate(${m ? x + 18 : x + NW - 42} ${top + 34})">` +
-    `<rect x="0" y="0" width="24" height="36" rx="6"/>` +
-    `<path d="M8 9h11M8 18h11M8 27h11"/>` +
-    `<circle cx="4.5" cy="9" r="1.5"/><circle cx="4.5" cy="18" r="1.5"/><circle cx="4.5" cy="27" r="1.5"/>` +
-    `</g>` +
-    `</g>`;
+  const countryLabel = (TOPO_COUNTRIES.find(c => c[0] === cc) || ['', tr('', 'Other')])[1];
+  // server cards, the second mockup's way: the flag tile and a stacked-server
+  // glyph own the left column, the live status dot rides the name (no pill),
+  // a chevron points out at the far edge, the pin + datacenter and server
+  // icon + ip rows follow, and ONE glowing port on the edge facing the other
+  // side where this card's cables plug in
+  const icPin = (ix, iy) => `<g class="topo-n-ic" transform="translate(${ix},${iy})"><path d="M8 1.5a5 5 0 015 5c0 3.6-5 8-5 8s-5-4.4-5-8a5 5 0 015-5z"/><circle cx="8" cy="6.4" r="1.7"/></g>`;
+  const icSrv = (ix, iy) => `<g class="topo-n-ic" transform="translate(${ix},${iy})"><rect x="1.5" y="2.5" width="13" height="4.6" rx="1.5"/><rect x="1.5" y="9" width="13" height="4.6" rx="1.5"/><path d="M4.3 4.8h.01M4.3 11.3h.01"/></g>`;
+  const icMon = (ix, iy) => `<g class="topo-n-ic" transform="translate(${ix},${iy})"><rect x="1.5" y="2.5" width="13" height="8.5" rx="1.5"/><path d="M6 14h4M8 11v3"/></g>`;
+  const node = (col, i, s, side) => {
+    const x = col.x + 12, y = nodeY(col, i), w = (col.w || NW) - 24;
+    const m = rtl && !vert;
+    const agRow = (window.__topoAgents || []).find(a => a.server && a.server.name === s.name);
+    const online = !!(agRow && agRow.status === 'online');
+    const info = { name: s.name, dc: s.dc, cc: s.cc || (side === 'iran' ? 'IR' : String(topo.country || '').toUpperCase()), ip: s.ip || (side === 'iran' ? iranIp : foreignIp) };
+    const title = s.name || (side === 'iran' ? tr('', 'Iran server') : countryLabel);
+    const flag = side === 'iran' ? 'ir' : topo.country;
+    const pk = portKind[(side === 'iran' ? 'iran:' : 'foreign:') + i] || 'off';
+    // the glowing port on the edge facing the other column (top/bottom in
+    // the vertical stack)
+    let port;
+    if (vert) {
+      const px = col.x + col.w / 2;
+      const py = side === 'iran' ? y + NH : y;
+      port = `<circle class="topo-port-halo ${pk}" cx="${px}" cy="${py}" r="9"/><circle class="topo-port ${pk}" cx="${px}" cy="${py}" r="5"/>`;
+    } else {
+      const px = side === 'iran' ? (rtl ? x : x + w) : (rtl ? x + w : x);
+      port = `<circle class="topo-port-halo ${pk}" cx="${px}" cy="${y + NH / 2}" r="9"/><circle class="topo-port ${pk}" cx="${px}" cy="${y + NH / 2}" r="5"/>`;
+    }
+    const fw = 44, fh = 32;
+    const flagX = m ? x + w - 12 - fw : x + 12;
+    const nameTx = m
+      ? tTxt(x + w - 62, y + 31, 'topo-n-name', title, 'end')
+      : tTxt(x + 62, y + 31, 'topo-n-name', title);
+    // the online/offline corner tag, the owner-mockup's way: the status dot
+    // rides ITS beginning (top-right in LTR, top-left in RTL) — no second dot
+    // by the name
+    const stLbl = agRow ? (() => {
+      const lbl = online ? tr('', 'Online') : tr('', 'Offline');
+      const kind = online ? 'ok' : 'err';
+      // the dot rides the label's END — right of the word in LTR, left of it
+      // in RTL — per the owner's eye
+      const tX = m ? x + 20 : x + w - 20;
+      const dotX = m ? x + 12 : x + w - 12;
+      return `<text class="topo-n-status ${kind}" x="${tX}" y="${y + 20}" text-anchor="${m ? 'start' : 'end'}">${text(lbl)}</text>` +
+        `<circle class="topo-n-dot ${kind}" cx="${dotX}" cy="${y + 16}" r="4"/>`;
+    })() : '';
+    // the chevron points out toward the agent view, direction-aware
+    const chevCx = m ? x + 20 : x + w - 20;
+    const chevD = m
+      ? `M ${chevCx + 4} ${y + NH / 2 - 6} L ${chevCx - 4} ${y + NH / 2} L ${chevCx + 4} ${y + NH / 2 + 6}`
+      : `M ${chevCx - 4} ${y + NH / 2 - 6} L ${chevCx + 4} ${y + NH / 2} L ${chevCx - 4} ${y + NH / 2 + 6}`;
+    const chev = `<path class="topo-n-chev" d="${chevD}"/>`;
+    // the three info rows face the three bars of the stacked-server glyph —
+    // the datacenter, then the LOCATION (the country), then the ip, one row
+    // per bar, icons per the owner's zoomed mockup (rack, pin, terminal)
+    const dcTxt = info.dc ? (info.dc + (info.cc ? ' (' + info.cc + ')' : '')) : (side === 'iran' ? tr('', 'Iran') : topoCountryName(topo.country) || '—');
+    // the location row: the card's country — Iran is not a TOPO_COUNTRIES
+    // entry (that dropdown is for the foreign side), so name it directly
+    const locTxt = side === 'iran' ? tr('', 'Iran') : (topoCountryName(info.cc) || tr('', 'Other'));
+    const rowIcX = m ? x + w - 32 - 24 : x + 42;
+    const row = (icon, yy, cls, val) => m
+      ? icon(rowIcX, yy) + tTxt(rowIcX - 8, yy + 13, cls, val, 'end')
+      : icon(rowIcX, yy) + tTxt(rowIcX + 20, yy + 13, cls, val);
+    const rowYs = [y + 54, y + 80, y + 106];
+    // the stacked-server glyph: one compact block right under the flag, its
+    // three disks TOUCHING each other like the owner's zoomed mockup
+    const bars = [0, 9, 18].map(dy => `<rect x="0" y="${y + 54 + dy}" width="20" height="9" rx="2"/>`).join('');
+    const stack = `<g class="topo-n-stack" transform="translate(${m ? x + w - 12 - 20 : x + 14},0)">${bars}</g>`;
+    return `<g class="cl-n ${side === 'iran' ? 'topo-node-iran' : 'topo-node-foreign'}" data-agview="${text(agRow ? agRow.id : '')}" data-server-name="${text(s.name || '')}" role="button" tabindex="0" aria-label="${text(title)} · ${text(info.ip)}"><title>${text(title)} · ${text(info.ip)}</title>` +
+      `<rect class="cl-n-bg" x="${x}" y="${y}" width="${w}" height="${NH}" rx="12"/>` +
+      tFlag(flag, `x="${flagX}" y="${y + 10}" width="${fw}" height="${fh}"`) +
+      stack +
+      nameTx +
+      row(icSrv, rowYs[0], 'topo-n-dc', dcTxt) +
+      row(icPin, rowYs[1], 'topo-n-loc', locTxt) +
+      row(icMon, rowYs[2], 'topo-ip', info.ip) +
+      stLbl +
+      chev +
+      port +
+      `</g>`;
   };
+  const iranNodes = iranServers.map((s, i) => node(geo.iran, i, s, 'iran'));
+  const foreignNodes = foreignServers.map((s, i) => node(geo.foreign, i, s, 'foreign'));
+  // the column containers: a flag-headed header (flag + bold label + green
+  // live count) over the stacked server cards
+  const colBox = (col, side, list) => {
+    const w = col.w || NW, h = HDR + list.length * (NH + GAP) + 8;
+    const lbl = side === 'iran' ? tr('', 'IRAN SERVERS') : tr('', 'FOREIGN SERVERS');
+    const m = rtl && !vert;
+    const x = col.x - 12, y = col.y - 8;
+    const flag = side === 'iran' ? 'ir' : topo.country;
+    const fx = m ? x + w + 12 - 14 - 22 : x + 14;
+    return `<g class="topo-colbox ${side}"><rect class="topo-col-bg" x="${x}" y="${y}" width="${w + 24}" height="${h}" rx="16"/>` +
+      tFlag(flag, `x="${fx}" y="${y + 12}" width="22" height="15"`) +
+      (m
+        ? `<text class="topo-col-cap" x="${fx - 8}" y="${y + 24}" text-anchor="end">${text(lbl)}<tspan class="topo-col-count"> · ${list.length}</tspan></text>`
+        : `<text class="topo-col-cap" x="${x + 42}" y="${y + 24}">${text(lbl)}<tspan class="topo-col-count"> · ${list.length}</tspan></text>`) +
+      `</g>`;
+  };
+  const colBoxes = [];
+  colBoxes.push(colBox(geo.iran, 'iran', iranServers));
+  colBoxes.push(colBox(geo.foreign, 'foreign', foreignServers));
+  // the footer legend: line samples for the four states, then the hint, all
+  // in one strip under the map
+  const lgLine = (cls, dash) => `<svg class="topo-lg-line" viewBox="0 0 26 8" aria-hidden="true"><line x1="1" y1="4" x2="25" y2="4" class="${cls}"${dash ? ` stroke-dasharray="${dash}"` : ''}/></svg>`;
+  const legend = `<div class="topo-map-foot">` +
+    `<span class="topo-lg">${lgLine('ok')}${esc(tr('', 'Connected'))}</span>` +
+    `<span class="topo-lg">${lgLine('warn', '2 4')}${esc(tr('', 'Unverified'))}</span>` +
+    `<span class="topo-lg">${lgLine('err', '2 4')}${esc(tr('', 'Stopped'))}</span>` +
+    `<span class="topo-lg">${lgLine('off', '2 4')}${esc(tr('', 'Disabled'))}</span>` +
+    `<span class="topo-lg-sep" aria-hidden="true"></span>` +
+    `<span class="topo-lg-hint">${esc(tr('', 'Each cable represents one tunnel between the two servers.'))}</span>` +
+    `</div>`;
   return `<div class="topo-map"><div class="topo-map-scroll">` +
-    `<svg class="topo-graph" viewBox="0 0 ${W} ${H}" role="img" aria-label="${text(tr('', 'Topology connections'))}" dir="ltr">` +
-    (n ? '' : `<g class="topo-cable topo-idle"><path class="topo-e-wire" d="M ${ix + NW} ${cy} L ${fx} ${cy}"/><path class="topo-e-dots" d="M ${ix + NW} ${cy} L ${fx} ${cy}"/></g>` +
-      `<text class="topo-empty" x="${W / 2}" y="${cy - 12}" text-anchor="middle">${text(tr('', 'No tunnel attached yet'))}</text>`) +
-    cables +
-    node(iranX, esc(tr('', 'Iran')), tr('', 'Iran server'), iran, 'ir') +
-    node(foreignX, esc(tr('', countryLabel)), tr('', 'Foreign server'), foreign, topo.country) +
+    `<svg class="topo-graph" viewBox="0 0 ${geo.W} ${Math.round(geo.H)}" role="img" aria-label="${text(tr('', 'Topology connections'))}" dir="ltr">` +
+    colBoxes.join('') + cables + iranNodes.join('') + foreignNodes.join('') +
     `</svg></div>` +
-    `<div class="cl-legend">` +
-    `<span><i class="ok"></i>${esc(tr('', 'Connected'))}</span>` +
-    `<span><i class="warn"></i>${esc(tr('', 'Unverified'))}</span>` +
-    `<span><i class="err"></i>${esc(tr('', 'Stopped'))}</span>` +
-    `</div></div>`;
+    `<div class="topo-tip" hidden></div>` +
+    legend +
+    `</div>`;
+}
+
+// ===== topology members: agents (=servers) join/leave the topology ========
+// The established tunnels of the open topology, from the agent layer: every
+// member agent reports the tunnels it actually runs for this topology.
+// The tunnel set a topology DISPLAYS with: the panel inventory tunnels bound
+// to it plus the tunnels its member agents actually report running (deduped
+// by id/key). Display paths use this; the attach picker keeps the raw
+// inventory (it must only offer truly unassigned tunnels).
+function topoAllTunnels(topo) {
+  const inv = topologyExistingTunnels(topo);
+  const seen = {};
+  inv.forEach(t => { seen[t.id || t.name || ''] = true; });
+  const extra = topoAgentTunnels(topo).filter(tn => !seen[tn.key]);
+  return inv.concat(extra);
+}
+function topoAgentTunnels(topo) {
+  // both endpoints report the same tunnel rows — dedupe by tunnel_key so a
+  // tunnel renders once regardless of how many of its agents reported it
+  const seen = {};
+  return (window.__topoTunnels || []).filter(tn => {
+    if (!tn.key || seen[tn.key]) return false;
+    seen[tn.key] = true;
+    return true;
+  });
+}
+function topoDcReset() { topoDcLoaded = false; topoServersByTopo = {}; }
+function renderTopoMembers(topo) {
+  const card = $('topoMembersCard');
+  if (!card || !topo) { if (card) card.innerHTML = ''; return; }
+  const ags = window.__topoAgents || [];
+  const members = side => ags.filter(a => a.role === side && (a.topologies || []).includes(topo.name));
+  const memRow = (a, side) => '<div class="topo-mem-row">' +
+    '<span class="badge ' + (a.status === 'online' ? 'ok' : 'dim') + '">' + esc(a.status || '\\u2014') + '</span>' +
+    '<b>' + esc(a.name || '') + '</b>' +
+    (a.server && a.server.datacenter ? '<span class="topo-mem-dc">' + esc(topoIsFa() ? (a.server.datacenter || '') : (a.server.datacenter_en || a.server.datacenter || '')) + '</span>' : '') +
+    '<button type="button" class="topo-mem-x" data-mem-remove="' + side + '" data-mem-agent="' + esc(a.id) + '" aria-label="' + esc(tr('', 'Remove')) + '" title="' + esc(tr('', 'Remove')) + '">\×</button></div>';
+  const sideBlock = (side, lbl) => {
+    const list = members(side);
+    return '<div class="topo-mem-side"><div class="topo-mem-side-h"><b>' + esc(lbl) + '</b>' +
+      '<button type="button" class="quantum-btn quantum-btn-secondary u-btn-xs" data-mem-add="' + side + '">+ ' + esc(tr('', 'Add agent')) + '</button></div>' +
+      (list.length ? list.map(a => memRow(a, side)).join('') : '<div class="u-hint-12">' + esc(tr('', 'No agents on this side yet')) + '</div>') + '</div>';
+  };
+  card.innerHTML = '<div class="tc-header u-flex-wrap-gap8"><p class="tc-title" data-i18n="topo_members_t">' + esc(tr('', 'Agents on this topology')) + '</p></div>' +
+    '<div class="topo-mem-grid">' + sideBlock('iran', tr('', 'Iran side')) + sideBlock('foreign', tr('', 'Foreign side')) + '</div>';
+}
+function topoMembersPickOpen(side) {
+  const topo = topologyCurrent();
+  if (!topo) return;
+  const ags = (window.__topoAgents || []).filter(a => a.role === side && !(a.topologies || []).includes(topo.name));
+  const rows = ags.length ? ags.map(a => '<label class="cores-pick-row"><input type="checkbox" value="' + esc(a.id) + '"><b>' + esc(a.name) + '</b>' +
+    (a.server && a.server.datacenter ? '<span class="cores-pick-state">' + esc(topoIsFa() ? (a.server.datacenter || '') : (a.server.datacenter_en || a.server.datacenter || '')) + '</span>' : '') + '</label>').join('')
+    : '<div class="ent-empty"><b>' + esc(tr('', 'No agents on this side yet')) + '</b></div>';
+  let ov = document.getElementById('topoMemPick');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'topoMemPick';
+    ov.className = 'ent-modal';
+    ov.innerHTML = '<div class="ent-card cores-pick-card"><div class="cores-pick-head"><b></b><button type="button" class="mtb-toast-x" data-mem-pick-close>\×</button></div>' +
+      '<div class="cores-pick-list"></div><div class="cores-pick-foot"><button type="button" class="quantum-btn quantum-btn-primary" data-mem-pick-go>' + esc(tr('', 'Add')) + '</button>' +
+      '<button type="button" class="quantum-btn quantum-btn-secondary" data-mem-pick-close>' + esc(tr('', 'Cancel')) + '</button></div></div>';
+    document.body.appendChild(ov);
+  }
+  ov.dataset.memSide = side;
+  ov.querySelector('.cores-pick-head b').textContent = (side === 'iran' ? tr('', 'Iran side') : tr('', 'Foreign side')) + ' \\u2014 ' + tr('', 'Add agent');
+  ov.querySelector('.cores-pick-list').innerHTML = rows;
+  ov.hidden = false;
+}
+async function topoMembersPickGo() {
+  const ov = document.getElementById('topoMemPick');
+  if (!ov) return;
+  const topo = topologyCurrent();
+  const side = ov.dataset.memSide;
+  const ids = Array.from(ov.querySelectorAll('.cores-pick-row input:checked')).map(i => i.value);
+  if (!topo || !ids.length) { ov.hidden = true; return; }
+  const go = ov.querySelector('[data-mem-pick-go]');
+  go.disabled = true;
+  const results = await Promise.allSettled(ids.map(id =>
+    api('/api/ui/topologies/' + encodeURIComponent(topo.name) + '/members/add', { agent_id: id }, 'POST')));
+  const bad = results.filter(r => r.status === 'rejected');
+  if (bad.length) toastErr(tr('', 'Agents'), bad.map(r => (r.reason && r.reason.message) || 'HTTP ' + (r.reason && r.reason.status)).join(' · '));
+  else toastOk(tr('', 'Agents'), tr('', 'Agent added to the topology'));
+  go.disabled = false;
+  ov.hidden = true;
+  topoDcReset();
+  await topologyReload();
+}
+async function topoMemberRemove(side, agentId) {
+  const topo = topologyCurrent();
+  if (!topo) return;
+  try {
+    await api('/api/ui/topologies/' + encodeURIComponent(topo.name) + '/members/remove', { agent_id: agentId }, 'POST');
+    toastOk(tr('', 'Agents'), tr('', 'Agent removed'));
+  } catch (e) { toastErr(tr('', 'Agents'), e.message || 'HTTP ' + e.status); }
+  topoDcReset();
+  await topologyReload();
+}
+
+
+// The topbar breadcrumb's back link: while a topology is open on the tunnel
+// tab, clicking it closes the detail and paints the list — the native hash
+// jump alone leaves the detail view stuck on screen.
+document.addEventListener('click', e => {
+  const bcb = e.target.closest && e.target.closest('[data-bc-topo-back]');
+  if (!bcb) return;
+  if (location.hash.indexOf('#t=tunnel') === 0 && typeof topologySelected !== 'undefined' && topologySelected) {
+    e.preventDefault();
+    topologyBack();
+  }
+});
+
+// fillHeadCard paints the detail head card's name/pill/actions — called from
+// topologyRender AND directly after topoDcLoad completes, so the health pill
+// never lags the agent-layer tunnel data.
+function fillHeadCard(topo) {
+  const hn = $('topologyHeadName');
+  if (hn) hn.textContent = topo ? topo.name : '—';
+  const pill = $('topologyHeadPill');
+  if (!pill || !topo) return;
+  // the health counts BOTH sources: the panel inventory and the tunnels
+  // the member agents actually report running for this topology
+  const own = topoAllTunnels(topo);
+  const health = topologyHealthOf(topo, own);
+  const cls = !own.length ? 'st-none' : 'st-' + health;
+  pill.className = 'topo-state-pill ' + cls;
+  const lbl = !own.length ? tr('', 'No tunnels') : tr('', health === 'ok' ? 'Active' : health === 'down' ? 'Down' : 'Unknown');
+  const tx = $('topologyHeadPillTx');
+  if (tx) tx.textContent = lbl;
+  // The delete guard (owner rule): a topology can only be deleted while it
+  // is powered off or holds no tunnels at all — otherwise the button is
+  // disabled with the reason on its title.
+  const del = $('topologyDeleteBtn');
+  if (del) {
+    const canDelete = topo.Disabled === true || !own.length;
+    del.disabled = !canDelete;
+    del.title = canDelete ? '' : tr('', 'The topology must be off or empty before it can be deleted');
+  }
+}
+
+// fillHeadStats paints the head card's bottom stat strip (the owner's mockup):
+// each side's server count and datacenter with its flag, the tunnel total
+// split into healthy/faulty, and the topology's overall uptime — the healthy
+// share of its tunnels (the one honest percentage the live states can give).
+function fillHeadStats(topo) {
+  const host = $('topologyHeadStats');
+  if (!host) return;
+  if (!topo) { host.innerHTML = ''; return; }
+  const icServer = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="7" rx="2"/><rect x="2" y="13" width="20" height="7" rx="2"/><path d="M6 7.5h.01M6 16.5h.01"/></svg>';
+  const icLink = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 13.5l5-5"/><path d="M11 7l1.8-1.8a3.6 3.6 0 0 1 5.1 5.1L16 12.2"/><path d="M13 17l-1.8 1.8a3.6 3.6 0 0 1-5.1-5.1L8 12.2"/></svg>';
+  const icPulse = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>';
+  const sideStat = side => {
+    const list = topoSideServers(topo, side);
+    const cc = topoDcCc(topo, side);
+    const dcs = [];
+    list.forEach(s => {
+      const nm = topoIsFa() ? (s.dc || s.dcEn || '') : (s.dcEn || s.dc || '');
+      if (nm && dcs.indexOf(nm) < 0) dcs.push(nm);
+    });
+    const dcTxt = dcs.length ? dcs[0] + (dcs.length > 1 ? ' +' + (dcs.length - 1) : '') : '';
+    return '<div class="topo-stat">' +
+      '<span class="topo-stat-ic ' + (side === 'iran' ? 'iran' : 'alt') + '">' + icServer + '</span>' +
+      '<div class="topo-stat-tx"><b>' + list.length + '</b><span>' + esc(tr('', side === 'iran' ? 'Iran servers' : 'Foreign servers')) + '</span></div></div>' +
+      '<div class="topo-stat"><span class="topo-stat-flag">' + topologyFlagSvg(cc) + '</span>' +
+      '<div class="topo-stat-tx"><span class="topo-stat-dc">' + esc(dcTxt ? dcTxt + ' (' + cc + ')' : cc) + '</span>' +
+      '<span>' + esc(tr('', 'Datacenter')) + '</span></div></div>';
+  };
+  const own = topoAllTunnels(topo);
+  const isOk = t => ['healthy', 'ok', 'up', 'connected'].includes(String(t.state || ''));
+  const good = own.filter(isOk).length;
+  const bad = own.length - good;
+  const pct = own.length ? (Math.round(good / own.length * 1000) / 10) + '%' : '—';
+  // the four logical sections (each side's servers+datacenter, the tunnels,
+  // the uptime) each take a fair share of the strip's whole width, so no
+  // dead space is left at its end
+  host.innerHTML =
+    '<div class="topo-stat-group">' + sideStat('iran') + '</div>' +
+    '<div class="topo-stat-group">' + sideStat('foreign') + '</div>' +
+    '<div class="topo-stat-group">' +
+      '<div class="topo-stat"><span class="topo-stat-ic">' + icLink + '</span>' +
+        '<div class="topo-stat-tx"><b>' + own.length + '</b><span>' + esc(tr('', 'Tunnels')) + '</span></div>' +
+        '<div class="topo-stat-mini">' +
+          '<span class="topo-stat-k"><i></i>' + esc(good + ' ' + tr('', 'Healthy')) + '</span>' +
+          '<span class="topo-stat-k er"><i></i>' + esc(bad + ' ' + tr('', 'Faulty')) + '</span>' +
+        '</div></div>' +
+    '</div>' +
+    '<div class="topo-stat-group">' +
+      '<div class="topo-stat upt"><span class="topo-stat-ic upt">' + icPulse + '</span>' +
+        '<div class="topo-stat-tx"><b>' + pct + '</b><span>' + esc(tr('', 'Overall uptime')) + '</span></div></div>' +
+    '</div>';
 }
 
 async function topologyReload() {
@@ -408,6 +893,9 @@ async function topologyReload() {
     topologyData = { topologies: r.topologies || [], tunnels: r.tunnels || [] };
     if (topologySelected && !topologyCurrent()) topologySelected = null;
     topologyLoadedOnce = true;
+    await topoDcLoad(topologyCurrent());
+    fillHeadCard(topologyCurrent());
+    fillHeadStats(topologyCurrent());
     topologyRender();
     renderTunnelsList();
   } catch(e) {
@@ -429,60 +917,207 @@ function topologySearchMatches(t, tunnels) {
   return [t.name, endpoints.iran, endpoints.foreign]
     .some(value => String(value || '').toLowerCase().includes(query));
 }
+// Status filter (All statuses / With tunnels / Without tunnels) and the
+// country filter (All countries / per-country) narrow the list rows.
+let topologyStatusFilter = 'all';
+let topologyCountryFilter = 'all';
+function topologyStatusMatches(t, tunnels) {
+  if (topologyStatusFilter === 'all') return true;
+  const has = tunnels.length > 0;
+  return topologyStatusFilter === 'with' ? has : !has;
+}
+function topologyCountryMatches(t) {
+  if (topologyCountryFilter === 'all') return true;
+  return String(t.country || '').toLowerCase() === topologyCountryFilter;
+}
 function topologyRender() {
   const topo = topologyCurrent();
   const inTunnel = typeof _tunnelDetail !== 'undefined' && _tunnelDetail !== null;
   $('topologyListCard').hidden = !!topo || inTunnel;
   $('topologyDetailCard').hidden = !topo || inTunnel;
+  // the established-tunnels card: shown while a topology is open and it
+  // actually carries tunnels (the merged panel + agent-layer set)
+  const tunsCard = $('topologyTunnelsCard');
+  if (tunsCard) tunsCard.hidden = !topo || inTunnel || !topoAllTunnels(topo).length;
+  const tunsCount = $('topologyTunnelsCount');
+  if (tunsCount) tunsCount.textContent = topo ? String(topoAllTunnels(topo).length) : '—';
+  // the head card: the topology's own name + health pill + the actions
+  const headCard = $('topologyHeadCard');
+  if (headCard) headCard.hidden = !topo || inTunnel;
+  fillHeadCard(topo);
+  fillHeadStats(topo);
   $('topologySetupBack').hidden = !topo;
   $('rscBanner').classList.toggle('td-hide', !inTunnel);
   $('dialCard').classList.toggle('td-hide', !inTunnel);
   const error = $('topologyError'); if (error) { error.hidden = true; error.textContent = ''; }
   $('tunnelsAddBtn').disabled = !topo || !topo.local_ip || !topo.remote_ip;
   $('topologyAddTunnelBtn').disabled = !topo || !topo.local_ip || !topo.remote_ip;
-  $('tunnelsEmpty').hidden = !topo || inTunnel;
   if (!topo) $('tunnelsListCard').hidden = true;
-  $('topologyCount').textContent = String(topologyData.topologies.length);
-  const listTable = $('topologyListTable');
-  if (listTable && listTable.classList) listTable.classList.toggle('topo-grid', topologyViewMode === 'grid');
+  // KPI strip: three numbers the page can actually prove from its own data —
+  // the server pairs on this panel and how many of them carry tunnels —
+  // the two numbers the mockup KPI strip shows beside the total.
+  if ($('topoStatPairs')) {
+    let tunnelTotal = 0, withT = 0;
+    topologyData.topologies.forEach(t => {
+      const own = topoAllTunnels(t);
+      tunnelTotal += own.length;
+      if (own.length) withT++;
+    });
+    $('topoStatPairs').textContent = String(topologyData.topologies.length);
+    $('topoStatWith').textContent = String(withT);
+    const wo = $('topoStatWithout');
+    if (wo) wo.textContent = String(topologyData.topologies.length - withT);
+  }
+  const countrySel = $('topologyCountryFilter');
+  if (countrySel) {
+    const seen = {}, opts = ['<option value="all">' + esc(tr('', 'All countries')) + '</option>'];
+    topologyData.topologies.forEach(t => {
+      const cc = String(t.country || '').toLowerCase();
+      if (cc && !seen[cc]) { seen[cc] = 1; opts.push('<option value="' + esc(cc) + '">' + esc(topoCountryName(cc)) + '</option>'); }
+    });
+    countrySel.innerHTML = opts.join('');
+    countrySel.value = topologyCountryFilter;
+  }
+  const dcSel = $('topologyDcFilter');
+  if (dcSel) {
+    const seen = {}, opts = ['<option value="all">' + esc(tr('', 'All datacenters')) + '</option>'];
+    topologyData.topologies.forEach(t => {
+      ['iran', 'foreign'].forEach(side => {
+        topoSideServers(t, side).forEach(s => {
+          const dc = topoIsFa() ? (s.dc || s.dcEn) : (s.dcEn || s.dc);
+          if (dc && !seen[dc]) { seen[dc] = 1; opts.push('<option value="' + esc(dc) + '">' + esc(dc) + '</option>'); }
+        });
+      });
+    });
+    dcSel.innerHTML = opts.join('');
+    dcSel.value = topologyDcFilter;
+    dcSel.parentElement.hidden = opts.length <= 1; // no dc data resolved: hide the empty filter
+  }
   const searching = topologySearchQuery.trim() !== '';
-  const visible = topologyData.topologies.filter(t => topologySearchMatches(t, topologyExistingTunnels(t)));
+  const all = topologyData.topologies
+    .filter(t => topologySearchMatches(t, topologyExistingTunnels(t)))
+    .filter(t => topologyStatusMatches(t, topologyExistingTunnels(t)))
+    .filter(t => topologyCountryMatches(t))
+    .filter(t => topologyDcMatches(t));
+  const pages = Math.max(1, Math.ceil(all.length / TOPO_PAGE_SIZE));
+  if (topoPage > pages) topoPage = pages;
+  const pageFrom = (topoPage - 1) * TOPO_PAGE_SIZE;
+  const visible = all.slice(pageFrom, pageFrom + TOPO_PAGE_SIZE);
+  const foot = $('topologyFootCount');
+  if (foot) foot.textContent = all.length
+    ? tr('', 'Showing {a} to {b} of {c} topologies')
+        .replace('{a}', String(pageFrom + 1))
+        .replace('{b}', String(Math.min(pageFrom + visible.length, all.length)))
+        .replace('{c}', String(all.length))
+    : tr('', '{n} item(s)').replace('{n}', '0');
+  const prev = $('topoPagePrev'), next = $('topoPageNext'), cur = $('topoPageCur');
+  if (prev && next && cur) {
+    cur.textContent = String(topoPage);
+    prev.disabled = topoPage <= 1;
+    next.disabled = topoPage >= pages;
+    cur.disabled = pages <= 1;
+  }
+  if (typeof topTitleSync === 'function') { try { topTitleSync(); } catch (e) {} }
+  renderTopoMembers(topo);
   $('topologiesList').innerHTML = visible.length
-    ? visible.map(t => {
-        const tunnels = topologyExistingTunnels(t);
+    ? visible.map((t, i) => {
+        const tunnels = topoAllTunnels(t);
         const remaining = tunnels.length;
         const endpoints = topologyEndpointPair(t);
-        const countLabel = tr('', '{n} existing tunnel(s)').replace('{n}', String(remaining));
         const deleteTitle = remaining ? topologyDeleteNotice(remaining) : tr('', 'Delete topology');
-        const serverCell = (flag, ip) => `<span class="topo-server"><span class="topo-flag" aria-hidden="true">${topologyFlagSvg(flag)}</span><bdi class="u-mono" dir="ltr">${esc(ip || '—')}</bdi></span>`;
         const health = topologyHealthOf(t, tunnels);
-        const healthLabel = tr('', health === 'ok' ? 'Active' : health === 'down' ? 'Down' : 'Unknown');
+        // No attached tunnel is a state of its own: calling it "Unknown" reads
+        // like a failed probe when the pair simply has nothing to probe yet.
+        const healthLabel = !remaining
+          ? tr('', 'No tunnels')
+          : tr('', health === 'ok' ? 'Active' : health === 'down' ? 'Down' : 'Unknown');
+        const pillClass = !remaining ? 'st-none' : 'st-' + health;
         const powering = health === 'down' || !remaining;
+        // The mockup's server cell, extended for multi-server sides: one block
+        // per datacenter — flag, "Datacenter (CC)", the server count, and one
+        // mono address line per server. A single-server side keeps the exact
+        // mockup line ("1 server • IP").
+        const serverCell = (side, flag, ip) => {
+          const list = topoSideServers(t, side);
+          const ccUp = topoDcCc(t, side);
+          const dcLabel = s0 => {
+            const dc = s0 ? (topoIsFa() ? (s0.dc || s0.dcEn) : (s0.dcEn || s0.dc)) : '';
+            const base = dc || (side === 'iran' ? tr('', 'Iran') : topoCountryName(flag));
+            return base && ccUp ? base + ' (' + ccUp + ')' : (base || '—');
+          };
+          if (list.length <= 1) {
+            const line = '1 ' + tr('', 'server') + ' • ' + ((list[0] && list[0].ip) || ip || '—');
+            return `<span class="topo-server"><span class="topo-flag" aria-hidden="true">${topologyFlagSvg(flag)}</span><span class="topo-server-tx"><b>${esc(dcLabel(list[0]))}</b><span class="topo-server-sub u-mono" dir="ltr">${esc(line)}</span></span></span>`;
+          }
+          // group by datacenter: the label line carries the count, the IPs stack below
+          const groups = [];
+          list.forEach(s => {
+            const key = (topoIsFa() ? (s.dc || s.dcEn) : (s.dcEn || s.dc)) || (side === 'iran' ? tr('', 'Iran') : topoCountryName(flag));
+            const g = groups.find(x => x.key === key);
+            if (g) g.servers.push(s); else groups.push({ key, servers: [s] });
+          });
+          const blocks = groups.map(g => `<div class="topo-server"><span class="topo-flag" aria-hidden="true">${topologyFlagSvg(flag)}</span><span class="topo-server-tx"><b>${esc(g.key)}<span class="topo-server-count">${esc(' · ' + String(g.servers.length) + ' ' + (g.servers.length === 1 ? tr('', 'server') : tr('', 'servers')))}</span></b>${g.servers.map(s => `<span class="topo-server-sub u-mono" dir="ltr">${esc(s.ip || '—')}</span>`).join('')}</span></div>`).join('');
+          return `<div class="topo-server-stack">${blocks}</div>`;
+        };
         return `<tr class="topo-list-row" role="row" tabindex="0" data-topo-id="${esc(t.id)}" aria-label="${esc(t.name)}">
-        <td role="cell" class="topo-cell-name" data-label="${esc(tr('', 'Name'))}"><button type="button" class="topo-name" data-topo-open="${esc(t.id)}"><bdi>${esc(t.name)}</bdi></button></td>
-        <td role="cell" class="topo-cell-iran" data-label="${esc(tr('', 'Iran'))}">${serverCell('ir', endpoints.iran)}</td>
-        <td role="cell" class="topo-cell-foreign" data-label="${esc(tr('', 'Foreign'))}">${serverCell(t.country, endpoints.foreign)}</td>
-        <td role="cell" class="topo-cell-tunnels" data-label="${esc(tr('', 'Tunnels'))}"><span class="topo-count" aria-label="${esc(countLabel)}">${remaining}</span></td>
-        <td role="cell" class="topo-cell-state" data-label="${esc(tr('', 'Status'))}"><span class="topo-state-pill st-${health}"><i aria-hidden="true"></i>${esc(healthLabel)}</span></td>
-        <td role="cell" class="topo-cell-actions" data-label="${esc(tr('', 'Actions'))}"><div class="topo-actions"><div class="topo-menu"><button type="button" class="topo-kebab" data-topo-menu="${esc(t.id)}" aria-haspopup="menu" aria-expanded="false" aria-label="${esc(tr('', 'Tunnel actions'))}"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></button><div class="topo-menu-pop hidden" role="menu" aria-label="${esc(tr('', 'Tunnel actions'))}"><button type="button" class="topo-menu-item" role="menuitem" data-topo-open="${esc(t.id)}">${esc(tr('', 'View'))}</button><button type="button" class="topo-menu-item" role="menuitem" data-topo-power="${esc(t.id)}" data-active="${powering ? 'true' : 'false'}">${esc(powering ? tr('', 'Activate') : tr('', 'Deactivate'))}</button><span class="topo-delete-wrap" title="${esc(deleteTitle)}"><button type="button" class="quantum-btn quantum-btn-danger topo-delete topo-menu-item" role="menuitem" data-topo-delete="${esc(t.id)}" aria-label="${esc(tr('', 'Delete topology'))}"${remaining ? ` title="${esc(tr('', 'Delete all tunnels in this topology first'))}"` : ''}>${esc(tr('', 'Delete'))}</button></span></div></div></div></td>
+        <td role="cell" class="topo-cell-name" data-label="${esc(tr('', 'Topology name'))}"><button type="button" class="topo-name" data-topo-open="${esc(t.id)}"><bdi>${esc(t.name)}</bdi></button></td>
+        <td role="cell" class="topo-cell-state" data-label="${esc(tr('', 'Status'))}"><span class="topo-state-pill ${pillClass}"><i aria-hidden="true"></i>${esc(healthLabel)}</span></td>
+        <td role="cell" class="topo-cell-tunnels" data-label="${esc(tr('', 'Tunnels'))}">${remaining}</td>
+        <td role="cell" class="topo-cell-foreign" data-label="${esc(tr('', 'Foreign server'))}">${serverCell('foreign', t.country, endpoints.foreign)}</td>
+        <td role="cell" class="topo-cell-iran" data-label="${esc(tr('', 'Iran servers'))}">${serverCell('iran', 'ir', endpoints.iran)}</td>
+        <td role="cell" class="topo-cell-no">${pageFrom + i + 1}</td>
+        <td role="cell" class="topo-cell-actions" data-label="${esc(tr('', 'Actions'))}"><div class="topo-actions"><div class="topo-actions-inline"><button type="button" class="topo-inline-btn topo-view" data-topo-open="${esc(t.id)}" aria-label="${esc(tr('', 'View'))}" title="${esc(tr('', 'View'))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"/><circle cx="12" cy="12" r="2.5"/></svg></button><button type="button" class="topo-inline-btn topo-edit" data-topo-edit="${esc(t.id)}" aria-label="${esc(tr('', 'Edit topology'))}" title="${esc(tr('', 'Edit topology'))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17v3z"/><path d="M13.5 6.5l3 3"/></svg></button><span class="topo-delete-wrap" title="${esc(deleteTitle)}"><button type="button" class="topo-inline-btn topo-delete" data-topo-delete="${esc(t.id)}" aria-label="${esc(tr('', 'Delete topology'))}"${remaining ? ` title="${esc(tr('', 'Delete all tunnels in this topology first'))}"` : ''}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg></button></span></div><div class="topo-menu"><button type="button" class="topo-kebab" data-topo-menu="${esc(t.id)}" aria-haspopup="menu" aria-expanded="false" aria-label="${esc(tr('', 'Tunnel actions'))}"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></button><div class="topo-menu-pop hidden" role="menu" aria-label="${esc(tr('', 'Tunnel actions'))}"><button type="button" class="topo-menu-item" role="menuitem" data-topo-open="${esc(t.id)}"><svg class="topo-menu-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"/><circle cx="12" cy="12" r="2.5"/></svg>${esc(tr('', 'View'))}</button><button type="button" class="topo-menu-item" role="menuitem" data-topo-power="${esc(t.id)}" data-active="${powering ? 'true' : 'false'}"><svg class="topo-menu-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8"/><path d="M6.3 6.3a8.5 8.5 0 1 0 11.4 0"/></svg>${esc(powering ? tr('', 'Activate') : tr('', 'Deactivate'))}</button><span class="topo-delete-wrap" title="${esc(deleteTitle)}"><button type="button" class="quantum-btn quantum-btn-danger topo-delete topo-menu-item" role="menuitem" data-topo-delete="${esc(t.id)}" aria-label="${esc(tr('', 'Delete topology'))}"${remaining ? ` title="${esc(tr('', 'Delete all tunnels in this topology first'))}"` : ''}><svg class="topo-menu-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg>${esc(tr('', 'Delete'))}</button></span></div></div></div></td>
       </tr>`;
       }).join('')
     : searching
-      ? `<tr class="topo-list-empty"><td colspan="6"><div class="ent-empty"><b>${esc(tr('', 'No topology matches your search.'))}</b><span>${esc(tr('', 'Clear the search to see all topologies.'))}</span></div></td></tr>`
+      ? `<tr class="topo-list-empty"><td colspan="7"><div class="ent-empty"><b>${esc(tr('', 'No topology matches your search.'))}</b><span>${esc(tr('', 'Clear the search to see all topologies.'))}</span></div></td></tr>`
       : topologyLoading && !topologyLoadedOnce
-        ? `<tr class="topo-list-empty topo-list-skel"><td colspan="6">${skel(2)}</td></tr>`
-        : `<tr class="topo-list-empty"><td colspan="6"><div class="ent-empty"><b>${esc(tr('', 'No topology yet'))}</b><span>${esc(tr('', 'Create a topology, set the server roles, then add tunnels between them.'))}</span></div></td></tr>`;
+        ? `<tr class="topo-list-empty topo-list-skel"><td colspan="7">${skel(2)}</td></tr>`
+        : `<tr class="topo-list-empty"><td colspan="7"><div class="mtb-hero"><div class="mtb-hero-in">
+            <svg class="mtb-hero-logo" width="110" height="110" viewBox="0 0 100 100" fill="none" aria-hidden="true"><rect width="100" height="100" rx="22" fill="#090d16" stroke="rgba(56,189,248,0.25)" stroke-width="1.5"/><path d="M50 48 C42 38 26 32 12 42 C4 48 1 56 3 62 C6 60 12 54 20 55 C32 56 42 60 50 52 C58 60 68 56 80 55 C88 54 94 60 97 62 C99 56 96 48 88 42 C74 32 58 38 50 48 Z" fill="#38bdf8"/></svg>
+            <h3 class="mtb-hero-title">${esc(tr('', 'Build your first topology'))}</h3>
+            <p class="mtb-hero-desc">${esc(tr('', 'Set the server roles, then connect tunnels between them.'))}</p>
+            <button type="button" class="quantum-btn quantum-btn-primary mtb-hero-cta" data-topo-new="1">+ ${esc(tr('', 'Add topology'))}</button>
+            <div class="mtb-hero-doc"><span class="mtb-hero-doc-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6"/></svg></span><span class="mtb-hero-doc-tx"><b>${esc(tr('', 'What is a topology and what is it for?'))}</b><span>${esc(tr('', 'Read the primer in the docs'))}</span></span></div>
+          </div></div></td></tr>`;
+  // One clear action in the empty state: the same wizard the header button opens.
+  const emptyNew = document.querySelector('[data-topo-new]');
+  if (emptyNew) emptyNew.onclick = topologyCreate;
   const assigned = new Set(topologyData.topologies.flatMap(t => t.tunnel_ids || []));
   if (!topo) return;
   const cables = (topo.tunnel_ids || []).map(id => topologyData.tunnels.find(t => t.id === id) || {id, name: id, engine: '—', state: 'down'});
-  $('topologyGraph').innerHTML = topologyGraph(topo, cables);
+  if (topo) $('topologyGraph').innerHTML = topologyGraph(topo, cables); else $('topologyGraph').innerHTML = '';
+  // the established tunnels between this pair, listed under the map
+  const tl = $('topologyTunnelList');
+  if (tl) {
+    const agentRows = topo ? topoAgentTunnels(topo) : [];
+    const label = st => st === 'ok' ? tr('', 'Connected') : st === 'err' ? tr('', 'Stopped') : st === 'off' ? tr('', 'Disabled') : tr('', 'Unverified');
+    const stOf = s => ['healthy', 'ok', 'up', 'connected'].includes(String(s || '')) ? 'ok'
+      : String(s || '') === 'down' ? 'err' : String(s || '') === 'disabled' ? 'off' : 'warn';
+    tl.innerHTML = agentRows.length
+      ? '<div class="topo-tl">' + agentRows.map(tn => {
+          const st = stOf(tn.state);
+          const lat = tn.latency != null && tn.latency >= 0 ? Math.round(tn.latency) + ' ms' : '\u2014';
+          return '<button type="button" class="topo-tl-row" data-topo-agent="' + esc(tn.agentId) + '">' +
+            '<span class="topo-tl-dot ' + st + '"></span>' +
+            '<b>' + esc(tn.key || '') + '</b>' +
+            '<span class="topo-tl-eng">' + esc(tn.engine || '') + '</span>' +
+            '<span class="topo-tl-lat u-mono">' + esc(lat) + '</span>' +
+            '<span class="topo-tl-st">' + esc(label(st)) + '</span>' +
+            '<span class="topo-tl-go">' + esc(tr('', 'View')) + ' \u2190</span>' +
+            '</button>';
+        }).join('') + '</div>'
+      : '';
+  }
   // The header's power toggle mirrors the row menu: a pair whose tunnels are
   // not up offers Activate, a live pair offers Deactivate.
-  const act = $('topologyActivateBtn');
-  if (act) {
-    // The button carries an icon + label span; only the label may change.
-    const lbl = $('topologyActivateLbl') || act;
-    lbl.textContent = tr('', topologyHealthOf(topo, cables) !== 'ok' ? 'Activate' : 'Deactivate');
+  const act = $('topologyActivateBtn'), deact = $('topologyDeactivateBtn');
+  if (act && deact) {
+    // The header's power toggle mirrors the row menu: a pair whose tunnels are
+    // not up offers the green Activate; a live pair offers the red Deactivate.
+    const powering = topologyHealthOf(topo, topoAllTunnels(topo)) !== 'ok';
+    act.hidden = !powering;
+    deact.hidden = powering;
   }
   // Do not overwrite a form the user is currently editing.
   if (!$('topologySettings').contains(document.activeElement)) {
@@ -493,11 +1128,7 @@ function topologyRender() {
     topoCountryMount('topologyCountryDD', 'topologyCountry', tr('', 'Foreign server country'), 'topologyCountryLbl');
     topologyChooseRole(topo.role || 'iran');
   }
-  const candidates = topologyData.tunnels.filter(t => !assigned.has(t.id) && (!t.remote_ip || t.remote_ip === topo.remote_ip || (t.remote_ips || []).includes(topo.remote_ip)));
-  $('topologyAttachSelect').innerHTML = `<option value="">${esc(tr('', 'Select an existing tunnel'))}</option>`
-    + candidates.map(t => `<option value="${esc(t.id)}">${esc(t.name)} · ${esc(t.engine)}</option>`).join('');
   $('topologyBoundList').innerHTML = cables.map(t => `<div class="topo-binding"><b>${esc(t.name)}</b><span>${esc(t.state)}</span><button type="button" class="quantum-btn quantum-btn-ghost" data-topo-detach="${esc(t.id)}">${esc(tr('', 'Detach from topology'))}</button><button type="button" class="quantum-btn quantum-btn-secondary" data-topo-view-tunnel="${esc(t.id)}">${esc(tr('', 'View'))}</button></div>`).join('');
-  $('tunnelsEmpty').innerHTML = cables.length ? '' : `<p class="qs-hint">${esc(tr('', 'Attach an existing tunnel or add a new tunnel for this server pair.'))}</p>`;
 }
 function topologyChooseRole(role) {
   $('topologyRole').value = role;
@@ -555,13 +1186,16 @@ function topoEditOpen() {
   topologyChooseRole(topo.role || 'iran');
   topoEditShow();
 }
-async function topologyAttach() {
-  const topo = topologyCurrent(), id = $('topologyAttachSelect').value;
-  if (!topo || !id) return;
-  try {
-    await api('/api/topologies/' + encodeURIComponent(topo.id), {tunnel_ids: [...(topo.tunnel_ids || []), id]}, 'PATCH');
-    await topologyReload();
-  } catch(e) { toastErr(tr('', 'Topology save failed'), e.message); }
+function topologyEditRow(id) {
+  topologySelected = id;
+  topoEditOpen();
+}
+function topologyDcMatches(t) {
+  if (topologyDcFilter === 'all') return true;
+  return ['iran', 'foreign'].some(side => topoSideServers(t, side).some(s => {
+    const dc = topoIsFa() ? (s.dc || s.dcEn) : (s.dcEn || s.dc);
+    return dc === topologyDcFilter;
+  }));
 }
 async function topologyDetach(id) {
   const topo = topologyCurrent(); if (!topo) return;
@@ -572,11 +1206,12 @@ async function topologyDetach(id) {
 }
 async function topologyDelete(id) {
   const topo = topologyData.topologies.find(t => t.id === id);
-  const remaining = topologyExistingTunnelCount(topo);
-  if (remaining) {
-    // The delete button is never disabled; existing tunnels block the deletion
-    // with a visible warning instead of a silent no-op.
-    toastWarn(tr('', 'Delete topology'), topologyDeleteNotice(remaining));
+  const tunnelsNow = topo ? topoAllTunnels(topo) : [];
+  const off = !topo || topo.Disabled === true;
+  if (tunnelsNow.length && !off) {
+    // The owner rule: delete needs the topology powered off or empty. A live
+    // topology answers with a visible warning instead of a silent no-op.
+    toastWarn(tr('', 'Delete topology'), tr('', 'The topology must be off or empty before it can be deleted'));
     return;
   }
   if (!await entConfirm(tr('', 'Delete topology?'), tr('', 'This empty topology will be removed.'), tr('', 'Delete topology'))) return;
@@ -1414,37 +2049,112 @@ async function topoCreateFinish() {
   }
 }
 
-function topologySetView(mode) {
-  topologyViewMode = mode === 'grid' ? 'grid' : 'list';
-  const listBtn = $('topologyViewListBtn'), gridBtn = $('topologyViewGridBtn');
-  if (listBtn && typeof listBtn.setAttribute === 'function') listBtn.setAttribute('aria-pressed', String(topologyViewMode === 'list'));
-  if (gridBtn && typeof gridBtn.setAttribute === 'function') gridBtn.setAttribute('aria-pressed', String(topologyViewMode === 'grid'));
-  topologyRender();
-}
 $('topologyCreateBtn').onclick = topologyCreate;
 $('topologyBackBtn').onclick = topologyBack;
 $('topologySaveBtn').onclick = topologySave;
-$('topologyAttachBtn').onclick = topologyAttach;
 $('topologyEditBtn').onclick = topoEditOpen;
 $('topoEditCancel').onclick = topoEditClose;
 $('topoEditX').onclick = topoEditClose;
 $('topologyActivateBtn').onclick = () => {
   const t = topologyCurrent(); if (!t) return;
-  topologyPower(t.id, topologyHealthOf(t, topologyExistingTunnels(t)) !== 'ok');
+  topologyPower(t.id, true);
+};
+$('topologyDeactivateBtn').onclick = () => {
+  const t = topologyCurrent(); if (!t) return;
+  topologyPower(t.id, false);
 };
 $('topologyDeleteBtn').onclick = () => { const t = topologyCurrent(); if (t) topologyDelete(t.id); };
 $('topologySetupBack').onclick = topologyResume;
 $('tunnelsAddBtn').onclick = topologyNewTunnel;
 $('topologyAddTunnelBtn').onclick = topologyNewTunnel;
+// The live map: a hover tooltip with the tunnel's real facts, and the
+// inline add-tunnel button for the no-tunnel state.
+(function () {
+  const box = $('topologyGraph');
+  if (!box) return;
+  box.addEventListener('mousemove', e => {
+    const pairEl = e.target.closest && e.target.closest('[data-topology-pair]');
+    const g = pairEl || (e.target.closest && e.target.closest('[data-topology-cable]'));
+    const tip = box.querySelector('.topo-tip');
+    if (!tip) return;
+    const topo = topologyCurrent();
+    if (!g || !topo) { tip.hidden = true; return; }
+    const label = st => st === 'ok' ? tr('', 'Connected') : st === 'err' ? tr('', 'Stopped') : st === 'off' ? tr('', 'Disabled') : tr('', 'Unverified');
+    const stOf = s => ['healthy', 'ok', 'up', 'connected'].includes(String(s || '')) ? 'ok'
+      : String(s || '') === 'down' ? 'err' : String(s || '') === 'disabled' ? 'off' : 'warn';
+    const rows = topoAgentTunnels(topo);
+    let html = '';
+    const pillOf = st => '<span class="topo-tip-pill ' + stOf(st) + '"><i></i>' + esc(label(st)) + '</span>';
+    const shortKey = k => String(k || '').replace('tun-' + topo.name + '-', '');
+    if (pairEl) {
+      // a pair wire: every tunnel between the two servers, each in its own row
+      const pair = (g.getAttribute('data-topology-pair') || '').split('|');
+      const mine = rows.filter(tn => tn.localName === pair[0] && tn.remoteName === pair[1]);
+      html = '<div class="topo-tip-h"><b>' + esc(pair[0] + ' → ' + pair[1]) + '</b>' +
+        '<span class="topo-tip-count">' + esc(mine.length + ' ' + tr('', mine.length === 1 ? 'tunnel' : 'tunnels')) + '</span></div>' +
+        '<div class="topo-tip-rows">' +
+        (mine.length ? mine.map(tn => '<div class="topo-tip-row">' +
+            '<span class="topo-tip-dot ' + stOf(tn.state) + '"></span>' +
+            '<span class="topo-tip-key"><bdi dir="ltr">' + esc(shortKey(tn.key)) + '</bdi></span>' +
+            '<span class="topo-tip-eng">' + esc(tn.engine || '') + '</span>' +
+            pillOf(tn.state) +
+            (tn.latency != null && tn.latency >= 0 ? '<span class="topo-tip-lat">' + esc(Math.round(tn.latency) + ' ms') + '</span>' : '') +
+            '</div>').join('')
+          : '<div class="topo-tip-none">' + esc(tr('', 'No tunnels')) + '</div>') +
+        '</div>';
+    } else {
+      const attr = g.getAttribute('data-topology-cable');
+      const t = (topologyData.tunnels || []).find(x => String(x.id) === attr || String(x.name) === attr);
+      const ar = rows.find(tn => tn.key === attr) || null;
+      if (!t && !ar) { tip.hidden = true; return; }
+      // the agent layer is the live truth — prefer its state over the
+      // inventory row's possibly-stale one
+      const src = ar || t;
+      const st = String(src.state || '');
+      const key = ar ? ar.key : (t ? t.id : '');
+      // the tunnel's real traffic share: the agent layer reports weight_pct,
+      // the inventory layer carries raw weights — share them out here
+      let wpct = (ar && ar.weightPct != null && ar.weightPct >= 0) ? Math.round(ar.weightPct) : null;
+      if (wpct == null && t && t.weight != null) {
+        const sib = topologyExistingTunnels(topo);
+        const sum = sib.reduce((a, x) => a + (Number(x.weight) || 0), 0);
+        if (sum > 0) wpct = Math.round(Number(t.weight) / sum * 100);
+      }
+      // the hover window, the owner-mockup's way: the name, then its Weight
+      // and its Status — nothing else
+      html = '<div class="topo-tip-h"><span class="topo-tip-dot ' + stOf(st) + '"></span><b>' + esc(shortKey(key)) + '</b></div>' +
+        '<div class="topo-tip-facts">' +
+        '<div class="topo-tip-fact"><span>' + esc(tr('', 'Weight')) + '</span><b>' + esc(wpct != null ? wpct + '%' : '—') + '</b></div>' +
+        '<div class="topo-tip-fact"><span>' + esc(tr('', 'Status')) + '</span><b class="' + stOf(st) + '">' + esc(label(stOf(st))) + '</b></div>' +
+        '</div>';
+    }
+    tip.innerHTML = html;
+    const host = box.querySelector('.topo-map') || box;
+    const r = host.getBoundingClientRect();
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    tip.style.left = x + 'px';
+    // near the top edge the window flips below the cursor instead of leaving the card
+    const below = y < 190;
+    tip.classList.toggle('below', below);
+    tip.style.top = below ? (y + 14) + 'px' : y + 'px';
+    tip.hidden = false;
+  });
+  box.addEventListener('mouseleave', () => { const tip = box.querySelector('.topo-tip'); if (tip) tip.hidden = true; });
+  box.addEventListener('click', e => {
+  });
+})();
 $('topoWizX').onclick = topoWizCancel;
 $('topoWizBack').onclick = topoWizBack;
 $('topoWizNext').onclick = topoWizNext;
 $('topoCreateX').onclick = topoCreateCancel;
 $('topoCreateBack').onclick = topoCreateBack;
 $('topoCreateNext').onclick = topoCreateNext;
-$('topologySearch').addEventListener('input', e => { topologySearchQuery = (e && e.target ? e.target.value : '') || ''; topologyRender(); });
-$('topologyViewListBtn').onclick = () => topologySetView('list');
-$('topologyViewGridBtn').onclick = () => topologySetView('grid');
+$('topologySearch').addEventListener('input', e => { topologySearchQuery = (e && e.target ? e.target.value : '') || ''; topoPage = 1; topologyRender(); });
+$('topologyStatusFilter').addEventListener('change', e => { topologyStatusFilter = (e && e.target ? e.target.value : 'all') || 'all'; topoPage = 1; topologyRender(); });
+$('topologyCountryFilter').addEventListener('change', e => { topologyCountryFilter = (e && e.target ? e.target.value : 'all') || 'all'; topoPage = 1; topologyRender(); });
+$('topologyDcFilter').addEventListener('change', e => { topologyDcFilter = (e && e.target ? e.target.value : 'all') || 'all'; topoPage = 1; topologyRender(); });
+$('topoPagePrev').addEventListener('click', () => { if (topoPage > 1) { topoPage--; topologyRender(); } });
+$('topoPageNext').addEventListener('click', () => { topoPage++; topologyRender(); });
 document.querySelectorAll('[data-topo-role]').forEach(b => { b.onclick = () => topologyChooseRole(b.dataset.topoRole); });
 $('tab-tunnel').addEventListener('click', e => {
   const target = e.target.closest('button'); if (!target) return;
@@ -1456,23 +2166,43 @@ $('tab-tunnel').addEventListener('click', e => {
       pop.classList.remove('hidden');
       const r = target.getBoundingClientRect();
       const ph = pop.offsetHeight || 130, pw = pop.offsetWidth || 172;
+      // The pop is position:fixed, but the glassy .tunnel-card ancestor has a
+      // backdrop-filter — that makes the CARD the containing block, so fixed
+      // coordinates are card-relative. Clamp inside the real containing block
+      // (offsetParent; the viewport when there is none), never the window.
+      const host = pop.offsetParent;
+      const hr = host ? host.getBoundingClientRect()
+        : { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight };
       let top = r.bottom + 6;
-      if (top + ph > window.innerHeight - 8) top = Math.max(8, r.top - ph - 6);
-      pop.style.top = top + 'px';
-      pop.style.right = 'auto';
-      // end-align the pop with the kebab (kebab sits at the row's end edge),
-      // then clamp inside the viewport
+      if (top + ph > hr.bottom - 8) top = Math.max(hr.top + 8, r.top - ph - 6);
       let left = document.documentElement.dir === 'rtl' ? r.left : r.right - pw;
-      pop.style.left = Math.min(Math.max(8, left), window.innerWidth - pw - 8) + 'px';
+      left = Math.min(Math.max(hr.left + 8, left), hr.right - pw - 8);
+      pop.style.top = (host ? top - hr.top : top) + 'px';
+      pop.style.left = (host ? left - hr.left : left) + 'px';
       target.setAttribute('aria-expanded', 'true');
     }
     return;
   }
   if (target.dataset.topoPower !== undefined) { topoMenusClose(); topologyPower(target.dataset.topoPower, target.dataset.active === 'true'); return; }
   if (target.dataset.topoOpen || target.dataset.topoDelete) topoMenusClose();
+  if (target.dataset.topoEdit) { topoMenusClose(); topologyEditRow(target.dataset.topoEdit); return; }
   if (target.dataset.topoOpen) topologyOpen(target.dataset.topoOpen);
   if (target.dataset.topoDelete) topologyDelete(target.dataset.topoDelete);
   if (target.dataset.topoDetach) topologyDetach(target.dataset.topoDetach);
+  const memAdd = target.closest ? target.closest('[data-mem-add]') : null;
+  if (memAdd) { topoMembersPickOpen(memAdd.getAttribute('data-mem-add')); return; }
+  const memRm = target.closest ? target.closest('[data-mem-remove]') : null;
+  if (memRm) { topoMemberRemove(memRm.getAttribute('data-mem-remove'), memRm.getAttribute('data-mem-agent')); return; }
+  const memGo = target.closest ? target.closest('[data-mem-pick-go]') : null;
+  if (memGo) { topoMembersPickGo(); return; }
+  const memX = target.closest ? target.closest('[data-mem-pick-close]') : null;
+  if (memX) { const ov = document.getElementById('topoMemPick'); if (ov) ov.hidden = true; return; }
+  const agJump = target.closest ? target.closest('[data-topo-agent]') : null;
+  if (agJump) {
+    const id = agJump.getAttribute('data-topo-agent');
+    if (typeof openAgtDetail === 'function') { openAgtDetail(id); if (typeof goTab === 'function') goTab('magt'); }
+    return;
+  }
   if (target.dataset.topoViewTunnel) {
     const kind = topologyKind(target.dataset.topoViewTunnel);
     if (target.dataset.topoViewTunnel.startsWith('xray:')) { goTab('xray'); return; }

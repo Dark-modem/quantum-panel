@@ -349,9 +349,28 @@ CREATE TABLE agent_listening (
 	// 8: Phase 26 bilingual datacenter names (UI-API-REQUESTS §9). Additive:
 	// old binaries ignore the column; DEFAULT '' keeps NOT NULL satisfied on
 	// reopen and makes the change downgrade-safe (pre-26 binaries read the
-	// table without the column and never write it).
+	// table without the column and never write it). Phase32 merge note: this
+	// keeps the number main shipped it with (8) — append-only rule — so a DB
+	// that already ran main's chain re-runs nothing here. The demo line's DB
+	// applied these last three additively in the old ui/live order and sits at
+	// version 10 either way; the columns land identically.
 	`
 ALTER TABLE datacenters ADD COLUMN datacenter_en TEXT NOT NULL DEFAULT '';
+`,
+	// 9: Agent hosting country (UI review round). The operator picks the
+	// country of a FOREIGN agent when minting its enrollment token; the
+	// agents table shows it next to the role. Additive column; empty =
+	// unknown or a pre-country agent.
+	`
+ALTER TABLE agents ADD COLUMN country TEXT NOT NULL DEFAULT '';
+`,
+	// 10: Agent CPU model (UI review round). The agent's resource report
+	// carries the CPU model string read from /proc/cpuinfo (its model
+	// name usually includes the "@ X.XXGHz" frequency); the agents
+	// detail page extracts the GHz from it. Additive column; empty =
+	// a pre-model report. New batch so it also applies to existing DBs.
+	`
+ALTER TABLE agents ADD COLUMN cpu_model TEXT NOT NULL DEFAULT '';
 `,
 }
 

@@ -637,6 +637,66 @@ func diskPct(path string) any {
 	return fmt.Sprintf("%.1f", float64(used)*100/float64(total))
 }
 
+// cpuFreqGHz averages the per-core "cpu MHz" lines of /proc/cpuinfo — the
+// live average core frequency. Many modern CPUs omit "@ X.XXGHz" from the
+// model name, so the running frequency is read instead.
+func cpuFreqGHz() any {
+	data, err := os.ReadFile("/proc/cpuinfo")
+	if err != nil {
+		return nil
+	}
+	var sum, n float64
+	for _, line := range strings.Split(string(data), "\n") {
+		if !strings.HasPrefix(line, "cpu MHz") {
+			continue
+		}
+		vPart := ""
+		if i := strings.Index(line, ":"); i >= 0 {
+			vPart = strings.TrimSpace(line[i+1:])
+		}
+		if v, perr := strconv.ParseFloat(vPart, 64); perr == nil && v > 0 {
+			sum += v
+			n++
+		}
+	}
+	if n == 0 {
+		return nil
+	}
+	return fmt.Sprintf("%.2f", sum/n/1000)
+}
+
+// hostStats is the central server's own system picture for the dashboard
+// KPI cards: the panel host is not an agent, so the three cards read the
+// machine the panel itself runs on (live /proc + statfs).
+func hostStats() map[string]any {
+	mem := memInfo()
+	out := map[string]any{
+		"cpu_pct":  cpuPct(),
+		"load":     loadAvg(),
+		"cores":    runtime.NumCPU(),
+		"freq_ghz": cpuFreqGHz(),
+	}
+	if v, ok := mem["used"].(uint64); ok {
+		out["mem_used_mb"] = int64(v) / 1048576
+	}
+	if v, ok := mem["total"].(uint64); ok {
+		out["mem_total_mb"] = int64(v) / 1048576
+	}
+	if p, ok := mem["pct"].(string); ok {
+		if f, perr := strconv.ParseFloat(p, 64); perr == nil {
+			out["mem_pct"] = f
+		}
+	}
+	total, free, derr := getDiskUsage("/")
+	if derr == nil && total > 0 {
+		used := total - free
+		out["disk_used_gb"] = float64(used) / 1073741824
+		out["disk_total_gb"] = float64(total) / 1073741824
+		out["disk_pct"] = float64(used) * 100 / float64(total)
+	}
+	return out
+}
+
 // cpuPct reads /proc/stat and compares with the previous sample.
 func cpuPct() any {
 	cur, ok := readCPU()
