@@ -1034,13 +1034,6 @@ function topologyRender() {
   if (topoPage > pages) topoPage = pages;
   const pageFrom = (topoPage - 1) * topoPerPage;
   const visible = all.slice(pageFrom, pageFrom + topoPerPage);
-  const foot = $('topologyFootCount');
-  if (foot) foot.textContent = all.length
-    ? tr('', 'Showing {a} to {b} of {c} topologies')
-        .replace('{a}', String(pageFrom + 1))
-        .replace('{b}', String(Math.min(pageFrom + visible.length, all.length)))
-        .replace('{c}', String(all.length))
-    : tr('', '{n} item(s)').replace('{n}', '0');
   // the agents-list pager, cloned: per-page size dropdown on the left,
   // prev / numbered pages / next on the right
   const pager = $('topoPager');
