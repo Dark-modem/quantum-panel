@@ -441,7 +441,7 @@ function topologyGraph(topo, tunnels) {
   };
   const tTxt = (x, y, cls, s2, anchor) => `<text class="${cls}" x="${x}" y="${y}"${anchor ? ` text-anchor="${anchor}"` : ''}>${text(s2)}</text>`;
   const tFlag = (flag, attrs) => topologyFlagSvg(flag, attrs);
-  const NW = 236, NH = 118, GAP = 12, HDR = 46;
+  const NW = 236, NH = 140, GAP = 12, HDR = 46;
   const agentTuns = topoAgentTunnels(topo);
   // geometry: two column containers (Iran servers / Foreign servers), the
   // server cards stacked inside, vertically centered against each other
@@ -602,8 +602,8 @@ function topologyGraph(topo, tunnels) {
     const fw = 44, fh = 32;
     const flagX = m ? x + w - 12 - fw : x + 12;
     const nameTx = m
-      ? tTxt(x + w - 12 - fw - 9, y + 28, 'topo-n-name', title, 'end')
-      : tTxt(x + 12 + fw + 9, y + 28, 'topo-n-name', title);
+      ? tTxt(x + w - 62, y + 62, 'topo-n-name', title, 'end')
+      : tTxt(x + 62, y + 62, 'topo-n-name', title);
     // the online/offline corner tag, the owner-mockup's way: the status dot
     // rides ITS beginning (top-right in LTR, top-left in RTL) — no second dot
     // by the name
@@ -629,13 +629,13 @@ function topologyGraph(topo, tunnels) {
     // the location row: the card's country — Iran is not a TOPO_COUNTRIES
     // entry (that dropdown is for the foreign side), so name it directly
     const locTxt = side === 'iran' ? tr('', 'Iran') : (topoCountryName(info.cc) || tr('', 'Other'));
-    const rowIcX = m ? x + w - 12 - 18 - 8 : x + 12 + 18 + 8;
+    const rowIcX = m ? x + w - 32 - 24 : x + 42;
     const row = (icon, yy, cls, val) => m
       ? icon(rowIcX, yy) + tTxt(rowIcX - 8, yy + 13, cls, val, 'end')
       : icon(rowIcX, yy) + tTxt(rowIcX + 20, yy + 13, cls, val);
-    const rowYs = [y + 48, y + 72, y + 96];
-    const bars = rowYs.map(v => `<rect x="0" y="${(v + 4.5).toFixed(1)}" width="18" height="7" rx="2"/>`).join('');
-    const stack = `<g class="topo-n-stack" transform="translate(${m ? x + w - 12 - 18 : x + 14},0)">${bars}</g>`;
+    const rowYs = [y + 74, y + 96, y + 118];
+    const bars = rowYs.map(v => `<rect x="0" y="${(v + 4).toFixed(1)}" width="20" height="8" rx="2.5"/>`).join('');
+    const stack = `<g class="topo-n-stack" transform="translate(${m ? x + w - 12 - 20 : x + 14},0)">${bars}</g>`;
     return `<g class="cl-n ${side === 'iran' ? 'topo-node-iran' : 'topo-node-foreign'}" data-agview="${text(agRow ? agRow.id : '')}" data-server-name="${text(s.name || '')}" role="button" tabindex="0" aria-label="${text(title)} · ${text(info.ip)}"><title>${text(title)} · ${text(info.ip)}</title>` +
       `<rect class="cl-n-bg" x="${x}" y="${y}" width="${w}" height="${NH}" rx="12"/>` +
       tFlag(flag, `x="${flagX}" y="${y + 10}" width="${fw}" height="${fh}"`) +
