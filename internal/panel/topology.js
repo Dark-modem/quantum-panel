@@ -578,7 +578,7 @@ function topologyGraph(topo, tunnels) {
   // side where this card's cables plug in
   const icPin = (ix, iy) => `<g class="topo-n-ic" transform="translate(${ix},${iy})"><path d="M8 1.5a5 5 0 015 5c0 3.6-5 8-5 8s-5-4.4-5-8a5 5 0 015-5z"/><circle cx="8" cy="6.4" r="1.7"/></g>`;
   const icSrv = (ix, iy) => `<g class="topo-n-ic" transform="translate(${ix},${iy})"><rect x="1.5" y="2.5" width="13" height="4.6" rx="1.5"/><rect x="1.5" y="9" width="13" height="4.6" rx="1.5"/><path d="M4.3 4.8h.01M4.3 11.3h.01"/></g>`;
-  const icTerm = (ix, iy) => `<g class="topo-n-ic" transform="translate(${ix},${iy})"><path d="M3 4l4.5 4L3 12"/><path d="M9.5 12.5H13"/></g>`;
+  const icMon = (ix, iy) => `<g class="topo-n-ic" transform="translate(${ix},${iy})"><rect x="1.5" y="2.5" width="13" height="8.5" rx="1.5"/><path d="M6 14h4M8 11v3"/></g>`;
   const node = (col, i, s, side) => {
     const x = col.x + 12, y = nodeY(col, i), w = (col.w || NW) - 24;
     const m = rtl && !vert;
@@ -607,6 +607,11 @@ function topologyGraph(topo, tunnels) {
       ? tTxt(dotCx - 7, y + 28, 'topo-n-name', title, 'end')
       : tTxt(dotCx + 7, y + 28, 'topo-n-name', title);
     const dot = agRow ? `<circle class="topo-n-dot ${online ? 'ok' : 'err'}" cx="${dotCx}" cy="${dotCy}" r="4"/>` : '';
+    // the online/offline corner tag, the owner-mockup's way: top-right in
+    // LTR, top-left in RTL
+    const stLbl = agRow
+      ? `<text class="topo-n-status ${online ? 'ok' : 'err'}" x="${m ? x + 12 : x + w - 12}" y="${y + 20}"${m ? '' : ' text-anchor="end"'}>${text(online ? tr('', 'Online') : tr('', 'Offline'))}</text>`
+      : '';
     // the chevron points out toward the agent view, direction-aware
     const chevCx = m ? x + 20 : x + w - 20;
     const chevD = m
@@ -634,7 +639,8 @@ function topologyGraph(topo, tunnels) {
       dot + nameTx +
       row(icSrv, rowYs[0], 'topo-n-dc', dcTxt) +
       row(icPin, rowYs[1], 'topo-n-loc', locTxt) +
-      row(icTerm, rowYs[2], 'topo-ip', info.ip) +
+      row(icMon, rowYs[2], 'topo-ip', info.ip) +
+      stLbl +
       chev +
       port +
       `</g>`;
