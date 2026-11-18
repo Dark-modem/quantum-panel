@@ -2153,6 +2153,7 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
    border glows in the card's side color */
 .topo-n-dot.ok { fill:var(--ok); } .topo-n-dot.err { fill:var(--er); }
 .topo-n-status { font-size:12px; font-weight:700; letter-spacing:.2px; }
+.topo-n-tag-bg { fill:color-mix(in srgb, var(--ac) 16%, transparent); stroke:color-mix(in srgb, var(--ac) 45%, transparent); }
 .topo-n-status.ok { fill:var(--ok); } .topo-n-status.err { fill:var(--er); }
 .topo-n-stack rect { fill:var(--ac); stroke:none; }
 .topo-n-stack-tiers { stroke:color-mix(in srgb, var(--s1) 55%, transparent); stroke-width:1.2; stroke-linecap:round; fill:none; }

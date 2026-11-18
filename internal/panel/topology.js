@@ -612,12 +612,18 @@ function topologyGraph(topo, tunnels) {
     const stLbl = agRow ? (() => {
       const lbl = online ? tr('', 'Online') : tr('', 'Offline');
       const kind = online ? 'ok' : 'err';
-      // the dot rides the label's END — right of the word in LTR, left of it
-      // in RTL — per the owner's eye
-      const tX = m ? x + 20 : x + w - 20;
-      const dotX = m ? x + 12 : x + w - 12;
-      return `<text class="topo-n-status ${kind}" x="${tX}" y="${y + 20}" text-anchor="${m ? 'start' : 'end'}">${text(lbl)}</text>` +
-        `<circle class="topo-n-dot ${kind}" cx="${dotX}" cy="${y + 16}" r="4"/>`;
+      // the dot + label ride inside one soft blue pill, the card's accent
+      const tw = Math.round(lbl.length * 6.8);
+      const pw = tw + 34, ph = 20;
+      const px = m ? x + 14 : x + w - 14 - pw;
+      const py = y + 6;
+      const dotCx = m ? px + 10 : px + pw - 10;
+      const tX = m ? px + 19 : px + pw - 19;
+      return `<g class="topo-n-tag">` +
+        `<rect class="topo-n-tag-bg" x="${px}" y="${py}" width="${pw}" height="${ph}" rx="10"/>` +
+        `<text class="topo-n-status ${kind}" x="${tX}" y="${py + 14}" text-anchor="${m ? 'start' : 'end'}">${text(lbl)}</text>` +
+        `<circle class="topo-n-dot ${kind}" cx="${dotCx}" cy="${py + 10}" r="4"/>` +
+        `</g>`;
     })() : '';
     // the three info rows face the three bars of the stacked-server glyph —
     // the datacenter, then the LOCATION (the country), then the ip, one row
