@@ -2154,7 +2154,6 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 .topo-n-dot.ok { fill:var(--ok); } .topo-n-dot.err { fill:var(--er); }
 .topo-n-status { font-size:12px; font-weight:700; letter-spacing:.2px; }
 .topo-n-status.ok { fill:var(--ok); } .topo-n-status.err { fill:var(--er); }
-.topo-n-chev { fill:none; stroke:var(--mu); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
 .topo-n-stack rect { fill:color-mix(in srgb, var(--ac) 26%, transparent); stroke:var(--ac); stroke-width:1.4; }
 .topo-n-stack-sep { stroke:color-mix(in srgb, var(--ac) 50%, transparent); stroke-width:1; fill:none; }
 .topo-n-stack-led { fill:var(--ac); stroke:none; }

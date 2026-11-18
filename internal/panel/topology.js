@@ -617,12 +617,6 @@ function topologyGraph(topo, tunnels) {
       return `<text class="topo-n-status ${kind}" x="${tX}" y="${y + 20}" text-anchor="${m ? 'start' : 'end'}">${text(lbl)}</text>` +
         `<circle class="topo-n-dot ${kind}" cx="${dotX}" cy="${y + 16}" r="4"/>`;
     })() : '';
-    // the chevron points out toward the agent view, direction-aware
-    const chevCx = m ? x + 20 : x + w - 20;
-    const chevD = m
-      ? `M ${chevCx + 4} ${y + NH / 2 - 6} L ${chevCx - 4} ${y + NH / 2} L ${chevCx + 4} ${y + NH / 2 + 6}`
-      : `M ${chevCx - 4} ${y + NH / 2 - 6} L ${chevCx + 4} ${y + NH / 2} L ${chevCx - 4} ${y + NH / 2 + 6}`;
-    const chev = `<path class="topo-n-chev" d="${chevD}"/>`;
     // the three info rows face the three bars of the stacked-server glyph —
     // the datacenter, then the LOCATION (the country), then the ip, one row
     // per bar, icons per the owner's zoomed mockup (rack, pin, terminal)
@@ -656,7 +650,6 @@ function topologyGraph(topo, tunnels) {
       row(icPin, rowYs[1], 'topo-n-loc', locTxt) +
       row(icMon, rowYs[2], 'topo-ip', info.ip) +
       stLbl +
-      chev +
       port +
       `</g>`;
   };
