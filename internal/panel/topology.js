@@ -629,16 +629,15 @@ function topologyGraph(topo, tunnels) {
       ? icon(rowIcX, yy) + tTxt(rowIcX - 8, yy + 13, cls, val, 'end')
       : icon(rowIcX, yy) + tTxt(rowIcX + 20, yy + 13, cls, val);
     const rowYs = [y + 57, y + 80, y + 103];
-    // the server tower icon: one body, three unit levels, every level wearing
-    // its LED and vent lines — a proper icon, not a bare bar
-    const gTop = y + 54, gH = 68, gW = 22, unit = gH / 3;
+    // the server stack icon, the owner's zoomed mockup: three solid disks
+    // with twin LEDs, filling the rows' exact current height
+    const gTop = y + 54, gW = 22, barH = 20, gap = 4;
     const stack = `<g class="topo-n-stack" transform="translate(${m ? x + w - 12 - gW : x + 14},0)">` +
-      `<rect x="0" y="${gTop}" width="${gW}" height="${gH}" rx="7"/>` +
-      [1, 2].map(i => `<path class="topo-n-stack-sep" d="M1 ${gTop + i * unit - 0.5}h${gW - 2}"/>`).join('') +
       [0, 1, 2].map(i => {
-        const cy = gTop + i * unit + unit / 2;
-        return `<circle class="topo-n-stack-led" cx="5.5" cy="${cy}" r="2"/>` +
-          `<path class="topo-n-stack-vent" d="M11 ${cy - 2.5}h6M11 ${cy + 1.5}h6"/>`;
+        const by = gTop + i * (barH + gap);
+        return `<rect x="0" y="${by}" width="${gW}" height="${barH}" rx="5"/>` +
+          `<circle class="topo-n-stack-dot" cx="${gW - 5}" cy="${by + barH / 2}" r="1.8"/>` +
+          `<circle class="topo-n-stack-dot" cx="${gW - 10.5}" cy="${by + barH / 2}" r="1.8"/>`;
       }).join('') +
       `</g>`;
     return `<g class="cl-n ${side === 'iran' ? 'topo-node-iran' : 'topo-node-foreign'}" data-agview="${text(agRow ? agRow.id : '')}" data-server-name="${text(s.name || '')}" role="button" tabindex="0" aria-label="${text(title)} · ${text(info.ip)}"><title>${text(title)} · ${text(info.ip)}</title>` +
