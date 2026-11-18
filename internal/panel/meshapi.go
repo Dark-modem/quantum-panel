@@ -1150,30 +1150,3 @@ func handleMeshPGDelete(w http.ResponseWriter, r *http.Request) {
 	meshAudit(meshActor(r), "mesh.pasarguard.delete", fmt.Sprintf(`{"id":%d}`, id))
 	writeJSON(w, map[string]any{"ok": true})
 }
-
-// serveMeshPage renders the mesh management page (session-authed like the
-// rest of the UI; the page itself is static, all data comes from the API).
-// serveWizardPage serves the guided setup wizard (phase 7) at
-// <base>/mesh-wizard — the same embedded-asset pattern as the mesh page.
-func serveWizardPage(w http.ResponseWriter, r *http.Request) {
-	serveAsset("wizard.html", "text/html; charset=utf-8").ServeHTTP(w, r)
-}
-
-func serveMeshPage(w http.ResponseWriter, r *http.Request) {
-	data, err := panelFS.ReadFile("mesh.html")
-	if err != nil {
-		http.Error(w, "not found", http.StatusNotFound)
-		return
-	}
-	page := string(data)
-	// Cache-bust first-party assets per build (24h cache on the assets).
-	for _, f := range []string{"fonts.css", "tokens.css", "base.css", "enterprise.css", "quantum-mesh.css"} {
-		page = strings.ReplaceAll(page, `href="`+f+`"`, `href="`+f+`?v=`+assetTag()+`"`)
-	}
-	page = strings.ReplaceAll(page, `src="mesh.js"`, `src="mesh.js?v=`+assetTag()+`"`)
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	// The page must revalidate (its asset URLs carry the ?v= tag); the
-	// tagged assets themselves are 86400-cached.
-	w.Header().Set("Cache-Control", "no-cache")
-	_, _ = w.Write([]byte(page))
-}
