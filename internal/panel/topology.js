@@ -664,7 +664,7 @@ function topologyGraph(topo, tunnels) {
       `</g>`;
     return `<g class="cl-n ${side === 'iran' ? 'topo-node-iran' : 'topo-node-foreign'}" data-agview="${text(agRow ? agRow.id : '')}" data-server-name="${text(s.name || '')}" role="button" tabindex="0" aria-label="${text(title)} · ${text(info.ip)}"><title>${text(title)} · ${text(info.ip)}</title>` +
       `<rect class="cl-n-bg" x="${x}" y="${y}" width="${w}" height="${NH}" rx="12"/>` +
-      tFlag(flag, `x="${flagX}" y="${y + 10}" width="${fw}" height="${fh}"`) +
+      tFlag(flag, `x="${flagX}" y="${y + 12}" width="36" height="26"`) +
       stack +
       nameTx +
       row(icSrv, rowYs[0], 'topo-n-dc', dcTxt) +
