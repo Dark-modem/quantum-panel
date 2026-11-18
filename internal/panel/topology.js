@@ -1145,6 +1145,13 @@ function topologyRender() {
       `<button type="button" class="mtb-eng-chip${topoTunFilter === c.k ? ' on' : ''}" data-topotunfilter="${c.k}"><i style="background:${c.dot}"></i>${esc(c.lbl)}</button>`).join('') + '</div>';
     const shown = agentRows.filter(tn => topoTunFilter === 'all' || tn.state === topoTunFilter);
     const bytes = v => v >= 1073741824 ? (v / 1073741824).toFixed(1) + ' GB' : v >= 1048576 ? (v / 1048576).toFixed(1) + ' MB' : v >= 1024 ? (v / 1024).toFixed(1) + ' KB' : v + ' B';
+    // engine logos: the same art map the agent details table uses — engines
+    // without brand art (matrix!) fall back to a text-only badge; the ?v=
+    // query is required or the asset route falls back to the SPA shell
+    const ENG_IMG = { aestun: 'img/engines/aestun.png', rakhsh: 'img/engines/rakhsh.png', gost: 'img/engines/gost.png', xray: 'img/engines/xray.svg', wireguard: 'img/engines/wireguard.png', rathole: 'img/engines/rathole.png', wst: 'img/engines/wstunnel.png', wstunnel: 'img/engines/wstunnel.png', tinc: 'img/engines/tinc.svg', hysteria: 'img/engines/hysteria.png', singbox: 'img/engines/singbox.png', midos: 'img/engines/midos.png', dagger: 'img/engines/dagger.png', pengo: 'img/engines/pengo.png', backhaul: 'img/engines/backhaul.png', backpack: 'img/engines/backpack.png', narnia: 'img/engines/narnia.png', waterwall: 'img/engines/waterwall.png', wattunnel: 'img/engines/wattunnel.png', udp2raw: 'img/engines/udp2raw.png', paqet: 'img/engines/paqet.png', frp: 'img/engines/frp.png', easytier: 'img/engines/easytier.png', chisel: 'img/engines/chisel.png' };
+    const engImgTag = ((document.querySelector('script[src*="app.js"]') || { src: '' }).src.match(/v=([^&]+)/) || ['', ''])[1];
+    const engImgQ = engImgTag ? '?v=' + engImgTag : '';
+    const engImg = en => { const e = String(en || '').toLowerCase(); return ENG_IMG[e] ? ENG_IMG[e] + engImgQ : ''; };
     const ENG_DISP = { aestun: 'AESTun', rakhsh: 'Rakhsh', matrix: 'Matrix', frp: 'FRP', backhaul: 'Backhaul', gost: 'Gost', xray: 'Xray', wireguard: 'WireGuard', wstunnel: 'wstunnel', chisel: 'Chisel', rathole: 'Rathole', tinc: 'Tinc', easytier: 'EasyTier', hysteria: 'Hysteria', singbox: 'sing-box', spoof: 'Spoof', udp2raw: 'udp2raw', waterwall: 'WaterWall', wattunnel: 'WatTunnel' };
     const engName = en => { const e = String(en || '').toLowerCase(); return ENG_DISP[e] || (en ? en.charAt(0).toUpperCase() + en.slice(1) : '—'); };
     const th = (svg, lbl) => `<th><span class="mtb-th">${svg}${esc(lbl)}</span></th>`;
@@ -1177,7 +1184,7 @@ function topologyRender() {
         `<td><b class="mono mtb-tun-key" dir="ltr" title="${esc(tn.key)}">${esc(tn.key)}</b></td>` +
         `<td><div class="mtb-dest"><span class="mtb-dest-flag">${topologyFlagSvg(remCc)}</span><div class="mtb-dest-tx"><b>${esc(tn.remoteName || '—')}</b>` +
         (remDc ? `<span class="mtb-muted mtb-dest-dc"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="7" rx="1.5"/><rect x="3" y="13" width="18" height="7" rx="1.5"/><path d="M7 7.5h.01M7 16.5h.01"/></svg>${esc(remDc)}</span>` : '') + '</div></div></td>' +
-        `<td><span class="badge info mtb-eng-badge"><img src="img/engines/${encodeURIComponent(String(tn.engine || '').toLowerCase())}.png" alt="${esc(engN)}" draggable="false"> ${esc(engN)}</span></td>` +
+        `<td><span class="badge info mtb-eng-badge">${engImg(tn.engine) ? `<img src="${engImg(tn.engine)}" alt="${esc(engN)}" draggable="false"> ` : ''}${esc(engN)}</span></td>` +
         `<td>${b2}</td>` +
         `<td>${w}</td>` +
         `<td>${td}</td>` +
