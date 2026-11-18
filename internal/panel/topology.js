@@ -2081,9 +2081,11 @@ $('topologyAddTunnelBtn').onclick = topologyNewTunnel;
       const t = (topologyData.tunnels || []).find(x => String(x.id) === attr || String(x.name) === attr);
       const ar = rows.find(tn => tn.key === attr) || null;
       if (!t && !ar) { tip.hidden = true; return; }
-      const src = t || ar;
+      // the agent layer is the live truth — prefer its state over the
+      // inventory row's possibly-stale one
+      const src = ar || t;
       const st = String(src.state || '');
-      const key = t ? t.id : ar.key;
+      const key = ar ? ar.key : (t ? t.id : '');
       // the tunnel's real traffic share: the agent layer reports weight_pct,
       // the inventory layer carries raw weights — share them out here
       let wpct = (ar && ar.weightPct != null && ar.weightPct >= 0) ? Math.round(ar.weightPct) : null;
