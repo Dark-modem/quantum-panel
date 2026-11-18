@@ -571,12 +571,14 @@ function topologyGraph(topo, tunnels) {
   }).join('');
   const cc = String(topo.country || '').toLowerCase();
   const countryLabel = (TOPO_COUNTRIES.find(c => c[0] === cc) || ['', tr('', 'Other')])[1];
-  // server cards, the mockup's way: a big flag tile, the bold name with a
-  // status pill (Connected while the agent is online), a pin + datacenter
-  // row, a server icon + mono ip row, and ONE glowing port on the edge
-  // facing the other side where this card's cables plug in
+  // server cards, the second mockup's way: the flag tile and a stacked-server
+  // glyph own the left column, the live status dot rides the name (no pill),
+  // a chevron points out at the far edge, the pin + datacenter and server
+  // icon + ip rows follow, and ONE glowing port on the edge facing the other
+  // side where this card's cables plug in
   const icPin = (ix, iy) => `<g class="topo-n-ic" transform="translate(${ix},${iy})"><path d="M8 1.5a5 5 0 015 5c0 3.6-5 8-5 8s-5-4.4-5-8a5 5 0 015-5z"/><circle cx="8" cy="6.4" r="1.7"/></g>`;
   const icSrv = (ix, iy) => `<g class="topo-n-ic" transform="translate(${ix},${iy})"><rect x="1.5" y="2.5" width="13" height="4.6" rx="1.5"/><rect x="1.5" y="9" width="13" height="4.6" rx="1.5"/><path d="M4.3 4.8h.01M4.3 11.3h.01"/></g>`;
+  const icStack = (ix, iy) => `<g class="topo-n-stack" transform="translate(${ix},${iy})"><rect x="0" y="0" width="18" height="7" rx="2"/><rect x="0" y="9" width="18" height="7" rx="2"/><rect x="0" y="18" width="18" height="7" rx="2"/></g>`;
   const node = (col, i, s, side) => {
     const x = col.x + 12, y = nodeY(col, i), w = (col.w || NW) - 24;
     const m = rtl && !vert;
@@ -586,18 +588,6 @@ function topologyGraph(topo, tunnels) {
     const title = s.name || (side === 'iran' ? tr('', 'Iran server') : countryLabel);
     const flag = side === 'iran' ? 'ir' : topo.country;
     const pk = portKind[(side === 'iran' ? 'iran:' : 'foreign:') + i] || 'off';
-    // status pill: top-right in LTR, top-left in RTL
-    let pill = '';
-    if (agRow) {
-      const lbl = online ? tr('', 'Connected') : tr('', 'Offline');
-      const kind = online ? 'ok' : 'err';
-      const pw = Math.round(28 + lbl.length * 7);
-      const px = m ? x + 12 : x + w - 12 - pw;
-      const py = y + 12;
-      pill = `<g class="topo-pill"><rect class="topo-pill-bg ${kind}" x="${px}" y="${py}" width="${pw}" height="22" rx="11"/>` +
-        `<circle class="topo-pill-dot ${kind}" cx="${px + 11}" cy="${py + 11}" r="3"/>` +
-        `<text class="topo-pill-tx ${kind}" x="${px + 19}" y="${py + 15}">${text(lbl)}</text></g>`;
-    }
     // the glowing port on the edge facing the other column (top/bottom in
     // the vertical stack)
     let port;
@@ -609,20 +599,35 @@ function topologyGraph(topo, tunnels) {
       const px = side === 'iran' ? (rtl ? x : x + w) : (rtl ? x + w : x);
       port = `<circle class="topo-port-halo ${pk}" cx="${px}" cy="${y + NH / 2}" r="9"/><circle class="topo-port ${pk}" cx="${px}" cy="${y + NH / 2}" r="5"/>`;
     }
+    const fw = 44, fh = 32;
+    const flagX = m ? x + w - 12 - fw : x + 12;
+    const stackX = m ? x + w - 12 - 18 : x + 13;
+    const dotCy = y + 20;
+    const dotCx = m ? x + w - 12 - fw - 13 : x + 12 + fw + 13;
+    const nameTx = m
+      ? tTxt(dotCx - 7, y + 26, 'topo-n-name', title, 'end')
+      : tTxt(dotCx + 7, y + 26, 'topo-n-name', title);
+    const dot = agRow ? `<circle class="topo-n-dot ${online ? 'ok' : 'err'}" cx="${dotCx}" cy="${dotCy}" r="4"/>` : '';
+    // the chevron points out toward the agent view, direction-aware
+    const chevCx = m ? x + 20 : x + w - 20;
+    const chevD = m
+      ? `M ${chevCx + 4} ${y + NH / 2 - 6} L ${chevCx - 4} ${y + NH / 2} L ${chevCx + 4} ${y + NH / 2 + 6}`
+      : `M ${chevCx - 4} ${y + NH / 2 - 6} L ${chevCx + 4} ${y + NH / 2} L ${chevCx - 4} ${y + NH / 2 + 6}`;
+    const chev = `<path class="topo-n-chev" d="${chevD}"/>`;
     // rows: pin + datacenter, then the server icon + ip — mirrored in RTL
     const dcTxt = info.dc ? (info.dc + (info.cc ? ' (' + info.cc + ')' : '')) : (side === 'iran' ? tr('', 'Iran') : topoCountryName(topo.country) || '—');
-    const flagX = m ? x + w - 14 - 42 : x + 14;
-    const nameTx = m ? tTxt(x + w - 64, y + 30, 'topo-n-name', title, 'end') : tTxt(x + 64, y + 30, 'topo-n-name', title);
+    const rowIcX = m ? x + w - 12 - fw - 4 : x + 12 + fw + 4;
     const row = (icon, yy, cls, val) => m
-      ? icon(x + w - 14 - 16, yy) + tTxt(x + w - 14 - 22, yy + 13, cls, val, 'end')
-      : icon(x + 16, yy) + tTxt(x + 40, yy + 13, cls, val);
+      ? icon(rowIcX, yy) + tTxt(rowIcX - 8, yy + 13, cls, val, 'end')
+      : icon(rowIcX, yy) + tTxt(rowIcX + 20, yy + 13, cls, val);
     return `<g class="cl-n ${side === 'iran' ? 'topo-node-iran' : 'topo-node-foreign'}" data-agview="${text(agRow ? agRow.id : '')}" data-server-name="${text(s.name || '')}" role="button" tabindex="0" aria-label="${text(title)} · ${text(info.ip)}"><title>${text(title)} · ${text(info.ip)}</title>` +
       `<rect class="cl-n-bg" x="${x}" y="${y}" width="${w}" height="${NH}" rx="12"/>` +
-      tFlag(flag, `x="${flagX}" y="${y + 14}" width="42" height="30"`) +
-      nameTx +
-      pill +
-      row(icPin, y + 44, 'topo-n-dc', dcTxt) +
-      row(icSrv, y + 66, 'topo-ip', info.ip) +
+      tFlag(flag, `x="${flagX}" y="${y + 10}" width="${fw}" height="${fh}"`) +
+      icStack(stackX, y + 56) +
+      dot + nameTx +
+      row(icPin, y + 34, 'topo-n-dc', dcTxt) +
+      row(icSrv, y + 56, 'topo-ip', info.ip) +
+      chev +
       port +
       `</g>`;
   };
