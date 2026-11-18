@@ -520,13 +520,12 @@ func (s *Store) UpsertAgent(a Agent) error {
 
 // GetAgent returns one agent.
 func (s *Store) GetAgent(id string) (Agent, error) {
-	row := s.db.QueryRow(`SELECT id, COALESCE(server_id, 0), name, role, country, key_hash, status, version, hostname, public_ip, last_seen, applied_revision,
+	return scanOne(s, `SELECT id, COALESCE(server_id, 0), name, role, country, key_hash, status, version, hostname, public_ip, last_seen, applied_revision,
 		arch, os, cpu_cores, cpu_pct, load1, mem_total_mb, mem_used_mb, disk_total_gb, disk_used_gb, uptime_s, virt, public_ip_override, COALESCE(cpu_model, '')
-		FROM agents WHERE id = ?`, id)
-	var a Agent
-	err := row.Scan(&a.ID, &a.ServerID, &a.Name, &a.Role, &a.Country, &a.KeyHash, &a.Status, &a.Version, &a.Hostname, &a.PublicIP, &a.LastSeen, &a.AppliedRevision,
-		&a.Arch, &a.OS, &a.CPUCores, &a.CPUPct, &a.Load1, &a.MemTotalMB, &a.MemUsedMB, &a.DiskTotalGB, &a.DiskUsedGB, &a.UptimeS, &a.Virt, &a.PublicIPOverride, &a.CPUModel)
-	return a, wrapNotFound(err)
+		FROM agents WHERE id = ?`, func(a *Agent) []any {
+		return []any{&a.ID, &a.ServerID, &a.Name, &a.Role, &a.Country, &a.KeyHash, &a.Status, &a.Version, &a.Hostname, &a.PublicIP, &a.LastSeen, &a.AppliedRevision,
+			&a.Arch, &a.OS, &a.CPUCores, &a.CPUPct, &a.Load1, &a.MemTotalMB, &a.MemUsedMB, &a.DiskTotalGB, &a.DiskUsedGB, &a.UptimeS, &a.Virt, &a.PublicIPOverride, &a.CPUModel}
+	}, id)
 }
 
 // --- audit log ---

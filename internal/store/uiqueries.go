@@ -748,13 +748,12 @@ func (s *Store) TopologyMemberships(serverID int64) ([]int64, error) {
 
 // AgentByServer returns the agent linked to a server ("" when none).
 func (s *Store) AgentByServer(serverID int64) (Agent, error) {
-	row := s.db.QueryRow(`SELECT id, COALESCE(server_id, 0), name, role, key_hash, status, version, hostname, public_ip, last_seen, applied_revision,
+	return scanOne(s, `SELECT id, COALESCE(server_id, 0), name, role, key_hash, status, version, hostname, public_ip, last_seen, applied_revision,
 		arch, os, cpu_cores, cpu_pct, load1, mem_total_mb, mem_used_mb, disk_total_gb, disk_used_gb, uptime_s, virt, public_ip_override
-		FROM agents WHERE server_id = ? ORDER BY id LIMIT 1`, serverID)
-	var a Agent
-	err := row.Scan(&a.ID, &a.ServerID, &a.Name, &a.Role, &a.KeyHash, &a.Status, &a.Version, &a.Hostname, &a.PublicIP, &a.LastSeen, &a.AppliedRevision,
-		&a.Arch, &a.OS, &a.CPUCores, &a.CPUPct, &a.Load1, &a.MemTotalMB, &a.MemUsedMB, &a.DiskTotalGB, &a.DiskUsedGB, &a.UptimeS, &a.Virt, &a.PublicIPOverride)
-	return a, wrapNotFound(err)
+		FROM agents WHERE server_id = ? ORDER BY id LIMIT 1`, func(a *Agent) []any {
+		return []any{&a.ID, &a.ServerID, &a.Name, &a.Role, &a.KeyHash, &a.Status, &a.Version, &a.Hostname, &a.PublicIP, &a.LastSeen, &a.AppliedRevision,
+			&a.Arch, &a.OS, &a.CPUCores, &a.CPUPct, &a.Load1, &a.MemTotalMB, &a.MemUsedMB, &a.DiskTotalGB, &a.DiskUsedGB, &a.UptimeS, &a.Virt, &a.PublicIPOverride}
+	}, serverID)
 }
 
 // ---- batched writes (phase 12 TASK 3) ---------------------------------

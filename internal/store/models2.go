@@ -484,34 +484,20 @@ func (s *Store) SetPasarguardCoefficient(id int64, coefficient float64) error {
 // ---- agents: v2 state + linking ------------------------------------------
 
 func (s *Store) ListAgents() ([]Agent, error) {
-	rows, err := s.db.Query(`SELECT id, COALESCE(server_id, 0), name, role, country, key_hash, status, version, hostname, public_ip, last_seen, applied_revision,
+	return scanList(s, `SELECT id, COALESCE(server_id, 0), name, role, country, key_hash, status, version, hostname, public_ip, last_seen, applied_revision,
 		arch, os, cpu_cores, cpu_pct, load1, mem_total_mb, mem_used_mb, disk_total_gb, disk_used_gb, uptime_s, virt, public_ip_override, COALESCE(cpu_model, '')
-		FROM agents ORDER BY id`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []Agent
-	for rows.Next() {
-		var a Agent
-		if err := rows.Scan(&a.ID, &a.ServerID, &a.Name, &a.Role, &a.Country, &a.KeyHash, &a.Status, &a.Version, &a.Hostname, &a.PublicIP, &a.LastSeen, &a.AppliedRevision,
-			&a.Arch, &a.OS, &a.CPUCores, &a.CPUPct, &a.Load1, &a.MemTotalMB, &a.MemUsedMB, &a.DiskTotalGB, &a.DiskUsedGB, &a.UptimeS, &a.Virt, &a.PublicIPOverride, &a.CPUModel); err != nil {
-			return nil, err
-		}
-		out = append(out, a)
-	}
-	return out, rows.Err()
+		FROM agents ORDER BY id`, func(a *Agent) []any {
+		return []any{&a.ID, &a.ServerID, &a.Name, &a.Role, &a.Country, &a.KeyHash, &a.Status, &a.Version, &a.Hostname, &a.PublicIP, &a.LastSeen, &a.AppliedRevision,
+			&a.Arch, &a.OS, &a.CPUCores, &a.CPUPct, &a.Load1, &a.MemTotalMB, &a.MemUsedMB, &a.DiskTotalGB, &a.DiskUsedGB, &a.UptimeS, &a.Virt, &a.PublicIPOverride, &a.CPUModel}
+	})
 }
 
 // AgentV2 reads the v2 session columns of one agent.
 func (s *Store) AgentV2(id string) (AgentV2State, error) {
-	var v AgentV2State
-	err := s.db.QueryRow(`SELECT engine_catalog, desired_v2, applied_v2, last_ack, last_error, proto_version FROM agents WHERE id = ?`, id).
-		Scan(&v.EngineCatalog, &v.DesiredV2, &v.AppliedV2, &v.LastAck, &v.LastError, &v.ProtoVersion)
-	if errors.Is(err, sql.ErrNoRows) {
-		return v, ErrNotFound
-	}
-	return v, err
+	return scanOne(s, `SELECT engine_catalog, desired_v2, applied_v2, last_ack, last_error, proto_version FROM agents WHERE id = ?`,
+		func(v *AgentV2State) []any {
+			return []any{&v.EngineCatalog, &v.DesiredV2, &v.AppliedV2, &v.LastAck, &v.LastError, &v.ProtoVersion}
+		}, id)
 }
 
 // SetAgentV2Session updates the negotiated protocol version and the
@@ -548,11 +534,8 @@ func (s *Store) SetPendingDesiredV2(id, desiredJSON string) error {
 // ok clears the pending row and moves applied_revision; failure keeps the
 // pending row and records last_error (the compiler re-pushes on change).
 func (s *Store) AckDesiredV2(id, revision string, ok bool, ackErr string) (bool, error) {
-	var pending string
-	err := s.db.QueryRow(`SELECT desired_v2 FROM agents WHERE id = ?`, id).Scan(&pending)
-	if errors.Is(err, sql.ErrNoRows) {
-		return false, ErrNotFound
-	}
+	pending, err := scanOne(s, `SELECT desired_v2 FROM agents WHERE id = ?`,
+		func(p *string) []any { return []any{p} }, id)
 	if err != nil {
 		return false, err
 	}
