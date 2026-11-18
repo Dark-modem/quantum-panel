@@ -12723,8 +12723,8 @@ function coresPickerOpen(engine) {
   if (!ov) {
     ov = document.createElement('div');
     ov.id = 'coresPickModal';
-    ov.className = 'ent-modal';
-    ov.innerHTML = '<div class="ent-card cores-pick-card"><div class="cores-pick-head"><b></b><button type="button" class="mtb-toast-x" data-cores-pick-close>\u00d7</button></div><div class="cores-pick-list"></div><div class="cores-pick-foot"><span class="cores-pick-count" data-cores-pick-count></span><button type="button" class="quantum-btn quantum-btn-primary" data-cores-pick-go>' + esc(tr('', 'Install')) + '</button><button type="button" class="quantum-btn quantum-btn-secondary" data-cores-pick-close>' + esc(tr('', 'Cancel')) + '</button></div></div>';
+    ov.className = 'ent-modal-ov';
+    ov.innerHTML = '<div class="ent-modal"><div class="ent-card cores-pick-card"><div class="cores-pick-head"><b></b><button type="button" class="mtb-toast-x" data-cores-pick-close>\u00d7</button></div><div class="cores-pick-list"></div><div class="cores-pick-foot"><span class="cores-pick-count" data-cores-pick-count></span><button type="button" class="quantum-btn quantum-btn-primary" data-cores-pick-go>' + esc(tr('', 'Install')) + '</button><button type="button" class="quantum-btn quantum-btn-secondary" data-cores-pick-close>' + esc(tr('', 'Cancel')) + '</button></div></div></div>';
     document.body.appendChild(ov);
   }
   ov.querySelector('.cores-pick-head b').textContent = disp + ' — ' + tr('', 'Manage installation');
