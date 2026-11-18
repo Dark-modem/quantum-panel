@@ -647,16 +647,12 @@ function topologyGraph(topo, tunnels) {
         `</svg>`;
     }
     const rowYs = [y + 57, y + 80, y + 103];
-    // the server stack icon, the owner's zoomed mockup: three solid disks
-    // with twin LEDs, filling the rows' exact current height
-    const gTop = y + 54, gW = 22, barH = 20, gap = 4;
+    // ONE three-tier tower icon: a single solid rounded body spanning the
+    // info rows, the tiers hinted by two soft lines — the rows sit beside it
+    const gTop = y + 54, gH = 68, gW = 22;
     const stack = `<g class="topo-n-stack" transform="translate(${m ? x + w - 12 - gW : x + 14},0)">` +
-      [0, 1, 2].map(i => {
-        const by = gTop + i * (barH + gap);
-        return `<rect x="0" y="${by}" width="${gW}" height="${barH}" rx="5"/>` +
-          `<circle class="topo-n-stack-dot" cx="${gW - 5}" cy="${by + barH / 2}" r="1.8"/>` +
-          `<circle class="topo-n-stack-dot" cx="${gW - 10.5}" cy="${by + barH / 2}" r="1.8"/>`;
-      }).join('') +
+      `<rect x="0" y="${gTop}" width="${gW}" height="${gH}" rx="7"/>` +
+      `<path class="topo-n-stack-tiers" d="M2.5 ${gTop + 23}h${gW - 5}M2.5 ${gTop + 45}h${gW - 5}"/>` +
       `</g>`;
     return `<g class="cl-n ${side === 'iran' ? 'topo-node-iran' : 'topo-node-foreign'}" data-agview="${text(agRow ? agRow.id : '')}" data-server-name="${text(s.name || '')}" role="button" tabindex="0" aria-label="${text(title)} · ${text(info.ip)}"><title>${text(title)} · ${text(info.ip)}</title>` +
       `<rect class="cl-n-bg" x="${x}" y="${y}" width="${w}" height="${NH}" rx="12"/>` +
