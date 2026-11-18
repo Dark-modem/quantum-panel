@@ -653,12 +653,13 @@ function topologyGraph(topo, tunnels) {
         `</svg>`;
     }
     const rowYs = [y + 57, y + 80, y + 103];
-    // ONE three-tier tower icon: a single solid rounded body spanning the
-    // info rows, the tiers hinted by two soft lines — the rows sit beside it
-    const gTop = y + 54, gH = 68, gW = 22;
+    // the three-disk tower: one body spanning the rows, cut by two dark
+    // seams so it reads as three stacked disks, an LED on every disk
+    const gTop = y + 54, gH = 68, gW = 22, unit = gH / 3;
     const stack = `<g class="topo-n-stack" transform="translate(${m ? x + w - 12 - gW : x + 14},0)">` +
       `<rect x="0" y="${gTop}" width="${gW}" height="${gH}" rx="7"/>` +
-      `<path class="topo-n-stack-tiers" d="M2.5 ${gTop + 23}h${gW - 5}M2.5 ${gTop + 45}h${gW - 5}"/>` +
+      [1, 2].map(i => `<path class="topo-n-stack-seam" d="M0.8 ${gTop + i * unit}h${gW - 1.6}"/>`).join('') +
+      [0, 1, 2].map(i => `<circle class="topo-n-stack-led" cx="${gW / 2}" cy="${gTop + i * unit + unit / 2}" r="2.2"/>`).join('') +
       `</g>`;
     return `<g class="cl-n ${side === 'iran' ? 'topo-node-iran' : 'topo-node-foreign'}" data-agview="${text(agRow ? agRow.id : '')}" data-server-name="${text(s.name || '')}" role="button" tabindex="0" aria-label="${text(title)} · ${text(info.ip)}"><title>${text(title)} · ${text(info.ip)}</title>` +
       `<rect class="cl-n-bg" x="${x}" y="${y}" width="${w}" height="${NH}" rx="12"/>` +
