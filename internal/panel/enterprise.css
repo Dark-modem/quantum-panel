@@ -1575,6 +1575,9 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 .topo-cell-no { color:var(--mu); font-variant-numeric:tabular-nums; font-size:var(--fs-caption); }
 .topo-list-foot { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 18px; border-top:1px solid var(--ln); color:var(--mu); font-size:var(--fs-caption); }
 .topo-list-foot-note { color:var(--mu); }
+/* the agents-style pager fills the foot: the size dropdown pinned to the
+   left end, the page nav to the right end */
+#topoPager { display:flex; align-items:center; gap:10px; flex:1 1 auto; min-width:0; justify-content:space-between; }
 
 /* The index is a desktop reading aid: cards carry the name instead. */
 @media(max-width:799px){ .topo-list-row .topo-cell-no { display:none !important; } }
