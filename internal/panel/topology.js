@@ -761,8 +761,11 @@ function renderTopoMembers(topo) {
 function topoMembersPickOpen(side) {
   const topo = topologyCurrent();
   if (!topo) return;
-  const ags = (window.__topoAgents || []).filter(a => a.role === side && !(a.topologies || []).includes(topo.name));
+  // 'both' lists every agent that is not a member yet, whatever its side —
+  // the enrollment endpoint derives the side from the agent itself
+  const ags = (window.__topoAgents || []).filter(a => !(a.topologies || []).includes(topo.name) && (side === 'both' || a.role === side));
   const rows = ags.length ? ags.map(a => '<label class="cores-pick-row"><input type="checkbox" value="' + esc(a.id) + '"><b>' + esc(a.name) + '</b>' +
+    '<span class="cores-pick-state">' + esc(a.role === 'iran' ? tr('', 'Iran side') : tr('', 'Foreign side')) + '</span>' +
     (a.server && a.server.datacenter ? '<span class="cores-pick-state">' + esc(topoIsFa() ? (a.server.datacenter || '') : (a.server.datacenter_en || a.server.datacenter || '')) + '</span>' : '') + '</label>').join('')
     : '<div class="ent-empty"><b>' + esc(tr('', 'No agents on this side yet')) + '</b></div>';
   let ov = document.getElementById('topoMemPick');
@@ -776,7 +779,7 @@ function topoMembersPickOpen(side) {
     document.body.appendChild(ov);
   }
   ov.dataset.memSide = side;
-  ov.querySelector('.cores-pick-head b').textContent = (side === 'iran' ? tr('', 'Iran side') : tr('', 'Foreign side')) + ' \\u2014 ' + tr('', 'Add agent');
+  ov.querySelector('.cores-pick-head b').textContent = (side === 'both' ? tr('', 'Add agent') : (side === 'iran' ? tr('', 'Iran side') : tr('', 'Foreign side')) + ' \\u2014 ' + tr('', 'Add agent'));
   ov.querySelector('.cores-pick-list').innerHTML = rows;
   ov.hidden = false;
 }
@@ -2088,6 +2091,7 @@ $('topologyDeleteBtn').onclick = () => { const t = topologyCurrent(); if (t) top
 $('topologySetupBack').onclick = topologyResume;
 $('tunnelsAddBtn').onclick = topologyNewTunnel;
 $('topologyAddTunnelBtn').onclick = topologyNewTunnel;
+$('topoMapAddAgentBtn').onclick = () => topoMembersPickOpen('both');
 // The live map: a hover tooltip with the tunnel's real facts, and the
 // inline add-tunnel button for the no-tunnel state.
 (function () {
