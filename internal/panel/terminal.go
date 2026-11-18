@@ -76,34 +76,43 @@ type termSess struct {
 
 var termCur *termSess
 
-var termUpgrader = websocket.Upgrader{
-	ReadBufferSize:  4096,
-	WriteBufferSize: 32768,
-	CheckOrigin: func(r *http.Request) bool {
-		origin := r.Header.Get("Origin")
-		if origin == "" {
-			return true // non-browser client
-		}
-		origHost := CleanHost(origin)
-		reqHost := CleanHost(r.Host)
-		if origHost != "" && strings.EqualFold(origHost, reqHost) {
-			return true
-		}
-		// If behind a trusted reverse proxy, also accept X-Forwarded-Host
-		directHost, _, err := net.SplitHostPort(r.RemoteAddr)
-		if err != nil {
-			directHost = strings.Trim(r.RemoteAddr, "[]")
-		}
-		if IsTrustedProxy(directHost) {
-			if xfh := r.Header.Get("X-Forwarded-Host"); xfh != "" {
-				firstXFH := CleanHost(strings.TrimSpace(strings.Split(xfh, ",")[0]))
-				if firstXFH != "" && strings.EqualFold(origHost, firstXFH) {
-					return true
-				}
+// termUpgrader derives from the shared wsUpgrader (wsupgrade.go) with a
+// bigger write buffer (the PTY bursts) and the terminal's own
+// proxy-aware origin policy.
+var termUpgrader = func() websocket.Upgrader {
+	u := wsUpgrader
+	u.WriteBufferSize = 32768
+	u.CheckOrigin = termCheckOrigin
+	return u
+}()
+
+// termCheckOrigin extends the shared non-browser rule with the
+// reverse-proxy path: behind a trusted proxy the browser origin arrives
+// via X-Forwarded-Host and the direct Host is the proxy's.
+func termCheckOrigin(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return true // non-browser client
+	}
+	origHost := CleanHost(origin)
+	reqHost := CleanHost(r.Host)
+	if origHost != "" && strings.EqualFold(origHost, reqHost) {
+		return true
+	}
+	// If behind a trusted reverse proxy, also accept X-Forwarded-Host
+	directHost, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		directHost = strings.Trim(r.RemoteAddr, "[]")
+	}
+	if IsTrustedProxy(directHost) {
+		if xfh := r.Header.Get("X-Forwarded-Host"); xfh != "" {
+			firstXFH := CleanHost(strings.TrimSpace(strings.Split(xfh, ",")[0]))
+			if firstXFH != "" && strings.EqualFold(origHost, firstXFH) {
+				return true
 			}
 		}
-		return false
-	},
+	}
+	return false
 }
 
 func termSessID() string {

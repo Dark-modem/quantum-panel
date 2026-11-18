@@ -1,13 +1,15 @@
 package panel
 
 // topology_identity.go — phase 31 (UI-API-REQUESTS §10, contract §2.19):
-// per-side server/datacenter identity for the legacy /api/topologies
-// payload (§10.2), the per-tunnel weight + today-traffic enrichment
-// (§10.1) and the one-DC-per-side invariant check for the manual attach
-// path (§10.3). All read-only over the mesh store, the cluster config
-// and the usage ledger: an unreadable store degrades to empty identities
-// and a vacuously-true invariant, never a failed payload or a blocked
-// attach — the backend only enforces what it can resolve.
+// the one-DC-per-side invariant check for the manual attach path (§10.3),
+// the per-tunnel weight + today-traffic enrichment (§10.1) and the
+// enriched legacy /api/topologies payload assembly. The per-side identity
+// RESOLUTION it used to carry moved to uirows.go (REFACTOR-S2) as the
+// shared side-identity resolver; this file keeps the §2.19 walk helpers
+// and the DC invariant. All read-only over the mesh store, the cluster
+// config and the usage ledger: an unreadable store degrades to empty
+// identities and a vacuously-true invariant, never a failed payload or a
+// blocked attach — the backend only enforces what it can resolve.
 import (
 	"encoding/json"
 	"fmt"
@@ -17,107 +19,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/Dark-modem/quantum-panel/internal/store"
 )
-
-// topologySideServer is one matched mesh server of a topology side.
-type topologySideServer struct {
-	Name         string `json:"name"`
-	Datacenter   string `json:"datacenter"`
-	DatacenterEN string `json:"datacenter_en"`
-	CC           string `json:"cc"`
-	IP           string `json:"ip"`
-}
-
-// topologySideInfo is the per-side identity block of a topology row
-// (contract §2.19). Empty strings + an empty servers list mean "nothing
-// resolved" — honest absence the UI already renders as country labels.
-type topologySideInfo struct {
-	ServerName   string               `json:"server_name"`
-	Datacenter   string               `json:"datacenter"`
-	DatacenterEN string               `json:"datacenter_en"`
-	CC           string               `json:"cc"`
-	Servers      []topologySideServer `json:"servers"`
-}
-
-// topologyIdentityView carries the mesh-store rows the resolution reads,
-// loaded ONCE per payload so N topologies cost three queries, not 3N.
-type topologyIdentityView struct {
-	servers    []store.Server
-	dcs        map[int64]store.Datacenter
-	serverByID map[int64]store.Server
-	// agentIP maps a linked agent's reported public IP to its server id.
-	agentIP map[string]int64
-}
-
-// meshStorePeek returns the OPEN mesh store WITHOUT opening one. The
-// legacy topology handlers must not create quantum.db as a side effect
-// (their file-purity contract: the metadata surface writes only
-// topologies.json), and a panel that never used the mesh API has no store
-// to resolve from — identity stays empty and the invariant passes until
-// the store exists.
-func meshStorePeek() *store.Store {
-	meshStoreMu.Lock()
-	defer meshStoreMu.Unlock()
-	return meshStore
-}
-
-// loadTopologyIdentityView reads the mesh store once (via peek: an
-// already-open store only). Any failure keeps the view empty: identity
-// fields stay empty and the invariant passes.
-func loadTopologyIdentityView() *topologyIdentityView {
-	v := &topologyIdentityView{
-		dcs:        map[int64]store.Datacenter{},
-		serverByID: map[int64]store.Server{},
-		agentIP:    map[string]int64{},
-	}
-	s := meshStorePeek()
-	if s == nil {
-		return v
-	}
-	servers, err := s.ListServers()
-	if err != nil {
-		return v
-	}
-	v.servers = servers
-	for _, sv := range servers {
-		v.serverByID[sv.ID] = sv
-		if sv.DatacenterID != 0 {
-			if dc, err := s.GetDatacenter(sv.DatacenterID); err == nil {
-				v.dcs[sv.DatacenterID] = dc
-			}
-		}
-	}
-	agents, err := s.ListAgents()
-	if err != nil {
-		return v
-	}
-	for _, a := range agents {
-		if a.ServerID == 0 || a.PublicIP == "" {
-			continue
-		}
-		if ip := net.ParseIP(strings.TrimSpace(a.PublicIP)); ip != nil {
-			v.agentIP[ip.String()] = a.ServerID
-		}
-	}
-	return v
-}
-
-// serverForIP resolves one endpoint IP to a mesh server id: the server's
-// own address first, then the linked agents' reported public IP. 0 = no
-// match (the endpoint stays unchecked/anonymous).
-func (v *topologyIdentityView) serverForIP(ipStr string) int64 {
-	if v == nil {
-		return 0
-	}
-	for _, sv := range v.servers {
-		if ip := net.ParseIP(strings.TrimSpace(sv.Address)); ip != nil && ip.String() == ipStr {
-			return sv.ID
-		}
-	}
-	return v.agentIP[ipStr]
-}
 
 // topologyTunnelEnds returns the distinct normalized endpoint IPs of one
 // inventory tunnel: its local end (this host) and its remote end(s).
@@ -136,55 +38,6 @@ func topologyTunnelByID(inventory []topologyTunnel) map[string]topologyTunnel {
 		byID[t.ID] = t
 	}
 	return byID
-}
-
-// topologySideIdentity resolves a topology's per-side identity: every
-// attached tunnel endpoint IP is matched against the mesh store and the
-// matched server's ROLE decides the side bucket (iran/foreign) — a
-// server's role is authoritative, so the topology's own declared role
-// cannot cross-contaminate the sides. The first matched server per side
-// (tunnel_ids order) fills the summary fields; servers[] lists every
-// distinct match.
-func topologySideIdentity(t Topology, inventory []topologyTunnel, v *topologyIdentityView) (topologySideInfo, topologySideInfo) {
-	iran := topologySideInfo{CC: "IR", Servers: []topologySideServer{}}
-	foreign := topologySideInfo{CC: strings.ToUpper(strings.TrimSpace(t.Country)), Servers: []topologySideServer{}}
-	if v == nil || len(v.servers) == 0 {
-		return iran, foreign
-	}
-	byID := topologyTunnelByID(inventory)
-	seen := map[int64]bool{}
-	for _, id := range t.TunnelIDs {
-		tt, ok := byID[id]
-		if !ok {
-			continue
-		}
-		local, remote := topologyTunnelEnds(tt)
-		for _, ipStr := range append(append([]string{}, local...), remote...) {
-			sid := v.serverForIP(ipStr)
-			if sid == 0 || seen[sid] {
-				continue
-			}
-			sv := v.serverByID[sid]
-			side := &foreign
-			if sv.Role == "iran" {
-				side = &iran
-			}
-			seen[sid] = true
-			entry := topologySideServer{Name: sv.Name, IP: ipStr, CC: side.CC}
-			if dc, ok := v.dcs[sv.DatacenterID]; ok {
-				entry.Datacenter, entry.DatacenterEN = dc.Name, dc.DatacenterEN
-			}
-			side.Servers = append(side.Servers, entry)
-		}
-	}
-	for _, side := range []*topologySideInfo{&iran, &foreign} {
-		if len(side.Servers) > 0 {
-			side.ServerName = side.Servers[0].Name
-			side.Datacenter = side.Servers[0].Datacenter
-			side.DatacenterEN = side.Servers[0].DatacenterEN
-		}
-	}
-	return iran, foreign
 }
 
 // topologyDCIssue names one side's datacenter mix for the structured

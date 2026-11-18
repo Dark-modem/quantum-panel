@@ -156,14 +156,7 @@ func handleUIAgentDetail(w http.ResponseWriter, r *http.Request) {
 	tunRows := []map[string]any{}
 	// serverID -> agent country (the servers table carries no country; the
 	// agent enrolled against it does) — feeds the destination flag cell.
-	tnCountry := map[int64]string{}
-	if ags, aerr := h.ListAgents(); aerr == nil {
-		for _, a2 := range ags {
-			if a2.ServerID != 0 {
-				tnCountry[a2.ServerID] = a2.Country
-			}
-		}
-	}
+	tnCountry := h.uiAgentCountries()
 	if ag.ServerID != 0 {
 		if allTopos, err := h.ListTopologies(); err == nil {
 			verdicts := uiVerdictsFn()
@@ -179,12 +172,7 @@ func handleUIAgentDetail(w http.ResponseWriter, r *http.Request) {
 					if tn.LocalServerID != ag.ServerID && tn.RemoteServerID != ag.ServerID {
 						continue
 					}
-					state := "unknown"
-					if !tn.Enabled {
-						state = "disabled"
-					} else if v, ok := verdicts[tn.TunnelKey]; ok {
-						state = v
-					}
+					state := uiTunnelVerdict(tn, verdicts)
 					usage, _, uerr := h.RangeUsageDetailed([]int64{tn.ID}, now-now%86400, now)
 					var todayBytes uint64
 					if uerr == nil {
@@ -269,14 +257,7 @@ func (h uiStoreHandle) uiAgentTopologies(s *store.Store, ag store.Agent, withTun
 	now := timeNowUnix()
 	// serverID → agent country (the servers table carries no country; the
 	// agent enrolled against it does). Feeds the per-side diagram summary.
-	agentCountry := map[int64]string{}
-	if ags, aerr := h.ListAgents(); aerr == nil {
-		for _, a2 := range ags {
-			if a2.ServerID != 0 {
-				agentCountry[a2.ServerID] = a2.Country
-			}
-		}
-	}
+	agentCountry := h.uiAgentCountries()
 	for _, topoID := range members {
 		topo, err := h.GetTopology(topoID)
 		if err != nil {
