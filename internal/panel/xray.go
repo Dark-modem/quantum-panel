@@ -916,6 +916,12 @@ func xrayDraft(req xrayPostRequest, base XrayLink) (XrayLink, error) {
 	return newXrayLink(l)
 }
 
+// handleXrayPost routes the xray link API. S4: the prologue (decode, the
+// two lock-free quick actions, the state lock + public-IP fixup) and the
+// four state-capturing closures (others/find/taken/up) stay here verbatim;
+// each switch-case body moved verbatim into its xrayAct* function below.
+// st rides as *xrayState so a case's mutations stay visible to the closures
+// capturing the same local (the closures' bodies are untouched).
 func handleXrayPost(w http.ResponseWriter, r *http.Request) {
 	var req xrayPostRequest
 	if err := json.NewDecoder(io.LimitReader(r.Body, 128<<10)).Decode(&req); err != nil {
@@ -996,157 +1002,190 @@ func handleXrayPost(w http.ResponseWriter, r *http.Request) {
 
 	switch action {
 	case "check":
-		// The wizard's live check: taken ports and a free tunnel port.
-		l, err := xrayDraft(req, XrayLink{ID: req.ID})
-		if err != nil {
-			writeAPIError(w, r, "E-XRAY-01", err.Error())
-			return
-		}
-		ls := xrayListeners()
-		cs := xrayPortConflicts(l, others(req.ID), ls, xrayClaimedPorts(l))
-		resp := map[string]any{"status": "ok", "conflicts": cs, "valid": ""}
-		if err := l.validate(); err != nil {
-			resp["valid"] = err.Error()
-		}
-		if p := xraySuggestPort("tcp", ls, l.Ports); p > 0 {
-			resp["suggest_tunnel_port"] = p
-		}
-		writeJSON(w, resp)
-
+		xrayActCheck(w, r, req, others)
 	case "create":
-		l, err := xrayDraft(req, XrayLink{})
-		if err == nil {
-			l.ProbePort = xrayFreeLoopbackPort(append(append([]int{l.TunnelPort}, l.Ports...), xrayUsedProbePorts(st)...))
-			err = l.validate()
-		}
-		if err != nil {
-			writeAPIError(w, r, "E-XRAY-01", err.Error())
-			return
-		}
-		if taken(l) {
-			return
-		}
-		bundle, err := makeXrayBundle(l, iranIP)
-		if err != nil {
-			writeAPIError(w, r, "E-XRAY-01", err.Error())
-			return
-		}
-		l = st.add(l)
-		if err := saveXrayState(st); err != nil {
-			writeAPIError(w, r, "E-XRAY-01", err.Error())
-			return
-		}
-		up(len(st.Links)-1, map[string]any{"bundle": bundle})
-
+		xrayActCreate(w, r, req, &st, iranIP, taken, up)
 	case "update":
-		i, ok := find()
-		if !ok {
-			return
-		}
-		old := st.Links[i]
-		if old.Side != xraySideIran {
-			writeAPIError(w, r, "E-XRAY-01", "this link is set up on the Iran server: change it there and import its new bundle here")
-			return
-		}
-		l, err := xrayDraft(req, old)
-		if err == nil {
-			xrayMoveProbe(&l, st, xrayListeners())
-			err = l.validate()
-		}
-		if err != nil {
-			writeAPIError(w, r, "E-XRAY-01", err.Error())
-			return
-		}
-		if taken(l) {
-			return
-		}
-		before, _ := makeXrayBundle(old, iranIP)
-		bundle, err := makeXrayBundle(l, iranIP)
-		if err != nil {
-			writeAPIError(w, r, "E-XRAY-01", err.Error())
-			return
-		}
-		l.Disabled = false
-		st.Links[i] = l
-		if err := saveXrayState(st); err != nil {
-			writeAPIError(w, r, "E-XRAY-01", err.Error())
-			return
-		}
-		up(i, map[string]any{"bundle": bundle, "bundle_changed": bundle != before})
-
+		xrayActUpdate(w, r, req, &st, iranIP, find, taken, up)
 	case "bundle":
-		i, ok := find()
-		if !ok {
-			return
-		}
-		if st.Links[i].Side != xraySideIran {
-			writeAPIError(w, r, "E-XRAY-01", "the bundle is made on the Iran server")
-			return
-		}
-		bundle, err := makeXrayBundle(st.Links[i], iranIP)
-		if err != nil {
-			writeAPIError(w, r, "E-XRAY-01", err.Error())
-			return
-		}
-		_ = saveXrayState(st) // keeps a public IP the request set
-		writeJSON(w, map[string]any{"status": "ok", "bundle": bundle})
-
+		xrayActBundle(w, r, &st, iranIP, find)
 	case "import":
-		b, err := parseXrayBundle(req.Bundle)
-		if err != nil {
-			writeAPIError(w, r, "E-XRAY-01", err.Error())
-			return
-		}
-		b.Name = strings.TrimSpace(req.Name)
-		if i := xrayIndexByUUID(st, b.Keys.UUID); i >= 0 {
-			b.ID = st.Links[i].ID // its own ports are not a conflict
-		}
-		if taken(b) {
-			return
-		}
-		l, updated := importXrayLink(&st, b)
-		if err := saveXrayState(st); err != nil {
-			writeAPIError(w, r, "E-XRAY-01", err.Error())
-			return
-		}
-		up(st.index(l.ID), map[string]any{"updated": updated})
-
+		xrayActImport(w, r, req, &st, taken, up)
 	case "apply", "start":
-		i, ok := find()
-		if !ok {
-			return
-		}
-		st.Links[i].Disabled = false
-		_ = saveXrayState(st)
-		up(i, nil)
-
+		xrayActApply(w, r, &st, find, up)
 	case "stop":
-		i, ok := find()
-		if !ok {
-			return
-		}
-		stopXrayLink(st.Links[i].ID, false)
-		st.Links[i].Disabled = true
-		_ = saveXrayState(st)
-		writeJSON(w, map[string]any{"status": "ok"})
-
+		xrayActStop(w, r, &st, find)
 	case "remove":
-		i, ok := find()
-		if !ok {
-			return
-		}
-		id := st.Links[i].ID
-		stopXrayLink(id, true)
-		st.Links = append(st.Links[:i], st.Links[i+1:]...)
-		_ = saveXrayState(st)
-		// The link is deleted: its recorded traffic must not survive as an
-		// unassigned or stale row anywhere.
-		purgeTunnelUsage("xray:" + strconv.Itoa(id))
-		writeJSON(w, map[string]any{"status": "ok"})
-
+		xrayActRemove(w, r, &st, find)
 	default:
 		writeAPIError(w, r, "E-ACTION-01", "unknown action: want check, create, update, bundle, import, apply, stop, remove, install or snitest")
 	}
+}
+
+// xrayActCheck implements the check action — the wizard's live check:
+// taken ports and a free tunnel port (S4 extract, body verbatim).
+func xrayActCheck(w http.ResponseWriter, r *http.Request, req xrayPostRequest, others func(int) []XrayLink) {
+	l, err := xrayDraft(req, XrayLink{ID: req.ID})
+	if err != nil {
+		writeAPIError(w, r, "E-XRAY-01", err.Error())
+		return
+	}
+	ls := xrayListeners()
+	cs := xrayPortConflicts(l, others(req.ID), ls, xrayClaimedPorts(l))
+	resp := map[string]any{"status": "ok", "conflicts": cs, "valid": ""}
+	if err := l.validate(); err != nil {
+		resp["valid"] = err.Error()
+	}
+	if p := xraySuggestPort("tcp", ls, l.Ports); p > 0 {
+		resp["suggest_tunnel_port"] = p
+	}
+	writeJSON(w, resp)
+}
+
+// xrayActCreate implements the create action (S4 extract, body verbatim;
+// st is the caller's locked state, mutated in place as before).
+func xrayActCreate(w http.ResponseWriter, r *http.Request, req xrayPostRequest, st *xrayState, iranIP string, taken func(XrayLink) bool, up func(int, map[string]any)) {
+	l, err := xrayDraft(req, XrayLink{})
+	if err == nil {
+		l.ProbePort = xrayFreeLoopbackPort(append(append([]int{l.TunnelPort}, l.Ports...), xrayUsedProbePorts(*st)...))
+		err = l.validate()
+	}
+	if err != nil {
+		writeAPIError(w, r, "E-XRAY-01", err.Error())
+		return
+	}
+	if taken(l) {
+		return
+	}
+	bundle, err := makeXrayBundle(l, iranIP)
+	if err != nil {
+		writeAPIError(w, r, "E-XRAY-01", err.Error())
+		return
+	}
+	l = st.add(l)
+	if err := saveXrayState(*st); err != nil {
+		writeAPIError(w, r, "E-XRAY-01", err.Error())
+		return
+	}
+	up(len(st.Links)-1, map[string]any{"bundle": bundle})
+}
+
+// xrayActUpdate implements the update action (S4 extract, body verbatim).
+func xrayActUpdate(w http.ResponseWriter, r *http.Request, req xrayPostRequest, st *xrayState, iranIP string, find func() (int, bool), taken func(XrayLink) bool, up func(int, map[string]any)) {
+	i, ok := find()
+	if !ok {
+		return
+	}
+	old := st.Links[i]
+	if old.Side != xraySideIran {
+		writeAPIError(w, r, "E-XRAY-01", "this link is set up on the Iran server: change it there and import its new bundle here")
+		return
+	}
+	l, err := xrayDraft(req, old)
+	if err == nil {
+		xrayMoveProbe(&l, *st, xrayListeners())
+		err = l.validate()
+	}
+	if err != nil {
+		writeAPIError(w, r, "E-XRAY-01", err.Error())
+		return
+	}
+	if taken(l) {
+		return
+	}
+	before, _ := makeXrayBundle(old, iranIP)
+	bundle, err := makeXrayBundle(l, iranIP)
+	if err != nil {
+		writeAPIError(w, r, "E-XRAY-01", err.Error())
+		return
+	}
+	l.Disabled = false
+	st.Links[i] = l
+	if err := saveXrayState(*st); err != nil {
+		writeAPIError(w, r, "E-XRAY-01", err.Error())
+		return
+	}
+	up(i, map[string]any{"bundle": bundle, "bundle_changed": bundle != before})
+}
+
+// xrayActBundle implements the bundle action (S4 extract, body verbatim).
+func xrayActBundle(w http.ResponseWriter, r *http.Request, st *xrayState, iranIP string, find func() (int, bool)) {
+	i, ok := find()
+	if !ok {
+		return
+	}
+	if st.Links[i].Side != xraySideIran {
+		writeAPIError(w, r, "E-XRAY-01", "the bundle is made on the Iran server")
+		return
+	}
+	bundle, err := makeXrayBundle(st.Links[i], iranIP)
+	if err != nil {
+		writeAPIError(w, r, "E-XRAY-01", err.Error())
+		return
+	}
+	_ = saveXrayState(*st) // keeps a public IP the request set
+	writeJSON(w, map[string]any{"status": "ok", "bundle": bundle})
+}
+
+// xrayActImport implements the import action (S4 extract, body verbatim).
+func xrayActImport(w http.ResponseWriter, r *http.Request, req xrayPostRequest, st *xrayState, taken func(XrayLink) bool, up func(int, map[string]any)) {
+	b, err := parseXrayBundle(req.Bundle)
+	if err != nil {
+		writeAPIError(w, r, "E-XRAY-01", err.Error())
+		return
+	}
+	b.Name = strings.TrimSpace(req.Name)
+	if i := xrayIndexByUUID(*st, b.Keys.UUID); i >= 0 {
+		b.ID = st.Links[i].ID // its own ports are not a conflict
+	}
+	if taken(b) {
+		return
+	}
+	l, updated := importXrayLink(st, b)
+	if err := saveXrayState(*st); err != nil {
+		writeAPIError(w, r, "E-XRAY-01", err.Error())
+		return
+	}
+	up(st.index(l.ID), map[string]any{"updated": updated})
+}
+
+// xrayActApply implements the apply/start action (S4 extract, body verbatim).
+func xrayActApply(w http.ResponseWriter, r *http.Request, st *xrayState, find func() (int, bool), up func(int, map[string]any)) {
+	i, ok := find()
+	if !ok {
+		return
+	}
+	st.Links[i].Disabled = false
+	_ = saveXrayState(*st)
+	up(i, nil)
+}
+
+// xrayActStop implements the stop action (S4 extract, body verbatim).
+func xrayActStop(w http.ResponseWriter, r *http.Request, st *xrayState, find func() (int, bool)) {
+	i, ok := find()
+	if !ok {
+		return
+	}
+	stopXrayLink(st.Links[i].ID, false)
+	st.Links[i].Disabled = true
+	_ = saveXrayState(*st)
+	writeJSON(w, map[string]any{"status": "ok"})
+}
+
+// xrayActRemove implements the remove action (S4 extract, body verbatim).
+func xrayActRemove(w http.ResponseWriter, r *http.Request, st *xrayState, find func() (int, bool)) {
+	i, ok := find()
+	if !ok {
+		return
+	}
+	id := st.Links[i].ID
+	stopXrayLink(id, true)
+	st.Links = append(st.Links[:i], st.Links[i+1:]...)
+	_ = saveXrayState(*st)
+	// The link is deleted: its recorded traffic must not survive as an
+	// unassigned or stale row anywhere.
+	purgeTunnelUsage("xray:" + strconv.Itoa(id))
+	writeJSON(w, map[string]any{"status": "ok"})
 }
 
 func xrayUsedProbePorts(st xrayState) []int {
