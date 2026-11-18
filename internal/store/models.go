@@ -427,11 +427,8 @@ func (s *Store) EngineOverheadRatioTx(engine string) (float64, error) {
 // a datacenter+engine; 0 when the overhead is unknown (the caller shows
 // UNKNOWN rather than inventing a number).
 func (s *Store) SuggestedCoefficient(datacenterID int64, engine string) (float64, error) {
-	var price float64
-	err := s.db.QueryRow(`SELECT price_coefficient FROM datacenters WHERE id = ?`, datacenterID).Scan(&price)
-	if errors.Is(err, sql.ErrNoRows) {
-		return 0, ErrNotFound
-	}
+	price, err := scanOne(s, `SELECT price_coefficient FROM datacenters WHERE id = ?`,
+		func(p *float64) []any { return []any{p} }, datacenterID)
 	if err != nil {
 		return 0, err
 	}
