@@ -278,30 +278,18 @@ func (s *Store) lookupID(query string, args ...any) (int64, error) {
 
 // GetTunnelByKey returns the tunnel with that key.
 func (s *Store) GetTunnelByKey(key string) (Tunnel, error) {
-	row := s.db.QueryRow(`SELECT id, tunnel_key, topology_id, local_server_id, remote_server_id, engine, engine_params, enabled, created_at
-		FROM tunnels WHERE tunnel_key = ?`, key)
-	var t Tunnel
-	err := row.Scan(&t.ID, &t.TunnelKey, &t.TopologyID, &t.LocalServerID, &t.RemoteServerID, &t.Engine, &t.EngineParams, &t.Enabled, &t.CreatedAt)
-	return t, wrapNotFound(err)
+	return scanOne(s, `SELECT id, tunnel_key, topology_id, local_server_id, remote_server_id, engine, engine_params, enabled, created_at
+		FROM tunnels WHERE tunnel_key = ?`, func(t *Tunnel) []any {
+		return []any{&t.ID, &t.TunnelKey, &t.TopologyID, &t.LocalServerID, &t.RemoteServerID, &t.Engine, &t.EngineParams, &t.Enabled, &t.CreatedAt}
+	}, key)
 }
 
 // ListTunnels lists the tunnels of one topology.
 func (s *Store) ListTunnels(topologyID int64) ([]Tunnel, error) {
-	rows, err := s.db.Query(`SELECT id, tunnel_key, topology_id, local_server_id, remote_server_id, engine, engine_params, enabled, created_at
-		FROM tunnels WHERE topology_id = ? ORDER BY tunnel_key`, topologyID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []Tunnel
-	for rows.Next() {
-		var t Tunnel
-		if err := rows.Scan(&t.ID, &t.TunnelKey, &t.TopologyID, &t.LocalServerID, &t.RemoteServerID, &t.Engine, &t.EngineParams, &t.Enabled, &t.CreatedAt); err != nil {
-			return nil, err
-		}
-		out = append(out, t)
-	}
-	return out, rows.Err()
+	return scanList(s, `SELECT id, tunnel_key, topology_id, local_server_id, remote_server_id, engine, engine_params, enabled, created_at
+		FROM tunnels WHERE topology_id = ? ORDER BY tunnel_key`, func(t *Tunnel) []any {
+		return []any{&t.ID, &t.TunnelKey, &t.TopologyID, &t.LocalServerID, &t.RemoteServerID, &t.Engine, &t.EngineParams, &t.Enabled, &t.CreatedAt}
+	}, topologyID)
 }
 
 // --- weight policies ---

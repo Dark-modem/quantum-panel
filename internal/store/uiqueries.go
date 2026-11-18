@@ -221,21 +221,10 @@ func (s *Store) TunnelEvents(tunnelID int64, limit int) ([]TunnelEvent, error) {
 	if limit <= 0 || limit > 200 {
 		limit = 50
 	}
-	rows, err := s.db.Query(`SELECT id, tunnel_id, at, kind, from_state, to_state, code, text
-		FROM tunnel_events WHERE tunnel_id=? ORDER BY at DESC, id DESC LIMIT ?`, tunnelID, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []TunnelEvent
-	for rows.Next() {
-		var e TunnelEvent
-		if err := rows.Scan(&e.ID, &e.TunnelID, &e.At, &e.Kind, &e.FromState, &e.ToState, &e.Code, &e.Text); err != nil {
-			return nil, err
-		}
-		out = append(out, e)
-	}
-	return out, rows.Err()
+	return scanList(s, `SELECT id, tunnel_id, at, kind, from_state, to_state, code, text
+		FROM tunnel_events WHERE tunnel_id=? ORDER BY at DESC, id DESC LIMIT ?`, func(e *TunnelEvent) []any {
+		return []any{&e.ID, &e.TunnelID, &e.At, &e.Kind, &e.FromState, &e.ToState, &e.Code, &e.Text}
+	}, tunnelID, limit)
 }
 
 // PruneTunnelEvents drops events older than `before` (called next to the
@@ -551,22 +540,11 @@ func (s *Store) RangeUsageByDatacenter(from, to int64) ([]DatacenterUsage, error
 
 // ListAllTunnels returns every tunnel regardless of topology.
 func (s *Store) ListAllTunnels() ([]Tunnel, error) {
-	rows, err := s.db.Query(`SELECT id, tunnel_key, topology_id, local_server_id, remote_server_id,
-		engine, engine_params, enabled, created_at FROM tunnels ORDER BY id`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []Tunnel
-	for rows.Next() {
-		var t Tunnel
-		if err := rows.Scan(&t.ID, &t.TunnelKey, &t.TopologyID, &t.LocalServerID, &t.RemoteServerID,
-			&t.Engine, &t.EngineParams, &t.Enabled, &t.CreatedAt); err != nil {
-			return nil, err
-		}
-		out = append(out, t)
-	}
-	return out, rows.Err()
+	return scanList(s, `SELECT id, tunnel_key, topology_id, local_server_id, remote_server_id,
+		engine, engine_params, enabled, created_at FROM tunnels ORDER BY id`, func(t *Tunnel) []any {
+		return []any{&t.ID, &t.TunnelKey, &t.TopologyID, &t.LocalServerID, &t.RemoteServerID,
+			&t.Engine, &t.EngineParams, &t.Enabled, &t.CreatedAt}
+	})
 }
 
 // RecentSamples returns the tunnel's last n raw readings, newest first
@@ -575,23 +553,12 @@ func (s *Store) RecentSamples(tunnelID int64, n int) ([]TrafficSample, error) {
 	if n <= 0 || n > 16 {
 		n = 2
 	}
-	rows, err := s.db.Query(`SELECT tunnel_id, at, wire_rx, wire_tx, payload_rx, payload_tx,
+	return scanList(s, `SELECT tunnel_id, at, wire_rx, wire_tx, payload_rx, payload_tx,
 		counters_known, agent_id, payload_known FROM traffic_samples
-		WHERE tunnel_id = ? ORDER BY at DESC LIMIT ?`, tunnelID, n)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []TrafficSample
-	for rows.Next() {
-		var t TrafficSample
-		if err := rows.Scan(&t.TunnelID, &t.At, &t.WireRx, &t.WireTx, &t.PayloadRx, &t.PayloadTx,
-			&t.CountersKnown, &t.AgentID, &t.PayloadKnown); err != nil {
-			return nil, err
-		}
-		out = append(out, t)
-	}
-	return out, rows.Err()
+		WHERE tunnel_id = ? ORDER BY at DESC LIMIT ?`, func(t *TrafficSample) []any {
+		return []any{&t.TunnelID, &t.At, &t.WireRx, &t.WireTx, &t.PayloadRx, &t.PayloadTx,
+			&t.CountersKnown, &t.AgentID, &t.PayloadKnown}
+	}, tunnelID, n)
 }
 
 // UsagePoint is one history bucket (deltas attributed to the bucket of
@@ -730,20 +697,8 @@ func (s *Store) UsageSeriesDetailed(tunnelID int64, from, to, bucketSec int64) (
 // TopologyMemberships returns the topologies whose membership includes
 // the server (the agent-detail "my topologies" list).
 func (s *Store) TopologyMemberships(serverID int64) ([]int64, error) {
-	rows, err := s.db.Query(`SELECT topology_id FROM topology_members WHERE server_id = ? ORDER BY topology_id`, serverID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []int64
-	for rows.Next() {
-		var id int64
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		out = append(out, id)
-	}
-	return out, rows.Err()
+	return scanList(s, `SELECT topology_id FROM topology_members WHERE server_id = ? ORDER BY topology_id`,
+		func(id *int64) []any { return []any{id} }, serverID)
 }
 
 // AgentByServer returns the agent linked to a server ("" when none).

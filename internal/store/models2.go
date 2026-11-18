@@ -12,7 +12,6 @@ package store
 import (
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math"
 	"strings"
@@ -191,18 +190,10 @@ func (s *Store) DeleteTopology(id int64) error {
 // ---- tunnels: get, update, delete ---------------------------------------
 
 func (s *Store) GetTunnel(id int64) (Tunnel, error) {
-	var t Tunnel
-	var params string
-	err := s.db.QueryRow(`SELECT id, tunnel_key, topology_id, local_server_id, remote_server_id, engine, engine_params, enabled, created_at FROM tunnels WHERE id = ?`, id).
-		Scan(&t.ID, &t.TunnelKey, &t.TopologyID, &t.LocalServerID, &t.RemoteServerID, &t.Engine, &params, &t.Enabled, &t.CreatedAt)
-	if errors.Is(err, sql.ErrNoRows) {
-		return t, ErrNotFound
-	}
-	if err != nil {
-		return t, err
-	}
-	t.EngineParams = params
-	return t, nil
+	return scanOne(s, `SELECT id, tunnel_key, topology_id, local_server_id, remote_server_id, engine, engine_params, enabled, created_at FROM tunnels WHERE id = ?`,
+		func(t *Tunnel) []any {
+			return []any{&t.ID, &t.TunnelKey, &t.TopologyID, &t.LocalServerID, &t.RemoteServerID, &t.Engine, &t.EngineParams, &t.Enabled, &t.CreatedAt}
+		}, id)
 }
 
 func (s *Store) UpdateTunnel(t Tunnel) error {
@@ -241,37 +232,18 @@ func (s *Store) DeleteTunnel(id int64) error {
 // TunnelsBetween lists the tunnels of one (local, remote) server pair
 // across every topology.
 func (s *Store) TunnelsBetween(localServerID, remoteServerID int64) ([]Tunnel, error) {
-	rows, err := s.db.Query(`SELECT id, tunnel_key, topology_id, local_server_id, remote_server_id, engine, engine_params, enabled, created_at
-		FROM tunnels WHERE local_server_id = ? AND remote_server_id = ? ORDER BY id`,
-		localServerID, remoteServerID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	return scanTunnels(rows)
+	return scanList(s, `SELECT id, tunnel_key, topology_id, local_server_id, remote_server_id, engine, engine_params, enabled, created_at
+		FROM tunnels WHERE local_server_id = ? AND remote_server_id = ? ORDER BY id`, func(t *Tunnel) []any {
+		return []any{&t.ID, &t.TunnelKey, &t.TopologyID, &t.LocalServerID, &t.RemoteServerID, &t.Engine, &t.EngineParams, &t.Enabled, &t.CreatedAt}
+	}, localServerID, remoteServerID)
 }
 
 // TunnelsForServer lists tunnels where the server is either end.
 func (s *Store) TunnelsForServer(serverID int64) ([]Tunnel, error) {
-	rows, err := s.db.Query(`SELECT id, tunnel_key, topology_id, local_server_id, remote_server_id, engine, engine_params, enabled, created_at
-		FROM tunnels WHERE local_server_id = ? OR remote_server_id = ? ORDER BY id`, serverID, serverID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	return scanTunnels(rows)
-}
-
-func scanTunnels(rows *sql.Rows) ([]Tunnel, error) {
-	var out []Tunnel
-	for rows.Next() {
-		var t Tunnel
-		if err := rows.Scan(&t.ID, &t.TunnelKey, &t.TopologyID, &t.LocalServerID, &t.RemoteServerID, &t.Engine, &t.EngineParams, &t.Enabled, &t.CreatedAt); err != nil {
-			return nil, err
-		}
-		out = append(out, t)
-	}
-	return out, rows.Err()
+	return scanList(s, `SELECT id, tunnel_key, topology_id, local_server_id, remote_server_id, engine, engine_params, enabled, created_at
+		FROM tunnels WHERE local_server_id = ? OR remote_server_id = ? ORDER BY id`, func(t *Tunnel) []any {
+		return []any{&t.ID, &t.TunnelKey, &t.TopologyID, &t.LocalServerID, &t.RemoteServerID, &t.Engine, &t.EngineParams, &t.Enabled, &t.CreatedAt}
+	}, serverID, serverID)
 }
 
 // ---- weight policies ----------------------------------------------------
