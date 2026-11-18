@@ -634,8 +634,10 @@ function topologyGraph(topo, tunnels) {
     const row = (icon, yy, cls, val) => m
       ? icon(rowIcX, yy) + tTxt(rowIcX - 8, yy + 13, cls, val, 'end')
       : icon(rowIcX, yy) + tTxt(rowIcX + 20, yy + 13, cls, val);
-    const rowYs = [y + 74, y + 96, y + 118];
-    const bars = rowYs.map(v => `<rect x="0" y="${(v + 4).toFixed(1)}" width="20" height="8" rx="2.5"/>`).join('');
+    const rowYs = [y + 54, y + 80, y + 106];
+    // the stacked-server glyph: one compact block right under the flag, its
+    // three disks TOUCHING each other like the owner's zoomed mockup
+    const bars = [0, 9, 18].map(dy => `<rect x="0" y="${y + 54 + dy}" width="20" height="9" rx="2"/>`).join('');
     const stack = `<g class="topo-n-stack" transform="translate(${m ? x + w - 12 - 20 : x + 14},0)">${bars}</g>`;
     return `<g class="cl-n ${side === 'iran' ? 'topo-node-iran' : 'topo-node-foreign'}" data-agview="${text(agRow ? agRow.id : '')}" data-server-name="${text(s.name || '')}" role="button" tabindex="0" aria-label="${text(title)} · ${text(info.ip)}"><title>${text(title)} · ${text(info.ip)}</title>` +
       `<rect class="cl-n-bg" x="${x}" y="${y}" width="${w}" height="${NH}" rx="12"/>` +
