@@ -610,11 +610,12 @@ function topologyGraph(topo, tunnels) {
     const stLbl = agRow ? (() => {
       const lbl = online ? tr('', 'Online') : tr('', 'Offline');
       const kind = online ? 'ok' : 'err';
-      const ew = Math.round(lbl.length * 7);
-      const dotX = m ? x + 12 + ew + 8 : x + w - 12 - ew - 8;
-      const tX = m ? x + 12 : x + w - 12;
-      return `<circle class="topo-n-dot ${kind}" cx="${dotX}" cy="${y + 16}" r="4"/>` +
-        `<text class="topo-n-status ${kind}" x="${tX}" y="${y + 20}" text-anchor="${m ? 'start' : 'end'}">${text(lbl)}</text>`;
+      // the dot rides the label's END — right of the word in LTR, left of it
+      // in RTL — per the owner's eye
+      const tX = m ? x + 20 : x + w - 20;
+      const dotX = m ? x + 12 : x + w - 12;
+      return `<text class="topo-n-status ${kind}" x="${tX}" y="${y + 20}" text-anchor="${m ? 'start' : 'end'}">${text(lbl)}</text>` +
+        `<circle class="topo-n-dot ${kind}" cx="${dotX}" cy="${y + 16}" r="4"/>`;
     })() : '';
     // the chevron points out toward the agent view, direction-aware
     const chevCx = m ? x + 20 : x + w - 20;
