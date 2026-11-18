@@ -612,17 +612,18 @@ function topologyGraph(topo, tunnels) {
     const stLbl = agRow ? (() => {
       const lbl = online ? tr('', 'Online') : tr('', 'Offline');
       const kind = online ? 'ok' : 'err';
-      // the dot + label ride inside one soft blue pill, the card's accent
+      // the dot + label ride inside one soft blue pill, the card's accent —
+      // the pill hugs its content
       const tw = Math.round(lbl.length * 6.8);
-      const pw = tw + 34, ph = 20;
+      const pw = tw + 22, ph = 18;
       const px = m ? x + 14 : x + w - 14 - pw;
-      const py = y + 6;
-      const dotCx = m ? px + 10 : px + pw - 10;
-      const tX = m ? px + 19 : px + pw - 19;
+      const py = y + 7;
+      const dotCx = m ? px + 9 : px + pw - 9;
+      const tX = m ? px + 17 : px + pw - 17;
       return `<g class="topo-n-tag">` +
-        `<rect class="topo-n-tag-bg" x="${px}" y="${py}" width="${pw}" height="${ph}" rx="10"/>` +
-        `<text class="topo-n-status ${kind}" x="${tX}" y="${py + 14}" text-anchor="${m ? 'start' : 'end'}">${text(lbl)}</text>` +
-        `<circle class="topo-n-dot ${kind}" cx="${dotCx}" cy="${py + 10}" r="4"/>` +
+        `<rect class="topo-n-tag-bg" x="${px}" y="${py}" width="${pw}" height="${ph}" rx="9"/>` +
+        `<text class="topo-n-status ${kind}" x="${tX}" y="${py + 13}" text-anchor="${m ? 'start' : 'end'}">${text(lbl)}</text>` +
+        `<circle class="topo-n-dot ${kind}" cx="${dotCx}" cy="${py + 9}" r="4"/>` +
         `</g>`;
     })() : '';
     // the three info rows face the three bars of the stacked-server glyph —
