@@ -61,20 +61,24 @@ func s2VerdictSeam(t *testing.T) {
 	t.Cleanup(func() { uiVerdictsFn = oldVerdicts })
 }
 
-// s2LatencySeam injects fresh runtime for tl-a only: tl-a carries latency
-// 41.5, every other tunnel stays latency-nil.
+// s2LatencySeam REPLACES the whole runtime maps for the test, not just
+// adds one entry: earlier tests leak meshRuntimeBy rows (e.g. the
+// uiapi_test.go overview fixture never cleans its agent up), and
+// uiLatencyMap resolves same-tunnel conflicts by Go MAP ITERATION ORDER —
+// a leaked tl-a row would race the byte-compare between the old and new
+// builds (observed on Windows full-suite ordering: 41.5 vs a leaked 12.5).
 func s2LatencySeam(t *testing.T, agentID string) {
 	t.Helper()
 	meshRuntimeMu.Lock()
-	meshRuntimeBy[agentID] = []protocol.TunnelRuntime{
-		{TunnelID: "tl-a", Engine: "chisel", Up: true, WireKnown: true, LatencyMs: 41.5},
+	oldBy, oldSeen := meshRuntimeBy, meshRuntimeSeen
+	meshRuntimeBy = map[string][]protocol.TunnelRuntime{
+		agentID: {{TunnelID: "tl-a", Engine: "chisel", Up: true, WireKnown: true, LatencyMs: 41.5}},
 	}
-	meshRuntimeSeen[agentID] = time.Now().Unix()
+	meshRuntimeSeen = map[string]int64{agentID: time.Now().Unix()}
 	meshRuntimeMu.Unlock()
 	t.Cleanup(func() {
 		meshRuntimeMu.Lock()
-		delete(meshRuntimeBy, agentID)
-		delete(meshRuntimeSeen, agentID)
+		meshRuntimeBy, meshRuntimeSeen = oldBy, oldSeen
 		meshRuntimeMu.Unlock()
 	})
 }
