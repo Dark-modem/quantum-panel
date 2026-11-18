@@ -2128,3 +2128,22 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 .topo-lg-line line.off { stroke:var(--mu); opacity:.7; }
 .topo-lg-sep { width:1px; height:16px; background:var(--ln2); flex:none; }
 .topo-lg-hint { font-size:12px; color:var(--mu); }
+/* the mockup's neon cables: a soft blurred halo under every cable, tinted by
+   the cable's own state color */
+.cl-e-glow { fill:none; stroke-linecap:round; opacity:.3; filter:blur(3px); pointer-events:none; }
+.cl-e.ok .cl-e-glow { stroke:var(--ok); }
+.cl-e.warn .cl-e-glow { stroke:var(--wr); }
+.cl-e.err .cl-e-glow { stroke:var(--er); }
+.cl-e.off .cl-e-glow { stroke:var(--mu); }
+/* the hover window, the owner-mockup's way: the name on top, then the Weight
+   and Status rows */
+.topo-tip-h { display:flex; align-items:center; gap:8px; font-size:13px; }
+.topo-tip-dot { width:8px; height:8px; border-radius:50%; display:inline-block; flex:none; }
+.topo-tip-dot.ok { background:var(--ok); } .topo-tip-dot.err { background:var(--er); }
+.topo-tip-dot.warn { background:var(--wr); } .topo-tip-dot.off { background:var(--mu); }
+.topo-tip-facts { display:flex; flex-direction:column; gap:7px; margin-top:9px; }
+.topo-tip-fact { display:flex; align-items:center; justify-content:space-between; gap:16px; font-size:12px; }
+.topo-tip-fact span { color:var(--mu); }
+.topo-tip-fact b { color:var(--tx); font-weight:700; }
+.topo-tip-fact b.ok { color:var(--ok); } .topo-tip-fact b.err { color:var(--er); }
+.topo-tip-fact b.warn { color:var(--wr); } .topo-tip-fact b.off { color:var(--mu); }

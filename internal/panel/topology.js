@@ -557,13 +557,14 @@ function topologyGraph(topo, tunnels) {
       const y2 = nodeY(geo.foreign, r.fi) + NH / 2;
       const x1 = rtl ? geo.iran.x + 12 : geo.iran.x + geo.iran.w - 12;
       const x2 = rtl ? geo.foreign.x + geo.foreign.w - 12 : geo.foreign.x + 12;
-      const dx = Math.max(60, (x2 - x1) / 2);
-      const sag = Math.max(-90, Math.min(90, r.bow * 30 + r.lane * 9));
+      const dx = Math.max(70, (x2 - x1) * 0.42);
+      const sag = Math.max(-110, Math.min(110, r.bow * 36 + r.lane * 12));
       d = `M ${x1},${y1.toFixed(1)} C ${x1 + dx},${(y1 + sag).toFixed(1)} ${x2 - dx},${(y2 + sag).toFixed(1)} ${x2},${y2.toFixed(1)}`;
     }
     return `<g data-topology-cable="${text(r.id)}" data-topo-iran="${text(r.iranName)}" data-topo-foreign="${text(r.foreignName)}" data-topo-agent="${text(r.agentId || '')}" class="cl-e ${st} topo-cable" tabindex="0" role="button" aria-label="${text(r.name)} · ${text(stateLabel(st))}">` +
       `<title>${text(r.name)} · ${text(r.engine)} · ${text(stateLabel(st))}</title>` +
       `<path class="cl-e-hit" d="${d}"/>` +
+      `<path class="cl-e-glow" style="stroke-width:${(sw * 2.8).toFixed(1)}" d="${d}"/>` +
       `<path class="cl-e-line" style="stroke-width:${sw}" d="${d}"/>` +
       (st === 'ok' ? `<path class="cl-e-flow" d="${d}"/>` : '') +
     `</g>`;
@@ -2083,17 +2084,21 @@ $('topologyAddTunnelBtn').onclick = topologyNewTunnel;
       const src = t || ar;
       const st = String(src.state || '');
       const key = t ? t.id : ar.key;
-      const eng = src.engine || '';
-      const lat = t ? t.latency_ms : (ar ? ar.latency : null);
-      const iranName = g.getAttribute('data-topo-iran') || (topoSideServers(topo, 'iran')[0] || {}).name || topo.local_ip || '';
-      const frnName = g.getAttribute('data-topo-foreign') || (topoSideServers(topo, 'foreign')[0] || {}).name || topo.remote_ip || '';
-      html = '<div class="topo-tip-h"><b>' + esc(shortKey(key)) + '</b></div>' +
-        '<div class="topo-tip-rows"><div class="topo-tip-row">' +
-        '<span class="topo-tip-dot ' + stOf(st) + '"></span>' +
-        '<span class="topo-tip-eng">' + esc(eng) + '</span>' +
-        pillOf(st) +
-        '<span class="topo-tip-lat">' + esc(lat != null && lat >= 0 ? Math.round(lat) + ' ms' : '—') + '</span>' +
-        '</div><div class="topo-tip-path u-mono">' + esc(iranName) + ' → ' + esc(frnName) + '</div></div>';
+      // the tunnel's real traffic share: the agent layer reports weight_pct,
+      // the inventory layer carries raw weights — share them out here
+      let wpct = (ar && ar.weightPct != null && ar.weightPct >= 0) ? Math.round(ar.weightPct) : null;
+      if (wpct == null && t && t.weight != null) {
+        const sib = topologyExistingTunnels(topo);
+        const sum = sib.reduce((a, x) => a + (Number(x.weight) || 0), 0);
+        if (sum > 0) wpct = Math.round(Number(t.weight) / sum * 100);
+      }
+      // the hover window, the owner-mockup's way: the name, then its Weight
+      // and its Status — nothing else
+      html = '<div class="topo-tip-h"><span class="topo-tip-dot ' + stOf(st) + '"></span><b>' + esc(shortKey(key)) + '</b></div>' +
+        '<div class="topo-tip-facts">' +
+        '<div class="topo-tip-fact"><span>' + esc(tr('', 'Weight')) + '</span><b>' + esc(wpct != null ? wpct + '%' : '—') + '</b></div>' +
+        '<div class="topo-tip-fact"><span>' + esc(tr('', 'Status')) + '</span><b class="' + stOf(st) + '">' + esc(label(st)) + '</b></div>' +
+        '</div>';
     }
     tip.innerHTML = html;
     const host = box.querySelector('.topo-map') || box;
