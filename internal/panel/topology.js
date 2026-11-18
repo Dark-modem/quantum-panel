@@ -10,6 +10,7 @@ let topoDcLoaded = false;
 let topologyDcFilter = 'all';
 let topoPage = 1;
 let topoPerPage = 10;
+let topoTunFilter = 'all';
 function topoIsFa() { return typeof currentLang !== 'undefined' && currentLang === 'fa'; }
 async function topoDcLoad(topo) {
   if (topoDcLoaded) return;
@@ -1134,27 +1135,67 @@ function topologyRender() {
   if (!topo) return;
   const cables = (topo.tunnel_ids || []).map(id => topologyData.tunnels.find(t => t.id === id) || {id, name: id, engine: '—', state: 'down'});
   if (topo) $('topologyGraph').innerHTML = topologyGraph(topo, cables); else $('topologyGraph').innerHTML = '';
-  // the established tunnels between this pair, listed under the map
+  // the established tunnels between this pair, listed under the map — the
+  // agent-details tunnels table, cloned for the topology page: state filter
+  // chips, the same eight columns, the same badges and formatters
   const tl = $('topologyTunnelList');
   if (tl) {
     const agentRows = topo ? topoAgentTunnels(topo) : [];
-    const label = st => st === 'ok' ? tr('', 'Connected') : st === 'err' ? tr('', 'Stopped') : st === 'off' ? tr('', 'Disabled') : tr('', 'Unverified');
-    const stOf = s => ['healthy', 'ok', 'up', 'connected'].includes(String(s || '')) ? 'ok'
-      : String(s || '') === 'down' ? 'err' : String(s || '') === 'disabled' ? 'off' : 'warn';
-    tl.innerHTML = agentRows.length
-      ? '<div class="topo-tl">' + agentRows.map(tn => {
-          const st = stOf(tn.state);
-          const lat = tn.latency != null && tn.latency >= 0 ? Math.round(tn.latency) + ' ms' : '\u2014';
-          return '<button type="button" class="topo-tl-row" data-topo-agent="' + esc(tn.agentId) + '">' +
-            '<span class="topo-tl-dot ' + st + '"></span>' +
-            '<b>' + esc(tn.key || '') + '</b>' +
-            '<span class="topo-tl-eng">' + esc(tn.engine || '') + '</span>' +
-            '<span class="topo-tl-lat u-mono">' + esc(lat) + '</span>' +
-            '<span class="topo-tl-st">' + esc(label(st)) + '</span>' +
-            '<span class="topo-tl-go">' + esc(tr('', 'View')) + ' \u2190</span>' +
-            '</button>';
-        }).join('') + '</div>'
-      : '';
+    const tunChips = [
+      { k: 'all', lbl: tr('', 'All'), dot: 'var(--ac)' },
+      { k: 'healthy', lbl: tr('', 'up'), dot: 'var(--ok)' },
+      { k: 'down', lbl: tr('', 'down'), dot: 'var(--er)' },
+      { k: 'disabled', lbl: tr('', 'Disabled'), dot: 'var(--mu)' },
+      { k: 'unknown', lbl: tr('', 'unknown'), dot: 'var(--mu)' },
+    ];
+    const chipHtml = '<div class="mtb-eng-filters">' + tunChips.map(c =>
+      `<button type="button" class="mtb-eng-chip${topoTunFilter === c.k ? ' on' : ''}" data-topotunfilter="${c.k}"><i style="background:${c.dot}"></i>${esc(c.lbl)}</button>`).join('') + '</div>';
+    const shown = agentRows.filter(tn => topoTunFilter === 'all' || tn.state === topoTunFilter);
+    const bytes = v => v >= 1073741824 ? (v / 1073741824).toFixed(1) + ' GB' : v >= 1048576 ? (v / 1048576).toFixed(1) + ' MB' : v >= 1024 ? (v / 1024).toFixed(1) + ' KB' : v + ' B';
+    const ENG_DISP = { aestun: 'AESTun', rakhsh: 'Rakhsh', matrix: 'Matrix', frp: 'FRP', backhaul: 'Backhaul', gost: 'Gost', xray: 'Xray', wireguard: 'WireGuard', wstunnel: 'wstunnel', chisel: 'Chisel', rathole: 'Rathole', tinc: 'Tinc', easytier: 'EasyTier', hysteria: 'Hysteria', singbox: 'sing-box', spoof: 'Spoof', udp2raw: 'udp2raw', waterwall: 'WaterWall', wattunnel: 'WatTunnel' };
+    const engName = en => { const e = String(en || '').toLowerCase(); return ENG_DISP[e] || (en ? en.charAt(0).toUpperCase() + en.slice(1) : '—'); };
+    const th = (svg, lbl) => `<th><span class="mtb-th">${svg}${esc(lbl)}</span></th>`;
+    const icoTun = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16"/><path d="M16.5 8.5L20 12l-3.5 3.5"/><path d="M7.5 8.5L4 12l3.5 3.5"/></svg>';
+    const icoDst = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="7" rx="1.5"/><rect x="3" y="13" width="18" height="7" rx="1.5"/><path d="M7 7.5h.01M7 16.5h.01"/></svg>';
+    const icoEng = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
+    const icoSt = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg>';
+    const icoW = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6a3 3 0 0 1 6 0"/><path d="M6.5 6h11l2.5 12h-16l2.5-12z"/></svg>';
+    const icoTd = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="M8 11l4 4 4-4"/><path d="M4 21h16"/></svg>';
+    const icoLat = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
+    const icoAct = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>';
+    const badge = (kind, lbl, dot) => `<span class="badge ${kind}">${dot ? '<span class="dot"></span>' : ''}${esc(lbl)}</span>`;
+    const stKind = { healthy: 'ok', down: 'err', disabled: 'dim' };
+    const stLblOf = s => s === 'healthy' ? tr('', 'up') : s === 'down' ? tr('', 'down') : s === 'disabled' ? tr('', 'Disabled') : tr('', 'unknown');
+    const srvByName = name => {
+      const all = topoSideServers(topo, 'iran').concat(topoSideServers(topo, 'foreign'));
+      return all.find(x => x.name === name) || null;
+    };
+    const rows = shown.map(tn => {
+      const kind = stKind[tn.state] || 'dim';
+      const b2 = badge(kind, stLblOf(tn.state), true);
+      const srv = srvByName(tn.remoteName);
+      const remDc = srv ? (topoIsFa() ? (srv.dc || srv.dcEn || '') : (srv.dcEn || srv.dc || '')) : '';
+      const remCc = srv && srv.cc ? String(srv.cc) : String(topo.country || '');
+      const engN = engName(tn.engine);
+      const lat = (tn.latency != null && tn.latency > 0) ? `<span class="mtb-lat ${tn.latency < 80 ? 'ok' : tn.latency < 200 ? 'warn' : 'bad'}">${tn.latency < 1 ? '&lt;1 ms' : Math.round(tn.latency) + ' ms'}</span>` : '—';
+      const w = tn.weightPct != null ? (Math.round(tn.weightPct * 10) / 10) + '%' : '—';
+      const td = tn.today ? esc(bytes(tn.today)) : '—';
+      return '<tr>' +
+        `<td><b class="mono mtb-tun-key" dir="ltr" title="${esc(tn.key)}">${esc(tn.key)}</b></td>` +
+        `<td><div class="mtb-dest"><span class="mtb-dest-flag">${topologyFlagSvg(remCc)}</span><div class="mtb-dest-tx"><b>${esc(tn.remoteName || '—')}</b>` +
+        (remDc ? `<span class="mtb-muted mtb-dest-dc"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="7" rx="1.5"/><rect x="3" y="13" width="18" height="7" rx="1.5"/><path d="M7 7.5h.01M7 16.5h.01"/></svg>${esc(remDc)}</span>` : '') + '</div></div></td>' +
+        `<td><span class="badge info mtb-eng-badge"><img src="img/engines/${encodeURIComponent(String(tn.engine || '').toLowerCase())}.png" alt="${esc(engN)}" draggable="false"> ${esc(engN)}</span></td>` +
+        `<td>${b2}</td>` +
+        `<td>${w}</td>` +
+        `<td>${td}</td>` +
+        `<td>${lat}</td>` +
+        `<td><button type="button" class="quantum-btn quantum-btn-secondary u-btn-xs" data-topo-agent="${esc(tn.agentId)}">${esc(tr('', 'View details'))}</button></td>` +
+        '</tr>';
+    }).join('');
+    tl.innerHTML = chipHtml +
+      '<div class="ent-tbl-wrap"><table class="ent-tbl"><thead><tr>' +
+      th(icoTun, 'Tunnel') + th(icoDst, 'Destination') + th(icoEng, 'Engine') + th(icoSt, 'State') + th(icoW, 'Weight') + th(icoTd, 'Today traffic') + th(icoLat, 'Latency') + th(icoAct, 'Actions') +
+      `</tr></thead><tbody>${rows || `<tr><td colspan="8" class="u-hint-12">${esc(tr('', 'No tunnels'))}</td></tr>`}</tbody></table></div>`;
   }
   // The header's power toggle mirrors the row menu: a pair whose tunnels are
   // not up offers Activate, a live pair offers Deactivate.
@@ -2223,6 +2264,15 @@ $('topologySearch').addEventListener('input', e => { topologySearchQuery = (e &&
         const pop = document.querySelector('#topoPager .mtb-cdd-pop');
         if (pop) pop.hidden = true;
       }
+    });
+  }
+  // the tunnels-table chips: state filter for the agent-style tunnels table
+  const tlw = $('topologyTunnelList');
+  if (tlw && !tlw.dataset.tunWired) {
+    tlw.dataset.tunWired = '1';
+    tlw.addEventListener('click', e => {
+      const chip = e.target.closest('[data-topotunfilter]');
+      if (chip) { topoTunFilter = chip.getAttribute('data-topotunfilter') || 'all'; renderTunnelsList(); }
     });
   }
 }
