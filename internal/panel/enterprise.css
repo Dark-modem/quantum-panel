@@ -2090,7 +2090,9 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
    over the column captions, flag-tile server cards with a status pill, a pin
    + datacenter row and a server icon + ip row, one glowing port per card on
    the edge facing the other side, and a footer legend strip --------------- */
-.topo-map-head { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+/* the inline .tc-header rule spreads its children with space-between — the
+   map head must keep the icon and the title block together at the start */
+.tc-header.topo-map-head { display:flex; align-items:center; gap:12px; flex-wrap:wrap; justify-content:flex-start; }
 .topo-map-head-ic { width:38px; height:38px; border-radius:11px; display:inline-flex; align-items:center; justify-content:center; flex:none;
   background:color-mix(in srgb, var(--ac) 14%, transparent); color:var(--ac);
   box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--ac) 22%, transparent); }
