@@ -34,6 +34,7 @@ async function topoDcLoad(topo) {
           key: tn.tunnel_key || '',
           engine: tn.engine || '',
           state: tn.state || '',
+          topology: tn.topology || '',
           weightPct: tn.weight_pct,
           latency: tn.latency_ms,
           today: tn.today_bytes,
@@ -731,10 +732,13 @@ function topoAllTunnels(topo) {
   return inv.concat(extra);
 }
 function topoAgentTunnels(topo) {
-  // both endpoints report the same tunnel rows — dedupe by tunnel_key so a
-  // tunnel renders once regardless of how many of its agents reported it
+  // both endpoints report the same tunnel rows — keep only the given
+  // topology's rows (the list page collects every agent's tunnels at once)
+  // and dedupe by tunnel_key so a tunnel renders once regardless of how
+  // many of its agents reported it
   const seen = {};
   return (window.__topoTunnels || []).filter(tn => {
+    if (topo && tn.topology && tn.topology !== topo.name) return false;
     if (!tn.key || seen[tn.key]) return false;
     seen[tn.key] = true;
     return true;
