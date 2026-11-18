@@ -35,7 +35,7 @@ import (
 type ClusterConfig struct {
 	Version    int       `json:"version"`
 	Pools      []LBPool  `json:"pools"`
-	Health     LBHealth  `json:"health"`
+	Health     lbHealth  `json:"health"`
 	NodeID     string    `json:"node_id"`
 	Name       string    `json:"name,omitempty"`
 	Secret     string    `json:"secret,omitempty"`
@@ -91,14 +91,14 @@ func lbCheckEvery(p LBPool) time.Duration {
 	return time.Duration(p.CheckEvery) * time.Second
 }
 
-// LBHealth tunes the per-link health check.
-type LBHealth struct {
+// lbHealth tunes the per-link health check.
+type lbHealth struct {
 	IntervalMs int `json:"interval_ms"`
 	Fall       int `json:"fall"` // failed checks in a row before a link is taken out
 	Rise       int `json:"rise"` // good checks in a row before it is put back
 }
 
-func (h LBHealth) norm() LBHealth {
+func (h lbHealth) norm() lbHealth {
 	if h.IntervalMs < 500 || h.IntervalMs > 10000 {
 		h.IntervalMs = 1000
 	}
@@ -146,7 +146,7 @@ func defaultClusterConfig() ClusterConfig {
 		Version:    2,
 		NodeID:     "hub-" + randHex(4),
 		Name:       host,
-		Health:     LBHealth{}.norm(),
+		Health:     lbHealth{}.norm(),
 		HubForward: true,
 		DNS:        DNSConfig{TTL: 60},
 	}
@@ -448,7 +448,7 @@ const lbIcmpTrust = 10 * time.Minute
 
 // lbObserve feeds one check into the link's state. It returns +1 when the
 // link came up, -1 when it went down, 0 otherwise.
-func (rt *lbLinkRT) lbObserve(now time.Time, session bool, icmpMs float64, icmpUsable bool, h LBHealth) int {
+func (rt *lbLinkRT) lbObserve(now time.Time, session bool, icmpMs float64, icmpUsable bool, h lbHealth) int {
 	rt.Session, rt.ICMPms = session, icmpMs
 	if icmpMs >= 0 {
 		rt.icmpGoodAt = now
@@ -501,7 +501,7 @@ type lbSvcRT struct {
 
 // observe feeds one check result: +1 when the service came back, -1 when it
 // was taken out.
-func (s *lbSvcRT) observe(ok bool, reason string, h LBHealth) int {
+func (s *lbSvcRT) observe(ok bool, reason string, h lbHealth) int {
 	s.Busy, s.Reason = false, reason
 	if ok {
 		s.okStreak, s.failStreak = s.okStreak+1, 0
@@ -969,7 +969,7 @@ func clusterTick(now time.Time) (idle bool) {
 }
 
 // lbCheckJob runs one service check of a member and feeds the result back.
-func lbCheckJob(sv *lbSvcRT, addr string, port int, pool, name string, h LBHealth) func() {
+func lbCheckJob(sv *lbSvcRT, addr string, port int, pool, name string, h lbHealth) func() {
 	return func() {
 		ok, why := lbProbe(addr, port, 3*time.Second)
 		clusterRT.mu.Lock()
@@ -1659,7 +1659,7 @@ func lbMemberChange(q lbMemberReq) (string, string) {
 // handleClusterSettings changes health tuning, hub forwarding and identity.
 func handleClusterSettings(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Health     *LBHealth `json:"health"`
+		Health     *lbHealth `json:"health"`
 		HubForward *bool     `json:"hub_forward"`
 		Name       *string   `json:"name"`
 		PublicIP   *string   `json:"public_ip"`

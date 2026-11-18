@@ -36,7 +36,7 @@ func TestBillingCSVFormulaInjection(t *testing.T) {
 }
 
 func TestParseMonthSpec(t *testing.T) {
-	from, to, err := ParseMonthSpec("1405-08")
+	from, to, err := parseMonthSpec("1405-08")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,10 +45,10 @@ func TestParseMonthSpec(t *testing.T) {
 	if from != wantFrom || to != wantTo {
 		t.Fatalf("1405-08 = %d..%d, want %d..%d", from, to, wantFrom, wantTo)
 	}
-	if _, _, err := ParseMonthSpec("1405-13"); err == nil {
+	if _, _, err := parseMonthSpec("1405-13"); err == nil {
 		t.Fatal("month 13 must fail")
 	}
-	if _, _, err := ParseMonthSpec("nonsense"); err == nil {
+	if _, _, err := parseMonthSpec("nonsense"); err == nil {
 		t.Fatal("garbage must fail")
 	}
 }

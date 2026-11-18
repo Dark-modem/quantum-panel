@@ -20,7 +20,7 @@ import (
 	"time"
 )
 
-type CarrierMetric struct {
+type carrierMetric struct {
 	ID            string  `json:"id"`             // e.g. "direct", "fou:443", "fou:55555", "wss:8443", "backhaul:tcp"
 	Name          string  `json:"name"`           // Friendly display name
 	Type          string  `json:"type"`           // "gre", "fou", "wss", "backhaul", "frp"
@@ -37,7 +37,7 @@ type CarrierMetric struct {
 	ErrorDetail   string  `json:"error_detail,omitempty"`
 }
 
-type BenchmarkReport struct {
+type benchmarkReport struct {
 	Timestamp       string          `json:"timestamp"`
 	DurationSec     float64         `json:"duration_sec"`
 	TargetHost      string          `json:"target_host,omitempty"`
@@ -47,18 +47,18 @@ type BenchmarkReport struct {
 	ActiveCarrier   string          `json:"active_carrier"`
 	BestCarrier     string          `json:"best_carrier"`
 	BestCarrierName string          `json:"best_carrier_name,omitempty"`
-	AutoPilot       AutoPilotStatus `json:"auto_pilot"`
-	Metrics         []CarrierMetric `json:"metrics"`
+	AutoPilot       autoPilotStatus `json:"auto_pilot"`
+	Metrics         []carrierMetric `json:"metrics"`
 }
 
-type AutoPilotStatus struct {
+type autoPilotStatus struct {
 	Enabled       bool    `json:"enabled"`
 	ThresholdLoss float64 `json:"threshold_loss"`
 	LastTriggered string  `json:"last_triggered"`
 	TriggerCount  int     `json:"trigger_count"`
 }
 
-type BenchmarkRunRequest struct {
+type benchmarkRunRequest struct {
 	TargetHost   string `json:"target_host,omitempty"`
 	TargetRole   string `json:"target_role,omitempty"`
 	FrpPort      int    `json:"frp_port,omitempty"`
@@ -67,11 +67,11 @@ type BenchmarkRunRequest struct {
 	BackhaulPort int    `json:"backhaul_port,omitempty"`
 }
 
-type BenchmarkApplyRequest struct {
+type benchmarkApplyRequest struct {
 	Carrier string `json:"carrier"` // e.g. "fou:443"
 }
 
-type BenchmarkAutoPilotRequest struct {
+type benchmarkAutoPilotRequest struct {
 	Enabled   *bool    `json:"enabled,omitempty"`
 	Threshold *float64 `json:"threshold,omitempty"`
 }
@@ -79,7 +79,7 @@ type BenchmarkAutoPilotRequest struct {
 var (
 	benchmarkMu           sync.RWMutex
 	benchmarkRunning      atomic.Bool
-	lastBenchmarkReport   *BenchmarkReport
+	lastBenchmarkReport   *benchmarkReport
 	autoPilotTriggerCount int
 	lastAutoPilotSwitch   string
 )
@@ -88,7 +88,7 @@ func benchmarkReportFile() string {
 	return filepath.Join(configDir, "benchmark_report.json")
 }
 
-func loadSavedBenchmarkReport() *BenchmarkReport {
+func loadSavedBenchmarkReport() *benchmarkReport {
 	benchmarkMu.RLock()
 	if lastBenchmarkReport != nil {
 		defer benchmarkMu.RUnlock()
@@ -98,7 +98,7 @@ func loadSavedBenchmarkReport() *BenchmarkReport {
 
 	data, err := os.ReadFile(benchmarkReportFile())
 	if err == nil {
-		var r BenchmarkReport
+		var r benchmarkReport
 		if json.Unmarshal(data, &r) == nil {
 			benchmarkMu.Lock()
 			lastBenchmarkReport = &r
@@ -109,7 +109,7 @@ func loadSavedBenchmarkReport() *BenchmarkReport {
 	return nil
 }
 
-func saveBenchmarkReport(r *BenchmarkReport) {
+func saveBenchmarkReport(r *benchmarkReport) {
 	benchmarkMu.Lock()
 	lastBenchmarkReport = r
 	benchmarkMu.Unlock()
@@ -345,7 +345,7 @@ func probePing(ctx context.Context, host string, count int) (avgRTT, minRTT, max
 }
 
 // runCarrierBenchmark probes all candidate carrier models and evaluates performance.
-func runCarrierBenchmark(customReq ...BenchmarkRunRequest) *BenchmarkReport {
+func runCarrierBenchmark(customReq ...benchmarkRunRequest) *benchmarkReport {
 	if !benchmarkRunning.CompareAndSwap(false, true) {
 		benchmarkMu.RLock()
 		rep := lastBenchmarkReport
@@ -459,7 +459,7 @@ func runCarrierBenchmark(customReq ...BenchmarkRunRequest) *BenchmarkReport {
 		quicPort = controlPort - 1
 	}
 
-	candidates := []CarrierMetric{
+	candidates := []carrierMetric{
 		{
 			ID:       "direct",
 			Name:     "GRE Direct (Protocol 47)",
@@ -517,7 +517,7 @@ func runCarrierBenchmark(customReq ...BenchmarkRunRequest) *BenchmarkReport {
 	for i := range candidates {
 		wg.Add(1)
 		sem <- struct{}{}
-		go func(c *CarrierMetric) {
+		go func(c *carrierMetric) {
 			defer wg.Done()
 			defer func() { <-sem }()
 
@@ -625,7 +625,7 @@ func runCarrierBenchmark(customReq ...BenchmarkRunRequest) *BenchmarkReport {
 
 	duration := float64(time.Since(startTime).Milliseconds()) / 1000.0
 
-	report := &BenchmarkReport{
+	report := &benchmarkReport{
 		Timestamp:       time.Now().Format("2006-01-02 15:04:05"),
 		DurationSec:     duration,
 		TargetHost:      remotePub,
@@ -635,7 +635,7 @@ func runCarrierBenchmark(customReq ...BenchmarkRunRequest) *BenchmarkReport {
 		ActiveCarrier:   activeCarrier,
 		BestCarrier:     bestCarrier,
 		BestCarrierName: bestCarrierName,
-		AutoPilot: AutoPilotStatus{
+		AutoPilot: autoPilotStatus{
 			Enabled:       peerCfg.AutoPilotEnabled,
 			ThresholdLoss: peerCfg.AutoPilotThreshold,
 			LastTriggered: lastAutoPilotSwitch,
@@ -728,7 +728,7 @@ func handleBenchmarkGet(w http.ResponseWriter, r *http.Request) {
 
 // POST /api/benchmark/run
 func handleBenchmarkRun(w http.ResponseWriter, r *http.Request) {
-	var req BenchmarkRunRequest
+	var req benchmarkRunRequest
 	if r.Body != nil && r.ContentLength > 0 {
 		_ = json.NewDecoder(r.Body).Decode(&req)
 	}
@@ -738,7 +738,7 @@ func handleBenchmarkRun(w http.ResponseWriter, r *http.Request) {
 
 // POST /api/benchmark/apply
 func handleBenchmarkApply(w http.ResponseWriter, r *http.Request) {
-	var req BenchmarkApplyRequest
+	var req benchmarkApplyRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeAPIError(w, r, "E-ACTION-01", "invalid json")
 		return
@@ -765,7 +765,7 @@ func handleBenchmarkApply(w http.ResponseWriter, r *http.Request) {
 
 // POST /api/benchmark/autopilot
 func handleBenchmarkAutoPilot(w http.ResponseWriter, r *http.Request) {
-	var req BenchmarkAutoPilotRequest
+	var req benchmarkAutoPilotRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeAPIError(w, r, "E-ACTION-01", "invalid json")
 		return

@@ -81,7 +81,7 @@ func newAgentTunnelLab(t *testing.T) *agentTunnelLab {
 	t.Cleanup(func() {
 		agentHubDrainAll()
 		agentTunnelWG.Wait()
-		AgentObserverWait() // observers still read the seams about to be restored
+		agentObserverWait() // observers still read the seams about to be restored
 		agentHubDeliverDesiredFn.set(oldDeliver)
 		agentHubCommandFn.set(oldCmd)
 		agentHubOnlineFn.set(oldOnline)
@@ -194,7 +194,7 @@ func TestAgentTunnelProvisionEndToEnd(t *testing.T) {
 				hubDesired := lab.desiresFor("hub1")[0]
 				agentTunnelAckObserved("hub1", agentAck{Revision: hubDesired.Revision, OK: true,
 					Detail: map[string]string{"main_host": "Subnet = 10.254.231.1/32\n" + agentTestRSAPem(t)}})
-				AgentObserverWait()
+				agentObserverWait()
 				continue
 			}
 			if !nodeAcked && nodeWant >= 1 {
@@ -204,7 +204,7 @@ func TestAgentTunnelProvisionEndToEnd(t *testing.T) {
 				continue
 			}
 			time.Sleep(10 * time.Millisecond)
-			AgentObserverWait()
+			agentObserverWait()
 		}
 	}()
 	agentTunnelProvision("at_x")
@@ -256,7 +256,7 @@ func TestAgentTunnelProvisionHubAckFail(t *testing.T) {
 		hubDesired := lab.desiresFor("hub1")[0]
 		agentTunnelAckObserved("hub1", agentAck{Revision: hubDesired.Revision, OK: false, Error: "port busy"})
 	}()
-	AgentObserverWait()
+	agentObserverWait()
 	agentTunnelProvision("at_y")
 
 	s = loadAgentTunnels()
@@ -398,7 +398,7 @@ func (c *agentE2EConn) read() (string, json.RawMessage, error) {
 
 func TestAgentTunnelControllerLoopRealHub(t *testing.T) {
 	dir := t.TempDir()
-	t.Cleanup(MeshStoreCloseForTest) // close the lazily-opened store before the temp dir is removed (BACKEND-24)
+	t.Cleanup(meshStoreCloseForTest) // close the lazily-opened store before the temp dir is removed (BACKEND-24)
 	oldDir := configDir
 	oldAck, oldPort, oldCmd := agentTunnelAckWait, agentTunnelPortWait, agentTunnelCmdTimeout
 	configDir = dir

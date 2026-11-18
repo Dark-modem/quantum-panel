@@ -40,8 +40,8 @@ func GenerateCSRFToken(sessionToken string) string {
 	return hex.EncodeToString(mac.Sum(nil))
 }
 
-// ValidateCSRFToken verifies if a candidate CSRF token matches the session token.
-func ValidateCSRFToken(sessionToken, candidate string) bool {
+// validateCSRFToken verifies if a candidate CSRF token matches the session token.
+func validateCSRFToken(sessionToken, candidate string) bool {
 	if sessionToken == "" || candidate == "" {
 		return false
 	}
@@ -77,7 +77,7 @@ func requireCSRF(next http.HandlerFunc) http.HandlerFunc {
 			clientCSRF = r.Header.Get("X-Csrf-Token")
 		}
 
-		if !ValidateCSRFToken(c.Value, clientCSRF) {
+		if !validateCSRFToken(c.Value, clientCSRF) {
 			LogSecurityAudit("csrf_rejected", cfg.Username, ClientIP(r), "path="+path)
 			writeAPIError(w, r, "E-AUTH-08", "invalid or missing CSRF token")
 			return

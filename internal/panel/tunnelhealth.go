@@ -66,7 +66,7 @@ var (
 	tunnelHealthSettle  = 12 * time.Second
 )
 
-type TunnelLayers struct {
+type tunnelLayers struct {
 	Service string `json:"service"`
 	Session string `json:"session"`
 	Data    string `json:"data"`
@@ -80,7 +80,7 @@ type TunnelHealthEntry struct {
 	Verdict     string       `json:"verdict"`
 	LatencyMs   float64      `json:"latency_ms"`
 	LatencyKind string       `json:"latency_kind"`
-	Layers      TunnelLayers `json:"layers"`
+	Layers      tunnelLayers `json:"layers"`
 	Reason      string       `json:"reason"`
 	Checked     string       `json:"checked"`
 }
@@ -242,7 +242,7 @@ func probeConn(c net.Conn, start time.Time) (float64, string, error) {
 // checkTunnel is the verdict logic for one tunnel; it reads only the target.
 func checkTunnel(t thTarget, now string) TunnelHealthEntry {
 	e := TunnelHealthEntry{ID: t.id, Name: t.name, Engine: t.engine, Role: t.role, LatencyMs: -1, Checked: now,
-		Layers: TunnelLayers{Service: layerSkipped, Session: layerSkipped, Data: layerSkipped}}
+		Layers: tunnelLayers{Service: layerSkipped, Session: layerSkipped, Data: layerSkipped}}
 	if t.latKind != "" && t.latMs >= 0 {
 		e.LatencyMs, e.LatencyKind = t.latMs, t.latKind
 	}
@@ -388,7 +388,7 @@ func runTunnelHealth() *tunnelHealthResult {
 		}
 		res.Tunnels = append(res.Tunnels, TunnelHealthEntry{ID: t.id, Name: t.name, Engine: t.engine, Role: t.role,
 			Verdict: VerdictFail, LatencyMs: -1, Checked: stamp, Reason: "health check timed out",
-			Layers: TunnelLayers{Service: layerUnknown, Session: layerUnknown, Data: layerUnknown}})
+			Layers: tunnelLayers{Service: layerUnknown, Session: layerUnknown, Data: layerUnknown}})
 	}
 	mu.Unlock()
 	return res

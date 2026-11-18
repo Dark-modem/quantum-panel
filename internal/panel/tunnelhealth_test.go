@@ -71,24 +71,24 @@ func TestTunnelHealthVerdicts(t *testing.T) {
 		mod     func(*thTarget)
 		serve   func(net.Conn)
 		verdict string
-		layers  TunnelLayers
+		layers  tunnelLayers
 		reason  string
 	}{
-		{"pass banner", nil, banner, VerdictPass, TunnelLayers{layerOK, layerOK, layerOK}, "banner"},
-		{"pass echo", nil, echo, VerdictPass, TunnelLayers{layerOK, layerOK, layerOK}, "data path OK on port 8001"},
-		{"pass held open", nil, silent, VerdictPass, TunnelLayers{layerOK, layerOK, layerOK}, "held open"},
-		{"data fail while session live", nil, slamShut, VerdictFail, TunnelLayers{layerOK, layerOK, layerFail}, "data probe on port 8001 failed"},
-		{"data dial refused", nil, nil, VerdictFail, TunnelLayers{layerOK, layerOK, layerFail}, "data probe"},
-		{"service down", func(x *thTarget) { x.svcUp, x.linked = false, false }, banner, VerdictFail, TunnelLayers{layerFail, layerSkipped, layerSkipped}, "frps-1 is configured but not active"},
-		{"session absent, peer pings", func(x *thTarget) { x.linked, x.icmpOK = false, true }, banner, VerdictFail, TunnelLayers{layerOK, layerFail, layerSkipped}, "session expected but absent"},
-		{"session absent, cached tcp probe", func(x *thTarget) { x.linked, x.probeCached = false, true }, banner, VerdictFail, TunnelLayers{layerOK, layerFail, layerSkipped}, "peer answers TCP"},
-		{"nothing answers", func(x *thTarget) { x.linked = false }, nil, VerdictUnreachable, TunnelLayers{layerOK, layerUnknown, layerSkipped}, "peer not answering on any path — cannot tell engine health"},
-		{"binary missing frp", func(x *thTarget) { x.unit = "frpc" }, banner, VerdictFail, TunnelLayers{layerFail, layerSkipped, layerSkipped}, "engine binary missing (frpc"},
-		{"control port only", func(x *thTarget) { x.ports = nil }, banner, VerdictPass, TunnelLayers{layerOK, layerOK, layerSkipped}, "no forwarded port to probe — control port only"},
-		{"control port only unreachable", func(x *thTarget) { x.ports = nil }, nil, VerdictFail, TunnelLayers{layerOK, layerOK, layerFail}, "control port only"},
-		{"backhaul ok", func(x *thTarget) { x.engine, x.unit = "backhaul", "frps-2" }, echo, VerdictPass, TunnelLayers{layerOK, layerOK, layerOK}, ""},
-		{"live session, no address", func(x *thTarget) { x.hosts = nil }, echo, VerdictUnreachable, TunnelLayers{layerOK, layerOK, layerUnknown}, "no address to probe"},
-		{"no unit configured", func(x *thTarget) { x.svcUp, x.linked, x.unit = false, false, "" }, banner, VerdictFail, TunnelLayers{layerFail, layerSkipped, layerSkipped}, "no tunnel service configured"},
+		{"pass banner", nil, banner, VerdictPass, tunnelLayers{layerOK, layerOK, layerOK}, "banner"},
+		{"pass echo", nil, echo, VerdictPass, tunnelLayers{layerOK, layerOK, layerOK}, "data path OK on port 8001"},
+		{"pass held open", nil, silent, VerdictPass, tunnelLayers{layerOK, layerOK, layerOK}, "held open"},
+		{"data fail while session live", nil, slamShut, VerdictFail, tunnelLayers{layerOK, layerOK, layerFail}, "data probe on port 8001 failed"},
+		{"data dial refused", nil, nil, VerdictFail, tunnelLayers{layerOK, layerOK, layerFail}, "data probe"},
+		{"service down", func(x *thTarget) { x.svcUp, x.linked = false, false }, banner, VerdictFail, tunnelLayers{layerFail, layerSkipped, layerSkipped}, "frps-1 is configured but not active"},
+		{"session absent, peer pings", func(x *thTarget) { x.linked, x.icmpOK = false, true }, banner, VerdictFail, tunnelLayers{layerOK, layerFail, layerSkipped}, "session expected but absent"},
+		{"session absent, cached tcp probe", func(x *thTarget) { x.linked, x.probeCached = false, true }, banner, VerdictFail, tunnelLayers{layerOK, layerFail, layerSkipped}, "peer answers TCP"},
+		{"nothing answers", func(x *thTarget) { x.linked = false }, nil, VerdictUnreachable, tunnelLayers{layerOK, layerUnknown, layerSkipped}, "peer not answering on any path — cannot tell engine health"},
+		{"binary missing frp", func(x *thTarget) { x.unit = "frpc" }, banner, VerdictFail, tunnelLayers{layerFail, layerSkipped, layerSkipped}, "engine binary missing (frpc"},
+		{"control port only", func(x *thTarget) { x.ports = nil }, banner, VerdictPass, tunnelLayers{layerOK, layerOK, layerSkipped}, "no forwarded port to probe — control port only"},
+		{"control port only unreachable", func(x *thTarget) { x.ports = nil }, nil, VerdictFail, tunnelLayers{layerOK, layerOK, layerFail}, "control port only"},
+		{"backhaul ok", func(x *thTarget) { x.engine, x.unit = "backhaul", "frps-2" }, echo, VerdictPass, tunnelLayers{layerOK, layerOK, layerOK}, ""},
+		{"live session, no address", func(x *thTarget) { x.hosts = nil }, echo, VerdictUnreachable, tunnelLayers{layerOK, layerOK, layerUnknown}, "no address to probe"},
+		{"no unit configured", func(x *thTarget) { x.svcUp, x.linked, x.unit = false, false, "" }, banner, VerdictFail, tunnelLayers{layerFail, layerSkipped, layerSkipped}, "no tunnel service configured"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

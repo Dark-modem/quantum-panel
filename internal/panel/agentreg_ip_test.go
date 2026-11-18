@@ -57,7 +57,7 @@ func TestEnrollLoopbackIPDoesNotPoison(t *testing.T) {
 	withTempConfig(t)
 	// Close the SQLite store before t.TempDir's RemoveAll: on Windows an
 	// open quantum.db handle blocks the cleanup (LIFO order puts this first).
-	t.Cleanup(MeshStoreCloseForTest)
+	t.Cleanup(meshStoreCloseForTest)
 
 	// Create a token via the real handler.
 	tok := createTestToken(t)
@@ -113,7 +113,7 @@ func TestMeshAgentPublicIPEndpoint(t *testing.T) {
 	withTempConfig(t)
 	// Close the SQLite store before t.TempDir's RemoveAll (Windows keeps
 	// the quantum.db handle locked; LIFO order puts this cleanup first).
-	t.Cleanup(MeshStoreCloseForTest)
+	t.Cleanup(meshStoreCloseForTest)
 	tok := createTestToken(t)
 
 	// Enroll from a usable public address so the record exists.

@@ -68,8 +68,8 @@ func newTestEngine(t *testing.T, startedAt time.Time) (*meshAlertEngine, *fakeNo
 	if err != nil {
 		t.Fatal(err)
 	}
-	MeshStoreSetForTest(s)
-	t.Cleanup(MeshStoreCloseForTest)
+	meshStoreSetForTest(s)
+	t.Cleanup(meshStoreCloseForTest)
 	e := newMeshAlertEngine()
 	e.startedAt = startedAt
 	fake := &fakeNotifier{}
@@ -234,8 +234,8 @@ func TestMeshAlertTunnelDownAndForeignAllDown(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
-	MeshStoreSetForTest(s)
-	t.Cleanup(MeshStoreCloseForTest)
+	meshStoreSetForTest(s)
+	t.Cleanup(meshStoreCloseForTest)
 	dc, _ := s.UpsertDatacenter(store.Datacenter{Kind: "iran", Name: "d1"})
 	sv1, _ := s.UpsertServer(store.Server{Name: "ir", Role: "iran", DatacenterID: dc})
 	sv2, _ := s.UpsertServer(store.Server{Name: "fr", Role: "foreign"})
@@ -330,8 +330,8 @@ func TestMeshAlertsSettingsAPIRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
-	MeshStoreSetForTest(s)
-	t.Cleanup(MeshStoreCloseForTest)
+	meshStoreSetForTest(s)
+	t.Cleanup(meshStoreCloseForTest)
 
 	mux := http.NewServeMux()
 	registerMeshAlertRoutes(mux, "")
@@ -393,8 +393,8 @@ func TestMeshAlertsClockDriftThresholdRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
-	MeshStoreSetForTest(s)
-	t.Cleanup(MeshStoreCloseForTest)
+	meshStoreSetForTest(s)
+	t.Cleanup(meshStoreCloseForTest)
 
 	mux := http.NewServeMux()
 	registerMeshAlertRoutes(mux, "")

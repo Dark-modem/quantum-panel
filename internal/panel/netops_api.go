@@ -71,9 +71,9 @@ func netRequireWritableInstall() error {
 // Operation results — stable JSON shapes (the transport contract)
 // ---------------------------------------------------------------------------
 
-// NetopDetectResult is the netopt.detect payload (netHardwareReport itself
+// netopDetectResult is the netopt.detect payload (netHardwareReport itself
 // is fully JSON-tagged; the envelope adds role and warnings count).
-type NetopDetectResult struct {
+type netopDetectResult struct {
 	Role   string             `json:"role"`
 	Report *netHardwareReport `json:"report"`
 }
@@ -114,8 +114,8 @@ type netDrifted struct {
 }
 
 // NetopDetect runs netopt.detect.
-func NetopDetect() (*NetopDetectResult, error) {
-	return &NetopDetectResult{Role: string(netInstallRoleOf()), Report: netDetectHardware()}, nil
+func NetopDetect() (*netopDetectResult, error) {
+	return &netopDetectResult{Role: string(netInstallRoleOf()), Report: netDetectHardware()}, nil
 }
 
 // NetopPlan runs netopt.plan for one role ("" = auto) and optional forced
@@ -244,8 +244,8 @@ func netopJSON(v any) string {
 // protocol. One typed request, one function, the stable result types above.
 // ---------------------------------------------------------------------------
 
-// NetopRequest is the typed request for every netopt operation.
-type NetopRequest struct {
+// netopRequest is the typed request for every netopt operation.
+type netopRequest struct {
 	Op      string `json:"op"`                // detect|plan|apply|status|rollback|revert
 	Role    string `json:"role,omitempty"`    // controller|agent|auto ("" = auto)
 	Profile string `json:"profile,omitempty"` // conservative|balanced|performance|auto
@@ -258,11 +258,11 @@ var netopValidOps = map[string]bool{
 	"status": true, "rollback": true, "revert": true,
 }
 
-// NetopDispatch routes one typed request to its handler. The returned value
+// netopDispatch routes one typed request to its handler. The returned value
 // is one of the stable result types (marshal directly); the error is a Go
 // error for the transport to wrap. Mutating ops enforce the installation and
 // privilege rules internally.
-func NetopDispatch(req NetopRequest) (any, error) {
+func netopDispatch(req netopRequest) (any, error) {
 	if !netopValidOps[req.Op] {
 		return nil, fmt.Errorf("netop: unknown op %q (valid: detect, plan, apply, status, rollback, revert)", req.Op)
 	}

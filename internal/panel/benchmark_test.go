@@ -96,7 +96,7 @@ func TestBenchmarkExecutionAndEndpoints(t *testing.T) {
 		t.Fatalf("handleBenchmarkGet returned %d", rrGet.Code)
 	}
 
-	var loadedRep BenchmarkReport
+	var loadedRep benchmarkReport
 	if err := json.Unmarshal(rrGet.Body.Bytes(), &loadedRep); err != nil {
 		t.Fatalf("failed to parse benchmark JSON response: %v", err)
 	}
@@ -115,7 +115,7 @@ func TestBenchmarkExecutionAndEndpoints(t *testing.T) {
 	// 4. POST /api/benchmark/autopilot
 	enable := true
 	thresh := 30.0
-	reqAPBody, _ := json.Marshal(BenchmarkAutoPilotRequest{
+	reqAPBody, _ := json.Marshal(benchmarkAutoPilotRequest{
 		Enabled:   &enable,
 		Threshold: &thresh,
 	})
@@ -132,7 +132,7 @@ func TestBenchmarkExecutionAndEndpoints(t *testing.T) {
 	}
 
 	// 5. POST /api/benchmark/apply
-	reqApplyBody, _ := json.Marshal(BenchmarkApplyRequest{
+	reqApplyBody, _ := json.Marshal(benchmarkApplyRequest{
 		Carrier: "direct",
 	})
 	reqApply := httptest.NewRequest("POST", "/api/benchmark/apply", bytes.NewReader(reqApplyBody))
@@ -156,7 +156,7 @@ func TestBenchmarkAllSevenProtocolsAndCustomTarget(t *testing.T) {
 	defer func() { configDir = oldConfigDir }()
 
 	// Test with custom TargetHost
-	req := BenchmarkRunRequest{
+	req := benchmarkRunRequest{
 		TargetHost:   "127.0.0.1",
 		TargetRole:   "iran",
 		FrpPort:      7000,

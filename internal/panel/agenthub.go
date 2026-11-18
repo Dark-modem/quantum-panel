@@ -97,9 +97,9 @@ func agentHubTrackRun(runDone chan struct{}) {
 	agentHubRunDonesMu.Unlock()
 }
 
-// AgentObserverWait quiesces the async ack/relay goroutines so tests can
+// agentObserverWait quiesces the async ack/relay goroutines so tests can
 // assert on their file/state effects without racing the observer path.
-func AgentObserverWait() { agentObserverWG.Wait() }
+func agentObserverWait() { agentObserverWG.Wait() }
 
 // agentHubDrainAll closes every live agent session and waits for all session
 // goroutines — current and superseded — to fully exit, including their final
@@ -185,7 +185,7 @@ func agentHubCloseAll() {
 	for _, c := range conns {
 		c.shutdown("test drain")
 	}
-	AgentObserverWait()
+	agentObserverWait()
 	deadline := time.Now().Add(2 * time.Second)
 	for {
 		agentHubMu.Lock()

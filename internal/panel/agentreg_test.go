@@ -126,7 +126,7 @@ func TestAgentRegEnrollLifecycle(t *testing.T) {
 	withTempConfig(t)
 	// The enroll flow lazily opens the file-backed mesh store; close it
 	// before the test's temp-dir cleanup races it on Windows (BACKEND-24).
-	t.Cleanup(MeshStoreCloseForTest)
+	t.Cleanup(meshStoreCloseForTest)
 
 	// Missing token header is a rejection.
 	if rec := agentTestEnroll(t, "", agentTestTokenBody); rec.Code != http.StatusUnauthorized {

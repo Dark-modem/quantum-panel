@@ -65,7 +65,7 @@ type PeerApplyEngineRequest struct {
 	Transport string `json:"transport"` // "tcpmux", "tcp", "ws", "wss"
 }
 
-type PeerConfigUpdateRequest struct {
+type peerConfigUpdateRequest struct {
 	Action             string  `json:"action,omitempty"` // "save", "test"
 	PeerURL            string  `json:"peer_url,omitempty"`
 	PeerSecret         string  `json:"peer_secret,omitempty"`
@@ -490,7 +490,7 @@ func handlePeerConfigGet(w http.ResponseWriter, r *http.Request) {
 
 // POST /api/peer/config (Web admin only)
 func handlePeerConfigPost(w http.ResponseWriter, r *http.Request) {
-	var req PeerConfigUpdateRequest
+	var req peerConfigUpdateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeAPIError(w, r, "E-ACTION-01", "invalid json")
 		return

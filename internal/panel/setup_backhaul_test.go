@@ -24,10 +24,10 @@ func TestBackhaulBundleMakeAndParse(t *testing.T) {
 		t.Fatalf("expected bundle to start with bh1_, got %s", bStr)
 	}
 
-	// 2. ParseBackhaulBundle directly
-	b, err := ParseBackhaulBundle(bStr)
+	// 2. parseBackhaulBundle directly
+	b, err := parseBackhaulBundle(bStr)
 	if err != nil {
-		t.Fatalf("ParseBackhaulBundle failed: %v", err)
+		t.Fatalf("parseBackhaulBundle failed: %v", err)
 	}
 	if b.Engine != "backhaul" {
 		t.Fatalf("expected engine=backhaul, got %s", b.Engine)
@@ -98,10 +98,10 @@ func TestGreBackhaulBundleMakeAndParse(t *testing.T) {
 		t.Fatalf("expected bundle to start with gh1_, got %s", bStr)
 	}
 
-	// 2. ParseGreBackhaulBundle directly
-	b, err := ParseGreBackhaulBundle(bStr)
+	// 2. parseGreBackhaulBundle directly
+	b, err := parseGreBackhaulBundle(bStr)
 	if err != nil {
-		t.Fatalf("ParseGreBackhaulBundle failed: %v", err)
+		t.Fatalf("parseGreBackhaulBundle failed: %v", err)
 	}
 	if b.Engine != "gre-backhaul" {
 		t.Fatalf("expected engine=gre-backhaul, got %s", b.Engine)
@@ -334,7 +334,7 @@ func TestBackhaulPeersPatchWithRangesAndMappings(t *testing.T) {
 	if !ok || !strings.HasPrefix(bundleStr, "bh1_") {
 		t.Fatalf("expected returned bundle to start with bh1_, got %v", resp["bundle"])
 	}
-	parsedBundle, err := ParseBackhaulBundle(bundleStr)
+	parsedBundle, err := parseBackhaulBundle(bundleStr)
 	if err != nil {
 		t.Fatalf("failed to parse returned bundle: %v", err)
 	}

@@ -32,7 +32,7 @@ func TestFirewallAgentPlanAlwaysDryRun(t *testing.T) {
 	fake.adopt(fwIptablesHost())
 	fake.setResponse("iptables -S QUANTUM_FW", "")
 
-	res, err := AgentFirewallPlan(fwAgentPlanParams{
+	res, err := agentFirewallPlan(fwAgentPlanParams{
 		Owner: "tunnel:at_x", Family: "ipv4", Note: "agent plan",
 		Add: []fwPortSpec{{Port: 8443, Proto: "tcp"}},
 	})
@@ -65,7 +65,7 @@ func TestFirewallAgentPlanValidation(t *testing.T) {
 		{Owner: "tunnel:at_x"}, // nothing to plan
 	}
 	for i, p := range cases {
-		if _, err := AgentFirewallPlan(p); err == nil {
+		if _, err := agentFirewallPlan(p); err == nil {
 			t.Fatalf("case %d must be rejected", i)
 		}
 	}
@@ -79,7 +79,7 @@ func TestFirewallAgentApplyRequiresConfirmed(t *testing.T) {
 	ops := []fwOp{{Kind: "add", Rule: fwPortRule{
 		Port: 8443, Proto: "tcp", Family: "ipv4", Owner: "tunnel:at_x"}}}
 
-	if _, err := AgentFirewallApply(fwAgentApplyParams{Ops: ops}); err == nil {
+	if _, err := agentFirewallApply(fwAgentApplyParams{Ops: ops}); err == nil {
 		t.Fatal("apply without Confirmed must be refused")
 	}
 	for _, c := range fake.recorded() {
@@ -87,7 +87,7 @@ func TestFirewallAgentApplyRequiresConfirmed(t *testing.T) {
 			t.Fatalf("unconfirmed apply mutated the host: %s", c)
 		}
 	}
-	res, err := AgentFirewallApply(fwAgentApplyParams{Ops: ops, Confirmed: true})
+	res, err := agentFirewallApply(fwAgentApplyParams{Ops: ops, Confirmed: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,10 +109,10 @@ func TestFirewallAgentTeardownGuardsAndReleases(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := AgentFirewallTeardown(fwAgentTeardownParams{Owner: "tunnel:at_x"}); err == nil {
+	if _, err := agentFirewallTeardown(fwAgentTeardownParams{Owner: "tunnel:at_x"}); err == nil {
 		t.Fatal("teardown without Confirmed must be refused")
 	}
-	_, err := AgentFirewallTeardown(fwAgentTeardownParams{Owner: "tunnel:at_x", Confirmed: true})
+	_, err := agentFirewallTeardown(fwAgentTeardownParams{Owner: "tunnel:at_x", Confirmed: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,20 +133,20 @@ func TestFirewallAgentPortCheckAndList(t *testing.T) {
 	fake := portTestLab(t)
 	fake.setResponse("ss -Htulnp", portTestSS)
 
-	if _, err := AgentPortCheck(fwAgentPortCheckParams{Port: 0}); err == nil {
+	if _, err := agentPortCheck(fwAgentPortCheckParams{Port: 0}); err == nil {
 		t.Fatal("bad port must be rejected")
 	}
-	if _, err := AgentPortCheck(fwAgentPortCheckParams{Port: 443, Proto: "sctp"}); err == nil {
+	if _, err := agentPortCheck(fwAgentPortCheckParams{Port: 443, Proto: "sctp"}); err == nil {
 		t.Fatal("bad proto must be rejected")
 	}
-	rep, err := AgentPortCheck(fwAgentPortCheckParams{Port: 8443})
+	rep, err := agentPortCheck(fwAgentPortCheckParams{Port: 8443})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if m, ok := rep.(map[string]any); !ok || m["tcp"] == nil || m["udp"] == nil {
 		t.Fatalf("proto-less check must report both transports: %#v", rep)
 	}
-	avail, err := AgentPortCheck(fwAgentPortCheckParams{Port: 8443, Proto: "tcp"})
+	avail, err := agentPortCheck(fwAgentPortCheckParams{Port: 8443, Proto: "tcp"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +155,7 @@ func TestFirewallAgentPortCheckAndList(t *testing.T) {
 		t.Fatalf("tcp 8443 must show the xray listener, got %+v", a)
 	}
 
-	list, err := AgentPortList()
+	list, err := agentPortList()
 	if err != nil {
 		t.Fatal(err)
 	}

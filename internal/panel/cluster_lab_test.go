@@ -443,7 +443,7 @@ func TestLBLabE2E(t *testing.T) {
 	for _, f := range fs {
 		members = append(members, LBMember{Link: f.link, Weight: 1, Priority: f.link})
 	}
-	if err := saveClusterConfig(ClusterConfig{Version: 2, NodeID: "lab", Health: LBHealth{IntervalMs: 1000, Fall: 2, Rise: 2},
+	if err := saveClusterConfig(ClusterConfig{Version: 2, NodeID: "lab", Health: lbHealth{IntervalMs: 1000, Fall: 2, Rise: 2},
 		Pools: []LBPool{{Port: 443, Proto: "tcp", Mode: lbBalance, Check: "tcp", CheckEvery: 1, Members: members}}}); err != nil {
 		t.Fatal(err)
 	}

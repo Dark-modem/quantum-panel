@@ -46,7 +46,7 @@ func TestBackhaulBundleUDPMark(t *testing.T) {
 	}
 
 	s := MakeBackhaulBundle("203.0.113.5", 3080, backhaulBundleTransport("tcpmux", 3082), "tok", []string{"443", "2083=8443"})
-	b, err := ParseBackhaulBundle(s)
+	b, err := parseBackhaulBundle(s)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,14 +54,14 @@ func TestBackhaulBundleUDPMark(t *testing.T) {
 		t.Fatalf("bh1 parse: %+v (%s)", b, s)
 	}
 	g := MakeGreBackhaulBundle("203.0.113.5", 3080, "10.80.0.1", "10.80.0.2", backhaulBundleTransport("wss", 3082), "tok", []string{"443"})
-	gb, err := ParseGreBackhaulBundle(g)
+	gb, err := parseGreBackhaulBundle(g)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if gb.Transport != "wss" || !gb.UDP || gb.UDPPort != 3082 {
 		t.Fatalf("gh1 parse: %+v", gb)
 	}
-	old, err := ParseBackhaulBundle("bh1_203.0.113.5_3080_tcpmux_tok_443")
+	old, err := parseBackhaulBundle("bh1_203.0.113.5_3080_tcpmux_tok_443")
 	if err != nil || old.UDP || old.Transport != "tcpmux" {
 		t.Fatalf("bundle without the mark: %+v %v", old, err)
 	}
@@ -145,9 +145,9 @@ func TestBagherUDP(t *testing.T) {
 		t.Fatalf("want 4 proxies (2 tcp + 2 udp), got %d", n)
 	}
 
-	raw, _ := json.Marshal(BagherBundle{Version: 1, Role: "foreign", IranPub: "203.0.113.5", FRPPort: 55400,
+	raw, _ := json.Marshal(bagherBundle{Version: 1, Role: "foreign", IranPub: "203.0.113.5", FRPPort: 55400,
 		Ports: []int{443}, PoolCount: 5, SSHPublicKey: "ssh-ed25519 AAAA", UDP: true})
-	b, err := ParseBagherBundle("BAGHER:" + base64.StdEncoding.EncodeToString(raw))
+	b, err := parseBagherBundle("BAGHER:" + base64.StdEncoding.EncodeToString(raw))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -26,19 +26,19 @@ func TestJalaliKnownDates(t *testing.T) {
 		{1398, 1, 1, 2019, time.March, 21}, // 1398 leap (Feb 29 2020 inside)
 	}
 	for _, c := range cases {
-		gy, gm, gd, err := JalaliToGregorian(c.jy, c.jm, c.jd)
+		gy, gm, gd, err := jalaliToGregorian(c.jy, c.jm, c.jd)
 		if err != nil {
 			t.Fatalf("%d-%d-%d: %v", c.jy, c.jm, c.jd, err)
 		}
 		if gy != c.gy || time.Month(gm) != c.gm || gd != c.gd {
-			t.Errorf("JalaliToGregorian(%d,%d,%d) = %d-%d-%d, want %d-%s-%d",
+			t.Errorf("jalaliToGregorian(%d,%d,%d) = %d-%d-%d, want %d-%s-%d",
 				c.jy, c.jm, c.jd, gy, gm, gd, c.gy, c.gm, c.gd)
 		}
 	}
-	if !JalaliIsLeap(1403) {
+	if !jalaliIsLeap(1403) {
 		t.Error("1403 must be leap (30 Esfand 1403 = 2026-03-20)")
 	}
-	if JalaliIsLeap(1404) || JalaliIsLeap(1405) {
+	if jalaliIsLeap(1404) || jalaliIsLeap(1405) {
 		t.Error("1404/1405 must NOT be leap")
 	}
 	if ml, _ := jalaliMonthLen(1403, 12); ml != 30 {
@@ -60,7 +60,7 @@ func TestGregorianToJalaliRoundTrip(t *testing.T) {
 		if jy != 1405 || jm != 8 || jd != d {
 			t.Fatalf("%s → %d-%d-%d, want 1405-8-%d", want.Format("2006-01-02"), jy, jm, jd, d)
 		}
-		gy, gm, gd, _ := JalaliToGregorian(1405, 8, d)
+		gy, gm, gd, _ := jalaliToGregorian(1405, 8, d)
 		if gy != want.Year() || int(gm) != int(want.Month()) || gd != want.Day() {
 			t.Fatalf("round trip broke at %d: %d-%d-%d, want %s", d, gy, gm, gd, want.Format("2006-01-02"))
 		}

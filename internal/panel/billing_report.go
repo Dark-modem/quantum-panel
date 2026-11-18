@@ -43,8 +43,8 @@ func jalaliOf(unix int64) string {
 	return fmt.Sprintf("%d-%02d-%02d", jy, jm, jd)
 }
 
-// BuildBillingReport computes the report over an explicit unix range.
-func BuildBillingReport(s interface {
+// buildBillingReport computes the report over an explicit unix range.
+func buildBillingReport(s interface {
 	BillingReport(from, to int64) ([]store.BillingDCRow, []store.BillingServerRow, []store.BillingTunnelRow, error)
 }, from, to int64) (*BillingReport, error) {
 	dcs, servers, tunnels, err := s.BillingReport(from, to)
@@ -61,8 +61,8 @@ func BuildBillingReport(s interface {
 	}, nil
 }
 
-// ParseMonthSpec resolves "1405-08" (Jalali month, Tehran boundaries).
-func ParseMonthSpec(spec string) (from, to int64, err error) {
+// parseMonthSpec resolves "1405-08" (Jalali month, Tehran boundaries).
+func parseMonthSpec(spec string) (from, to int64, err error) {
 	parts := strings.Split(strings.TrimSpace(spec), "-")
 	if len(parts) != 2 {
 		return 0, 0, fmt.Errorf("month must look like 1405-08 (Jalali year-month)")
@@ -78,9 +78,9 @@ func ParseMonthSpec(spec string) (from, to int64, err error) {
 	return TehranMonthRange(jy, jm)
 }
 
-// ParseDateSpec resolves "2026-10-23" as a Tehran DAY start (returns
+// parseDateSpec resolves "2026-10-23" as a Tehran DAY start (returns
 // [day-start, next-day-start)).
-func ParseDateSpec(spec string) (from, to int64, err error) {
+func parseDateSpec(spec string) (from, to int64, err error) {
 	t, err := time.ParseInLocation("2006-01-02", strings.TrimSpace(spec), tehranZone)
 	if err != nil {
 		return 0, 0, fmt.Errorf("date must look like 2026-10-23 (interpreted in Asia/Tehran)")
@@ -208,11 +208,11 @@ func cliReport(args []string) int {
 	var err error
 	switch {
 	case month != "":
-		from, to, err = ParseMonthSpec(month)
+		from, to, err = parseMonthSpec(month)
 	case fromSpec != "" && toSpec != "":
-		from, _, err = ParseDateSpec(fromSpec)
+		from, _, err = parseDateSpec(fromSpec)
 		if err == nil {
-			_, to, err = ParseDateSpec(toSpec)
+			_, to, err = parseDateSpec(toSpec)
 		}
 	default:
 		fmt.Fprintln(os.Stderr, "usage: quantum-panel report --month 1405-08 [--format csv|json] [--out FILE]")
@@ -233,7 +233,7 @@ func cliReport(args []string) int {
 		fmt.Fprintln(os.Stderr, "report: store:", serr)
 		return 1
 	}
-	rep, rerr := BuildBillingReport(s, from, to)
+	rep, rerr := buildBillingReport(s, from, to)
 	if rerr != nil {
 		fmt.Fprintln(os.Stderr, "report:", rerr)
 		return 1
@@ -272,11 +272,11 @@ func handleUIBillingReport(w http.ResponseWriter, r *http.Request) {
 	var from, to int64
 	var err error
 	if m := q.Get("month"); m != "" {
-		from, to, err = ParseMonthSpec(m)
+		from, to, err = parseMonthSpec(m)
 	} else if f, t := q.Get("from"), q.Get("to"); f != "" && t != "" {
-		from, _, err = ParseDateSpec(f)
+		from, _, err = parseDateSpec(f)
 		if err == nil {
-			_, to, err = ParseDateSpec(t)
+			_, to, err = parseDateSpec(t)
 		}
 	} else {
 		uiErrWrite(w, r, "E-VALIDATION", map[string]any{"field": "month"}, "month=1405-08 or from=2026-10-23&to=2026-11-21 required (Asia/Tehran)")
@@ -286,7 +286,7 @@ func handleUIBillingReport(w http.ResponseWriter, r *http.Request) {
 		uiErrWrite(w, r, "E-VALIDATION", map[string]any{"field": "month"}, err.Error())
 		return
 	}
-	rep, rerr := BuildBillingReport(h.Store, from, to)
+	rep, rerr := buildBillingReport(h.Store, from, to)
 	if rerr != nil {
 		uiErrWrite(w, r, "E-STORE", map[string]any{"op": "billing report"}, rerr.Error())
 		return

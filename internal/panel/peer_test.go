@@ -150,7 +150,7 @@ func TestPeerEndpoints(t *testing.T) {
 
 	// 4. Config Update (Web Admin)
 	enable := true
-	upBody, _ := json.Marshal(PeerConfigUpdateRequest{
+	upBody, _ := json.Marshal(peerConfigUpdateRequest{
 		PeerURL:            "http://8.8.8.8:8080",
 		PeerSecret:         "new-secret-xyz",
 		AutoPilotEnabled:   &enable,

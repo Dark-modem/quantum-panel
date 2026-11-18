@@ -95,7 +95,7 @@ func TestBagherLinkBundleAndPersistence(t *testing.T) {
 		t.Fatal(err)
 	}
 	raw, _ := base64.StdEncoding.DecodeString(strings.TrimPrefix(bundle, "BAGHER:"))
-	var b BagherBundle
+	var b bagherBundle
 	_ = json.Unmarshal(raw, &b)
 	if b.RemoteHost != "198.51.100.2" || len(b.Ports) != 1 || b.Ports[0] != 2053 || !b.UDP || b.SSHPort != 2222 || b.FRPPort != 55400 {
 		t.Fatalf("link bundle: %+v", b)

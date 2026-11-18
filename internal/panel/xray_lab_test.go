@@ -48,7 +48,7 @@ func TestXrayLabGen(t *testing.T) {
 			}
 			if preset == "kcp-noise" {
 				p = xrayPresets["kcp"]
-				p.Noise = &XrayNoise{Type: "rand", Length: "20-80", Delay: "5-10", Count: 3}
+				p.Noise = &xrayNoise{Type: "rand", Length: "20-80", Delay: "5-10", Count: 3}
 			}
 			if p.Security == "reality" {
 				p.SNI, p.Target = "lab.example", env("TARGET")
