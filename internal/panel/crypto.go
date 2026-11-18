@@ -13,9 +13,9 @@ import (
 	"strings"
 )
 
-// SecureRandomHex generates n cryptographically secure random bytes
+// secureRandomHex generates n cryptographically secure random bytes
 // and returns them as a hexadecimal string.
-func SecureRandomHex(n int) (string, error) {
+func secureRandomHex(n int) (string, error) {
 	b := make([]byte, n)
 	if _, err := rand.Read(b); err != nil {
 		return "", err
@@ -66,8 +66,8 @@ func ConstantTimeCompare(a, b string) bool {
 	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
 }
 
-// ComputeSHA256 computes the SHA256 hash of data read from r.
-func ComputeSHA256(r io.Reader) (string, error) {
+// computeSHA256 computes the SHA256 hash of data read from r.
+func computeSHA256(r io.Reader) (string, error) {
 	h := sha256.New()
 	if _, err := io.Copy(h, r); err != nil {
 		return "", err
@@ -83,7 +83,7 @@ func VerifyFileSHA256(path, expectedHash string) error {
 	}
 	defer f.Close()
 
-	actual, err := ComputeSHA256(f)
+	actual, err := computeSHA256(f)
 	if err != nil {
 		return err
 	}

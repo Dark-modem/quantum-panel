@@ -143,9 +143,9 @@ func TestBagherBundleRoundtrip(t *testing.T) {
 		t.Fatalf("expected bundle prefix 'BAGHER:', got: %s", bundleStr)
 	}
 
-	parsed, err := ParseBagherBundle(bundleStr)
+	parsed, err := parseBagherBundle(bundleStr)
 	if err != nil {
-		t.Fatalf("ParseBagherBundle failed: %v", err)
+		t.Fatalf("parseBagherBundle failed: %v", err)
 	}
 	if parsed.FRPPort != 55400 {
 		t.Errorf("expected FRPPort 55400, got: %d", parsed.FRPPort)
@@ -161,10 +161,10 @@ func TestBagherBundleRoundtrip(t *testing.T) {
 	}
 
 	// Corrupted bundle test
-	if _, err := ParseBagherBundle("BAGHER:invalid-b64-here"); err == nil {
+	if _, err := parseBagherBundle("BAGHER:invalid-b64-here"); err == nil {
 		t.Error("expected error parsing corrupted bundle, got nil")
 	}
-	if _, err := ParseBagherBundle("WRONGPREFIX:xxx"); err == nil {
+	if _, err := parseBagherBundle("WRONGPREFIX:xxx"); err == nil {
 		t.Error("expected error for wrong prefix, got nil")
 	}
 }
@@ -301,7 +301,7 @@ func TestBagherBundleGeneration(t *testing.T) {
 		t.Fatalf("expected bundle prefix BAGHER:, got: %s", bundleStr)
 	}
 
-	bundle, err := ParseBagherBundle(bundleStr)
+	bundle, err := parseBagherBundle(bundleStr)
 	if err != nil {
 		t.Fatalf("failed to parse bundle: %v", err)
 	}

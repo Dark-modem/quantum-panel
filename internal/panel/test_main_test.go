@@ -24,13 +24,13 @@ func withTempConfig(t *testing.T) {
 	if agentHubConns != nil {
 		agentHubDrainAll()
 	}
-	AgentObserverWait()
+	agentObserverWait()
 	old := configDir
 	configDir = t.TempDir()
 	t.Cleanup(func() {
 		agentHubDrainAll()
-		AgentObserverWait()
-		MeshStoreCloseForTest() // close the lazily-opened quantum.db BEFORE the temp dir is removed (Windows file locks, BACKEND-24)
+		agentObserverWait()
+		meshStoreCloseForTest() // close the lazily-opened quantum.db BEFORE the temp dir is removed (Windows file locks, BACKEND-24)
 		configDir = old
 	})
 }
@@ -56,7 +56,7 @@ func TestMain(m *testing.M) {
 	}
 	// The spoke half of the reverse-path matrix dials a spoke panel over
 	// HTTP; tests must opt in explicitly. Nothing here ever reaches the net.
-	spokeFetcher = func(p peerRecord) *SpokeProbeReport { return nil }
+	spokeFetcher = func(p peerRecord) *spokeProbeReport { return nil }
 	// The post-switch health run sleeps then probes; tests opt in explicitly.
 	tunnelHealthAutoRun = false
 	// detectPublicIP's "what is my IP" fallback must not reach the internet.

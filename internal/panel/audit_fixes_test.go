@@ -111,8 +111,8 @@ func TestPGGuardPrivateURLOptIn(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	MeshStoreSetForTest(s)
-	t.Cleanup(MeshStoreCloseForTest)
+	meshStoreSetForTest(s)
+	t.Cleanup(meshStoreCloseForTest)
 	_ = s.SetSetting("pasarguard_block_private", "true")
 
 	for _, bad := range []string{

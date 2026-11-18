@@ -60,7 +60,7 @@ func resetFixState() {
 	fixMu.Lock()
 	fixLastRun = map[int]time.Time{}
 	fixHour = nil
-	fixReports = map[int]*FixReport{}
+	fixReports = map[int]*fixReport{}
 	fixMu.Unlock()
 }
 
@@ -248,7 +248,7 @@ func TestMergeSpokeReport(t *testing.T) {
 		res(DirHubToSpoke, LayerICMPGre64, true),
 		{Layer: LayerICMPGre64, Direction: DirUnprobed},
 	}
-	rep := &SpokeProbeReport{
+	rep := &spokeProbeReport{
 		Matrix: ProbeMatrix{Results: []ProbeResult{
 			res(DirSpokeToHub, LayerICMPGre64, true),
 		}},
@@ -272,14 +272,14 @@ func TestMergeSpokeReport(t *testing.T) {
 
 // The spoke probe handler answers with a matrix and snapshot.
 func TestSpokeProbeHandler(t *testing.T) {
-	body, _ := json.Marshal(SpokeProbeRequest{HubInner: "10.10.10.1", HubPublic: "203.0.113.5", ControlPort: 7091})
+	body, _ := json.Marshal(spokeProbeRequest{HubInner: "10.10.10.1", HubPublic: "203.0.113.5", ControlPort: 7091})
 	req := httptest.NewRequest("POST", "/api/peer/revpath-probe", bytes.NewReader(body))
 	rr := httptest.NewRecorder()
 	handlePeerRevPathProbe(rr, req)
 	if rr.Code != http.StatusOK {
 		t.Fatalf("status %d: %s", rr.Code, rr.Body.String())
 	}
-	var rep SpokeProbeReport
+	var rep spokeProbeReport
 	if err := json.Unmarshal(rr.Body.Bytes(), &rep); err != nil || !rep.OK {
 		t.Fatalf("bad report: %v %s", err, rr.Body.String())
 	}
@@ -304,7 +304,7 @@ func TestProbeFromSpokeReadOnly(t *testing.T) {
 		return nil, fmt.Errorf("no host")
 	}
 	defer func() { runner = prev }()
-	m := probeFromSpoke(SpokeProbeRequest{HubInner: "10.10.10.1", HubPublic: "203.0.113.5", ControlPort: 7091}, LocalSnapshot{InnerLocal: "10.10.10.2"})
+	m := probeFromSpoke(spokeProbeRequest{HubInner: "10.10.10.1", HubPublic: "203.0.113.5", ControlPort: 7091}, LocalSnapshot{InnerLocal: "10.10.10.2"})
 	if len(m.Results) == 0 {
 		t.Fatal("expected layers even when all fail")
 	}
@@ -342,7 +342,7 @@ func TestFixHandlerDryRun(t *testing.T) {
 	var out struct {
 		DryRun    bool             `json:"dry_run"`
 		Diagnosis RevPathDiagnosis `json:"diagnosis"`
-		Steps     []FixStep        `json:"steps"`
+		Steps     []fixStep        `json:"steps"`
 	}
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil || !out.DryRun {
 		t.Fatalf("bad dry-run response: %v %s", err, rr.Body.String())

@@ -26,8 +26,8 @@ func backupTestEnv(t *testing.T) (string, string) {
 	if err != nil {
 		t.Fatalf("store: %v", err)
 	}
-	MeshStoreSetForTest(s)
-	t.Cleanup(func() { MeshStoreCloseForTest() })
+	meshStoreSetForTest(s)
+	t.Cleanup(func() { meshStoreCloseForTest() })
 	// Real on-disk db the snapshot can VACUUM INTO from.
 	dbPath := filepath.Join(configDir, "quantum.db")
 	disk, err := store.Open(dbPath)

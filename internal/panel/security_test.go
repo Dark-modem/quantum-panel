@@ -116,19 +116,19 @@ func TestCSRFTokenGenerationAndValidation(t *testing.T) {
 		t.Fatal("empty CSRF token generated")
 	}
 
-	if !ValidateCSRFToken(sessionTok, csrf) {
+	if !validateCSRFToken(sessionTok, csrf) {
 		t.Fatal("expected valid CSRF token to pass validation")
 	}
 
-	if ValidateCSRFToken(sessionTok, "forged-csrf-token") {
+	if validateCSRFToken(sessionTok, "forged-csrf-token") {
 		t.Fatal("forged CSRF token should have failed validation")
 	}
 
-	if ValidateCSRFToken("another-session", csrf) {
+	if validateCSRFToken("another-session", csrf) {
 		t.Fatal("CSRF token should not match a different session")
 	}
 
-	if ValidateCSRFToken("", csrf) || ValidateCSRFToken(sessionTok, "") {
+	if validateCSRFToken("", csrf) || validateCSRFToken(sessionTok, "") {
 		t.Fatal("empty session or candidate should fail validation")
 	}
 }

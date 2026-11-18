@@ -50,8 +50,8 @@ func newEngineTestEnv(t *testing.T) *engineTestEnv {
 	if err != nil {
 		t.Fatalf("store: %v", err)
 	}
-	MeshStoreSetForTest(s)
-	t.Cleanup(func() { MeshStoreCloseForTest() })
+	meshStoreSetForTest(s)
+	t.Cleanup(func() { meshStoreCloseForTest() })
 
 	pub, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {

@@ -79,8 +79,8 @@ func noteStoreRetry() {
 	meshRetryMu.Unlock()
 }
 
-// MeshStoreSetForTest replaces the process-wide store (tests only).
-func MeshStoreSetForTest(s *store.Store) {
+// meshStoreSetForTest replaces the process-wide store (tests only).
+func meshStoreSetForTest(s *store.Store) {
 	meshStoreMu.Lock()
 	defer meshStoreMu.Unlock()
 	if meshStore != nil {
@@ -91,8 +91,8 @@ func MeshStoreSetForTest(s *store.Store) {
 	meshImported = true // tests manage their own fixtures
 }
 
-// MeshStoreCloseForTest closes and forgets the store (test teardown).
-func MeshStoreCloseForTest() {
+// meshStoreCloseForTest closes and forgets the store (test teardown).
+func meshStoreCloseForTest() {
 	meshStoreMu.Lock()
 	defer meshStoreMu.Unlock()
 	if meshStore != nil {

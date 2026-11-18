@@ -430,7 +430,7 @@ func TestLBPassRanges(t *testing.T) {
 }
 
 func TestLinkHealthDebounce(t *testing.T) {
-	h := LBHealth{}.norm()
+	h := lbHealth{}.norm()
 	now := time.Now()
 	rt := &lbLinkRT{LatencyMs: -1}
 	step := func(session bool, ms float64, icmp bool) int {
@@ -490,7 +490,7 @@ func TestClusterTickFailover(t *testing.T) {
 	f.peer(3, 7003, "3.3.3.3", 8443) // not part of the pool
 	f.pings = map[string]float64{"10.0.1.2": 30, "10.0.2.2": 60}
 	f.sockets([]string{"169.254.77.2:443", "169.254.77.2:2083", "169.254.77.3:443"}, []string{"7001>10.0.1.2", "7002>10.0.2.2"})
-	if err := saveClusterConfig(ClusterConfig{Version: 2, NodeID: "hub-a", Health: LBHealth{}.norm(),
+	if err := saveClusterConfig(ClusterConfig{Version: 2, NodeID: "hub-a", Health: lbHealth{}.norm(),
 		Pools: []LBPool{{Port: 443, Proto: "tcp", Mode: lbFailover, Members: []LBMember{{Link: 1, Weight: 1, Priority: 0}}}}}); err != nil {
 		t.Fatal(err)
 	}
@@ -578,7 +578,7 @@ func TestClusterRemovedMemberStaysOut(t *testing.T) {
 	f := newClusterFixture(t)
 	f.peer(1, 7001, "1.1.1.1", 443)
 	f.peer(2, 7002, "2.2.2.2", 443)
-	_ = saveClusterConfig(ClusterConfig{Version: 2, NodeID: "hub-a", Health: LBHealth{}.norm(),
+	_ = saveClusterConfig(ClusterConfig{Version: 2, NodeID: "hub-a", Health: lbHealth{}.norm(),
 		Pools: []LBPool{{Port: 443, Proto: "tcp", Mode: lbBalance}}})
 	clusterTick(time.Now())
 	if n := len(loadClusterConfig().Pools[0].Members); n != 2 {
@@ -836,7 +836,7 @@ func TestClusterTickForwardsToHub(t *testing.T) {
 	f.peer(1, 7001, "1.1.1.1", 443)
 	f.sockets([]string{"169.254.77.2:443"}, nil) // link 1 has no session: down
 	lbHubForward = func(ClusterConfig, LBPool) string { return "6.6.6.6" }
-	_ = saveClusterConfig(ClusterConfig{Version: 2, NodeID: "hub-a", Health: LBHealth{}.norm(), HubForward: true,
+	_ = saveClusterConfig(ClusterConfig{Version: 2, NodeID: "hub-a", Health: lbHealth{}.norm(), HubForward: true,
 		Pools: []LBPool{{Port: 443, Proto: "tcp", Mode: lbFailover, Members: []LBMember{{Link: 1, Weight: 1}}}}})
 	now := time.Now()
 	for i := 0; i < 2; i++ {

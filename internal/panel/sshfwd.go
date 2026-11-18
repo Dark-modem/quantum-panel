@@ -448,9 +448,9 @@ EOF
 systemctl daemon-reload && systemctl enable --now quantum-bagher-frpc.service`, strings.TrimSpace(frpcToml))
 }
 
-// BagherBundle encapsulates all connection, authentication, and port parameters
+// bagherBundle encapsulates all connection, authentication, and port parameters
 // for zero-terminal Foreign server auto-configuration.
-type BagherBundle struct {
+type bagherBundle struct {
 	Version      int    `json:"v"`
 	Role         string `json:"role"`
 	IranPub      string `json:"iran_pub"`
@@ -516,7 +516,7 @@ func MakeBagherBundle(cfg SSHFwdConfig, pubKey string) (string, error) {
 	if iranIP == "" || iranIP == "0.0.0.0" {
 		iranIP = cfg.BindAddr
 	}
-	b := BagherBundle{
+	b := bagherBundle{
 		Version:      1,
 		Role:         "foreign",
 		IranPub:      iranIP,
@@ -537,8 +537,8 @@ func MakeBagherBundle(cfg SSHFwdConfig, pubKey string) (string, error) {
 	return "BAGHER:" + base64.StdEncoding.EncodeToString(data), nil
 }
 
-// ParseBagherBundle parses and validates a BAGHER:... bundle string.
-func ParseBagherBundle(bundleStr string) (*BagherBundle, error) {
+// parseBagherBundle parses and validates a BAGHER:... bundle string.
+func parseBagherBundle(bundleStr string) (*bagherBundle, error) {
 	bundleStr = strings.TrimSpace(bundleStr)
 	if !strings.HasPrefix(bundleStr, "BAGHER:") {
 		return nil, fmt.Errorf("invalid bundle prefix, expected BAGHER: prefix")
@@ -548,7 +548,7 @@ func ParseBagherBundle(bundleStr string) (*BagherBundle, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed decoding base64 bundle: %w", err)
 	}
-	var b BagherBundle
+	var b bagherBundle
 	if err := json.Unmarshal(data, &b); err != nil {
 		return nil, fmt.Errorf("invalid bundle json: %w", err)
 	}
@@ -573,8 +573,8 @@ func ParseBagherBundle(bundleStr string) (*BagherBundle, error) {
 	return &b, nil
 }
 
-// applyBagherBundle configures Foreign host automatically from a parsed BagherBundle.
-func applyBagherBundle(b *BagherBundle) error {
+// applyBagherBundle configures Foreign host automatically from a parsed bagherBundle.
+func applyBagherBundle(b *bagherBundle) error {
 	if err := installRestrictedKey(b.SSHPublicKey, "bagher", b.FRPPort, b.Ports); err != nil {
 		return err
 	}
@@ -650,7 +650,7 @@ func formatByteSize(b int64) string {
 	return fmt.Sprintf("%.1f %cB", float64(b)/float64(div), "KMGTPE"[exp])
 }
 
-type BagherLiveMetrics struct {
+type bagherLiveMetrics struct {
 	Connected      bool    `json:"connected"`
 	StatusText     string  `json:"status_text"`
 	LatencyMs      float64 `json:"latency_ms"`
@@ -664,7 +664,7 @@ type BagherLiveMetrics struct {
 	ClientCounts   int     `json:"client_counts"`
 }
 
-func getBagherLiveMetrics(cfg SSHFwdConfig) BagherLiveMetrics {
+func getBagherLiveMetrics(cfg SSHFwdConfig) bagherLiveMetrics {
 	isForeign := cfg.Role == "foreign" || cfg.Role == "server"
 	if !isForeign {
 		outFrpc, _ := runCmd("systemctl", "is-active", "quantum-bagher-frpc.service")
@@ -676,7 +676,7 @@ func getBagherLiveMetrics(cfg SSHFwdConfig) BagherLiveMetrics {
 	if isForeign {
 		outFrpc, _ := runCmd("systemctl", "is-active", "quantum-bagher-frpc.service")
 		if strings.TrimSpace(outFrpc) != "active" {
-			return BagherLiveMetrics{Connected: false, StatusText: "inactive", RxFormatted: "0 B", TxFormatted: "0 B", TotalFormatted: "0 B"}
+			return bagherLiveMetrics{Connected: false, StatusText: "inactive", RxFormatted: "0 B", TxFormatted: "0 B", TotalFormatted: "0 B"}
 		}
 
 		// Dial 127.0.0.1:FRPBindPort (SSH reverse forward to Iran)
@@ -692,7 +692,7 @@ func getBagherLiveMetrics(cfg SSHFwdConfig) BagherLiveMetrics {
 			statusText = "connected"
 		}
 
-		return BagherLiveMetrics{
+		return bagherLiveMetrics{
 			Connected:      connected,
 			StatusText:     statusText,
 			LatencyMs:      lat,
@@ -710,7 +710,7 @@ func getBagherLiveMetrics(cfg SSHFwdConfig) BagherLiveMetrics {
 	frpsActive := strings.TrimSpace(outFrps) == "active"
 
 	if !bagherActive && !frpsActive {
-		return BagherLiveMetrics{Connected: false, StatusText: "inactive", RxFormatted: "0 B", TxFormatted: "0 B", TotalFormatted: "0 B"}
+		return bagherLiveMetrics{Connected: false, StatusText: "inactive", RxFormatted: "0 B", TxFormatted: "0 B", TotalFormatted: "0 B"}
 	}
 
 	// The carrier's keepalive round trip is the tunnel's own ping; a TCP
@@ -790,7 +790,7 @@ func getBagherLiveMetrics(cfg SSHFwdConfig) BagherLiveMetrics {
 	}
 
 	tot := rx + tx
-	return BagherLiveMetrics{
+	return bagherLiveMetrics{
 		Connected:      connected,
 		StatusText:     statusText,
 		LatencyMs:      lat,
@@ -1156,7 +1156,7 @@ func handleSSHFwdPost(w http.ResponseWriter, r *http.Request) {
 			writeAPIError(w, r, "E-SSHFWD-07", "bundle string is required")
 			return
 		}
-		b, err := ParseBagherBundle(bundleStr)
+		b, err := parseBagherBundle(bundleStr)
 		if err != nil {
 			writeAPIError(w, r, "E-SSHFWD-07", fmt.Sprintf("invalid bagher bundle: %v", err))
 			return

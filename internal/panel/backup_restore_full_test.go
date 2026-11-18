@@ -24,8 +24,8 @@ func TestBackupRestoreCoversAllTables(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	MeshStoreSetForTest(fs)
-	t.Cleanup(MeshStoreCloseForTest)
+	meshStoreSetForTest(fs)
+	t.Cleanup(meshStoreCloseForTest)
 	s := meshStoreMust(t)
 
 	// ---- seed EVERY data class ----
@@ -142,7 +142,7 @@ func TestBackupRestoreCoversAllTables(t *testing.T) {
 	oldCfg := configDir
 	configDir = clean
 	t.Cleanup(func() { configDir = oldCfg })
-	MeshStoreCloseForTest()
+	meshStoreCloseForTest()
 	if rc := RestoreCmd([]string{"--in", bakFile, "--passphrase-file", passFile, "--force"}); rc != 0 {
 		t.Fatalf("RestoreCmd rc=%d", rc)
 	}
@@ -151,8 +151,8 @@ func TestBackupRestoreCoversAllTables(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reopen restored store: %v", err)
 	}
-	MeshStoreSetForTest(rs)
-	t.Cleanup(MeshStoreCloseForTest)
+	meshStoreSetForTest(rs)
+	t.Cleanup(meshStoreCloseForTest)
 
 	after := snapshot(rs)
 	for k, want := range before {

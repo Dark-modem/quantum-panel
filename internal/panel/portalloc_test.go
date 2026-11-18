@@ -62,7 +62,7 @@ func TestPortAllocatorDeterministicLowest(t *testing.T) {
 	}
 	// Reserved preferred ports fall through to the lowest free scan:
 	// SSH and the Pasarguard node port are never handed out.
-	if p, _ := AllocateServerPort(s, sv, "tcp", "test", "o4", SSH_PORT); p != 20002 {
+	if p, _ := AllocateServerPort(s, sv, "tcp", "test", "o4", sshPort); p != 20002 {
 		t.Fatalf("preferred 22 = %d (want 20002 — SSH must not be allocated)", p)
 	}
 	if p, _ := AllocateServerPort(s, sv, "tcp", "test", "o5", 62050); p != 20003 {

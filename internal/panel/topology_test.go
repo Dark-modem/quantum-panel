@@ -437,7 +437,7 @@ func TestTopologyInventorySnapshotOnlyAndNoSecrets(t *testing.T) {
 		Bagher: map[string]any{"has_config": true, "name": "Bagher", "remote_host": "203.0.113.2", "role": "client", "ports": []int{8443}, "connected": true, "latency_ms": 4.0, "private_key": "secret-bagher"},
 	}
 	snapPtr.Store(snap)
-	if err := saveXrayState(xrayState{Links: []XrayLink{{ID: 9, Name: "Xray", Side: "iran", Remote: "203.0.113.2", Ports: []int{2083}, Keys: XrayKeys{UUID: "secret-uuid", PrivateKey: "secret-xray"}}}}); err != nil {
+	if err := saveXrayState(xrayState{Links: []XrayLink{{ID: 9, Name: "Xray", Side: "iran", Remote: "203.0.113.2", Ports: []int{2083}, Keys: xrayKeys{UUID: "secret-uuid", PrivateKey: "secret-xray"}}}}); err != nil {
 		t.Fatal(err)
 	}
 	xrayHealthCache.Lock()

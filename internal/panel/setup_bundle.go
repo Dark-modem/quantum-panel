@@ -113,8 +113,8 @@ func MakeGreBackhaulBundle(iranPub string, bhPort int, iranGre, foreignGre, tran
 	return s
 }
 
-// ParseBackhaulBundle parses a Standalone Backhaul bundle (bh1_...).
-func ParseBackhaulBundle(s string) (setupBundle, error) {
+// parseBackhaulBundle parses a Standalone Backhaul bundle (bh1_...).
+func parseBackhaulBundle(s string) (setupBundle, error) {
 	var b setupBundle
 	s = strings.TrimSpace(s)
 	if !strings.HasPrefix(s, bundlePrefixBackhaul) {
@@ -157,8 +157,8 @@ func ParseBackhaulBundle(s string) (setupBundle, error) {
 	return b, nil
 }
 
-// ParseGreBackhaulBundle parses a GRE+Backhaul bundle (gh1_...).
-func ParseGreBackhaulBundle(s string) (setupBundle, error) {
+// parseGreBackhaulBundle parses a GRE+Backhaul bundle (gh1_...).
+func parseGreBackhaulBundle(s string) (setupBundle, error) {
 	var b setupBundle
 	s = strings.TrimSpace(s)
 	if !strings.HasPrefix(s, bundlePrefixGreBackhaul) {
@@ -213,10 +213,10 @@ func ParseGreBackhaulBundle(s string) (setupBundle, error) {
 func ParseBundle(s string) (setupBundle, error) {
 	s = strings.TrimSpace(s)
 	if strings.HasPrefix(s, bundlePrefixBackhaul) {
-		return ParseBackhaulBundle(s)
+		return parseBackhaulBundle(s)
 	}
 	if strings.HasPrefix(s, bundlePrefixGreBackhaul) {
-		return ParseGreBackhaulBundle(s)
+		return parseGreBackhaulBundle(s)
 	}
 	var b setupBundle
 	if !strings.HasPrefix(s, bundlePrefix) {

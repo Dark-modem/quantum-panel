@@ -42,17 +42,17 @@ func revPathAutoEnabled() bool {
 
 // ---------- spoke-side probe transport ----------
 
-// SpokeProbeRequest tells the spoke what to probe: the hub's inner + public
+// spokeProbeRequest tells the spoke what to probe: the hub's inner + public
 // address and the control port, as the hub sees them.
-type SpokeProbeRequest struct {
+type spokeProbeRequest struct {
 	HubInner    string `json:"hub_inner"`
 	HubPublic   string `json:"hub_public"`
 	ControlPort int    `json:"control_port"`
 }
 
-// SpokeProbeReport is the spoke's answer: its local snapshot plus the
+// spokeProbeReport is the spoke's answer: its local snapshot plus the
 // spoke->hub half of the matrix.
-type SpokeProbeReport struct {
+type spokeProbeReport struct {
 	OK       bool          `json:"ok"`
 	Error    string        `json:"error,omitempty"`
 	Matrix   ProbeMatrix   `json:"matrix"`
@@ -63,7 +63,7 @@ type SpokeProbeReport struct {
 
 // POST /api/peer/revpath-probe (peer auth): run the spoke->hub half locally.
 func handlePeerRevPathProbe(w http.ResponseWriter, r *http.Request) {
-	var req SpokeProbeRequest
+	var req spokeProbeRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeAPIError(w, r, "E-ACTION-01", "invalid probe json")
 		return
@@ -97,13 +97,13 @@ func handlePeerRevPathProbe(w http.ResponseWriter, r *http.Request) {
 		snap.InputDropsProto47, snap.FwDropsICMP = parseIptablesSave(string(out), "gre-tunnel")
 	}
 	m := probeFromSpoke(req, snap)
-	writeJSON(w, SpokeProbeReport{OK: true, Matrix: m, Snapshot: snap,
+	writeJSON(w, spokeProbeReport{OK: true, Matrix: m, Snapshot: snap,
 		SpokeGre: spokeInner, Checked: time.Now().UTC().Format(time.RFC3339)})
 }
 
 // probeFromSpoke builds the spoke->hub matrix against the hub addresses the
 // hub sent. Runs on the spoke; read-only.
-func probeFromSpoke(req SpokeProbeRequest, snap LocalSnapshot) ProbeMatrix {
+func probeFromSpoke(req spokeProbeRequest, snap LocalSnapshot) ProbeMatrix {
 	var m ProbeMatrix
 	rx0, tx0, have := greCounters("gre-tunnel")
 	if req.HubInner != "" {
@@ -186,7 +186,7 @@ var spokeFetcher = requestSpokeProbe
 // requestSpokeProbe asks one spoke for its half of the matrix. It reuses the
 // peer-link addressing (InternalIP then PeerURL) via a targeted send: the
 // payload carries the spoke's own addresses so the spoke probes the right hub.
-func requestSpokeProbe(p peerRecord) *SpokeProbeReport {
+func requestSpokeProbe(p peerRecord) *spokeProbeReport {
 	c := loadPeerConfig()
 	if c.PeerSecret == "" {
 		return nil
@@ -197,7 +197,7 @@ func requestSpokeProbe(p peerRecord) *SpokeProbeReport {
 		st := currentLocal()
 		hubInner = strings.SplitN(st.Gre.Inner, "/", 2)[0]
 	}
-	req := SpokeProbeRequest{HubInner: hubInner, HubPublic: p.LocalPub, ControlPort: p.FrpPort}
+	req := spokeProbeRequest{HubInner: hubInner, HubPublic: p.LocalPub, ControlPort: p.FrpPort}
 	body, _ := json.Marshal(req)
 	// Target the spoke directly: its panel answers on the GRE inner address
 	// (peer tunnel IP) or its public address, same secret as other peer calls.
@@ -239,7 +239,7 @@ func requestSpokeProbe(p peerRecord) *SpokeProbeReport {
 			deadHosts[hostKey] = true
 			continue
 		}
-		var rep SpokeProbeReport
+		var rep spokeProbeReport
 		derr := json.NewDecoder(resp.Body).Decode(&rep)
 		_ = resp.Body.Close()
 		cancel()
@@ -254,7 +254,7 @@ func requestSpokeProbe(p peerRecord) *SpokeProbeReport {
 // mergeSpokeReport folds the spoke's half into the hub entry: spoke->hub
 // results replace placeholders, spoke counters are attached, and the verdict
 // is recomputed with both directions genuinely probed.
-func mergeSpokeReport(e *revPathEntry, rep *SpokeProbeReport) {
+func mergeSpokeReport(e *revPathEntry, rep *spokeProbeReport) {
 	if rep == nil {
 		return
 	}
@@ -273,8 +273,8 @@ func mergeSpokeReport(e *revPathEntry, rep *SpokeProbeReport) {
 
 // ---------- auto-fix engine ----------
 
-// FixStep is one applied change, recorded for the report and rollback.
-type FixStep struct {
+// fixStep is one applied change, recorded for the report and rollback.
+type fixStep struct {
 	At      string  `json:"at"`
 	Verdict Verdict `json:"verdict"`
 	Action  string  `json:"action"`
@@ -283,18 +283,18 @@ type FixStep struct {
 	Error   string  `json:"error,omitempty"`
 }
 
-// FixReport is the per-peer history returned by the API.
-type FixReport struct {
+// fixReport is the per-peer history returned by the API.
+type fixReport struct {
 	PeerID      int       `json:"peer_id"`
 	Auto        bool      `json:"auto"`
-	Steps       []FixStep `json:"steps"`
+	Steps       []fixStep `json:"steps"`
 	LastRun     string    `json:"last_run,omitempty"`
 	LastVerdict Verdict   `json:"last_verdict,omitempty"`
 }
 
 var (
 	fixMu      sync.Mutex
-	fixReports = map[int]*FixReport{}
+	fixReports = map[int]*fixReport{}
 	fixLastRun = map[int]time.Time{} // per-peer rate limit
 	fixHour    = []time.Time{}       // global rate limit window
 )
@@ -329,12 +329,12 @@ func fixMarkRun(peerID int, now time.Time) {
 	fixHour = append(fixHour, now)
 }
 
-func fixRecord(peerID int, s FixStep, auto bool, v Verdict) {
+func fixRecord(peerID int, s fixStep, auto bool, v Verdict) {
 	fixMu.Lock()
 	defer fixMu.Unlock()
 	r := fixReports[peerID]
 	if r == nil {
-		r = &FixReport{PeerID: peerID}
+		r = &fixReport{PeerID: peerID}
 		fixReports[peerID] = r
 	}
 	r.Auto = auto
@@ -611,21 +611,21 @@ func fixMadeWorse(before RevPathDiagnosis, beforeFails int, after *revPathEntry)
 // applyFix runs the plan for one peer: dry-run builds the plan only;
 // otherwise snapshot -> apply -> re-probe -> rollback if worse. Every applied
 // step is recorded. Service units are never restarted.
-func applyFix(p peerRecord, snap LocalSnapshot, d RevPathDiagnosis, auto bool, dryRun bool) ([]FixStep, RevPathDiagnosis) {
+func applyFix(p peerRecord, snap LocalSnapshot, d RevPathDiagnosis, auto bool, dryRun bool) ([]fixStep, RevPathDiagnosis) {
 	plan := fixPlan(p, snap, d)
 	now := time.Now().UTC().Format(time.RFC3339)
-	var steps []FixStep
+	var steps []fixStep
 	if dryRun {
 		for _, a := range plan {
-			steps = append(steps, FixStep{At: now, Verdict: d.Verdict, Action: "plan", Detail: a.desc, OK: true})
+			steps = append(steps, fixStep{At: now, Verdict: d.Verdict, Action: "plan", Detail: a.desc, OK: true})
 		}
 		if len(plan) == 0 {
-			steps = append(steps, FixStep{At: now, Verdict: d.Verdict, Action: "plan", Detail: "no local fix available (" + string(d.Verdict) + ")", OK: false})
+			steps = append(steps, fixStep{At: now, Verdict: d.Verdict, Action: "plan", Detail: "no local fix available (" + string(d.Verdict) + ")", OK: false})
 		}
 		return steps, d
 	}
 	if !fixAllowed(p.ID, time.Now()) {
-		steps = append(steps, FixStep{At: now, Verdict: d.Verdict, Action: "rate-limited", Detail: "max 1 fix / peer / 10 min, 3 / hour; skipped", OK: false})
+		steps = append(steps, fixStep{At: now, Verdict: d.Verdict, Action: "rate-limited", Detail: "max 1 fix / peer / 10 min, 3 / hour; skipped", OK: false})
 		return steps, d
 	}
 	// Failing probe layers in the diagnosis this fix responds to.
@@ -647,12 +647,12 @@ func applyFix(p peerRecord, snap LocalSnapshot, d RevPathDiagnosis, auto bool, d
 	}
 	for _, a := range plan {
 		rb, err := a.apply()
-		st := FixStep{At: now, Verdict: d.Verdict, Action: "apply", Detail: a.desc, OK: err == nil}
+		st := fixStep{At: now, Verdict: d.Verdict, Action: "apply", Detail: a.desc, OK: err == nil}
 		if err != nil {
 			st.Error = err.Error()
 			steps = append(steps, st)
 			rollbackAll()
-			steps = append(steps, FixStep{At: now, Verdict: d.Verdict, Action: "rollback", Detail: "apply failed; reverted", OK: true})
+			steps = append(steps, fixStep{At: now, Verdict: d.Verdict, Action: "rollback", Detail: "apply failed; reverted", OK: true})
 			for _, s := range steps {
 				fixRecord(p.ID, s, auto, d.Verdict)
 			}
@@ -672,13 +672,13 @@ func applyFix(p peerRecord, snap LocalSnapshot, d RevPathDiagnosis, auto bool, d
 	}
 	if fixMadeWorse(d, beforeFails, after) {
 		rollbackAll()
-		steps = append(steps, FixStep{At: now, Verdict: d.Verdict, Action: "rollback", Detail: "re-probe worse (" + string(after.Diagnosis.Verdict) + "); reverted", OK: true})
+		steps = append(steps, fixStep{At: now, Verdict: d.Verdict, Action: "rollback", Detail: "re-probe worse (" + string(after.Diagnosis.Verdict) + "); reverted", OK: true})
 		for _, s := range steps {
 			fixRecord(p.ID, s, auto, d.Verdict)
 		}
 		return steps, after.Diagnosis
 	}
-	steps = append(steps, FixStep{At: now, Verdict: d.Verdict, Action: "verify", Detail: "re-probe: " + string(after.Diagnosis.Verdict), OK: true})
+	steps = append(steps, fixStep{At: now, Verdict: d.Verdict, Action: "verify", Detail: "re-probe: " + string(after.Diagnosis.Verdict), OK: true})
 	for _, s := range steps {
 		fixRecord(p.ID, s, auto, d.Verdict)
 	}
@@ -733,14 +733,14 @@ func handleRevPathFixes(w http.ResponseWriter, r *http.Request) {
 	if q != "" {
 		for id, rep := range fixReports {
 			if fmt.Sprint(id) == q {
-				writeJSON(w, map[string]any{"fixes": []FixReport{*rep}, "auto_enabled": revPathAutoEnabled()})
+				writeJSON(w, map[string]any{"fixes": []fixReport{*rep}, "auto_enabled": revPathAutoEnabled()})
 				return
 			}
 		}
-		writeJSON(w, map[string]any{"fixes": []FixReport{}, "auto_enabled": revPathAutoEnabled()})
+		writeJSON(w, map[string]any{"fixes": []fixReport{}, "auto_enabled": revPathAutoEnabled()})
 		return
 	}
-	out := make([]FixReport, 0, len(fixReports))
+	out := make([]fixReport, 0, len(fixReports))
 	for _, rep := range fixReports {
 		out = append(out, *rep)
 	}

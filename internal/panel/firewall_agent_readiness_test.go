@@ -32,21 +32,21 @@ func TestFirewallAgentIntegrationReadiness(t *testing.T) {
 	fake.setResponse("ss -Htulnp", portTestSS)
 
 	// 1. fw.detect — no mutation, structured result.
-	detect := AgentFirewallDetect()
+	detect := agentFirewallDetect()
 	if detect.Backend != fwBackendIptables || detect.Detail == "" {
 		t.Fatalf("detect: %+v", detect)
 	}
 	fwRoundTrip(t, detect)
 
 	// 2. fw.snapshot — read-only ruleset capture.
-	snap, err := AgentFirewallSnapshot()
+	snap, err := agentFirewallSnapshot()
 	if err != nil || snap.Backend != fwBackendIptables || snap.At == 0 {
 		t.Fatalf("snapshot: %+v err %v", snap, err)
 	}
 	fwRoundTrip(t, snap)
 
 	// 3. fw.plan — dry-run only, planned commands returned, host untouched.
-	plan, err := AgentFirewallPlan(fwAgentPlanParams{
+	plan, err := agentFirewallPlan(fwAgentPlanParams{
 		Owner: "tunnel:at_ready", Family: "both", Note: "readiness",
 		Add: []fwPortSpec{{Port: 8443, Proto: "tcp"}, {Port: 8443, Proto: "udp"}},
 	})
@@ -65,10 +65,10 @@ func TestFirewallAgentIntegrationReadiness(t *testing.T) {
 
 	// 4. fw.apply — refused without confirmation, executes with it.
 	ops := plan.Plan.Ops
-	if _, err := AgentFirewallApply(fwAgentApplyParams{Ops: ops}); err == nil {
+	if _, err := agentFirewallApply(fwAgentApplyParams{Ops: ops}); err == nil {
 		t.Fatal("unconfirmed apply must be refused")
 	}
-	applyRes, err := AgentFirewallApply(fwAgentApplyParams{Ops: ops, Confirmed: true})
+	applyRes, err := agentFirewallApply(fwAgentApplyParams{Ops: ops, Confirmed: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,12 +78,12 @@ func TestFirewallAgentIntegrationReadiness(t *testing.T) {
 	fwRoundTrip(t, applyRes)
 
 	// 5. port.check + port.list — read-only reporting.
-	check, err := AgentPortCheck(fwAgentPortCheckParams{Port: 8443, Proto: "tcp"})
+	check, err := agentPortCheck(fwAgentPortCheckParams{Port: 8443, Proto: "tcp"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	fwRoundTrip(t, check)
-	list, err := AgentPortList()
+	list, err := agentPortList()
 	if err != nil || list.Entries == nil || list.Listeners == nil {
 		t.Fatalf("port list: %+v err %v", list, err)
 	}
@@ -99,10 +99,10 @@ func TestFirewallAgentIntegrationReadiness(t *testing.T) {
 	if err := portReserve(9100, "tcp", portOwnerService, "panel", "ipv4", "must survive"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := AgentFirewallTeardown(fwAgentTeardownParams{Owner: "tunnel:at_ready"}); err == nil {
+	if _, err := agentFirewallTeardown(fwAgentTeardownParams{Owner: "tunnel:at_ready"}); err == nil {
 		t.Fatal("unconfirmed teardown must be refused")
 	}
-	teardown, err := AgentFirewallTeardown(fwAgentTeardownParams{Owner: "tunnel:at_ready", Confirmed: true})
+	teardown, err := agentFirewallTeardown(fwAgentTeardownParams{Owner: "tunnel:at_ready", Confirmed: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,20 +140,20 @@ func TestFirewallAgentErrorMapping(t *testing.T) {
 	fake.adopt(fwIptablesHost())
 	fake.setResponse("iptables -S QUANTUM_FW", "")
 
-	_, err1 := AgentFirewallApply(fwAgentApplyParams{Ops: []fwOp{{Kind: "add", Rule: fwPortRule{
+	_, err1 := agentFirewallApply(fwAgentApplyParams{Ops: []fwOp{{Kind: "add", Rule: fwPortRule{
 		Port: 8443, Proto: "tcp", Family: "ipv4", Owner: "tunnel:at_x"}}}})
 	if err1 == nil || !strings.Contains(err1.Error(), "confirmed=true") {
 		t.Fatalf("apply refusal must be recognizable: %v", err1)
 	}
-	_, err2 := AgentFirewallTeardown(fwAgentTeardownParams{Owner: "tunnel:at_x"})
+	_, err2 := agentFirewallTeardown(fwAgentTeardownParams{Owner: "tunnel:at_x"})
 	if err2 == nil || !strings.Contains(err2.Error(), "confirmed=true") {
 		t.Fatalf("teardown refusal must be recognizable: %v", err2)
 	}
-	_, err3 := AgentFirewallPlan(fwAgentPlanParams{Owner: "tunnel:at_x"})
+	_, err3 := agentFirewallPlan(fwAgentPlanParams{Owner: "tunnel:at_x"})
 	if err3 == nil || !strings.Contains(err3.Error(), "nothing to plan") {
 		t.Fatalf("empty plan must be rejected with a clear error: %v", err3)
 	}
-	_, err4 := AgentPortCheck(fwAgentPortCheckParams{Port: 70000})
+	_, err4 := agentPortCheck(fwAgentPortCheckParams{Port: 70000})
 	if err4 == nil {
 		t.Fatal("bad port must be rejected")
 	}
@@ -161,7 +161,7 @@ func TestFirewallAgentErrorMapping(t *testing.T) {
 	fake.setResponse("ufw status", "")
 	fake.setResponse("iptables -S", "!!!")
 	fake.setResponse("nft list tables", "table inet admin {}\n")
-	_, err5 := AgentFirewallPlan(fwAgentPlanParams{
+	_, err5 := agentFirewallPlan(fwAgentPlanParams{
 		Owner: "tunnel:at_x", Add: []fwPortSpec{{Port: 443, Proto: "tcp"}}})
 	if err5 == nil || err5.Error() != fwErrNftForeign.Error() {
 		t.Fatalf("nft refusal must surface fwErrNftForeign, got %v", err5)
