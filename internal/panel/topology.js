@@ -602,8 +602,8 @@ function topologyGraph(topo, tunnels) {
     const fw = 44, fh = 32;
     const flagX = m ? x + w - 12 - fw : x + 12;
     const nameTx = m
-      ? tTxt(x + w - 62, y + 62, 'topo-n-name', title, 'end')
-      : tTxt(x + 62, y + 62, 'topo-n-name', title);
+      ? tTxt(x + w - 62, y + 31, 'topo-n-name', title, 'end')
+      : tTxt(x + 62, y + 31, 'topo-n-name', title);
     // the online/offline corner tag, the owner-mockup's way: the status dot
     // rides ITS beginning (top-right in LTR, top-left in RTL) — no second dot
     // by the name
