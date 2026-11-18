@@ -16,7 +16,6 @@ window.FA_TEXT = {
  "Faulty": "مشکل‌دار",
  "Datacenter": "دیتاسنتر",
  "Datacenters": "دیتاسنترها",
- "Iran ↔ Foreign server connections": "اتصال سرورهای ایران ↔ خارج",
  "Overall uptime": "پایداری کلی",
  "Agents online": "ایجنت‌های آنلاین",
  "Agent tunnels active": "تونل‌های فعال ایجنت",

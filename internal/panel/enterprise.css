@@ -2091,14 +2091,12 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
    + datacenter row and a server icon + ip row, one glowing port per card on
    the edge facing the other side, and a footer legend strip --------------- */
 /* the inline .tc-header rule spreads its children with space-between — the
-   map head must keep the icon and the title block together at the start */
+   map head must keep the icon and the title together at the start */
 .tc-header.topo-map-head { display:flex; align-items:center; gap:12px; flex-wrap:wrap; justify-content:flex-start; }
 .topo-map-head-ic { width:38px; height:38px; border-radius:11px; display:inline-flex; align-items:center; justify-content:center; flex:none;
   background:color-mix(in srgb, var(--ac) 14%, transparent); color:var(--ac);
   box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--ac) 22%, transparent); }
 .topo-map-head-ic svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
-.topo-map-head-tx { min-width:0; }
-.topo-map-sub { margin:2px 0 0; font-size:12.5px; color:var(--mu); }
 .topo-col-cap { fill:var(--tx); font-size:12.5px; font-weight:700; letter-spacing:1px; }
 .topo-col-count { fill:var(--ok); font-weight:700; }
 .topo-n-name { fill:var(--tx); font-size:15px; font-weight:700; }
