@@ -635,17 +635,12 @@ function topologyGraph(topo, tunnels) {
       ? icon(rowIcX, yy) + tTxt(rowIcX - 8, yy + 13, cls, val, 'end')
       : icon(rowIcX, yy) + tTxt(rowIcX + 20, yy + 13, cls, val);
     const rowYs = [y + 57, y + 80, y + 103];
-    // the stacked-server glyph: a real rack — three rounded disks spanning
-    // the three info rows' full height, each with its LED and vent lines,
-    // every disk's center exactly on its row's line
-    const stackTop = y + 54, barH = 22, barGap = 1;
+    // ONE uniform rack glyph spanning the three info rows' full height — the
+    // rows sit in front of it, two thin lines hint at the three levels
+    const gTop = y + 54, gH = 68;
     const stack = `<g class="topo-n-stack" transform="translate(${m ? x + w - 12 - 20 : x + 14},0)">` +
-      [0, 1, 2].map(i => {
-        const by = stackTop + i * (barH + barGap);
-        return `<rect x="0" y="${by}" width="20" height="${barH}" rx="3"/>` +
-          `<circle class="topo-n-stack-led" cx="4.5" cy="${by + barH / 2}" r="1.6"/>` +
-          `<path class="topo-n-stack-slot" d="M9.5 ${by + barH / 2 - 2}h8M9.5 ${by + barH / 2 + 1.5}h5"/>`;
-      }).join('') +
+      `<rect x="0" y="${gTop}" width="20" height="${gH}" rx="6"/>` +
+      `<path class="topo-n-stack-div" d="M3 ${gTop + 22.5}h14M3 ${gTop + 45.5}h14"/>` +
       `</g>`;
     return `<g class="cl-n ${side === 'iran' ? 'topo-node-iran' : 'topo-node-foreign'}" data-agview="${text(agRow ? agRow.id : '')}" data-server-name="${text(s.name || '')}" role="button" tabindex="0" aria-label="${text(title)} · ${text(info.ip)}"><title>${text(title)} · ${text(info.ip)}</title>` +
       `<rect class="cl-n-bg" x="${x}" y="${y}" width="${w}" height="${NH}" rx="12"/>` +

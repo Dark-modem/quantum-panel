@@ -2155,8 +2155,7 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 .topo-n-status { font-size:12px; font-weight:700; letter-spacing:.2px; }
 .topo-n-status.ok { fill:var(--ok); } .topo-n-status.err { fill:var(--er); }
 .topo-n-chev { fill:none; stroke:var(--mu); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
-.topo-n-stack rect { fill:color-mix(in srgb, var(--ac) 18%, transparent); stroke:var(--ac); stroke-width:1.3; }
-.topo-n-stack-led { fill:var(--ac); stroke:none; }
-.topo-n-stack-slot { stroke:color-mix(in srgb, var(--ac) 75%, transparent); stroke-width:1.1; stroke-linecap:round; fill:none; }
+.topo-n-stack rect { fill:color-mix(in srgb, var(--ac) 30%, transparent); stroke:var(--ac); stroke-width:1.3; }
+.topo-n-stack-div { stroke:color-mix(in srgb, var(--ac) 45%, transparent); stroke-width:1; fill:none; }
 .topo-graph .topo-node-iran > .cl-n-bg { stroke:color-mix(in srgb, var(--ac) 70%, transparent); filter:drop-shadow(0 0 6px color-mix(in srgb, var(--ac) 40%, transparent)); }
 .topo-graph .topo-node-foreign > .cl-n-bg { stroke:color-mix(in srgb, var(--info) 70%, transparent); filter:drop-shadow(0 0 6px color-mix(in srgb, var(--info) 38%, transparent)); }
