@@ -2099,6 +2099,10 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 .topo-map-head-ic svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
 .topo-col-cap { fill:var(--tx); font-size:12.5px; font-weight:700; letter-spacing:1px; }
 .topo-col-count { fill:var(--ok); font-weight:700; }
+/* the map's flags: the base .topo-flag-svg is pinned to 20x14 for the badges
+   elsewhere — the column caption and the server-card tile size their own */
+.topo-colbox .topo-flag-svg { width:22px; height:15px; }
+.cl-n .topo-flag-svg { width:42px; height:30px; border-radius:6px; clip-path:inset(0 round 6px); }
 .topo-n-name { fill:var(--tx); font-size:15px; font-weight:700; }
 .topo-n-dc { fill:var(--mu); font-size:12px; }
 .topo-n-ic path, .topo-n-ic circle, .topo-n-ic rect { fill:none; stroke:var(--mu); stroke-width:1.4; }

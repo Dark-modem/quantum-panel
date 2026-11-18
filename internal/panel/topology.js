@@ -262,7 +262,11 @@ const TOPO_FLAG_GLOBE =
 function topologyFlagSvg(country, attrs) {
   const cc = String(country || '').toLowerCase();
   const innards = (/^[a-z]{2}$/.test(cc) && TOPO_FLAG_DRAW[cc]) || TOPO_FLAG_GLOBE;
-  return `<svg class="topo-flag-svg" viewBox="0 0 20 14" width="20" height="14"${attrs ? ' ' + attrs : ''} aria-hidden="true" focusable="false">` +
+  // a caller may size the flag through attrs — the hardcoded 20x14 must step
+  // aside then, because duplicate svg attributes resolve to the first pair
+  const hasW = !!attrs && /(^|\s)width=/.test(attrs);
+  const hasH = !!attrs && /(^|\s)height=/.test(attrs);
+  return `<svg class="topo-flag-svg" viewBox="0 0 20 14"${hasW ? '' : ' width="20"'}${hasH ? '' : ' height="14"'}${attrs ? ' ' + attrs : ''} aria-hidden="true" focusable="false">` +
     innards +
     '<rect x="0.5" y="0.5" width="19" height="13" rx="2.5" fill="none" stroke="currentColor" stroke-opacity=".3" stroke-width="1"/>' +
     '</svg>';
@@ -607,7 +611,7 @@ function topologyGraph(topo, tunnels) {
     // rows: pin + datacenter, then the server icon + ip — mirrored in RTL
     const dcTxt = info.dc ? (info.dc + (info.cc ? ' (' + info.cc + ')' : '')) : (side === 'iran' ? tr('', 'Iran') : topoCountryName(topo.country) || '—');
     const flagX = m ? x + w - 14 - 42 : x + 14;
-    const nameTx = m ? tTxt(x + w - 64, y + 34, 'topo-n-name', title, 'end') : tTxt(x + 64, y + 34, 'topo-n-name', title);
+    const nameTx = m ? tTxt(x + w - 64, y + 30, 'topo-n-name', title, 'end') : tTxt(x + 64, y + 30, 'topo-n-name', title);
     const row = (icon, yy, cls, val) => m
       ? icon(x + w - 14 - 16, yy) + tTxt(x + w - 14 - 22, yy + 13, cls, val, 'end')
       : icon(x + 16, yy) + tTxt(x + 40, yy + 13, cls, val);
