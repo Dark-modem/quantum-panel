@@ -749,6 +749,23 @@ func clusterTick(now time.Time) (idle bool) {
 	}()
 	rt.mu.Lock()
 	defer rt.mu.Unlock()
+	// The five phases below run under rt.mu exactly as they did inline; the
+	// helpers are called with the lock HELD (S4 extract, bodies verbatim).
+	clusterObserveLinks(rt, now, links, sess, targets, pings, icmpOK, h)
+	bound := clusterSyncBinds(rt, now, links, cfg.Pools)
+	// addrByLink (link id → bound private address) is built by the plan
+	// phase exactly where the inline original built it — the apply phase's
+	// active check reads it, so it must ride out of clusterPlanPools.
+	plan, phaseJobs, addrByLink := clusterPlanPools(rt, now, links, cfg, bound, listen, socks, h)
+	jobs = append(jobs, phaseJobs...)
+	clusterApplyRules(rt, now, cfg, plan, addrByLink)
+	clusterBuildView(rt, links, bound, listen)
+	return false
+}
+
+// clusterObserveLinks folds every link's probe result into its runtime
+// record and drops records of vanished links. Caller holds rt.mu.
+func clusterObserveLinks(rt *clusterRuntime, now time.Time, links []lbLink, sess map[int]bool, targets map[int]string, pings map[string]float64, icmpOK bool, h lbHealth) {
 	rt.ticks++
 	rt.icmpOK = icmpOK
 	alive := map[int]bool{}
@@ -771,18 +788,23 @@ func clusterTick(now time.Time) (idle bool) {
 			delete(rt.links, id)
 		}
 	}
+}
 
+// clusterSyncBinds keeps pool members bound to their private address and
+// non-members unbound (a disabled pool's relays stay there too). Returns
+// the per-link bound map. Caller holds rt.mu.
+func clusterSyncBinds(rt *clusterRuntime, now time.Time, links []lbLink, pools []LBPool) (bound map[int]bool) {
 	// Relays of pool members listen on their private address. A disabled
 	// pool's relays stay there too: its port passes through to one of them
 	// (the lowest link id) instead of every relay restarting to fight for it.
 	want := map[string]string{}
 	member := map[int]bool{}
-	for _, p := range cfg.Pools {
+	for _, p := range pools {
 		for _, m := range p.Members {
 			member[m.Link] = true
 		}
 	}
-	bound := map[int]bool{}
+	bound = map[int]bool{}
 	checkBinds := now.Sub(rt.bindAt) >= 5*time.Second
 	for _, l := range links {
 		if member[l.ID] {
@@ -830,7 +852,15 @@ func clusterTick(now time.Time) (idle bool) {
 		}
 		bound[l.ID] = isBound
 	}
+	return bound
+}
 
+// clusterPlanPools plans every pool (health-driven target picks, service
+// checks queued as jobs, hub-forward fallback) and the pass ranges.
+// Returns the plan, the queued service-check jobs and the per-link bound
+// private addresses (addrByLink) it computed — the inline original built
+// them here and the apply phase reads them. Caller holds rt.mu.
+func clusterPlanPools(rt *clusterRuntime, now time.Time, links []lbLink, cfg ClusterConfig, bound map[int]bool, listen map[string]map[string][]int, socks []sockInfo, h lbHealth) (lbPlan, []func(), map[int]string) {
 	// Plan.
 	byID := map[int]lbLink{}
 	for _, l := range links {
@@ -841,6 +871,7 @@ func clusterTick(now time.Time) (idle bool) {
 	rt.plans = map[string]lbPoolPlan{}
 	rt.members = map[string]map[int]lbMemberInfo{}
 	conns := lbConnCounts(socks)
+	var jobs []func()
 	for _, p := range cfg.Pools {
 		if !p.Disabled {
 			for _, proto := range lbProtos(p.Proto) {
@@ -925,7 +956,12 @@ func clusterTick(now time.Time) (idle bool) {
 	}
 	plan.Pass, rt.warnings = lbPassRanges(listenByLink, addrByLink, pooled)
 	rt.pass = plan.Pass
+	return plan, jobs, addrByLink
+}
 
+// clusterApplyRules applies (or clears) the nft rules when the plan
+// changed, re-checking the hooks at most every 30 s. Caller holds rt.mu.
+func clusterApplyRules(rt *clusterRuntime, now time.Time, cfg ClusterConfig, plan lbPlan, addrByLink map[int]string) {
 	// Apply when something changed, and re-check the hooks now and then.
 	active := len(cfg.Pools) > 0 || len(addrByLink) > 0
 	switch {
@@ -947,7 +983,11 @@ func clusterTick(now time.Time) (idle bool) {
 			rt.hooksAt = now
 		}
 	}
+}
 
+// clusterBuildView rebuilds the per-link API view from the runtime state.
+// Caller holds rt.mu.
+func clusterBuildView(rt *clusterRuntime, links []lbLink, bound map[int]bool, listen map[string]map[string][]int) {
 	// The API view.
 	rt.view = rt.view[:0]
 	for _, l := range links {
@@ -965,7 +1005,6 @@ func clusterTick(now time.Time) (idle bool) {
 		}
 		rt.view = append(rt.view, v)
 	}
-	return false
 }
 
 // lbCheckJob runs one service check of a member and feeds the result back.

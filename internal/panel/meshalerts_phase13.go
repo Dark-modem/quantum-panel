@@ -29,6 +29,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Dark-modem/quantum-panel/internal/store"
 	"github.com/Dark-modem/quantum-protocol"
 )
 
@@ -156,15 +157,33 @@ func (e *meshAlertEngine) alertEmit(evs *[]meshAlertEvent, now time.Time, rule, 
 
 // ---- the phase-13 rule pass (called from evaluate) ---------------------
 
+// evaluatePhase13 runs the nine phase-13 rule passes in their original
+// order (S4: each numbered block moved verbatim into its p13* method; the
+// double ListAgents fetch — agents for rules 1-2, v2rows for rules 8-9 —
+// is preserved exactly).
 func (e *meshAlertEngine) evaluatePhase13(now time.Time) []meshAlertEvent {
 	var evs []meshAlertEvent
 	s, err := MeshStore()
 	if err != nil {
 		return evs
 	}
-
-	// 1. agent cpu/mem/disk thresholds (persisted ResourceReport).
 	agents, _ := s.ListAgents()
+	e.p13ResourceAlerts(now, &evs, agents)
+	e.p13EngineIdleAlerts(now, &evs, s, agents)
+	e.p13FlapAlerts(now, &evs, s)
+	e.p13BillingAlerts(now, &evs, s)
+	e.p13BackupAgeAlert(now, &evs)
+	e.p13DiskAlert(now, &evs)
+	e.p13HardeningExpiryAlerts(now, &evs)
+	v2rows, _ := s.ListAgents()
+	e.p13DesiredStuckAlerts(now, &evs, s, v2rows)
+	e.p13ClockDriftAlerts(now, &evs, v2rows)
+	return evs
+}
+
+// p13ResourceAlerts is rule 1 (S4 extract, body verbatim).
+func (e *meshAlertEngine) p13ResourceAlerts(now time.Time, evs *[]meshAlertEvent, agents []store.Agent) {
+	// 1. agent cpu/mem/disk thresholds (persisted ResourceReport).
 	for _, a := range agents {
 		if a.Status != "online" || a.MemTotalMB == 0 {
 			continue
@@ -174,33 +193,40 @@ func (e *meshAlertEngine) evaluatePhase13(now time.Time) []meshAlertEvent {
 			memPct = float64(a.MemUsedMB) / float64(a.MemTotalMB) * 100
 		}
 		if a.CPUPct >= 90 {
-			e.alertEmit(&evs, now, "agent_cpu_high", "agent_cpu:"+a.ID, a.ID, "warn",
+			e.alertEmit(evs, now, "agent_cpu_high", "agent_cpu:"+a.ID, a.ID, "warn",
 				fmt.Sprintf("agent %s CPU at %.0f%%", a.Name, a.CPUPct), a.Name, a.CPUPct)
 		}
 		if memPct >= 90 {
-			e.alertEmit(&evs, now, "agent_mem_high", "agent_mem:"+a.ID, a.ID, "warn",
+			e.alertEmit(evs, now, "agent_mem_high", "agent_mem:"+a.ID, a.ID, "warn",
 				fmt.Sprintf("agent %s memory at %.0f%%", a.Name, memPct), a.Name, memPct)
 		}
 		if a.DiskTotalGB > 0 {
 			diskPct := a.DiskUsedGB / a.DiskTotalGB * 100
 			if diskPct >= 90 {
-				e.alertEmit(&evs, now, "agent_disk_high", "agent_disk:"+a.ID, a.ID, "warn",
+				e.alertEmit(evs, now, "agent_disk_high", "agent_disk:"+a.ID, a.ID, "warn",
 					fmt.Sprintf("agent %s disk at %.0f%%", a.Name, diskPct), a.Name, diskPct)
 			}
 		}
 	}
+}
 
+// p13EngineIdleAlerts is rule 2 (S4 extract, body verbatim).
+func (e *meshAlertEngine) p13EngineIdleAlerts(now time.Time, evs *[]meshAlertEvent, s *store.Store, agents []store.Agent) {
 	// 2. engine enabled but nothing running.
 	for _, a := range agents {
 		rows, _ := s.AgentEngines(a.ID)
 		for _, row := range rows {
 			if row.Desired && row.Installed && row.Instances == 0 {
-				e.alertEmit(&evs, now, "engine_not_running", "engine_idle:"+a.ID+":"+row.Engine, a.ID, "warn",
+				e.alertEmit(evs, now, "engine_not_running", "engine_idle:"+a.ID+":"+row.Engine, a.ID, "warn",
 					fmt.Sprintf("engine %s on agent %s enabled with 0 instances", row.Engine, a.Name), row.Engine, a.Name)
 			}
 		}
 	}
+}
 
+// p13FlapAlerts is rule 3 (S4 extract, body verbatim — including the
+// collect-first/close-rows deadlock note).
+func (e *meshAlertEngine) p13FlapAlerts(now time.Time, evs *[]meshAlertEvent, s *store.Store) {
 	// 3. tunnel flapping: >= 4 state changes in 15 minutes.
 	since := now.Add(-15 * time.Minute).Unix()
 	// Collect FIRST, close the rows, THEN resolve names — the store pool
@@ -227,11 +253,15 @@ func (e *meshAlertEngine) evaluatePhase13(now time.Time) []meshAlertEvent {
 				key = "tunnel_flap:" + tun.TunnelKey
 				name = tun.TunnelKey
 			}
-			e.alertEmit(&evs, now, "tunnel_flapping", key, name, "warn",
+			e.alertEmit(evs, now, "tunnel_flapping", key, name, "warn",
 				fmt.Sprintf("tunnel %s changed state %d times in 15 minutes", name, f.n), name, f.n)
 		}
 	}
+}
 
+// p13BillingAlerts is rule 4 (S4 extract, body verbatim — window math and
+// the meshRuntime freshness inline stay inside).
+func (e *meshAlertEngine) p13BillingAlerts(now time.Time, evs *[]meshAlertEvent, s *store.Store) {
 	// 4. billing anomalies per enabled tunnel: this hour vs the same
 	// hour last week (drop to ~0, or >8x growth).
 	tunnels, _ := s.ListAllTunnels()
@@ -285,27 +315,33 @@ func (e *meshAlertEngine) evaluatePhase13(now time.Time) []meshAlertEvent {
 		}
 		switch {
 		case prevD > 1<<20 && curD < prevD/100:
-			e.alertEmit(&evs, now, "billing_drop", "billing_drop:"+t.TunnelKey, t.TunnelKey, "warn",
+			e.alertEmit(evs, now, "billing_drop", "billing_drop:"+t.TunnelKey, t.TunnelKey, "warn",
 				fmt.Sprintf("tunnel %s carried ~0 bytes in the last complete hour vs %d the same hour last week", t.TunnelKey, prevD),
 				t.TunnelKey, prevD)
 		case prevD > 1<<20 && float64(curD) > 8*float64(prevD):
-			e.alertEmit(&evs, now, "billing_spike", "billing_spike:"+t.TunnelKey, t.TunnelKey, "warn",
+			e.alertEmit(evs, now, "billing_spike", "billing_spike:"+t.TunnelKey, t.TunnelKey, "warn",
 				fmt.Sprintf("tunnel %s carried %d bytes in the last complete hour (%.1fx the same hour last week)", t.TunnelKey, curD,
 					float64(curD)/float64(prevD)),
 				t.TunnelKey, curD, float64(curD)/float64(prevD))
 		}
 	}
+}
 
+// p13BackupAgeAlert is rule 5 (S4 extract, body verbatim).
+func (e *meshAlertEngine) p13BackupAgeAlert(now time.Time, evs *[]meshAlertEvent) {
 	// 5. backup age (state file mtime; written by the backup API/CLI).
 	if fi, err := statBackupState(); err == nil {
 		age := now.Sub(fi)
 		if age > 7*24*time.Hour {
-			e.alertEmit(&evs, now, "backup_old", "backup_age", "panel", "warn",
+			e.alertEmit(evs, now, "backup_old", "backup_age", "panel", "warn",
 				fmt.Sprintf("the last successful backup is %s old", age.Round(24*time.Hour)),
 				age.Round(24*time.Hour).String(), 7)
 		}
 	}
+}
 
+// p13DiskAlert is rule 6 (S4 extract, body verbatim).
+func (e *meshAlertEngine) p13DiskAlert(now time.Time, evs *[]meshAlertEvent) {
 	// 6. panel data-dir disk (reuse the selfcheck probe result shape).
 	// (The engine runs on the panel host; the df probe is cheap.)
 	if pct := panelDiskPct(); pct >= 90 {
@@ -313,24 +349,29 @@ func (e *meshAlertEngine) evaluatePhase13(now time.Time) []meshAlertEvent {
 		if pct >= 95 {
 			sev = "crit"
 		}
-		e.alertEmit(&evs, now, "panel_disk_full", "panel_disk", "panel", sev,
+		e.alertEmit(evs, now, "panel_disk_full", "panel_disk", "panel", sev,
 			fmt.Sprintf("the panel data filesystem is %d%% full", pct), pct)
 	}
+}
 
+// p13HardeningExpiryAlerts is rule 7 (S4 extract, body verbatim).
+func (e *meshAlertEngine) p13HardeningExpiryAlerts(now time.Time, evs *[]meshAlertEvent) {
 	// 7. pending hardening confirm near expiry.
 	profilePendingMu.Lock()
 	for _, pp := range profilePendingBy {
 		remain := time.Until(time.Unix(pp.Deadline, 0))
 		if remain > 0 && remain < 30*time.Second {
-			e.alertEmit(&evs, now, "hardening_expiry", "hardening:"+pp.AgentID, pp.AgentID, "warn",
+			e.alertEmit(evs, now, "hardening_expiry", "hardening:"+pp.AgentID, pp.AgentID, "warn",
 				fmt.Sprintf("agent %s hardening confirm expires in %s", pp.AgentID, remain.Round(time.Second)),
 				pp.AgentID, remain.Round(time.Second).String())
 		}
 	}
 	profilePendingMu.Unlock()
+}
 
+// p13DesiredStuckAlerts is rule 8 (S4 extract, body verbatim).
+func (e *meshAlertEngine) p13DesiredStuckAlerts(now time.Time, evs *[]meshAlertEvent, s *store.Store, v2rows []store.Agent) {
 	// 8. queued desired undelivered > 15 min (the offline-pending watchdog).
-	v2rows, _ := s.ListAgents()
 	for _, a := range v2rows {
 		v2, err := s.AgentV2(a.ID)
 		if err != nil || strings.TrimSpace(v2.DesiredV2) == "" {
@@ -343,12 +384,15 @@ func (e *meshAlertEngine) evaluatePhase13(now time.Time) []meshAlertEvent {
 		// The pending row has no timestamp — the agent's last_ack/last_seen
 		// bounds it: undelivered for >15 min = last_seen older AND pending.
 		if a.LastSeen > 0 && now.Unix()-a.LastSeen > 15*60 {
-			e.alertEmit(&evs, now, "desired_stuck", "desired_stuck:"+a.ID, a.ID, "info",
+			e.alertEmit(evs, now, "desired_stuck", "desired_stuck:"+a.ID, a.ID, "info",
 				fmt.Sprintf("agent %s has a queued desired state for %s", a.Name, time.Duration(now.Unix()-a.LastSeen)*time.Second),
 				a.Name, (time.Duration(now.Unix()-a.LastSeen) * time.Second).String())
 		}
 	}
+}
 
+// p13ClockDriftAlerts is rule 9 (S4 extract, body verbatim).
+func (e *meshAlertEngine) p13ClockDriftAlerts(now time.Time, evs *[]meshAlertEvent, v2rows []store.Agent) {
 	// 9. clock drift (R7, PROTOCOL-REQUESTS): the agent's own report clock
 	// vs panel time. The phase-13 stub became REAL when the protocol grew
 	// StateReportV2.ReportedAt — legacy agents (absent field, 0) skip
@@ -367,12 +411,11 @@ func (e *meshAlertEngine) evaluatePhase13(now time.Time) []meshAlertEvent {
 			drift = -drift
 		}
 		if drift > int64(e.settings.ClockDriftMaxS) {
-			e.alertEmit(&evs, now, "clock_drift", "clock_drift:"+a.ID, a.ID, "warn",
+			e.alertEmit(evs, now, "clock_drift", "clock_drift:"+a.ID, a.ID, "warn",
 				fmt.Sprintf("agent %s clock is %s off panel time", a.Name, (time.Duration(drift)*time.Second).Round(time.Second)),
 				a.Name, (time.Duration(drift) * time.Second).String())
 		}
 	}
-	return evs
 }
 
 // statBackupState reads the backup state file's mtime (absent = zero).

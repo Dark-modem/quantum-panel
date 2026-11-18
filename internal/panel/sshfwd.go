@@ -1119,26 +1119,33 @@ func handleSSHFwdGet(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, getSSHFwdStatus())
 }
 
+// sshFwdPostBody is the POST /api/sshfwd payload (S4: was the anonymous
+// struct inside handleSSHFwdPost — named so the per-action handlers share
+// it; fields and json tags verbatim).
+type sshFwdPostBody struct {
+	Action      string `json:"action"`
+	Mode        string `json:"mode"`
+	Role        string `json:"role"`
+	RemoteHost  string `json:"remote_host"`
+	RemoteUser  string `json:"remote_user"`
+	SSHPort     int    `json:"ssh_port"`
+	Ports       string `json:"ports"`
+	BindAddr    string `json:"bind_addr"`
+	FRPBindPort int    `json:"frp_bind_port"`
+	PoolCount   int    `json:"pool_count"`
+	Bundle      string `json:"bundle"`
+	UDP         *bool  `json:"udp"`
+	ID          int    `json:"id"`
+	// Name labels the foreign server (link 1 on enable, the new one on
+	// add_link); a pointer, so an enable that does not send it keeps it
+	Name *string `json:"name"`
+}
+
 // handleSSHFwdPost handles commands like enable, disable, update-ports, gen-key, sync-peer, apply-bundle.
+// S4: each action body moved verbatim into its sshFwdAct* handler; the
+// mutex spans the whole dispatch exactly as before.
 func handleSSHFwdPost(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		Action      string `json:"action"`
-		Mode        string `json:"mode"`
-		Role        string `json:"role"`
-		RemoteHost  string `json:"remote_host"`
-		RemoteUser  string `json:"remote_user"`
-		SSHPort     int    `json:"ssh_port"`
-		Ports       string `json:"ports"`
-		BindAddr    string `json:"bind_addr"`
-		FRPBindPort int    `json:"frp_bind_port"`
-		PoolCount   int    `json:"pool_count"`
-		Bundle      string `json:"bundle"`
-		UDP         *bool  `json:"udp"`
-		ID          int    `json:"id"`
-		// Name labels the foreign server (link 1 on enable, the new one on
-		// add_link); a pointer, so an enable that does not send it keeps it
-		Name *string `json:"name"`
-	}
+	var body sshFwdPostBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeAPIError(w, r, "E-SSHFWD-01", "invalid json payload")
 		return
@@ -1151,273 +1158,313 @@ func handleSSHFwdPost(w http.ResponseWriter, r *http.Request) {
 
 	switch act {
 	case "apply_bundle", "apply-bundle":
-		bundleStr := strings.TrimSpace(body.Bundle)
-		if bundleStr == "" {
-			writeAPIError(w, r, "E-SSHFWD-07", "bundle string is required")
-			return
-		}
-		b, err := parseBagherBundle(bundleStr)
-		if err != nil {
-			writeAPIError(w, r, "E-SSHFWD-07", fmt.Sprintf("invalid bagher bundle: %v", err))
-			return
-		}
-		if body.Name != nil {
-			if err := validLinkName(strings.TrimSpace(*body.Name)); err != nil {
-				writeAPIError(w, r, "E-SSHFWD-07", err.Error())
-				return
-			}
-		}
-		if err := applyBagherBundle(b); err != nil {
-			writeAPIError(w, r, "E-SSHFWD-08", fmt.Sprintf("failed applying bagher bundle: %v", err))
-			return
-		}
-		if body.Name != nil && strings.TrimSpace(*body.Name) != "" {
-			_ = setLinkName("bagher-1", *body.Name)
-		}
-		writeJSON(w, map[string]any{
-			"status":      "ok",
-			"message":     "Bagher bundle applied successfully. Foreign client active.",
-			"status_data": getSSHFwdStatusLocked(),
-		})
-
+		sshFwdActApplyBundle(w, r, body)
 	case "get_bundle", "get-bundle":
-		if body.RemoteHost != "" {
-			cfg.RemoteHost = strings.TrimSpace(body.RemoteHost)
-		}
-		if body.UDP != nil {
-			cfg.UDP = *body.UDP
-		}
-		if body.Ports != "" {
-			parsed := parsePorts(body.Ports)
-			if len(parsed) > 0 {
-				cfg.Ports = parsed
-			}
-		}
-		if len(cfg.Ports) == 0 {
-			writeAPIError(w, r, "E-SSHFWD-02", "Forwarded ports must be specified before generating bundle")
-			return
-		}
-		if strings.TrimSpace(cfg.RemoteHost) == "" {
-			writeAPIError(w, r, "E-SSHFWD-01", "Remote host IP must be specified before generating bundle")
-			return
-		}
-		_ = saveSSHFwdConfigLocked(cfg)
-
-		pub, err := ensureSSHFwdKey(cfg.KeyPath)
-		if err != nil {
-			writeAPIError(w, r, "E-SSHFWD-03", err.Error())
-			return
-		}
-		bundleStr, err := MakeBagherBundle(cfg, pub)
-		if err != nil {
-			writeAPIError(w, r, "E-SSHFWD-07", fmt.Sprintf("failed generating bundle: %v", err))
-			return
-		}
-		writeJSON(w, map[string]any{"status": "ok", "bundle": bundleStr})
-
+		sshFwdActGetBundle(w, r, body, &cfg)
 	case "gen_key", "gen-key":
-		pub, err := ensureSSHFwdKey(cfg.KeyPath)
-		if err != nil {
-			writeAPIError(w, r, "E-SSHFWD-03", err.Error())
-			return
-		}
-		writeJSON(w, map[string]any{"status": "ok", "pub_key": pub, "auth_line": formatAuthorizedKeyLine(pub, cfg.Mode, cfg.FRPBindPort, cfg.Ports)})
-
+		sshFwdActGenKey(w, r, &cfg)
 	case "enable", "apply":
-		if body.Name != nil {
-			if err := setLinkName("bagher-1", *body.Name); err != nil {
-				writeAPIError(w, r, "E-SSHFWD-02", err.Error())
-				return
-			}
-		}
-		cfg.Mode = "bagher"
-		if body.Role != "" {
-			cfg.Role = strings.TrimSpace(body.Role)
-		} else if cfg.Role == "" || cfg.Role == "foreign" {
-			cfg.Role = "iran"
-		}
-		if body.RemoteHost != "" {
-			cfg.RemoteHost = strings.TrimSpace(body.RemoteHost)
-		}
-		if body.RemoteUser != "" {
-			cfg.RemoteUser = strings.TrimSpace(body.RemoteUser)
-		}
-		if body.SSHPort > 0 {
-			cfg.RemoteSSHPort = body.SSHPort
-		}
-		if body.BindAddr != "" {
-			cfg.BindAddr = strings.TrimSpace(body.BindAddr)
-		}
-		if body.FRPBindPort > 0 {
-			cfg.FRPBindPort = body.FRPBindPort
-		}
-		if body.PoolCount > 0 {
-			cfg.PoolCount = body.PoolCount
-		}
-		if body.UDP != nil {
-			cfg.UDP = *body.UDP
-		}
-		if body.Ports != "" {
-			parsed := parsePorts(body.Ports)
-			if len(parsed) > 0 {
-				cfg.Ports = parsed
-			}
-		}
-
-		if cfg.RemoteHost == "" {
-			writeAPIError(w, r, "E-SSHFWD-01", "remote_host is required")
-			return
-		}
-		if len(cfg.Ports) == 0 {
-			writeAPIError(w, r, "E-SSHFWD-02", "At least one port must be specified in Forwarded Ports")
-			return
-		}
-		if err := checkBagherLinkPorts(cfg, cfg.Ports, 1); err != nil {
-			writeAPIError(w, r, "E-SSHFWD-02", err.Error())
-			return
-		}
-		for _, l := range cfg.Links {
-			if l.RemoteHost == cfg.RemoteHost {
-				writeAPIError(w, r, "E-SSHFWD-01", cfg.RemoteHost+" is already Bagher foreign server "+strconv.Itoa(l.ID))
-				return
-			}
-		}
-
-		if err := enableSSHFwd(cfg); err != nil {
-			writeAPIError(w, r, "E-SSHFWD-04", err.Error())
-			return
-		}
-		pubKey, _ := ensureSSHFwdKey(cfg.KeyPath)
-		bundleStr, _ := MakeBagherBundle(cfg, pubKey)
-		writeJSON(w, map[string]any{
-			"status":      "ok",
-			"message":     "Bagher Engine enabled successfully",
-			"bundle":      bundleStr,
-			"status_data": getSSHFwdStatusLocked(),
-		})
-
+		sshFwdActEnable(w, r, body, &cfg)
 	case "disable", "stop":
-		if err := disableSSHFwd(); err != nil {
-			writeAPIError(w, r, "E-SSHFWD-04", err.Error())
-			return
-		}
-		writeJSON(w, map[string]any{"status": "ok", "message": "Bagher Engine disabled", "status_data": getSSHFwdStatusLocked()})
-
+		sshFwdActDisable(w, r)
 	case "clean", "purge", "reset":
-		oldLinks := append([]BagherLink(nil), cfg.Links...)
-		if err := cleanSSHFwd(); err != nil {
-			writeAPIError(w, r, "E-SSHFWD-07", err.Error())
-			return
-		}
-		dropLinkNames("bagher-")
-		// The whole Bagher tunnel (main + every extra link) is deleted: its
-		// recorded traffic must not survive as an unassigned or stale row.
-		ids := make([]string, 0, len(oldLinks)+1)
-		ids = append(ids, "bagher")
-		for _, l := range oldLinks {
-			if l.ID > 0 {
-				ids = append(ids, "bagher:"+strconv.Itoa(l.ID))
-			}
-		}
-		purgeTunnelUsage(ids...)
-		writeJSON(w, map[string]any{
-			"status":      "ok",
-			"message":     "Bagher tunnel cleaned and reset",
-			"status_data": getSSHFwdStatusLocked(),
-		})
-
+		sshFwdActClean(w, r, &cfg)
 	case "sync_peer", "sync-peer":
-		pubKey, err := ensureSSHFwdKey(cfg.KeyPath)
-		if err != nil {
-			writeAPIError(w, r, "E-SSHFWD-03", err.Error())
-			return
-		}
-		pcfg := loadPeerConfig()
-		if pcfg.PeerSecret == "" {
-			writeAPIError(w, r, "E-SSHFWD-05", "peer secret not configured")
-			return
-		}
-		reqPayload := map[string]any{
-			"pub_key":       pubKey,
-			"mode":          cfg.Mode,
-			"frp_bind_port": cfg.FRPBindPort,
-			"ports":         cfg.Ports,
-		}
-		respBytes, err := sendToPeer("/api/peer/sshfwd-install-key", "POST", reqPayload)
-		if err != nil {
-			writeAPIError(w, r, "E-SSHFWD-06", fmt.Sprintf("failed pushing key to peer: %v", err))
-			return
-		}
-		writeJSON(w, map[string]any{"status": "ok", "peer_response": string(respBytes)})
-
+		sshFwdActSyncPeer(w, r, &cfg)
 	case "add_link", "add-link":
-		name := ""
-		if body.Name != nil {
-			name = strings.TrimSpace(*body.Name)
-		}
-		if err := validLinkName(name); err != nil {
-			writeAPIError(w, r, "E-SSHFWD-02", err.Error())
-			return
-		}
-		l, err := addBagherLink(&cfg, BagherLink{
-			RemoteHost: body.RemoteHost, RemoteUser: strings.TrimSpace(body.RemoteUser),
-			RemoteSSHPort: body.SSHPort, Ports: parsePorts(body.Ports), UDP: body.UDP != nil && *body.UDP,
-		})
-		if err != nil {
-			writeAPIError(w, r, "E-SSHFWD-02", err.Error())
-			return
-		}
-		pub, err := ensureSSHFwdKey(cfg.KeyPath)
-		if err != nil {
-			writeAPIError(w, r, "E-SSHFWD-03", err.Error())
-			return
-		}
-		if err := saveSSHFwdConfigLocked(cfg); err != nil {
-			writeAPIError(w, r, "E-SSHFWD-04", err.Error())
-			return
-		}
-		if name != "" {
-			_ = setLinkName(fmt.Sprintf("bagher-%d", l.ID), name)
-		}
-		if cfg.Enabled {
-			if err := installBagherLinkUnits(cfg, false); err != nil {
-				writeAPIError(w, r, "E-SSHFWD-04", err.Error())
-				return
-			}
-		}
-		bundleStr, err := MakeBagherBundle(bagherLinkCfg(cfg, l), pub)
-		if err != nil {
-			writeAPIError(w, r, "E-SSHFWD-07", fmt.Sprintf("failed generating bundle: %v", err))
-			return
-		}
-		writeJSON(w, map[string]any{"status": "ok", "id": l.ID, "bundle": bundleStr, "status_data": getSSHFwdStatusLocked()})
-
+		sshFwdActAddLink(w, r, body, &cfg)
 	case "remove_link", "remove-link":
-		if !removeBagherLink(&cfg, body.ID) {
-			writeAPIError(w, r, "E-SSHFWD-01", fmt.Sprintf("no Bagher foreign server %d", body.ID))
-			return
-		}
-		_, _ = runCmd("systemctl", "disable", "--now", bagherLinkUnit(body.ID)+".service")
-		_ = os.Remove(bagherLinkUnitPath(body.ID))
-		_ = os.Remove(bagherCarrierStatusPath(body.ID))
-		_ = setLinkName(fmt.Sprintf("bagher-%d", body.ID), "")
-		_, _ = runCmd("systemctl", "daemon-reload")
-		if err := saveSSHFwdConfigLocked(cfg); err != nil {
-			writeAPIError(w, r, "E-SSHFWD-04", err.Error())
-			return
-		}
-		// The link is deleted: its recorded traffic must not survive as an
-		// unassigned or stale row anywhere.
-		purgeTunnelUsage("bagher:" + strconv.Itoa(body.ID))
-		writeJSON(w, map[string]any{"status": "ok", "status_data": getSSHFwdStatusLocked()})
-
+		sshFwdActRemoveLink(w, r, body, &cfg)
 	case "clear_dnat", "clear-dnat":
-		_ = cleanDnatConflict(cfg.Ports)
-		writeJSON(w, map[string]any{"status": "ok", "message": "dnat table cleared"})
-
+		sshFwdActClearDnat(w, r, &cfg)
 	default:
 		writeAPIError(w, r, "E-SSHFWD-01", "unknown action: want enable, disable, gen_key, sync_peer, clear_dnat, apply_bundle, get_bundle, add_link, remove_link, or clean")
 	}
+}
+
+// sshFwdActApplyBundle implements the apply_bundle action (S4 extract, body verbatim).
+func sshFwdActApplyBundle(w http.ResponseWriter, r *http.Request, body sshFwdPostBody) {
+	bundleStr := strings.TrimSpace(body.Bundle)
+	if bundleStr == "" {
+		writeAPIError(w, r, "E-SSHFWD-07", "bundle string is required")
+		return
+	}
+	b, err := parseBagherBundle(bundleStr)
+	if err != nil {
+		writeAPIError(w, r, "E-SSHFWD-07", fmt.Sprintf("invalid bagher bundle: %v", err))
+		return
+	}
+	if body.Name != nil {
+		if err := validLinkName(strings.TrimSpace(*body.Name)); err != nil {
+			writeAPIError(w, r, "E-SSHFWD-07", err.Error())
+			return
+		}
+	}
+	if err := applyBagherBundle(b); err != nil {
+		writeAPIError(w, r, "E-SSHFWD-08", fmt.Sprintf("failed applying bagher bundle: %v", err))
+		return
+	}
+	if body.Name != nil && strings.TrimSpace(*body.Name) != "" {
+		_ = setLinkName("bagher-1", *body.Name)
+	}
+	writeJSON(w, map[string]any{
+		"status":      "ok",
+		"message":     "Bagher bundle applied successfully. Foreign client active.",
+		"status_data": getSSHFwdStatusLocked(),
+	})
+}
+
+// sshFwdActGetBundle implements the get_bundle action (S4 extract, body verbatim).
+func sshFwdActGetBundle(w http.ResponseWriter, r *http.Request, body sshFwdPostBody, cfg *SSHFwdConfig) {
+	if body.RemoteHost != "" {
+		cfg.RemoteHost = strings.TrimSpace(body.RemoteHost)
+	}
+	if body.UDP != nil {
+		cfg.UDP = *body.UDP
+	}
+	if body.Ports != "" {
+		parsed := parsePorts(body.Ports)
+		if len(parsed) > 0 {
+			cfg.Ports = parsed
+		}
+	}
+	if len(cfg.Ports) == 0 {
+		writeAPIError(w, r, "E-SSHFWD-02", "Forwarded ports must be specified before generating bundle")
+		return
+	}
+	if strings.TrimSpace(cfg.RemoteHost) == "" {
+		writeAPIError(w, r, "E-SSHFWD-01", "Remote host IP must be specified before generating bundle")
+		return
+	}
+	_ = saveSSHFwdConfigLocked(*cfg)
+
+	pub, err := ensureSSHFwdKey(cfg.KeyPath)
+	if err != nil {
+		writeAPIError(w, r, "E-SSHFWD-03", err.Error())
+		return
+	}
+	bundleStr, err := MakeBagherBundle(*cfg, pub)
+	if err != nil {
+		writeAPIError(w, r, "E-SSHFWD-07", fmt.Sprintf("failed generating bundle: %v", err))
+		return
+	}
+	writeJSON(w, map[string]any{"status": "ok", "bundle": bundleStr})
+}
+
+// sshFwdActGenKey implements the gen_key action (S4 extract, body verbatim).
+func sshFwdActGenKey(w http.ResponseWriter, r *http.Request, cfg *SSHFwdConfig) {
+	pub, err := ensureSSHFwdKey(cfg.KeyPath)
+	if err != nil {
+		writeAPIError(w, r, "E-SSHFWD-03", err.Error())
+		return
+	}
+	writeJSON(w, map[string]any{"status": "ok", "pub_key": pub, "auth_line": formatAuthorizedKeyLine(pub, cfg.Mode, cfg.FRPBindPort, cfg.Ports)})
+}
+
+// sshFwdActEnable implements the enable/apply action (S4 extract, body verbatim).
+func sshFwdActEnable(w http.ResponseWriter, r *http.Request, body sshFwdPostBody, cfg *SSHFwdConfig) {
+	if body.Name != nil {
+		if err := setLinkName("bagher-1", *body.Name); err != nil {
+			writeAPIError(w, r, "E-SSHFWD-02", err.Error())
+			return
+		}
+	}
+	cfg.Mode = "bagher"
+	if body.Role != "" {
+		cfg.Role = strings.TrimSpace(body.Role)
+	} else if cfg.Role == "" || cfg.Role == "foreign" {
+		cfg.Role = "iran"
+	}
+	if body.RemoteHost != "" {
+		cfg.RemoteHost = strings.TrimSpace(body.RemoteHost)
+	}
+	if body.RemoteUser != "" {
+		cfg.RemoteUser = strings.TrimSpace(body.RemoteUser)
+	}
+	if body.SSHPort > 0 {
+		cfg.RemoteSSHPort = body.SSHPort
+	}
+	if body.BindAddr != "" {
+		cfg.BindAddr = strings.TrimSpace(body.BindAddr)
+	}
+	if body.FRPBindPort > 0 {
+		cfg.FRPBindPort = body.FRPBindPort
+	}
+	if body.PoolCount > 0 {
+		cfg.PoolCount = body.PoolCount
+	}
+	if body.UDP != nil {
+		cfg.UDP = *body.UDP
+	}
+	if body.Ports != "" {
+		parsed := parsePorts(body.Ports)
+		if len(parsed) > 0 {
+			cfg.Ports = parsed
+		}
+	}
+
+	if cfg.RemoteHost == "" {
+		writeAPIError(w, r, "E-SSHFWD-01", "remote_host is required")
+		return
+	}
+	if len(cfg.Ports) == 0 {
+		writeAPIError(w, r, "E-SSHFWD-02", "At least one port must be specified in Forwarded Ports")
+		return
+	}
+	if err := checkBagherLinkPorts(*cfg, cfg.Ports, 1); err != nil {
+		writeAPIError(w, r, "E-SSHFWD-02", err.Error())
+		return
+	}
+	for _, l := range cfg.Links {
+		if l.RemoteHost == cfg.RemoteHost {
+			writeAPIError(w, r, "E-SSHFWD-01", cfg.RemoteHost+" is already Bagher foreign server "+strconv.Itoa(l.ID))
+			return
+		}
+	}
+
+	if err := enableSSHFwd(*cfg); err != nil {
+		writeAPIError(w, r, "E-SSHFWD-04", err.Error())
+		return
+	}
+	pubKey, _ := ensureSSHFwdKey(cfg.KeyPath)
+	bundleStr, _ := MakeBagherBundle(*cfg, pubKey)
+	writeJSON(w, map[string]any{
+		"status":      "ok",
+		"message":     "Bagher Engine enabled successfully",
+		"bundle":      bundleStr,
+		"status_data": getSSHFwdStatusLocked(),
+	})
+}
+
+// sshFwdActDisable implements the disable/stop action (S4 extract, body verbatim).
+func sshFwdActDisable(w http.ResponseWriter, r *http.Request) {
+	if err := disableSSHFwd(); err != nil {
+		writeAPIError(w, r, "E-SSHFWD-04", err.Error())
+		return
+	}
+	writeJSON(w, map[string]any{"status": "ok", "message": "Bagher Engine disabled", "status_data": getSSHFwdStatusLocked()})
+}
+
+// sshFwdActClean implements the clean/purge/reset action (S4 extract, body verbatim).
+func sshFwdActClean(w http.ResponseWriter, r *http.Request, cfg *SSHFwdConfig) {
+	oldLinks := append([]BagherLink(nil), cfg.Links...)
+	if err := cleanSSHFwd(); err != nil {
+		writeAPIError(w, r, "E-SSHFWD-07", err.Error())
+		return
+	}
+	dropLinkNames("bagher-")
+	// The whole Bagher tunnel (main + every extra link) is deleted: its
+	// recorded traffic must not survive as an unassigned or stale row.
+	ids := make([]string, 0, len(oldLinks)+1)
+	ids = append(ids, "bagher")
+	for _, l := range oldLinks {
+		if l.ID > 0 {
+			ids = append(ids, "bagher:"+strconv.Itoa(l.ID))
+		}
+	}
+	purgeTunnelUsage(ids...)
+	writeJSON(w, map[string]any{
+		"status":      "ok",
+		"message":     "Bagher tunnel cleaned and reset",
+		"status_data": getSSHFwdStatusLocked(),
+	})
+}
+
+// sshFwdActSyncPeer implements the sync_peer action (S4 extract, body verbatim).
+func sshFwdActSyncPeer(w http.ResponseWriter, r *http.Request, cfg *SSHFwdConfig) {
+	pubKey, err := ensureSSHFwdKey(cfg.KeyPath)
+	if err != nil {
+		writeAPIError(w, r, "E-SSHFWD-03", err.Error())
+		return
+	}
+	pcfg := loadPeerConfig()
+	if pcfg.PeerSecret == "" {
+		writeAPIError(w, r, "E-SSHFWD-05", "peer secret not configured")
+		return
+	}
+	reqPayload := map[string]any{
+		"pub_key":       pubKey,
+		"mode":          cfg.Mode,
+		"frp_bind_port": cfg.FRPBindPort,
+		"ports":         cfg.Ports,
+	}
+	respBytes, err := sendToPeer("/api/peer/sshfwd-install-key", "POST", reqPayload)
+	if err != nil {
+		writeAPIError(w, r, "E-SSHFWD-06", fmt.Sprintf("failed pushing key to peer: %v", err))
+		return
+	}
+	writeJSON(w, map[string]any{"status": "ok", "peer_response": string(respBytes)})
+}
+
+// sshFwdActAddLink implements the add_link action (S4 extract, body verbatim).
+func sshFwdActAddLink(w http.ResponseWriter, r *http.Request, body sshFwdPostBody, cfg *SSHFwdConfig) {
+	name := ""
+	if body.Name != nil {
+		name = strings.TrimSpace(*body.Name)
+	}
+	if err := validLinkName(name); err != nil {
+		writeAPIError(w, r, "E-SSHFWD-02", err.Error())
+		return
+	}
+	l, err := addBagherLink(cfg, BagherLink{
+		RemoteHost: body.RemoteHost, RemoteUser: strings.TrimSpace(body.RemoteUser),
+		RemoteSSHPort: body.SSHPort, Ports: parsePorts(body.Ports), UDP: body.UDP != nil && *body.UDP,
+	})
+	if err != nil {
+		writeAPIError(w, r, "E-SSHFWD-02", err.Error())
+		return
+	}
+	pub, err := ensureSSHFwdKey(cfg.KeyPath)
+	if err != nil {
+		writeAPIError(w, r, "E-SSHFWD-03", err.Error())
+		return
+	}
+	if err := saveSSHFwdConfigLocked(*cfg); err != nil {
+		writeAPIError(w, r, "E-SSHFWD-04", err.Error())
+		return
+	}
+	if name != "" {
+		_ = setLinkName(fmt.Sprintf("bagher-%d", l.ID), name)
+	}
+	if cfg.Enabled {
+		if err := installBagherLinkUnits(*cfg, false); err != nil {
+			writeAPIError(w, r, "E-SSHFWD-04", err.Error())
+			return
+		}
+	}
+	bundleStr, err := MakeBagherBundle(bagherLinkCfg(*cfg, l), pub)
+	if err != nil {
+		writeAPIError(w, r, "E-SSHFWD-07", fmt.Sprintf("failed generating bundle: %v", err))
+		return
+	}
+	writeJSON(w, map[string]any{"status": "ok", "id": l.ID, "bundle": bundleStr, "status_data": getSSHFwdStatusLocked()})
+}
+
+// sshFwdActRemoveLink implements the remove_link action (S4 extract, body verbatim).
+func sshFwdActRemoveLink(w http.ResponseWriter, r *http.Request, body sshFwdPostBody, cfg *SSHFwdConfig) {
+	if !removeBagherLink(cfg, body.ID) {
+		writeAPIError(w, r, "E-SSHFWD-01", fmt.Sprintf("no Bagher foreign server %d", body.ID))
+		return
+	}
+	_, _ = runCmd("systemctl", "disable", "--now", bagherLinkUnit(body.ID)+".service")
+	_ = os.Remove(bagherLinkUnitPath(body.ID))
+	_ = os.Remove(bagherCarrierStatusPath(body.ID))
+	_ = setLinkName(fmt.Sprintf("bagher-%d", body.ID), "")
+	_, _ = runCmd("systemctl", "daemon-reload")
+	if err := saveSSHFwdConfigLocked(*cfg); err != nil {
+		writeAPIError(w, r, "E-SSHFWD-04", err.Error())
+		return
+	}
+	// The link is deleted: its recorded traffic must not survive as an
+	// unassigned or stale row anywhere.
+	purgeTunnelUsage("bagher:" + strconv.Itoa(body.ID))
+	writeJSON(w, map[string]any{"status": "ok", "status_data": getSSHFwdStatusLocked()})
+}
+
+// sshFwdActClearDnat implements the clear_dnat action (S4 extract, body verbatim).
+func sshFwdActClearDnat(w http.ResponseWriter, r *http.Request, cfg *SSHFwdConfig) {
+	_ = cleanDnatConflict(cfg.Ports)
+	writeJSON(w, map[string]any{"status": "ok", "message": "dnat table cleared"})
 }
 
 // handlePeerSSHFwdInstallKey is called on Kharej by Iran panel to register the restrict SSH key.

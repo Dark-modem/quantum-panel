@@ -42,27 +42,49 @@ func meshDefaultFailover() protocol.FailoverRules {
 // compileDesiredV2 builds the DesiredV2 for one agent + its warnings.
 // skip (non-nil error nil, skip non-empty) means "nothing to do for this
 // agent" — not linked, no tunnels, nothing changed.
+// S4: the phases are compileDesiredTunnelSpecs (linked server + enabled
+// tunnel specs), compileDesiredEngines (artifact stamping + engine flags),
+// compileDesiredBalancing (weights/health/failover + scoped forwards) and
+// stampDesiredSelf (R6 self stamp + alignment warnings) — bodies verbatim,
+// every early return's exact (nil/skip/warnings/err) shape preserved.
 func compileDesiredV2(s *store.Store, ag store.Agent) (desired *protocol.DesiredV2, skip string, warnings []string, err error) {
-	if ag.ServerID == 0 {
-		return nil, "agent not linked to a configured server (link it first)", nil, nil
+	server, specs, engineUsed, topoSeen, warnings, skip, err := compileDesiredTunnelSpecs(s, ag)
+	if err != nil || skip != "" {
+		return nil, skip, warnings, err
 	}
-	server, err := s.GetServer(ag.ServerID)
-	if err != nil {
-		return nil, "", nil, fmt.Errorf("linked server: %v", err)
-	}
-	tunnels, err := s.TunnelsForServer(server.ID)
+	engines, err := compileDesiredEngines(s, ag, specs, engineUsed)
 	if err != nil {
 		return nil, "", nil, err
 	}
-	var specs []protocol.TunnelSpec
-	engineUsed := map[string]bool{}
-	topoSeen := map[int64]bool{}
-	var (
-		forwards     []protocol.ForwardRule
-		targetGroups []protocol.TargetGroup
-		groupSeen    = map[string]bool{}
-		groupDefs    = map[string]protocol.TargetGroup{}
-	)
+	bal, forwards, targetGroups, warnings := compileDesiredBalancing(s, server, engineUsed, topoSeen, warnings)
+	desired = &protocol.DesiredV2{
+		Engines: engines, Tunnels: specs, Balancing: &bal,
+		TargetGroups: targetGroups, Forwards: forwards,
+	}
+	warnings = stampDesiredSelf(server, specs, desired, warnings)
+	return desired, "", warnings, nil
+}
+
+// compileDesiredTunnelSpecs resolves the agent's linked server and compiles
+// the enabled-tunnel specs (S4 extract, body verbatim): per-tunnel topology
+// checks feed warnings, the engine/topology usage sets feed the later
+// phases, and the tunnel-less mis-link warning (BACKLOG P18-1) rides the
+// skip return. Hard errors return nil warnings exactly like the inline
+// original's early returns.
+func compileDesiredTunnelSpecs(s *store.Store, ag store.Agent) (server store.Server, specs []protocol.TunnelSpec, engineUsed map[string]bool, topoSeen map[int64]bool, warnings []string, skip string, err error) {
+	if ag.ServerID == 0 {
+		return server, nil, nil, nil, nil, "agent not linked to a configured server (link it first)", nil
+	}
+	server, err = s.GetServer(ag.ServerID)
+	if err != nil {
+		return store.Server{}, nil, nil, nil, nil, "", fmt.Errorf("linked server: %v", err)
+	}
+	tunnels, err := s.TunnelsForServer(server.ID)
+	if err != nil {
+		return store.Server{}, nil, nil, nil, nil, "", err
+	}
+	engineUsed = map[string]bool{}
+	topoSeen = map[int64]bool{}
 	for _, t := range tunnels {
 		if !t.Enabled {
 			continue
@@ -117,9 +139,16 @@ func compileDesiredV2(s *store.Store, ag store.Agent) (desired *protocol.Desired
 				"server %q compiles NO tunnels but is still named by %d tunnel(s) of enabled topologies (%s%s) — the agent would receive a tunnel-less document; check disabled tunnels, missing engines, or a mis-link (R6)",
 				server.Name, total, strings.Join(named, ", "), more))
 		}
-		return nil, "no enabled tunnels reference this server yet", warnings, nil
+		return server, nil, engineUsed, topoSeen, warnings, "no enabled tunnels reference this server yet", nil
 	}
+	return server, specs, engineUsed, topoSeen, warnings, "", nil
+}
 
+// compileDesiredEngines stamps the artifact engines' tunnel params (phase
+// 31 §10.4) and builds the desired engine list (S4 extract, body verbatim).
+// Hard errors return exactly like the inline original — the caller's
+// accumulated warnings are discarded.
+func compileDesiredEngines(s *store.Store, ag store.Agent, specs []protocol.TunnelSpec, engineUsed map[string]bool) (engines []protocol.EngineSpec, err error) {
 	// Phase 31 (contract §2.6, UI-API-REQUESTS §10.4): stamp the artifact
 	// engines' tunnel params with the LATEST artifact version for this
 	// agent's arch. A newly uploaded artifact then changes the desired
@@ -150,20 +179,19 @@ func compileDesiredV2(s *store.Store, ag store.Agent) (desired *protocol.Desired
 	if on, derr := s.AgentEngineDesired(ag.ID, "matrix"); derr == nil && on {
 		engEnabled["matrix"] = true
 	}
-	var engines []protocol.EngineSpec
 	for e, on := range engEnabled {
 		engines = append(engines, protocol.EngineSpec{ID: e, Enabled: on})
 	}
 	v2state, err := s.AgentV2(ag.ID)
 	if err != nil {
-		return nil, "", nil, fmt.Errorf("agent v2 state: %v", err)
+		return nil, fmt.Errorf("agent v2 state: %v", err)
 	}
 	if strings.TrimSpace(v2state.EngineCatalog) != "" {
 		var catalog []struct {
 			ID string `json:"id"`
 		}
 		if err := json.Unmarshal([]byte(v2state.EngineCatalog), &catalog); err != nil {
-			return nil, "", nil, fmt.Errorf("engine catalog: %v", err)
+			return nil, fmt.Errorf("engine catalog: %v", err)
 		}
 		for _, c := range catalog {
 			if c.ID != "" && !engEnabled[c.ID] {
@@ -173,10 +201,23 @@ func compileDesiredV2(s *store.Store, ag store.Agent) (desired *protocol.Desired
 	}
 	sort.Slice(engines, func(i, j int) bool { return engines[i].ID < engines[j].ID })
 	sort.Slice(specs, func(i, j int) bool { return specs[i].ID < specs[j].ID })
+	return engines, nil
+}
 
+// compileDesiredBalancing resolves the per-tunnel weight rules with the
+// store's specificity chain scoped to the topologies this agent tunnels
+// for, the topology health/failover overrides and the topology-scoped
+// forward rules with their target groups (S4 extract, body verbatim).
+// Returns the policy, the sorted rules/groups and the possibly-extended
+// warnings slice.
+func compileDesiredBalancing(s *store.Store, server store.Server, engineUsed map[string]bool, topoSeen map[int64]bool, warnings []string) (bal protocol.BalancingPolicy, forwards []protocol.ForwardRule, targetGroups []protocol.TargetGroup, _ []string) {
 	// Balancing: per-tunnel weight rules resolved with the store's
 	// specificity chain, scoped to the topologies this agent tunnels for.
-	bal := protocol.BalancingPolicy{HealthCheck: meshDefaultHealth(), Failover: meshDefaultFailover()}
+	bal = protocol.BalancingPolicy{HealthCheck: meshDefaultHealth(), Failover: meshDefaultFailover()}
+	var (
+		groupSeen = map[string]bool{}
+		groupDefs = map[string]protocol.TargetGroup{}
+	)
 	for topoID := range topoSeen {
 		tp, err := s.GetTopology(topoID)
 		if err != nil {
@@ -252,11 +293,12 @@ func compileDesiredV2(s *store.Store, ag store.Agent) (desired *protocol.Desired
 	}
 	sort.Slice(targetGroups, func(i, j int) bool { return targetGroups[i].ID < targetGroups[j].ID })
 	sort.Slice(forwards, func(i, j int) bool { return forwards[i].ID < forwards[j].ID })
+	return bal, forwards, targetGroups, warnings
+}
 
-	desired = &protocol.DesiredV2{
-		Engines: engines, Tunnels: specs, Balancing: &bal,
-		TargetGroups: targetGroups, Forwards: forwards,
-	}
+// stampDesiredSelf stamps the receiving agent's SELF (R6) and validates
+// spec alignment against it, extending warnings (S4 extract, body verbatim).
+func stampDesiredSelf(server store.Server, specs []protocol.TunnelSpec, desired *protocol.DesiredV2, warnings []string) []string {
 	// R6 (PROTOCOL-REQUESTS.md): stamp the receiving agent's SELF — the
 	// mesh server name it is linked to (the enrollment name), spelled
 	// exactly like the LocalServer/RemoteServer strings above — so the
@@ -273,7 +315,7 @@ func compileDesiredV2(s *store.Store, ag store.Agent) (desired *protocol.Desired
 			}
 		}
 	}
-	return desired, "", warnings, nil
+	return warnings
 }
 
 // agentArchForArtifacts resolves the arch an agent's artifacts resolve
