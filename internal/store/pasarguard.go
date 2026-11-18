@@ -74,35 +74,20 @@ func (s *Store) UpsertPGNode(n PGNode) (int64, error) {
 
 // ListPGNodes returns every mapping.
 func (s *Store) ListPGNodes() ([]PGNode, error) {
-	rows, err := s.db.Query(`SELECT id, server_id, datacenter_id, pg_node_id, api_key_enc, server_ca, node_port, note, created_at
-		FROM pg_nodes ORDER BY id`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []PGNode
-	for rows.Next() {
-		var n PGNode
-		if err := rows.Scan(&n.ID, &n.ServerID, &n.DatacenterID, &n.PGNodeID, &n.APIKeyEnc,
-			&n.ServerCA, &n.NodePort, &n.Note, &n.CreatedAt); err != nil {
-			return nil, err
-		}
-		out = append(out, n)
-	}
-	return out, rows.Err()
+	return scanList(s, `SELECT id, server_id, datacenter_id, pg_node_id, api_key_enc, server_ca, node_port, note, created_at
+		FROM pg_nodes ORDER BY id`, func(n *PGNode) []any {
+		return []any{&n.ID, &n.ServerID, &n.DatacenterID, &n.PGNodeID, &n.APIKeyEnc,
+			&n.ServerCA, &n.NodePort, &n.Note, &n.CreatedAt}
+	})
 }
 
 // GetPGNodeByPair resolves the mapping for one (server, datacenter) pair.
 func (s *Store) GetPGNodeByPair(serverID, datacenterID int64) (PGNode, error) {
-	var n PGNode
-	err := s.db.QueryRow(`SELECT id, server_id, datacenter_id, pg_node_id, api_key_enc, server_ca, node_port, note, created_at
-		FROM pg_nodes WHERE server_id = ? AND datacenter_id = ?`, serverID, datacenterID).
-		Scan(&n.ID, &n.ServerID, &n.DatacenterID, &n.PGNodeID, &n.APIKeyEnc,
-			&n.ServerCA, &n.NodePort, &n.Note, &n.CreatedAt)
-	if errors.Is(err, sql.ErrNoRows) {
-		return n, ErrNotFound
-	}
-	return n, err
+	return scanOne(s, `SELECT id, server_id, datacenter_id, pg_node_id, api_key_enc, server_ca, node_port, note, created_at
+		FROM pg_nodes WHERE server_id = ? AND datacenter_id = ?`, func(n *PGNode) []any {
+		return []any{&n.ID, &n.ServerID, &n.DatacenterID, &n.PGNodeID, &n.APIKeyEnc,
+			&n.ServerCA, &n.NodePort, &n.Note, &n.CreatedAt}
+	}, serverID, datacenterID)
 }
 
 // DeletePGNode removes a mapping row (not the PasarGuard node itself).
