@@ -25,7 +25,9 @@ async function topoDcLoad(topo) {
     const memberAgs = window.__topoAgents.filter(a => !topo || (a.topologies || []).includes(topo.name));
     const detailRows = await Promise.all(memberAgs.map(a =>
       api('/api/ui/agents/' + encodeURIComponent(a.id)).then(d2 => ({ agent: a, d: d2 })).catch(() => null)));
+    window.__topoAgentTraffic = {};
     detailRows.filter(Boolean).forEach(({ agent, d }) => {
+      window.__topoAgentTraffic[agent.id] = d.traffic24 || [];
       (d.tunnels || []).forEach(tn => {
         if (topo && tn.topology && tn.topology !== topo.name) return;
         window.__topoTunnels.push({
@@ -628,6 +630,22 @@ function topologyGraph(topo, tunnels) {
     const row = (icon, yy, cls, val) => m
       ? icon(rowIcX, yy) + tTxt(rowIcX - 8, yy + 13, cls, val, 'end')
       : icon(rowIcX, yy) + tTxt(rowIcX + 20, yy + 13, cls, val);
+    // the traffic sparkline, the mockup's bottom-right flourish: this
+    // server's last 24h hourly traffic (agent layer rollup) — flat and dim
+    // when the window carries no traffic
+    let spark = '';
+    if (agRow) {
+      const series = (window.__topoAgentTraffic || {})[agRow.id] || [];
+      const pts0 = series.length ? series : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+      const flat = !pts0.some(v => v > 0);
+      const sx = m ? x + 16 : x + w - 124, sy = y + 88, sw = 106, sh = 30;
+      const max = Math.max(...pts0, 1);
+      const pts = pts0.map((v, i) => (sx + i * sw / (pts0.length - 1)).toFixed(1) + ',' + (sy + sh - 1 - (v / max) * (sh - 2)).toFixed(1)).join(' ');
+      spark = `<svg class="topo-spark" x="${sx}" y="${sy}" width="${sw}" height="${sh}" viewBox="0 0 ${sw} ${sh}" aria-hidden="true">` +
+        (flat ? '' : `<polygon class="topo-spark-area" points="${pts} ${sx + sw},${sy + sh} ${sx},${sy + sh}"/>`) +
+        `<polyline class="topo-spark-line${flat ? ' flat' : ''}" points="${pts}"/>` +
+        `</svg>`;
+    }
     const rowYs = [y + 57, y + 80, y + 103];
     // the server stack icon, the owner's zoomed mockup: three solid disks
     // with twin LEDs, filling the rows' exact current height
@@ -649,6 +667,7 @@ function topologyGraph(topo, tunnels) {
       row(icPin, rowYs[1], 'topo-n-loc', locTxt) +
       row(icMon, rowYs[2], 'topo-ip', info.ip) +
       stLbl +
+      spark +
       port +
       `</g>`;
   };

@@ -2156,5 +2156,10 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 .topo-n-status.ok { fill:var(--ok); } .topo-n-status.err { fill:var(--er); }
 .topo-n-stack rect { fill:var(--ac); stroke:none; }
 .topo-n-stack-dot { fill:color-mix(in srgb, var(--tx) 88%, transparent); }
+/* the card's traffic sparkline, the mockup's bottom-right flourish */
+.topo-spark { display:block; overflow:visible; }
+.topo-spark-line { fill:none; stroke:var(--ok); stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+.topo-spark-line.flat { stroke:var(--mu); opacity:.55; }
+.topo-spark-area { fill:color-mix(in srgb, var(--ok) 13%, transparent); stroke:none; }
 .topo-graph .topo-node-iran > .cl-n-bg { stroke:color-mix(in srgb, var(--ac) 70%, transparent); filter:drop-shadow(0 0 6px color-mix(in srgb, var(--ac) 40%, transparent)); }
 .topo-graph .topo-node-foreign > .cl-n-bg { stroke:color-mix(in srgb, var(--info) 70%, transparent); filter:drop-shadow(0 0 6px color-mix(in srgb, var(--info) 38%, transparent)); }
