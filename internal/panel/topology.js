@@ -9,7 +9,7 @@ let topoServersByTopo = {};
 let topoDcLoaded = false;
 let topologyDcFilter = 'all';
 let topoPage = 1;
-const TOPO_PAGE_SIZE = 10;
+let topoPerPage = 10;
 function topoIsFa() { return typeof currentLang !== 'undefined' && currentLang === 'fa'; }
 async function topoDcLoad(topo) {
   if (topoDcLoaded) return;
@@ -1025,10 +1025,10 @@ function topologyRender() {
     .filter(t => topologyStatusMatches(t, topologyExistingTunnels(t)))
     .filter(t => topologyCountryMatches(t))
     .filter(t => topologyDcMatches(t));
-  const pages = Math.max(1, Math.ceil(all.length / TOPO_PAGE_SIZE));
+  const pages = Math.max(1, Math.ceil(all.length / topoPerPage));
   if (topoPage > pages) topoPage = pages;
-  const pageFrom = (topoPage - 1) * TOPO_PAGE_SIZE;
-  const visible = all.slice(pageFrom, pageFrom + TOPO_PAGE_SIZE);
+  const pageFrom = (topoPage - 1) * topoPerPage;
+  const visible = all.slice(pageFrom, pageFrom + topoPerPage);
   const foot = $('topologyFootCount');
   if (foot) foot.textContent = all.length
     ? tr('', 'Showing {a} to {b} of {c} topologies')
@@ -1036,12 +1036,29 @@ function topologyRender() {
         .replace('{b}', String(Math.min(pageFrom + visible.length, all.length)))
         .replace('{c}', String(all.length))
     : tr('', '{n} item(s)').replace('{n}', '0');
-  const prev = $('topoPagePrev'), next = $('topoPageNext'), cur = $('topoPageCur');
-  if (prev && next && cur) {
-    cur.textContent = String(topoPage);
-    prev.disabled = topoPage <= 1;
-    next.disabled = topoPage >= pages;
-    cur.disabled = pages <= 1;
+  // the agents-list pager, cloned: per-page size dropdown on the left,
+  // prev / numbered pages / next on the right
+  const pager = $('topoPager');
+  if (pager) {
+    let pgs;
+    if (pages <= 7) { pgs = []; for (let i = 1; i <= pages; i++) pgs.push(i); }
+    else if (topoPage <= 4) { pgs = [1, 2, 3, 4, 5, '…', pages]; }
+    else if (topoPage >= pages - 3) { pgs = [1, '…', pages - 4, pages - 3, pages - 2, pages - 1, pages]; }
+    else { pgs = [1, '…', topoPage - 1, topoPage, topoPage + 1, '…', pages]; }
+    const btns = pgs.map(p => p === '…'
+      ? '<span class="mtb-pg-dots">…</span>'
+      : `<button type="button" class="mtb-pg-btn${p === topoPage ? ' on' : ''}" data-topg="${p}">${p}</button>`).join('');
+    const sizes = [5, 10, 20, 50].map(s => `<button type="button" class="mtb-cdd-opt${s === topoPerPage ? ' on' : ''}" data-topsize="${s}">${s}</button>`).join('');
+    pager.innerHTML = '<div class="mtb-pg-size">' +
+      '<div class="mtb-cdd mtb-fcdd"><button type="button" class="mtb-cdd-btn" data-topsize-toggle><span class="mtb-cdd-cur">' + topoPerPage + '</span>' +
+      '<span class="mtb-cdd-arrow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span></button>' +
+      '<div class="mtb-cdd-pop" hidden>' + sizes + '</div></div>' +
+      '<span class="mtb-pg-szlbl">' + esc(tr('', 'Per page')) + '</span></div>' +
+      '<div class="mtb-pg-nav">' +
+      `<button type="button" class="mtb-pg-navbtn" data-topg="prev"${topoPage <= 1 ? ' disabled' : ''}>` + esc(tr('', 'Prev')) + '</button>' +
+      btns +
+      `<button type="button" class="mtb-pg-navbtn" data-topg="next"${topoPage >= pages ? ' disabled' : ''}>` + esc(tr('', 'Next')) + '</button>' +
+      '</div>';
   }
   if (typeof topTitleSync === 'function') { try { topTitleSync(); } catch (e) {} }
   renderTopoMembers(topo);
@@ -2177,11 +2194,37 @@ $('topoCreateX').onclick = topoCreateCancel;
 $('topoCreateBack').onclick = topoCreateBack;
 $('topoCreateNext').onclick = topoCreateNext;
 $('topologySearch').addEventListener('input', e => { topologySearchQuery = (e && e.target ? e.target.value : '') || ''; topoPage = 1; topologyRender(); });
+// the agents-style pager's wiring: size options, page buttons, the size
+// dropdown's toggle, and a click-away close for its popup
+{
+  const pager = $('topoPager');
+  if (pager && !pager.dataset.topWired) {
+    pager.dataset.topWired = '1';
+    pager.addEventListener('click', e => {
+      const sz = e.target.closest('[data-topsize]');
+      if (sz) { topoPerPage = parseInt(sz.getAttribute('data-topsize'), 10) || topoPerPage; topoPage = 1; topologyRender(); return; }
+      const tog = e.target.closest('[data-topsize-toggle]');
+      if (tog) { const pop = tog.parentElement.querySelector('.mtb-cdd-pop'); if (pop) pop.hidden = !pop.hidden; return; }
+      const pg = e.target.closest('[data-topg]');
+      if (pg) {
+        const v = pg.getAttribute('data-topg');
+        if (v === 'prev') topoPage = Math.max(1, topoPage - 1);
+        else if (v === 'next') topoPage++;
+        else topoPage = parseInt(v, 10) || topoPage;
+        topologyRender();
+      }
+    });
+    document.addEventListener('click', e => {
+      if (!e.target.closest('#topoPager .mtb-cdd') && !e.target.closest('[data-topsize-toggle]')) {
+        const pop = document.querySelector('#topoPager .mtb-cdd-pop');
+        if (pop) pop.hidden = true;
+      }
+    });
+  }
+}
 $('topologyStatusFilter').addEventListener('change', e => { topologyStatusFilter = (e && e.target ? e.target.value : 'all') || 'all'; topoPage = 1; topologyRender(); });
 $('topologyCountryFilter').addEventListener('change', e => { topologyCountryFilter = (e && e.target ? e.target.value : 'all') || 'all'; topoPage = 1; topologyRender(); });
 $('topologyDcFilter').addEventListener('change', e => { topologyDcFilter = (e && e.target ? e.target.value : 'all') || 'all'; topoPage = 1; topologyRender(); });
-$('topoPagePrev').addEventListener('click', () => { if (topoPage > 1) { topoPage--; topologyRender(); } });
-$('topoPageNext').addEventListener('click', () => { topoPage++; topologyRender(); });
 document.querySelectorAll('[data-topo-role]').forEach(b => { b.onclick = () => topologyChooseRole(b.dataset.topoRole); });
 $('tab-tunnel').addEventListener('click', e => {
   const target = e.target.closest('button'); if (!target) return;

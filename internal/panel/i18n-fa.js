@@ -838,6 +838,7 @@ window.FA_TEXT = {
  "Search…": "جستجو…",
  "Next": "بعدی",
  "Prev": "قبلی",
+ "Per page": "بر اساس صفحه",
  "Close search": "بستن جستجو",
  "Disconnected": "قطع",
  "Press Connect to open a root shell on this server.": "برای باز کردن شل root روی این سرور «اتصال» را بزنید.",
