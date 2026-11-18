@@ -41,20 +41,11 @@ const (
 // shrink it and still exercise the batched path quickly.
 var agentPersistEvery = 2 * time.Second
 
-var agentHubUpgrader = websocket.Upgrader{
-	ReadBufferSize:  4096,
-	WriteBufferSize: 4096,
-	CheckOrigin: func(r *http.Request) bool {
-		// Agents are not browsers and never send Origin. Any browser-origin
-		// upgrade is rejected (there is no cookie auth here, but keep the
-		// cross-site WebSocket hijacking surface closed, like the terminal).
-		origin := r.Header.Get("Origin")
-		if origin == "" {
-			return true
-		}
-		return strings.EqualFold(CleanHost(origin), CleanHost(r.Host))
-	},
-}
+// agentHubUpgrader is the shared wsUpgrader (wsupgrade.go). Agents are
+// not browsers and never send Origin; any browser-origin upgrade is
+// rejected (there is no cookie auth here, but the cross-site WebSocket
+// hijacking surface stays closed, like the terminal).
+var agentHubUpgrader = wsUpgrader
 
 // Hooks the coordinator (tunnel orchestration layer) wires at startup:
 //   - agentAckObserver fires when an agent acks the pending desired

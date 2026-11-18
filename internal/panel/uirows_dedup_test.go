@@ -16,6 +16,8 @@ package panel
 import (
 	"bytes"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"sort"
 	"strings"
@@ -24,6 +26,7 @@ import (
 
 	"github.com/Dark-modem/quantum-panel/internal/store"
 	protocol "github.com/Dark-modem/quantum-protocol"
+	"github.com/gorilla/websocket"
 )
 
 // s2CompareJSON byte-compares two payload builds: marshal both, require
@@ -442,4 +445,136 @@ func s2ServerIDsByRole(t *testing.T, s *store.Store) (int64, int64) {
 		t.Fatalf("seeded world lost its iran/foreign servers: %+v", servers)
 	}
 	return iranID, foreignID
+}
+
+// TestUIRowsHelpersByteCompare: the two extracted helpers against their
+// frozen inline bodies — uiTunnelVerdict (the exact "unknown/disabled/
+// verdict-map" block that served uiTunnelRow, the agent detail rows and
+// the tunnel detail) and uiAgentCountries (the exact serverID→country
+// loop that served the agent detail flags and the topologies side
+// summary: unlinked agents excluded, an empty country still assigned).
+func TestUIRowsHelpersByteCompare(t *testing.T) {
+	// The verdict block, frozen verbatim (enabled + verdict map in, string
+	// out — identical text at all three pre-S2 serving spots).
+	s2OldVerdict := func(enabled bool, key string, verdicts map[string]string) string {
+		verdict := "unknown"
+		if !enabled {
+			verdict = "disabled"
+		} else if v, ok := verdicts[key]; ok {
+			verdict = v
+		}
+		return verdict
+	}
+	for _, c := range []struct {
+		enabled  bool
+		key      string
+		verdicts map[string]string
+	}{
+		{false, "k", map[string]string{"k": "healthy"}}, // disabled beats any verdict
+		{true, "k", map[string]string{"k": "healthy"}},  // present verdict wins
+		{true, "k", map[string]string{"k": "degraded"}}, // present verdict wins
+		{true, "k", map[string]string{}},                // no map entry → unknown
+		{true, "k2", map[string]string{"k": "healthy"}}, // other tunnel's verdict ignored
+		{true, "k", nil}, // nil map → unknown
+	} {
+		tun := store.Tunnel{Enabled: c.enabled, TunnelKey: c.key}
+		if got := uiTunnelVerdict(tun, c.verdicts); got != s2OldVerdict(c.enabled, c.key, c.verdicts) {
+			t.Fatalf("verdict drift for enabled=%v key=%q: %q != %q",
+				c.enabled, c.key, got, s2OldVerdict(c.enabled, c.key, c.verdicts))
+		}
+	}
+
+	withTempConfig(t)
+	s := withMeshStore(t)
+	_, _, _, _ = uiSeedWorld(t, s)
+	irID, frID := s2ServerIDsByRole(t, s)
+	// An agent with an EMPTY country on a linked server: the map still
+	// assigns key→"" (the old inline block did not filter empties).
+	if err := s.UpsertAgent(store.Agent{ID: "agt_nocountry", ServerID: irID, Name: "nc",
+		Role: "iran", Status: "online"}); err != nil {
+		t.Fatal(err)
+	}
+	// An UNLINKED agent (ServerID 0 → NULL server_id): must contribute nothing.
+	if err := s.UpsertAgent(store.Agent{ID: "agt_free", Name: "free",
+		Role: "foreign", Status: "online"}); err != nil {
+		t.Fatal(err)
+	}
+	h := uiStoreHandle{s}
+	got := h.uiAgentCountries()
+	want := map[int64]string{}
+	ags, err := s.ListAgents()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, a := range ags {
+		if a.ServerID != 0 {
+			want[a.ServerID] = a.Country
+		}
+	}
+	if len(want) != 2 {
+		t.Fatalf("fixture drifted: want exactly the two linked servers mapped, got %+v", want)
+	}
+	s2CompareJSON(t, "agent countries map", want, got)
+	_ = frID
+}
+
+// TestUIRowsWSUpgraderShared: the ONE shared websocket.Upgrader and its
+// per-use derivations keep their exact configs. The per-connection read
+// limits are NOT upgrader fields — they stay at the accept sites
+// (agenthub.go agentWSReadLimit, terminal.go 64 KiB, wss_carrier.go
+// 65535) and are untouched by S2.
+func TestUIRowsWSUpgraderShared(t *testing.T) {
+	if wsUpgrader.ReadBufferSize != 4096 || wsUpgrader.WriteBufferSize != 4096 {
+		t.Fatalf("shared upgrader buffers drifted: %d/%d",
+			wsUpgrader.ReadBufferSize, wsUpgrader.WriteBufferSize)
+	}
+	accept := func(u websocket.Upgrader, origin, host string) bool {
+		req := httptest.NewRequest(http.MethodGet, "/ws", nil)
+		req.Host = host
+		if origin != "" {
+			req.Header.Set("Origin", origin)
+		}
+		return u.CheckOrigin(req)
+	}
+	// Agent channel: the shared non-browser policy verbatim (its pre-S2
+	// body = wsOriginNonBrowser; empty Origin passes, a matching host
+	// passes, everything else — including a sandboxed "null" origin —
+	// fails).
+	for _, c := range []struct {
+		origin, host string
+		want         bool
+	}{
+		{"", "panel.example.com", true},
+		{"https://panel.example.com", "panel.example.com", true},
+		{"https://panel.example.com:8443", "panel.example.com:8443", true},
+		{"https://evil.example.com", "panel.example.com", false},
+		{"null", "panel.example.com", false},
+	} {
+		if got := accept(agentHubUpgrader, c.origin, c.host); got != c.want {
+			t.Fatalf("agent origin policy %q@%q = %v, want %v", c.origin, c.host, got, c.want)
+		}
+	}
+	// Terminal: bigger write buffer + its proxy-aware policy (the full
+	// origin matrix incl. X-Forwarded-Host stays covered by
+	// TestWebSocketCheckOrigin in domain_tls_test.go).
+	if termUpgrader.ReadBufferSize != 4096 || termUpgrader.WriteBufferSize != 32768 {
+		t.Fatalf("terminal upgrader buffers drifted: %d/%d",
+			termUpgrader.ReadBufferSize, termUpgrader.WriteBufferSize)
+	}
+	if termUpgrader.CheckOrigin == nil {
+		t.Fatal("terminal origin policy lost in the derivation")
+	}
+	// Carrier: explicit 4096/4096 == the gorilla defaults its previous
+	// zero-value resolved to (websocket@v1.5.3 conn.go defaultRead/Write
+	// BufferSize = 4096); ANY browser origin rejected, even same-host.
+	u := wssUpgrader()
+	if u.ReadBufferSize != 4096 || u.WriteBufferSize != 4096 {
+		t.Fatalf("carrier upgrader buffers drifted: %d/%d", u.ReadBufferSize, u.WriteBufferSize)
+	}
+	if !accept(u, "", "carrier.example.com") {
+		t.Fatal("carrier must accept non-browser clients")
+	}
+	if accept(u, "https://carrier.example.com", "carrier.example.com") {
+		t.Fatal("carrier must reject ANY browser origin, even a same-host one")
+	}
 }

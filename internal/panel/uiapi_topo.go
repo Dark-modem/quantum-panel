@@ -15,70 +15,9 @@ import (
 	"github.com/Dark-modem/quantum-panel/internal/store"
 )
 
-// uiTunnelRow is the shared per-tunnel summary row (topology detail and
-// agent topologies).
-// uiLatencyMap: one locked pass over the runtime for every fresh
-// tunnel's latency (the per-row scans were an N+1 hotspot in the
-// phase-12 soak).
-func uiLatencyMap() map[string]float64 {
-	out := map[string]float64{}
-	now := time.Now().Unix()
-	meshRuntimeMu.Lock()
-	for agentID, rts := range meshRuntimeBy {
-		if now-meshRuntimeSeen[agentID] > 90 {
-			continue
-		}
-		for _, tr := range rts {
-			if tr.LatencyMs > 0 {
-				out[tr.TunnelID] = tr.LatencyMs
-			}
-		}
-	}
-	meshRuntimeMu.Unlock()
-	return out
-}
-
-// uiTunnelRow renders one row from PRECOMPUTED shares (pcts) and the
-// shared latency map — per-row recomputation was the topology detail's
-// N+1 hotspot (phase-12 soak).
-func (h uiStoreHandle) uiTunnelRow(s *store.Store, topo store.Topology, t store.Tunnel,
-	verdicts map[string]string, now int64, pcts map[int64]float64, lat map[string]float64) map[string]any {
-	verdict := "unknown"
-	if !t.Enabled {
-		verdict = "disabled"
-	} else if v, ok := verdicts[t.TunnelKey]; ok {
-		verdict = v
-	}
-	w, _ := h.WeightFor(topo.ID, t.LocalServerID, t.RemoteServerID, t.ID)
-	usage, _, err := h.RangeUsageDetailed([]int64{t.ID}, now-now%86400, now)
-	if err != nil {
-		usage = store.Usage{}
-	}
-	var latency any
-	if l, ok := lat[t.TunnelKey]; ok {
-		latency = l
-	}
-	row := map[string]any{
-		"id": t.ID, "tunnel_key": t.TunnelKey, "engine": t.Engine, "enabled": t.Enabled,
-		"local_server":  h.uiServerRef(t.LocalServerID),
-		"remote_server": h.uiServerRef(t.RemoteServerID),
-		"state":         verdict,
-		"weight":        w,
-		"traffic_today": map[string]any{
-			"wire_rx_bytes":    usage.WireRx,
-			"wire_tx_bytes":    usage.WireTx,
-			"payload_rx_bytes": usage.PayloadRx,
-			"payload_tx_bytes": usage.PayloadTx,
-		},
-		"latency_ms": latency,
-	}
-	// Only connected tunnels carry weight — a dropped tunnel shows no
-	// resolved share and the survivors re-normalize without it.
-	if p := pcts[t.ID]; p > 0 {
-		row["resolved_percent"] = p
-	}
-	return row
-}
+// uiTunnelRow and uiLatencyMap moved to uirows.go (REFACTOR-S2): one
+// shared per-tunnel row builder + latency map for the topology detail
+// and the agent topologies rows.
 
 func mustListTunnels(s *store.Store, topoID int64) []store.Tunnel {
 	t, _ := s.ListTunnels(topoID)
@@ -207,12 +146,7 @@ func handleUITunnelDetail(w http.ResponseWriter, r *http.Request) {
 	verdicts := uiVerdictsFn()
 
 	// NOW: state, proc metrics, rates, latency/loss, uptime.
-	state := "unknown"
-	if !t.Enabled {
-		state = "disabled"
-	} else if v, ok := verdicts[key]; ok {
-		state = v
-	}
+	state := uiTunnelVerdict(t, verdicts)
 	cpu, rss := any(nil), any(nil)
 	if tp, err := h.TunnelProcFor([]int64{t.ID}); err == nil {
 		if p, ok := tp[t.ID]; ok {
