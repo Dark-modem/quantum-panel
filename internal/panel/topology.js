@@ -1152,6 +1152,9 @@ function topologyRender() {
     const engImgTag = ((document.querySelector('script[src*="app.js"]') || { src: '' }).src.match(/v=([^&]+)/) || ['', ''])[1];
     const engImgQ = engImgTag ? '?v=' + engImgTag : '';
     const engImg = en => { const e = String(en || '').toLowerCase(); return ENG_IMG[e] ? ENG_IMG[e] + engImgQ : ''; };
+    // engines without brand art wear the panel's own mark, like the agent table
+    const ENG_QMARK = '<svg viewBox="0 0 100 100" aria-hidden="true"><path d="M50 48 C42 38 26 32 12 42 C4 48 1 56 3 62 C6 60 12 54 20 55 C32 56 42 60 50 52 C58 60 68 56 80 55 C88 54 94 60 97 62 C99 56 96 48 88 42 C74 32 58 38 50 48 Z" fill="#38bdf8"/></svg>';
+    const engLogo = en => engImg(en) ? `<img src="${engImg(en)}" alt="" draggable="false">` : ENG_QMARK;
     const ENG_DISP = { aestun: 'AESTun', rakhsh: 'Rakhsh', matrix: 'Matrix', frp: 'FRP', backhaul: 'Backhaul', gost: 'Gost', xray: 'Xray', wireguard: 'WireGuard', wstunnel: 'wstunnel', chisel: 'Chisel', rathole: 'Rathole', tinc: 'Tinc', easytier: 'EasyTier', hysteria: 'Hysteria', singbox: 'sing-box', spoof: 'Spoof', udp2raw: 'udp2raw', waterwall: 'WaterWall', wattunnel: 'WatTunnel' };
     const engName = en => { const e = String(en || '').toLowerCase(); return ENG_DISP[e] || (en ? en.charAt(0).toUpperCase() + en.slice(1) : '—'); };
     const th = (svg, lbl) => `<th><span class="mtb-th">${svg}${esc(lbl)}</span></th>`;
@@ -1184,7 +1187,7 @@ function topologyRender() {
         `<td><b class="mono mtb-tun-key" dir="ltr" title="${esc(tn.key)}">${esc(tn.key)}</b></td>` +
         `<td><div class="mtb-dest"><span class="mtb-dest-flag">${topologyFlagSvg(remCc)}</span><div class="mtb-dest-tx"><b>${esc(tn.remoteName || '—')}</b>` +
         (remDc ? `<span class="mtb-muted mtb-dest-dc"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="7" rx="1.5"/><rect x="3" y="13" width="18" height="7" rx="1.5"/><path d="M7 7.5h.01M7 16.5h.01"/></svg>${esc(remDc)}</span>` : '') + '</div></div></td>' +
-        `<td><span class="badge info mtb-eng-badge">${engImg(tn.engine) ? `<img src="${engImg(tn.engine)}" alt="${esc(engN)}" draggable="false"> ` : ''}${esc(engN)}</span></td>` +
+        `<td><span class="badge info mtb-eng-badge">${engLogo(tn.engine)} ${esc(engN)}</span></td>` +
         `<td>${b2}</td>` +
         `<td>${w}</td>` +
         `<td>${td}</td>` +
