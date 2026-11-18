@@ -344,7 +344,26 @@ func probePing(ctx context.Context, host string, count int) (avgRTT, minRTT, max
 	return avgRTT, minRTT, maxRTT, loss, jitter, nil
 }
 
-// runCarrierBenchmark probes all candidate carrier models and evaluates performance.
+// benchmarkTargets bundles the resolved benchmark inputs (S4 extract):
+// one config/status load per run, every later stage reads the same values.
+type benchmarkTargets struct {
+	start         time.Time
+	peerCfg       PeerConfig
+	activeCarrier string
+	remotePub     string
+	targetRole    string
+	controlPort   int
+	wssPort       int
+	sshPort       int
+	backhaulPort  int
+	grePeer       string
+	quicPort      int
+}
+
+// runCarrierBenchmark probes all candidate carrier models and evaluates
+// performance. S4: the stages are newBenchmarkTargets (inputs), the
+// parallel probeCarrierCandidates, rankCarrierCandidates and the
+// report/AutoPilot tail — bodies verbatim, one load per run preserved.
 func runCarrierBenchmark(customReq ...benchmarkRunRequest) *benchmarkReport {
 	if !benchmarkRunning.CompareAndSwap(false, true) {
 		benchmarkMu.RLock()
@@ -354,14 +373,66 @@ func runCarrierBenchmark(customReq ...benchmarkRunRequest) *benchmarkReport {
 	}
 	defer benchmarkRunning.Store(false)
 
-	startTime := time.Now()
+	t := newBenchmarkTargets(customReq)
+	candidates := probeCarrierCandidates(t)
+	best, bestName := rankCarrierCandidates(candidates)
+	duration := float64(time.Since(t.start).Milliseconds()) / 1000.0
+
+	report := &benchmarkReport{
+		Timestamp:       time.Now().Format("2006-01-02 15:04:05"),
+		DurationSec:     duration,
+		TargetHost:      t.remotePub,
+		TargetRole:      t.targetRole,
+		PeerURL:         t.peerCfg.PeerURL,
+		PeerInternalIP:  t.grePeer,
+		ActiveCarrier:   t.activeCarrier,
+		BestCarrier:     best,
+		BestCarrierName: bestName,
+		AutoPilot: autoPilotStatus{
+			Enabled:       t.peerCfg.AutoPilotEnabled,
+			ThresholdLoss: t.peerCfg.AutoPilotThreshold,
+			LastTriggered: lastAutoPilotSwitch,
+			TriggerCount:  autoPilotTriggerCount,
+		},
+		Metrics: candidates,
+	}
+
+	saveBenchmarkReport(report)
+
+	// Check AutoPilot triggering
+	// Automatic carrier switching is strictly disabled: carrier changes require manual user action.
+	if t.peerCfg.AutoPilotEnabled && t.peerCfg.Role == "master" && best != "" && best != t.activeCarrier {
+		// Find active carrier metric
+		var activeLoss float64 = 100.0
+		for _, m := range candidates {
+			if m.IsActive {
+				activeLoss = m.PacketLoss
+				break
+			}
+		}
+
+		if activeLoss >= t.peerCfg.AutoPilotThreshold {
+			log.Printf("[AutoPilot] Active carrier %s has %.1f%% loss (threshold: %.1f%%). Best candidate: %s (automatic switching is disabled — carrier remains manual)",
+				t.activeCarrier, activeLoss, t.peerCfg.AutoPilotThreshold, best)
+		}
+	}
+
+	return report
+}
+
+// newBenchmarkTargets resolves everything the probes need from the live
+// configs/status and the optional custom request override — the exact
+// precedence the function always used.
+func newBenchmarkTargets(customReq []benchmarkRunRequest) *benchmarkTargets {
+	t := &benchmarkTargets{start: time.Now()}
 	peerCfg := loadPeerConfig()
 	carrierCfg := loadCarrierConfig()
 	localSt := localStatus()
+	t.peerCfg = peerCfg
 
-	activeCarrier := carrierCfg.ActiveCarrier
-	if activeCarrier == "" {
-		activeCarrier = "direct"
+	t.activeCarrier = carrierCfg.ActiveCarrier
+	if t.activeCarrier == "" {
+		t.activeCarrier = "direct"
 	}
 
 	remotePub := localSt.Gre.PeerIP
@@ -384,31 +455,31 @@ func runCarrierBenchmark(customReq ...benchmarkRunRequest) *benchmarkReport {
 		}
 	}
 
-	targetRole := localSt.Role
-	if targetRole == "" {
-		targetRole = "iran"
+	t.targetRole = localSt.Role
+	if t.targetRole == "" {
+		t.targetRole = "iran"
 	}
 
-	controlPort := localSt.FrpPort
-	if controlPort <= 0 {
-		controlPort = localSt.BindPort
+	t.controlPort = localSt.FrpPort
+	if t.controlPort <= 0 {
+		t.controlPort = localSt.BindPort
 	}
-	if controlPort <= 0 {
-		controlPort = 7000
-	}
-
-	wssPort := carrierCfg.WSSPort
-	if wssPort <= 0 {
-		wssPort = 8443
+	if t.controlPort <= 0 {
+		t.controlPort = 7000
 	}
 
-	sshPort := 22
-	backhaulPort := 3080
+	t.wssPort = carrierCfg.WSSPort
+	if t.wssPort <= 0 {
+		t.wssPort = 8443
+	}
+
+	t.sshPort = 22
+	t.backhaulPort = 3080
 
 	if len(customReq) > 0 {
 		req := customReq[0]
 		if req.TargetRole != "" {
-			targetRole = req.TargetRole
+			t.targetRole = req.TargetRole
 		}
 		if req.TargetHost != "" {
 			clean := strings.TrimSpace(req.TargetHost)
@@ -425,22 +496,23 @@ func runCarrierBenchmark(customReq ...benchmarkRunRequest) *benchmarkReport {
 			}
 		}
 		if req.FrpPort > 0 {
-			controlPort = req.FrpPort
+			t.controlPort = req.FrpPort
 		}
 		if req.WssPort > 0 {
-			wssPort = req.WssPort
+			t.wssPort = req.WssPort
 		}
 		if req.SshPort > 0 {
-			sshPort = req.SshPort
+			t.sshPort = req.SshPort
 		}
 		if req.BackhaulPort > 0 {
-			backhaulPort = req.BackhaulPort
+			t.backhaulPort = req.BackhaulPort
 		}
 	}
 
 	if remotePub == "" {
 		remotePub = "127.0.0.1"
 	}
+	t.remotePub = remotePub
 
 	// The peer's GRE inner address (localSt.GrePeer is its public one).
 	grePeer := ""
@@ -453,61 +525,68 @@ func runCarrierBenchmark(customReq ...benchmarkRunRequest) *benchmarkReport {
 	if grePeer == "" {
 		grePeer = "10.10.10.1"
 	}
+	t.grePeer = grePeer
 
-	quicPort := controlPort + 1
-	if quicPort > 65535 {
-		quicPort = controlPort - 1
+	t.quicPort = t.controlPort + 1
+	if t.quicPort > 65535 {
+		t.quicPort = t.controlPort - 1
 	}
+	return t
+}
 
+// probeCarrierCandidates builds the candidate list from the resolved
+// targets and probes every candidate in parallel (4 at a time) — the
+// exact probes and rounding the function always used.
+func probeCarrierCandidates(t *benchmarkTargets) []carrierMetric {
 	candidates := []carrierMetric{
 		{
 			ID:       "direct",
 			Name:     "GRE Direct (Protocol 47)",
 			Type:     "gre",
 			Port:     0,
-			IsActive: activeCarrier == "direct",
+			IsActive: t.activeCarrier == "direct",
 		},
 		{
 			ID:       "frp:tcp",
-			Name:     fmt.Sprintf("FRP TCP Multiplexed (Port %d)", controlPort),
+			Name:     fmt.Sprintf("FRP TCP Multiplexed (Port %d)", t.controlPort),
 			Type:     "frp_tcp",
-			Port:     controlPort,
-			IsActive: strings.Contains(activeCarrier, "tcp") || activeCarrier == "frp",
+			Port:     t.controlPort,
+			IsActive: strings.Contains(t.activeCarrier, "tcp") || t.activeCarrier == "frp",
 		},
 		{
 			ID:       "frp:kcp",
-			Name:     fmt.Sprintf("FRP KCP (UDP ARQ Anti-Loss %d)", controlPort),
+			Name:     fmt.Sprintf("FRP KCP (UDP ARQ Anti-Loss %d)", t.controlPort),
 			Type:     "frp_kcp",
-			Port:     controlPort,
-			IsActive: strings.Contains(activeCarrier, "kcp"),
+			Port:     t.controlPort,
+			IsActive: strings.Contains(t.activeCarrier, "kcp"),
 		},
 		{
 			ID:       "frp:quic",
-			Name:     fmt.Sprintf("FRP QUIC (UDP Stream %d)", quicPort),
+			Name:     fmt.Sprintf("FRP QUIC (UDP Stream %d)", t.quicPort),
 			Type:     "frp_quic",
-			Port:     quicPort,
-			IsActive: strings.Contains(activeCarrier, "quic"),
+			Port:     t.quicPort,
+			IsActive: strings.Contains(t.activeCarrier, "quic"),
 		},
 		{
-			ID:       fmt.Sprintf("wss:%d", wssPort),
-			Name:     fmt.Sprintf("FRP / Obfuscated WSS (TLS %d)", wssPort),
+			ID:       fmt.Sprintf("wss:%d", t.wssPort),
+			Name:     fmt.Sprintf("FRP / Obfuscated WSS (TLS %d)", t.wssPort),
 			Type:     "wss",
-			Port:     wssPort,
-			IsActive: strings.HasPrefix(activeCarrier, "wss"),
+			Port:     t.wssPort,
+			IsActive: strings.HasPrefix(t.activeCarrier, "wss"),
 		},
 		{
-			ID:       fmt.Sprintf("backhaul:%d", backhaulPort),
-			Name:     fmt.Sprintf("Backhaul Transport (Port %d)", backhaulPort),
+			ID:       fmt.Sprintf("backhaul:%d", t.backhaulPort),
+			Name:     fmt.Sprintf("Backhaul Transport (Port %d)", t.backhaulPort),
 			Type:     "backhaul",
-			Port:     backhaulPort,
-			IsActive: strings.Contains(activeCarrier, "backhaul"),
+			Port:     t.backhaulPort,
+			IsActive: strings.Contains(t.activeCarrier, "backhaul"),
 		},
 		{
-			ID:       fmt.Sprintf("bagher:%d", sshPort),
-			Name:     fmt.Sprintf("Bagher (SSH Tunnel %d)", sshPort),
+			ID:       fmt.Sprintf("bagher:%d", t.sshPort),
+			Name:     fmt.Sprintf("Bagher (SSH Tunnel %d)", t.sshPort),
 			Type:     "bagher",
-			Port:     sshPort,
-			IsActive: strings.Contains(activeCarrier, "bagher") || strings.Contains(activeCarrier, "ssh"),
+			Port:     t.sshPort,
+			IsActive: strings.Contains(t.activeCarrier, "bagher") || strings.Contains(t.activeCarrier, "ssh"),
 		},
 	}
 
@@ -531,10 +610,10 @@ func runCarrierBenchmark(customReq ...benchmarkRunRequest) *benchmarkReport {
 			case "gre":
 				// Measured results only: the old code invented numbers for a
 				// loopback target, which ranked carriers that were never tested.
-				avg, min, max, loss, jit, err := probePing(cctx, grePeer, probeCount)
+				avg, min, max, loss, jit, err := probePing(cctx, t.grePeer, probeCount)
 				if err != nil {
 					// Fallback probe to remote public IP if GRE link down
-					avg, min, max, loss, jit, err = probePing(cctx, remotePub, probeCount)
+					avg, min, max, loss, jit, err = probePing(cctx, t.remotePub, probeCount)
 				}
 				c.AvgRTTMs = math.Round(avg*10) / 10
 				c.MinRTTMs = math.Round(min*10) / 10
@@ -546,7 +625,7 @@ func runCarrierBenchmark(customReq ...benchmarkRunRequest) *benchmarkReport {
 				}
 
 			case "wss":
-				targetHost := remotePub
+				targetHost := t.remotePub
 				addr := net.JoinHostPort(targetHost, strconv.Itoa(c.Port))
 				avg, min, max, loss, jit, err := probeTLS(cctx, addr, probeCount, timeout)
 				if err != nil {
@@ -570,7 +649,7 @@ func runCarrierBenchmark(customReq ...benchmarkRunRequest) *benchmarkReport {
 				return
 
 			case "frp_tcp", "frp_ws", "backhaul", "frp", "bagher":
-				targetHost := remotePub
+				targetHost := t.remotePub
 				addr := net.JoinHostPort(targetHost, strconv.Itoa(c.Port))
 				avg, min, max, loss, jit, err := probeTCP(cctx, addr, probeCount, timeout)
 				c.AvgRTTMs = math.Round(avg*10) / 10
@@ -593,78 +672,41 @@ func runCarrierBenchmark(customReq ...benchmarkRunRequest) *benchmarkReport {
 	sort.Slice(candidates, func(i, j int) bool {
 		return candidates[i].Score > candidates[j].Score
 	})
+	return candidates
+}
 
+// rankCarrierCandidates picks the recommended carrier — only MEASURED
+// candidates qualify, the best scored one at ≥10, else the first measured
+// one — and flags it on the slice (shared backing array, the report reads
+// the same flag).
+func rankCarrierCandidates(candidates []carrierMetric) (best, bestName string) {
 	// Determine best recommended carrier
 	// Only measured carriers can be recommended.
-	bestCarrier := ""
-	bestCarrierName := ""
 	for i := range candidates {
 		if candidates[i].Status == benchUnmeasured {
 			continue
 		}
 		id := candidates[i].ID
 		if id == "direct" || strings.HasPrefix(id, "wss:") || strings.HasPrefix(id, "frp:") || strings.HasPrefix(id, "backhaul:") || strings.HasPrefix(id, "bagher:") {
-			if bestCarrier == "" && candidates[i].Score >= 10 {
-				bestCarrier = id
-				bestCarrierName = candidates[i].Name
+			if best == "" && candidates[i].Score >= 10 {
+				best = id
+				bestName = candidates[i].Name
 				candidates[i].IsRecommended = true
 				break
 			}
 		}
 	}
-	if bestCarrier == "" {
+	if best == "" {
 		for i := range candidates {
 			if candidates[i].Status != benchUnmeasured {
-				bestCarrier = candidates[i].ID
-				bestCarrierName = candidates[i].Name
+				best = candidates[i].ID
+				bestName = candidates[i].Name
 				candidates[i].IsRecommended = true
 				break
 			}
 		}
 	}
-
-	duration := float64(time.Since(startTime).Milliseconds()) / 1000.0
-
-	report := &benchmarkReport{
-		Timestamp:       time.Now().Format("2006-01-02 15:04:05"),
-		DurationSec:     duration,
-		TargetHost:      remotePub,
-		TargetRole:      targetRole,
-		PeerURL:         peerCfg.PeerURL,
-		PeerInternalIP:  grePeer,
-		ActiveCarrier:   activeCarrier,
-		BestCarrier:     bestCarrier,
-		BestCarrierName: bestCarrierName,
-		AutoPilot: autoPilotStatus{
-			Enabled:       peerCfg.AutoPilotEnabled,
-			ThresholdLoss: peerCfg.AutoPilotThreshold,
-			LastTriggered: lastAutoPilotSwitch,
-			TriggerCount:  autoPilotTriggerCount,
-		},
-		Metrics: candidates,
-	}
-
-	saveBenchmarkReport(report)
-
-	// Check AutoPilot triggering
-	// Automatic carrier switching is strictly disabled: carrier changes require manual user action.
-	if peerCfg.AutoPilotEnabled && peerCfg.Role == "master" && bestCarrier != "" && bestCarrier != activeCarrier {
-		// Find active carrier metric
-		var activeLoss float64 = 100.0
-		for _, m := range candidates {
-			if m.IsActive {
-				activeLoss = m.PacketLoss
-				break
-			}
-		}
-
-		if activeLoss >= peerCfg.AutoPilotThreshold {
-			log.Printf("[AutoPilot] Active carrier %s has %.1f%% loss (threshold: %.1f%%). Best candidate: %s (automatic switching is disabled — carrier remains manual)",
-				activeCarrier, activeLoss, peerCfg.AutoPilotThreshold, bestCarrier)
-		}
-	}
-
-	return report
+	return best, bestName
 }
 
 // applyBenchmarkCarrier applies the selected carrier locally and then on the
