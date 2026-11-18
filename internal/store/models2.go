@@ -52,30 +52,17 @@ type AgentV2State struct {
 // ---- datacenters / servers: list, get, update, delete ------------------
 
 func (s *Store) ListDatacenters() ([]Datacenter, error) {
-	rows, err := s.db.Query(`SELECT id, kind, name, price_coefficient, COALESCE(datacenter_en, ''), created_at FROM datacenters ORDER BY id`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []Datacenter
-	for rows.Next() {
-		var d Datacenter
-		if err := rows.Scan(&d.ID, &d.Kind, &d.Name, &d.PriceCoefficient, &d.DatacenterEN, &d.CreatedAt); err != nil {
-			return nil, err
-		}
-		out = append(out, d)
-	}
-	return out, rows.Err()
+	return scanList(s, `SELECT id, kind, name, price_coefficient, COALESCE(datacenter_en, ''), created_at FROM datacenters ORDER BY id`,
+		func(d *Datacenter) []any {
+			return []any{&d.ID, &d.Kind, &d.Name, &d.PriceCoefficient, &d.DatacenterEN, &d.CreatedAt}
+		})
 }
 
 func (s *Store) GetDatacenter(id int64) (Datacenter, error) {
-	var d Datacenter
-	err := s.db.QueryRow(`SELECT id, kind, name, price_coefficient, COALESCE(datacenter_en, ''), created_at FROM datacenters WHERE id = ?`, id).
-		Scan(&d.ID, &d.Kind, &d.Name, &d.PriceCoefficient, &d.DatacenterEN, &d.CreatedAt)
-	if errors.Is(err, sql.ErrNoRows) {
-		return d, ErrNotFound
-	}
-	return d, err
+	return scanOne(s, `SELECT id, kind, name, price_coefficient, COALESCE(datacenter_en, ''), created_at FROM datacenters WHERE id = ?`,
+		func(d *Datacenter) []any {
+			return []any{&d.ID, &d.Kind, &d.Name, &d.PriceCoefficient, &d.DatacenterEN, &d.CreatedAt}
+		}, id)
 }
 
 // SetDatacenterEN sets the optional English display name (phase 26 §9).
@@ -114,30 +101,17 @@ func (s *Store) DeleteDatacenter(id int64) error {
 }
 
 func (s *Store) ListServers() ([]Server, error) {
-	rows, err := s.db.Query(`SELECT id, name, role, COALESCE(datacenter_id, 0), address, created_at FROM servers ORDER BY id`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []Server
-	for rows.Next() {
-		var sv Server
-		if err := rows.Scan(&sv.ID, &sv.Name, &sv.Role, &sv.DatacenterID, &sv.Address, &sv.CreatedAt); err != nil {
-			return nil, err
-		}
-		out = append(out, sv)
-	}
-	return out, rows.Err()
+	return scanList(s, `SELECT id, name, role, COALESCE(datacenter_id, 0), address, created_at FROM servers ORDER BY id`,
+		func(sv *Server) []any {
+			return []any{&sv.ID, &sv.Name, &sv.Role, &sv.DatacenterID, &sv.Address, &sv.CreatedAt}
+		})
 }
 
 func (s *Store) GetServer(id int64) (Server, error) {
-	var sv Server
-	err := s.db.QueryRow(`SELECT id, name, role, COALESCE(datacenter_id, 0), address, created_at FROM servers WHERE id = ?`, id).
-		Scan(&sv.ID, &sv.Name, &sv.Role, &sv.DatacenterID, &sv.Address, &sv.CreatedAt)
-	if errors.Is(err, sql.ErrNoRows) {
-		return sv, ErrNotFound
-	}
-	return sv, err
+	return scanOne(s, `SELECT id, name, role, COALESCE(datacenter_id, 0), address, created_at FROM servers WHERE id = ?`,
+		func(sv *Server) []any {
+			return []any{&sv.ID, &sv.Name, &sv.Role, &sv.DatacenterID, &sv.Address, &sv.CreatedAt}
+		}, id)
 }
 
 func (s *Store) UpdateServer(sv Server) error {
@@ -163,34 +137,17 @@ func (s *Store) DeleteServer(id int64) error {
 // ---- topologies: list, get, update, delete ------------------------------
 
 func (s *Store) ListTopologies() ([]Topology, error) {
-	rows, err := s.db.Query(`SELECT id, name, enabled, created_at, health_check, failover FROM topologies ORDER BY id`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []Topology
-	for rows.Next() {
-		var t Topology
-		var hc, fo string
-		if err := rows.Scan(&t.ID, &t.Name, &t.Enabled, &t.CreatedAt, &hc, &fo); err != nil {
-			return nil, err
-		}
-		t.HealthCheck, t.Failover = hc, fo
-		out = append(out, t)
-	}
-	return out, rows.Err()
+	return scanList(s, `SELECT id, name, enabled, created_at, health_check, failover FROM topologies ORDER BY id`,
+		func(t *Topology) []any {
+			return []any{&t.ID, &t.Name, &t.Enabled, &t.CreatedAt, &t.HealthCheck, &t.Failover}
+		})
 }
 
 func (s *Store) GetTopology(id int64) (Topology, error) {
-	var t Topology
-	var hc, fo string
-	err := s.db.QueryRow(`SELECT id, name, enabled, created_at, health_check, failover FROM topologies WHERE id = ?`, id).
-		Scan(&t.ID, &t.Name, &t.Enabled, &t.CreatedAt, &hc, &fo)
-	if errors.Is(err, sql.ErrNoRows) {
-		return t, ErrNotFound
-	}
-	t.HealthCheck, t.Failover = hc, fo
-	return t, err
+	return scanOne(s, `SELECT id, name, enabled, created_at, health_check, failover FROM topologies WHERE id = ?`,
+		func(t *Topology) []any {
+			return []any{&t.ID, &t.Name, &t.Enabled, &t.CreatedAt, &t.HealthCheck, &t.Failover}
+		}, id)
 }
 
 // SetTopologyBalancing stores the balancing defaults (health check +
@@ -330,21 +287,10 @@ type WeightPolicy struct {
 }
 
 func (s *Store) ListWeights(topologyID int64) ([]WeightPolicy, error) {
-	rows, err := s.db.Query(`SELECT id, topology_id, local_server_id, remote_server_id, tunnel_id, weight
-		FROM weight_policies WHERE topology_id = ? ORDER BY id`, topologyID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []WeightPolicy
-	for rows.Next() {
-		var w WeightPolicy
-		if err := rows.Scan(&w.ID, &w.TopologyID, &w.LocalServerID, &w.RemoteServerID, &w.TunnelID, &w.Weight); err != nil {
-			return nil, err
-		}
-		out = append(out, w)
-	}
-	return out, rows.Err()
+	return scanList(s, `SELECT id, topology_id, local_server_id, remote_server_id, tunnel_id, weight
+		FROM weight_policies WHERE topology_id = ? ORDER BY id`, func(w *WeightPolicy) []any {
+		return []any{&w.ID, &w.TopologyID, &w.LocalServerID, &w.RemoteServerID, &w.TunnelID, &w.Weight}
+	}, topologyID)
 }
 
 func (s *Store) DeleteWeightPolicy(id int64) error {
@@ -382,39 +328,24 @@ func (s *Store) CreateForwardRule(f ForwardRule) (int64, error) {
 }
 
 func (s *Store) GetForwardRule(id int64) (ForwardRule, error) {
-	var f ForwardRule
-	err := s.db.QueryRow(`SELECT id, topology_id, local_server_id, remote_server_id, tunnel_id, listen_port, proto, target, target_port, enabled, note, created_at
-		FROM forward_rules WHERE id = ?`, id).
-		Scan(&f.ID, &f.TopologyID, &f.LocalServerID, &f.RemoteServerID, &f.TunnelID, &f.ListenPort, &f.Proto, &f.Target, &f.TargetPort, &f.Enabled, &f.Note, &f.CreatedAt)
-	if errors.Is(err, sql.ErrNoRows) {
-		return f, ErrNotFound
-	}
-	return f, err
+	return scanOne(s, `SELECT id, topology_id, local_server_id, remote_server_id, tunnel_id, listen_port, proto, target, target_port, enabled, note, created_at
+		FROM forward_rules WHERE id = ?`, func(f *ForwardRule) []any {
+		return []any{&f.ID, &f.TopologyID, &f.LocalServerID, &f.RemoteServerID, &f.TunnelID, &f.ListenPort, &f.Proto, &f.Target, &f.TargetPort, &f.Enabled, &f.Note, &f.CreatedAt}
+	}, id)
 }
 
 func (s *Store) ListForwardRules(topologyID int64) ([]ForwardRule, error) {
-	var rows *sql.Rows
-	var err error
+	q := `SELECT id, topology_id, local_server_id, remote_server_id, tunnel_id, listen_port, proto, target, target_port, enabled, note, created_at
+		FROM forward_rules ORDER BY id`
+	var args []any
 	if topologyID > 0 {
-		rows, err = s.db.Query(`SELECT id, topology_id, local_server_id, remote_server_id, tunnel_id, listen_port, proto, target, target_port, enabled, note, created_at
-			FROM forward_rules WHERE topology_id = ? ORDER BY id`, topologyID)
-	} else {
-		rows, err = s.db.Query(`SELECT id, topology_id, local_server_id, remote_server_id, tunnel_id, listen_port, proto, target, target_port, enabled, note, created_at
-			FROM forward_rules ORDER BY id`)
+		q = `SELECT id, topology_id, local_server_id, remote_server_id, tunnel_id, listen_port, proto, target, target_port, enabled, note, created_at
+			FROM forward_rules WHERE topology_id = ? ORDER BY id`
+		args = []any{topologyID}
 	}
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []ForwardRule
-	for rows.Next() {
-		var f ForwardRule
-		if err := rows.Scan(&f.ID, &f.TopologyID, &f.LocalServerID, &f.RemoteServerID, &f.TunnelID, &f.ListenPort, &f.Proto, &f.Target, &f.TargetPort, &f.Enabled, &f.Note, &f.CreatedAt); err != nil {
-			return nil, err
-		}
-		out = append(out, f)
-	}
-	return out, rows.Err()
+	return scanList(s, q, func(f *ForwardRule) []any {
+		return []any{&f.ID, &f.TopologyID, &f.LocalServerID, &f.RemoteServerID, &f.TunnelID, &f.ListenPort, &f.Proto, &f.Target, &f.TargetPort, &f.Enabled, &f.Note, &f.CreatedAt}
+	}, args...)
 }
 
 func (s *Store) UpdateForwardRule(f ForwardRule) error {
@@ -583,20 +514,10 @@ func (s *Store) Audit(limit int) ([]AuditEntry, error) {
 	if limit <= 0 || limit > 500 {
 		limit = 100
 	}
-	rows, err := s.db.Query(`SELECT id, at, actor, action, detail FROM audit_log ORDER BY id DESC LIMIT ?`, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []AuditEntry
-	for rows.Next() {
-		var e AuditEntry
-		if err := rows.Scan(&e.ID, &e.At, &e.Actor, &e.Action, &e.Detail); err != nil {
-			return nil, err
-		}
-		out = append(out, e)
-	}
-	return out, rows.Err()
+	return scanList(s, `SELECT id, at, actor, action, detail FROM audit_log ORDER BY id DESC LIMIT ?`,
+		func(e *AuditEntry) []any {
+			return []any{&e.ID, &e.At, &e.Actor, &e.Action, &e.Detail}
+		}, limit)
 }
 
 // ---- traffic usage ---------------------------------------------------------
