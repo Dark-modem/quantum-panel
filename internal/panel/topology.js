@@ -640,9 +640,9 @@ function topologyGraph(topo, tunnels) {
       const flat = !pts0.some(v => v > 0);
       const sx = m ? x + 16 : x + w - 124, sy = y + 88, sw = 106, sh = 30;
       const max = Math.max(...pts0, 1);
-      const pts = pts0.map((v, i) => (sx + i * sw / (pts0.length - 1)).toFixed(1) + ',' + (sy + sh - 1 - (v / max) * (sh - 2)).toFixed(1)).join(' ');
+      const pts = pts0.map((v, i) => (i * sw / (pts0.length - 1)).toFixed(1) + ',' + (sh - 1 - (v / max) * (sh - 2)).toFixed(1)).join(' ');
       spark = `<svg class="topo-spark" x="${sx}" y="${sy}" width="${sw}" height="${sh}" viewBox="0 0 ${sw} ${sh}" aria-hidden="true">` +
-        (flat ? '' : `<polygon class="topo-spark-area" points="${pts} ${sx + sw},${sy + sh} ${sx},${sy + sh}"/>`) +
+        (flat ? '' : `<polygon class="topo-spark-area" points="${pts} ${sw},${sh} 0,${sh}"/>`) +
         `<polyline class="topo-spark-line${flat ? ' flat' : ''}" points="${pts}"/>` +
         `</svg>`;
     }
