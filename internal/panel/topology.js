@@ -617,7 +617,9 @@ function topologyGraph(topo, tunnels) {
     // the datacenter, then the LOCATION (the country), then the ip, one row
     // per bar, icons per the owner's zoomed mockup (rack, pin, terminal)
     const dcTxt = info.dc ? (info.dc + (info.cc ? ' (' + info.cc + ')' : '')) : (side === 'iran' ? tr('', 'Iran') : topoCountryName(topo.country) || '—');
-    const locTxt = topoCountryName(info.cc) || '—';
+    // the location row: the card's country — Iran is not a TOPO_COUNTRIES
+    // entry (that dropdown is for the foreign side), so name it directly
+    const locTxt = side === 'iran' ? tr('', 'Iran') : (topoCountryName(info.cc) || tr('', 'Other'));
     const rowIcX = m ? x + w - 12 - 18 - 8 : x + 12 + 18 + 8;
     const row = (icon, yy, cls, val) => m
       ? icon(rowIcX, yy) + tTxt(rowIcX - 8, yy + 13, cls, val, 'end')
