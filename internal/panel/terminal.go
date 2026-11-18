@@ -169,19 +169,47 @@ func redactTermLine(line string) string {
 }
 
 // GET <base>/api/term/ws — hijacked to WebSocket after requireAuth.
+// S4: guards, PTY spawn and the three loops moved verbatim into
+// termGuard / termSpawn / termPumpPTY / termWatchdog / termReadLoop;
+// handleTermWS is the phase sequence (clientIP computed once, same value
+// the inline original used for the audits/banner/read loop).
 func handleTermWS(w http.ResponseWriter, r *http.Request) {
+	if !termGuard(w, r) {
+		return
+	}
+	conn, err := termUpgrader.Upgrade(w, r, nil)
+	if err != nil {
+		return // upgrade failure: not our protocol, nothing to JSON-write
+	}
+	clientIP := ClientIP(r)
+	s, pf, cmd, ok := termSpawn(r, conn, clientIP)
+	if !ok {
+		return
+	}
+	// pty -> ws pump.
+	go termPumpPTY(s, pf, cmd, conn)
+	// idle / max-age watchdog.
+	go termWatchdog(s, conn, r)
+	// ws -> pty pump (this goroutine owns conn reads).
+	termReadLoop(s, pf, conn, r, clientIP)
+}
+
+// termGuard is handleTermWS's pre-upgrade gate: auth, feature flag, IP
+// allow-list, one-time ticket and the single-session check — each writing
+// its own error (S4 extract, body verbatim).
+func termGuard(w http.ResponseWriter, r *http.Request) bool {
 	if !authed(r) {
 		writeAPIError(w, r, "E-AUTH-01", "")
-		return
+		return false
 	}
 	if !termEnabled() {
 		writeAPIError(w, r, "E-TERM-11", "terminal disabled — enable it from Settings first")
-		return
+		return false
 	}
 	if !ipAllowed(ClientIP(r), cfg.TerminalAllowIPs) {
 		LogSecurityAudit("terminal_ip_denied", cfg.Username, ClientIP(r), "ws connect")
 		writeAPIError(w, r, "E-TERM-12", "")
-		return
+		return false
 	}
 	sess := ""
 	if c, err := r.Cookie("gre_session"); err == nil {
@@ -190,35 +218,37 @@ func handleTermWS(w http.ResponseWriter, r *http.Request) {
 	if !redeemTermTicket(r.URL.Query().Get("ticket"), sess, ClientIP(r)) {
 		LogSecurityAudit("terminal_ticket_rejected", cfg.Username, ClientIP(r), "missing/expired/mismatched ticket")
 		writeAPIError(w, r, "E-TERM-16", "")
-		return
+		return false
 	}
 	termMu.Lock()
 	if termCur != nil {
 		termMu.Unlock()
 		writeAPIError(w, r, "E-TERM-07", "")
-		return
+		return false
 	}
 	termMu.Unlock()
+	return true
+}
 
-	conn, err := termUpgrader.Upgrade(w, r, nil)
-	if err != nil {
-		return // upgrade failure: not our protocol, nothing to JSON-write
-	}
-
+// termSpawn starts the shell PTY, registers the session, writes the
+// connect audit + monitoring banner and the hello frame (S4 extract,
+// body verbatim). ok=false after sending E-TERM-01 and closing the conn.
+func termSpawn(r *http.Request, conn *websocket.Conn, clientIP string) (s *termSess, pf *os.File, cmd *exec.Cmd, ok bool) {
 	shell := termShell
 	if _, err := os.Stat(shell); err != nil {
 		shell = "/bin/sh"
 	}
-	cmd := exec.Command(shell, "-l")
+	cmd = exec.Command(shell, "-l")
 	// Minimal safe env: keep PATH/HOME/TERM, drop the rest.
 	cmd.Env = []string{"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", "TERM=xterm-256color", "HOME=/root", "LANG=C.UTF-8"}
-	pf, err := pty.StartWithSize(cmd, &pty.Winsize{Rows: 24, Cols: 100})
+	var err error
+	pf, err = pty.StartWithSize(cmd, &pty.Winsize{Rows: 24, Cols: 100})
 	if err != nil {
 		termSendErr(conn, "E-TERM-01", "")
 		_ = conn.Close()
-		return
+		return nil, nil, nil, false
 	}
-	s := &termSess{
+	s = &termSess{
 		id:      termSessID(),
 		pty:     pf,
 		cmd:     cmd,
@@ -231,7 +261,6 @@ func handleTermWS(w http.ResponseWriter, r *http.Request) {
 	termCur = s
 	termMu.Unlock()
 
-	clientIP := ClientIP(r)
 	LogSecurityAudit("terminal_connect", cfg.Username, clientIP, "session="+s.id)
 
 	// Interactive warning banner informing operator of monitoring
@@ -239,75 +268,82 @@ func handleTermWS(w http.ResponseWriter, r *http.Request) {
 	_, _ = pf.Write([]byte(warnBanner))
 
 	_ = conn.WriteJSON(termMsg{V: termProtoV, T: "hello", D: s.id})
+	return s, pf, cmd, true
+}
 
-	// pty -> ws pump.
-	go func() {
-		buf := make([]byte, 8192)
-		for {
-			// The deadline only lets the loop notice a closed session. Its
-			// timeout is not an exit: treating it as one ended every shell
-			// that printed nothing for 30s (H5).
-			_ = pf.SetReadDeadline(time.Now().Add(30 * time.Second))
-			n, err := pf.Read(buf)
-			if errors.Is(err, os.ErrDeadlineExceeded) {
-				select {
-				case <-s.closed:
-					return
-				default:
-					continue
-				}
-			}
-			if err != nil || n <= 0 {
-				code := 0
-				if cmd.ProcessState != nil {
-					code = cmd.ProcessState.ExitCode()
-				}
-				_ = conn.WriteJSON(termMsg{V: termProtoV, T: "exit", D: s.id, Cols: code})
-				termClose(s)
-				return
-			}
-			// Backpressure is the write deadline below: output is sent as soon
-			// as it is read, so a "pending bytes" counter could never exceed
-			// one 8 KB read and its 256 KB limit never fired (L5).
-			out := termMsg{V: termProtoV, T: "out", D: base64.StdEncoding.EncodeToString(buf[:n])}
-			_ = conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
-			if err := conn.WriteJSON(out); err != nil {
-				termClose(s)
-				return
-			}
-		}
-	}()
-
-	// idle / max-age watchdog.
-	go func() {
-		t := time.NewTicker(15 * time.Second)
-		defer t.Stop()
-		for {
+// termPumpPTY is the pty -> ws pump goroutine (S4 extract, body verbatim).
+func termPumpPTY(s *termSess, pf *os.File, cmd *exec.Cmd, conn *websocket.Conn) {
+	buf := make([]byte, 8192)
+	for {
+		// The deadline only lets the loop notice a closed session. Its
+		// timeout is not an exit: treating it as one ended every shell
+		// that printed nothing for 30s (H5).
+		_ = pf.SetReadDeadline(time.Now().Add(30 * time.Second))
+		n, err := pf.Read(buf)
+		if errors.Is(err, os.ErrDeadlineExceeded) {
 			select {
 			case <-s.closed:
 				return
-			case now := <-t.C:
-				termMu.Lock()
-				idle := now.Sub(s.lastIn)
-				age := now.Sub(s.started)
-				termMu.Unlock()
-				if age > termMaxAge {
-					termSendErr(conn, "E-TERM-09", "")
-					recordError("E-TERM-09", "WS "+r.URL.Path, "session "+s.id+" reached 30m cap")
-					termClose(s)
-					return
-				}
-				if idle > termIdleKill {
-					termSendErr(conn, "E-TERM-08", "")
-					recordError("E-TERM-08", "WS "+r.URL.Path, "session "+s.id+" idle 10m, killed")
-					termClose(s)
-					return
-				}
+			default:
+				continue
 			}
 		}
-	}()
+		if err != nil || n <= 0 {
+			code := 0
+			if cmd.ProcessState != nil {
+				code = cmd.ProcessState.ExitCode()
+			}
+			_ = conn.WriteJSON(termMsg{V: termProtoV, T: "exit", D: s.id, Cols: code})
+			termClose(s)
+			return
+		}
+		// Backpressure is the write deadline below: output is sent as soon
+		// as it is read, so a "pending bytes" counter could never exceed
+		// one 8 KB read and its 256 KB limit never fired (L5).
+		out := termMsg{V: termProtoV, T: "out", D: base64.StdEncoding.EncodeToString(buf[:n])}
+		_ = conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+		if err := conn.WriteJSON(out); err != nil {
+			termClose(s)
+			return
+		}
+	}
+}
 
-	// ws -> pty pump (this goroutine owns conn reads).
+// termWatchdog is the idle / max-age watchdog goroutine (S4 extract,
+// body verbatim).
+func termWatchdog(s *termSess, conn *websocket.Conn, r *http.Request) {
+	t := time.NewTicker(15 * time.Second)
+	defer t.Stop()
+	for {
+		select {
+		case <-s.closed:
+			return
+		case now := <-t.C:
+			termMu.Lock()
+			idle := now.Sub(s.lastIn)
+			age := now.Sub(s.started)
+			termMu.Unlock()
+			if age > termMaxAge {
+				termSendErr(conn, "E-TERM-09", "")
+				recordError("E-TERM-09", "WS "+r.URL.Path, "session "+s.id+" reached 30m cap")
+				termClose(s)
+				return
+			}
+			if idle > termIdleKill {
+				termSendErr(conn, "E-TERM-08", "")
+				recordError("E-TERM-08", "WS "+r.URL.Path, "session "+s.id+" idle 10m, killed")
+				termClose(s)
+				return
+			}
+		}
+	}
+}
+
+// termReadLoop is the ws -> pty pump — the only conn reader — with the
+// disconnect audit + termClose deferred (it is handleTermWS's last
+// statement, so the deferred close fires exactly when the inline original's
+// did) (S4 extract, body verbatim).
+func termReadLoop(s *termSess, pf *os.File, conn *websocket.Conn, r *http.Request, clientIP string) {
 	var lineBuf strings.Builder
 	defer func() {
 		LogSecurityAudit("terminal_disconnect", cfg.Username, clientIP, "session="+s.id)
