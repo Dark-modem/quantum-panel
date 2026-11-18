@@ -2099,7 +2099,7 @@ $('topologyAddTunnelBtn').onclick = topologyNewTunnel;
       html = '<div class="topo-tip-h"><span class="topo-tip-dot ' + stOf(st) + '"></span><b>' + esc(shortKey(key)) + '</b></div>' +
         '<div class="topo-tip-facts">' +
         '<div class="topo-tip-fact"><span>' + esc(tr('', 'Weight')) + '</span><b>' + esc(wpct != null ? wpct + '%' : '—') + '</b></div>' +
-        '<div class="topo-tip-fact"><span>' + esc(tr('', 'Status')) + '</span><b class="' + stOf(st) + '">' + esc(label(st)) + '</b></div>' +
+        '<div class="topo-tip-fact"><span>' + esc(tr('', 'Status')) + '</span><b class="' + stOf(st) + '">' + esc(label(stOf(st))) + '</b></div>' +
         '</div>';
     }
     tip.innerHTML = html;
