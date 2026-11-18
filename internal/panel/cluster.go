@@ -752,8 +752,11 @@ func clusterTick(now time.Time) (idle bool) {
 	// The five phases below run under rt.mu exactly as they did inline; the
 	// helpers are called with the lock HELD (S4 extract, bodies verbatim).
 	clusterObserveLinks(rt, now, links, sess, targets, pings, icmpOK, h)
-	bound, addrByLink := clusterSyncBinds(rt, now, links, cfg.Pools)
-	plan, phaseJobs := clusterPlanPools(rt, now, links, cfg, bound, listen, socks, h)
+	bound := clusterSyncBinds(rt, now, links, cfg.Pools)
+	// addrByLink (link id → bound private address) is built by the plan
+	// phase exactly where the inline original built it — the apply phase's
+	// active check reads it, so it must ride out of clusterPlanPools.
+	plan, phaseJobs, addrByLink := clusterPlanPools(rt, now, links, cfg, bound, listen, socks, h)
 	jobs = append(jobs, phaseJobs...)
 	clusterApplyRules(rt, now, cfg, plan, addrByLink)
 	clusterBuildView(rt, links, bound, listen)
@@ -789,8 +792,8 @@ func clusterObserveLinks(rt *clusterRuntime, now time.Time, links []lbLink, sess
 
 // clusterSyncBinds keeps pool members bound to their private address and
 // non-members unbound (a disabled pool's relays stay there too). Returns
-// the per-link bound map and the bound private addresses. Caller holds rt.mu.
-func clusterSyncBinds(rt *clusterRuntime, now time.Time, links []lbLink, pools []LBPool) (bound map[int]bool, addrByLink map[int]string) {
+// the per-link bound map. Caller holds rt.mu.
+func clusterSyncBinds(rt *clusterRuntime, now time.Time, links []lbLink, pools []LBPool) (bound map[int]bool) {
 	// Relays of pool members listen on their private address. A disabled
 	// pool's relays stay there too: its port passes through to one of them
 	// (the lowest link id) instead of every relay restarting to fight for it.
@@ -849,13 +852,15 @@ func clusterSyncBinds(rt *clusterRuntime, now time.Time, links []lbLink, pools [
 		}
 		bound[l.ID] = isBound
 	}
-	return bound, nil
+	return bound
 }
 
 // clusterPlanPools plans every pool (health-driven target picks, service
 // checks queued as jobs, hub-forward fallback) and the pass ranges.
-// Returns the plan and the queued service-check jobs. Caller holds rt.mu.
-func clusterPlanPools(rt *clusterRuntime, now time.Time, links []lbLink, cfg ClusterConfig, bound map[int]bool, listen map[string]map[string][]int, socks []sockInfo, h lbHealth) (lbPlan, []func()) {
+// Returns the plan, the queued service-check jobs and the per-link bound
+// private addresses (addrByLink) it computed — the inline original built
+// them here and the apply phase reads them. Caller holds rt.mu.
+func clusterPlanPools(rt *clusterRuntime, now time.Time, links []lbLink, cfg ClusterConfig, bound map[int]bool, listen map[string]map[string][]int, socks []sockInfo, h lbHealth) (lbPlan, []func(), map[int]string) {
 	// Plan.
 	byID := map[int]lbLink{}
 	for _, l := range links {
@@ -951,7 +956,7 @@ func clusterPlanPools(rt *clusterRuntime, now time.Time, links []lbLink, cfg Clu
 	}
 	plan.Pass, rt.warnings = lbPassRanges(listenByLink, addrByLink, pooled)
 	rt.pass = plan.Pass
-	return plan, jobs
+	return plan, jobs, addrByLink
 }
 
 // clusterApplyRules applies (or clears) the nft rules when the plan
