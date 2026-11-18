@@ -601,17 +601,21 @@ function topologyGraph(topo, tunnels) {
     }
     const fw = 44, fh = 32;
     const flagX = m ? x + w - 12 - fw : x + 12;
-    const dotCy = y + 22;
-    const dotCx = m ? x + w - 12 - fw - 13 : x + 12 + fw + 13;
     const nameTx = m
-      ? tTxt(dotCx - 7, y + 28, 'topo-n-name', title, 'end')
-      : tTxt(dotCx + 7, y + 28, 'topo-n-name', title);
-    const dot = agRow ? `<circle class="topo-n-dot ${online ? 'ok' : 'err'}" cx="${dotCx}" cy="${dotCy}" r="4"/>` : '';
-    // the online/offline corner tag, the owner-mockup's way: top-right in
-    // LTR, top-left in RTL
-    const stLbl = agRow
-      ? `<text class="topo-n-status ${online ? 'ok' : 'err'}" x="${m ? x + 12 : x + w - 12}" y="${y + 20}"${m ? '' : ' text-anchor="end"'}>${text(online ? tr('', 'Online') : tr('', 'Offline'))}</text>`
-      : '';
+      ? tTxt(x + w - 12 - fw - 9, y + 28, 'topo-n-name', title, 'end')
+      : tTxt(x + 12 + fw + 9, y + 28, 'topo-n-name', title);
+    // the online/offline corner tag, the owner-mockup's way: the status dot
+    // rides ITS beginning (top-right in LTR, top-left in RTL) — no second dot
+    // by the name
+    const stLbl = agRow ? (() => {
+      const lbl = online ? tr('', 'Online') : tr('', 'Offline');
+      const kind = online ? 'ok' : 'err';
+      const ew = Math.round(lbl.length * 7);
+      const dotX = m ? x + 12 + ew + 8 : x + w - 12 - ew - 8;
+      const tX = m ? x + 12 : x + w - 12;
+      return `<circle class="topo-n-dot ${kind}" cx="${dotX}" cy="${y + 16}" r="4"/>` +
+        `<text class="topo-n-status ${kind}" x="${tX}" y="${y + 20}" text-anchor="${m ? 'start' : 'end'}">${text(lbl)}</text>`;
+    })() : '';
     // the chevron points out toward the agent view, direction-aware
     const chevCx = m ? x + 20 : x + w - 20;
     const chevD = m
@@ -636,7 +640,7 @@ function topologyGraph(topo, tunnels) {
       `<rect class="cl-n-bg" x="${x}" y="${y}" width="${w}" height="${NH}" rx="12"/>` +
       tFlag(flag, `x="${flagX}" y="${y + 10}" width="${fw}" height="${fh}"`) +
       stack +
-      dot + nameTx +
+      nameTx +
       row(icSrv, rowYs[0], 'topo-n-dc', dcTxt) +
       row(icPin, rowYs[1], 'topo-n-loc', locTxt) +
       row(icMon, rowYs[2], 'topo-ip', info.ip) +
