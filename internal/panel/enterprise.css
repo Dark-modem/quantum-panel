@@ -2105,6 +2105,7 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 .cl-n .topo-flag-svg { width:42px; height:30px; border-radius:6px; clip-path:inset(0 round 6px); }
 .topo-n-name { fill:var(--tx); font-size:15px; font-weight:700; }
 .topo-n-dc { fill:var(--mu); font-size:12px; }
+.topo-n-loc { fill:var(--mu); font-size:12px; }
 .topo-n-ic path, .topo-n-ic circle, .topo-n-ic rect { fill:none; stroke:var(--mu); stroke-width:1.4; }
 .topo-pill-tx { font-size:12px; font-weight:700; letter-spacing:.2px; }
 .topo-pill-bg.ok { fill:color-mix(in srgb, var(--ok) 14%, transparent); stroke:color-mix(in srgb, var(--ok) 45%, transparent); }

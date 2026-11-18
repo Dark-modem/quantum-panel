@@ -441,7 +441,7 @@ function topologyGraph(topo, tunnels) {
   };
   const tTxt = (x, y, cls, s2, anchor) => `<text class="${cls}" x="${x}" y="${y}"${anchor ? ` text-anchor="${anchor}"` : ''}>${text(s2)}</text>`;
   const tFlag = (flag, attrs) => topologyFlagSvg(flag, attrs);
-  const NW = 236, NH = 96, GAP = 12, HDR = 46;
+  const NW = 236, NH = 118, GAP = 12, HDR = 46;
   const agentTuns = topoAgentTunnels(topo);
   // geometry: two column containers (Iran servers / Foreign servers), the
   // server cards stacked inside, vertically centered against each other
@@ -578,7 +578,7 @@ function topologyGraph(topo, tunnels) {
   // side where this card's cables plug in
   const icPin = (ix, iy) => `<g class="topo-n-ic" transform="translate(${ix},${iy})"><path d="M8 1.5a5 5 0 015 5c0 3.6-5 8-5 8s-5-4.4-5-8a5 5 0 015-5z"/><circle cx="8" cy="6.4" r="1.7"/></g>`;
   const icSrv = (ix, iy) => `<g class="topo-n-ic" transform="translate(${ix},${iy})"><rect x="1.5" y="2.5" width="13" height="4.6" rx="1.5"/><rect x="1.5" y="9" width="13" height="4.6" rx="1.5"/><path d="M4.3 4.8h.01M4.3 11.3h.01"/></g>`;
-  const icStack = (ix, iy) => `<g class="topo-n-stack" transform="translate(${ix},${iy})"><rect x="0" y="0" width="18" height="7" rx="2"/><rect x="0" y="9" width="18" height="7" rx="2"/><rect x="0" y="18" width="18" height="7" rx="2"/></g>`;
+  const icTerm = (ix, iy) => `<g class="topo-n-ic" transform="translate(${ix},${iy})"><path d="M3 4l4.5 4L3 12"/><path d="M9.5 12.5H13"/></g>`;
   const node = (col, i, s, side) => {
     const x = col.x + 12, y = nodeY(col, i), w = (col.w || NW) - 24;
     const m = rtl && !vert;
@@ -601,12 +601,11 @@ function topologyGraph(topo, tunnels) {
     }
     const fw = 44, fh = 32;
     const flagX = m ? x + w - 12 - fw : x + 12;
-    const stackX = m ? x + w - 12 - 18 : x + 13;
-    const dotCy = y + 20;
+    const dotCy = y + 22;
     const dotCx = m ? x + w - 12 - fw - 13 : x + 12 + fw + 13;
     const nameTx = m
-      ? tTxt(dotCx - 7, y + 26, 'topo-n-name', title, 'end')
-      : tTxt(dotCx + 7, y + 26, 'topo-n-name', title);
+      ? tTxt(dotCx - 7, y + 28, 'topo-n-name', title, 'end')
+      : tTxt(dotCx + 7, y + 28, 'topo-n-name', title);
     const dot = agRow ? `<circle class="topo-n-dot ${online ? 'ok' : 'err'}" cx="${dotCx}" cy="${dotCy}" r="4"/>` : '';
     // the chevron points out toward the agent view, direction-aware
     const chevCx = m ? x + 20 : x + w - 20;
@@ -614,19 +613,26 @@ function topologyGraph(topo, tunnels) {
       ? `M ${chevCx + 4} ${y + NH / 2 - 6} L ${chevCx - 4} ${y + NH / 2} L ${chevCx + 4} ${y + NH / 2 + 6}`
       : `M ${chevCx - 4} ${y + NH / 2 - 6} L ${chevCx + 4} ${y + NH / 2} L ${chevCx - 4} ${y + NH / 2 + 6}`;
     const chev = `<path class="topo-n-chev" d="${chevD}"/>`;
-    // rows: pin + datacenter, then the server icon + ip — mirrored in RTL
+    // the three info rows face the three bars of the stacked-server glyph —
+    // the datacenter, then the LOCATION (the country), then the ip, one row
+    // per bar, icons per the owner's zoomed mockup (rack, pin, terminal)
     const dcTxt = info.dc ? (info.dc + (info.cc ? ' (' + info.cc + ')' : '')) : (side === 'iran' ? tr('', 'Iran') : topoCountryName(topo.country) || '—');
-    const rowIcX = m ? x + w - 12 - fw - 4 : x + 12 + fw + 4;
+    const locTxt = topoCountryName(info.cc) || '—';
+    const rowIcX = m ? x + w - 12 - 18 - 8 : x + 12 + 18 + 8;
     const row = (icon, yy, cls, val) => m
       ? icon(rowIcX, yy) + tTxt(rowIcX - 8, yy + 13, cls, val, 'end')
       : icon(rowIcX, yy) + tTxt(rowIcX + 20, yy + 13, cls, val);
+    const rowYs = [y + 48, y + 72, y + 96];
+    const bars = rowYs.map(v => `<rect x="0" y="${(v + 4.5).toFixed(1)}" width="18" height="7" rx="2"/>`).join('');
+    const stack = `<g class="topo-n-stack" transform="translate(${m ? x + w - 12 - 18 : x + 14},0)">${bars}</g>`;
     return `<g class="cl-n ${side === 'iran' ? 'topo-node-iran' : 'topo-node-foreign'}" data-agview="${text(agRow ? agRow.id : '')}" data-server-name="${text(s.name || '')}" role="button" tabindex="0" aria-label="${text(title)} · ${text(info.ip)}"><title>${text(title)} · ${text(info.ip)}</title>` +
       `<rect class="cl-n-bg" x="${x}" y="${y}" width="${w}" height="${NH}" rx="12"/>` +
       tFlag(flag, `x="${flagX}" y="${y + 10}" width="${fw}" height="${fh}"`) +
-      icStack(stackX, y + 56) +
+      stack +
       dot + nameTx +
-      row(icPin, y + 34, 'topo-n-dc', dcTxt) +
-      row(icSrv, y + 56, 'topo-ip', info.ip) +
+      row(icSrv, rowYs[0], 'topo-n-dc', dcTxt) +
+      row(icPin, rowYs[1], 'topo-n-loc', locTxt) +
+      row(icTerm, rowYs[2], 'topo-ip', info.ip) +
       chev +
       port +
       `</g>`;
