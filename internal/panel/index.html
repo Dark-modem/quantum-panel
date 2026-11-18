@@ -65,7 +65,7 @@
   img, canvas, table { max-width:100%; }
   .tunnel-card, .qs, .det-card { min-width:0; }
   .app-layout { display:flex; min-height:100dvh; width:100%; background:var(--bg); }
-  .sidebar { width:252px; background:var(--sidebar-bg); border-right:1px solid var(--ln);
+  .sidebar { width:248px; background:var(--sidebar-bg); border-right:1px solid var(--ln);
     display:flex; flex-direction:column; position:sticky; top:0; height:100dvh; z-index:50; flex-shrink:0; }
   .sidebar-brand { padding:14px 14px 12px; display:flex; flex-direction:row; align-items:center;
     gap:8px; border-bottom:1px solid var(--ln); flex-shrink:0; }
@@ -2088,24 +2088,24 @@
       </section>
       <!-- ==================== CORES TAB ==================== -->
       <section id="tab-cores" role="tabpanel" hidden>
-        <div class="ent-card">
-          <header class="topo-hero">
-            <div class="topo-hero-text">
-              <div class="topo-title-row">
-                <span class="topo-title-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><ellipse cx="12" cy="12" rx="10" ry="4.2" transform="rotate(-30 12 12)"/></svg></span>
-                <p class="tc-title" data-i18n="cores_title">Cores</p>
-              </div>
-            </div>
-          </header>
-        </div>
-        <div class="ent-card">
-          <div class="cores-tools">
-            <div class="mtb-eng-filters" id="coresFilters"></div>
-            <span class="cores-count" id="coresCount"></span>
-            <button type="button" class="quantum-btn quantum-btn-secondary" id="coresRefresh" data-cores-refresh><svg class="topo-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg><span data-i18n="cores_refresh">Refresh</span></button>
+        <div class="eng-head">
+          <span class="eng-head-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4.5 16.5c-1.5 1.3-2 5-2 5s3.7-.5 5-2c.7-.8.7-2 0-2.8-.7-.7-2.2-.9-3-.2z"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.9A12.9 12.9 0 0 1 22 2c0 2.7-.9 7.4-6 11a22.4 22.4 0 0 1-4 2z"/><path d="M9 12H4s.5-3.9 1.5-4.5c1-.6 4 0 4 0"/><path d="M12 15v5s3.9-.5 4.5-1.5c.6-1 0-4 0-4"/></svg></span>
+          <div class="eng-head-tx">
+            <p class="tc-title" data-i18n="eng_title">Engines</p>
+            <p class="eng-head-sub" data-i18n="eng_sub">Manage and deploy tunnel engines across your agents.</p>
           </div>
         </div>
-        <div class="ent-card" id="coresList"></div>
+        <div class="eng-tools">
+          <div class="eng-search">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+            <input id="engSearch" type="search" data-i18n-ph="eng_search_ph" placeholder="Search engines by name..." aria-label="Search engines by name">
+          </div>
+          <div class="mtb-eng-filters" id="engFilters"></div>
+          <span class="eng-meta" id="engMeta"></span>
+          <span class="u-flex-1"></span>
+          <button type="button" class="eng-refresh" id="engRefresh" data-cores-refresh aria-label="Refresh" data-i18n-aria="eng_refresh" title="Refresh"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg></button>
+        </div>
+        <div id="engList"></div>
       </section>
       <!-- ==================== CLUSTER TAB ==================== -->
       <section id="tab-cluster" role="tabpanel" hidden>
