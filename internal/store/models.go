@@ -180,10 +180,10 @@ func (s *Store) UpsertDatacenter(dc Datacenter) (int64, error) {
 
 // DatacenterByName returns the datacenter with that name.
 func (s *Store) DatacenterByName(name string) (Datacenter, error) {
-	row := s.db.QueryRow(`SELECT id, kind, name, price_coefficient, COALESCE(datacenter_en, ''), created_at FROM datacenters WHERE name = ?`, name)
-	var dc Datacenter
-	err := row.Scan(&dc.ID, &dc.Kind, &dc.Name, &dc.PriceCoefficient, &dc.DatacenterEN, &dc.CreatedAt)
-	return dc, wrapNotFound(err)
+	return scanOne(s, `SELECT id, kind, name, price_coefficient, COALESCE(datacenter_en, ''), created_at FROM datacenters WHERE name = ?`,
+		func(dc *Datacenter) []any {
+			return []any{&dc.ID, &dc.Kind, &dc.Name, &dc.PriceCoefficient, &dc.DatacenterEN, &dc.CreatedAt}
+		}, name)
 }
 
 // --- servers ---
@@ -206,10 +206,10 @@ func (s *Store) UpsertServer(sv Server) (int64, error) {
 
 // ServerByName returns the server with that name.
 func (s *Store) ServerByName(name string) (Server, error) {
-	row := s.db.QueryRow(`SELECT id, name, role, COALESCE(datacenter_id, 0), address, created_at FROM servers WHERE name = ?`, name)
-	var sv Server
-	err := row.Scan(&sv.ID, &sv.Name, &sv.Role, &sv.DatacenterID, &sv.Address, &sv.CreatedAt)
-	return sv, wrapNotFound(err)
+	return scanOne(s, `SELECT id, name, role, COALESCE(datacenter_id, 0), address, created_at FROM servers WHERE name = ?`,
+		func(sv *Server) []any {
+			return []any{&sv.ID, &sv.Name, &sv.Role, &sv.DatacenterID, &sv.Address, &sv.CreatedAt}
+		}, name)
 }
 
 // --- topologies ---
@@ -244,20 +244,8 @@ func (s *Store) RemoveTopologyMember(topologyID, serverID int64) error {
 
 // TopologyMembers lists the member server ids of a topology.
 func (s *Store) TopologyMembers(topologyID int64) ([]int64, error) {
-	rows, err := s.db.Query(`SELECT server_id FROM topology_members WHERE topology_id = ? ORDER BY server_id`, topologyID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []int64
-	for rows.Next() {
-		var id int64
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		out = append(out, id)
-	}
-	return out, rows.Err()
+	return scanList(s, `SELECT server_id FROM topology_members WHERE topology_id = ? ORDER BY server_id`,
+		func(id *int64) []any { return []any{id} }, topologyID)
 }
 
 // --- tunnels ---
@@ -285,40 +273,23 @@ func (s *Store) UpsertTunnel(t Tunnel) (int64, error) {
 
 // lookupID runs a single-value id query with the shared not-found mapping.
 func (s *Store) lookupID(query string, args ...any) (int64, error) {
-	var id int64
-	err := s.db.QueryRow(query, args...).Scan(&id)
-	if errors.Is(err, sql.ErrNoRows) {
-		return 0, ErrNotFound
-	}
-	return id, err
+	return scanOne(s, query, func(id *int64) []any { return []any{id} }, args...)
 }
 
 // GetTunnelByKey returns the tunnel with that key.
 func (s *Store) GetTunnelByKey(key string) (Tunnel, error) {
-	row := s.db.QueryRow(`SELECT id, tunnel_key, topology_id, local_server_id, remote_server_id, engine, engine_params, enabled, created_at
-		FROM tunnels WHERE tunnel_key = ?`, key)
-	var t Tunnel
-	err := row.Scan(&t.ID, &t.TunnelKey, &t.TopologyID, &t.LocalServerID, &t.RemoteServerID, &t.Engine, &t.EngineParams, &t.Enabled, &t.CreatedAt)
-	return t, wrapNotFound(err)
+	return scanOne(s, `SELECT id, tunnel_key, topology_id, local_server_id, remote_server_id, engine, engine_params, enabled, created_at
+		FROM tunnels WHERE tunnel_key = ?`, func(t *Tunnel) []any {
+		return []any{&t.ID, &t.TunnelKey, &t.TopologyID, &t.LocalServerID, &t.RemoteServerID, &t.Engine, &t.EngineParams, &t.Enabled, &t.CreatedAt}
+	}, key)
 }
 
 // ListTunnels lists the tunnels of one topology.
 func (s *Store) ListTunnels(topologyID int64) ([]Tunnel, error) {
-	rows, err := s.db.Query(`SELECT id, tunnel_key, topology_id, local_server_id, remote_server_id, engine, engine_params, enabled, created_at
-		FROM tunnels WHERE topology_id = ? ORDER BY tunnel_key`, topologyID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []Tunnel
-	for rows.Next() {
-		var t Tunnel
-		if err := rows.Scan(&t.ID, &t.TunnelKey, &t.TopologyID, &t.LocalServerID, &t.RemoteServerID, &t.Engine, &t.EngineParams, &t.Enabled, &t.CreatedAt); err != nil {
-			return nil, err
-		}
-		out = append(out, t)
-	}
-	return out, rows.Err()
+	return scanList(s, `SELECT id, tunnel_key, topology_id, local_server_id, remote_server_id, engine, engine_params, enabled, created_at
+		FROM tunnels WHERE topology_id = ? ORDER BY tunnel_key`, func(t *Tunnel) []any {
+		return []any{&t.ID, &t.TunnelKey, &t.TopologyID, &t.LocalServerID, &t.RemoteServerID, &t.Engine, &t.EngineParams, &t.Enabled, &t.CreatedAt}
+	}, topologyID)
 }
 
 // --- weight policies ---
@@ -456,11 +427,8 @@ func (s *Store) EngineOverheadRatioTx(engine string) (float64, error) {
 // a datacenter+engine; 0 when the overhead is unknown (the caller shows
 // UNKNOWN rather than inventing a number).
 func (s *Store) SuggestedCoefficient(datacenterID int64, engine string) (float64, error) {
-	var price float64
-	err := s.db.QueryRow(`SELECT price_coefficient FROM datacenters WHERE id = ?`, datacenterID).Scan(&price)
-	if errors.Is(err, sql.ErrNoRows) {
-		return 0, ErrNotFound
-	}
+	price, err := scanOne(s, `SELECT price_coefficient FROM datacenters WHERE id = ?`,
+		func(p *float64) []any { return []any{p} }, datacenterID)
 	if err != nil {
 		return 0, err
 	}
@@ -520,13 +488,12 @@ func (s *Store) UpsertAgent(a Agent) error {
 
 // GetAgent returns one agent.
 func (s *Store) GetAgent(id string) (Agent, error) {
-	row := s.db.QueryRow(`SELECT id, COALESCE(server_id, 0), name, role, country, key_hash, status, version, hostname, public_ip, last_seen, applied_revision,
+	return scanOne(s, `SELECT id, COALESCE(server_id, 0), name, role, country, key_hash, status, version, hostname, public_ip, last_seen, applied_revision,
 		arch, os, cpu_cores, cpu_pct, load1, mem_total_mb, mem_used_mb, disk_total_gb, disk_used_gb, uptime_s, virt, public_ip_override, COALESCE(cpu_model, '')
-		FROM agents WHERE id = ?`, id)
-	var a Agent
-	err := row.Scan(&a.ID, &a.ServerID, &a.Name, &a.Role, &a.Country, &a.KeyHash, &a.Status, &a.Version, &a.Hostname, &a.PublicIP, &a.LastSeen, &a.AppliedRevision,
-		&a.Arch, &a.OS, &a.CPUCores, &a.CPUPct, &a.Load1, &a.MemTotalMB, &a.MemUsedMB, &a.DiskTotalGB, &a.DiskUsedGB, &a.UptimeS, &a.Virt, &a.PublicIPOverride, &a.CPUModel)
-	return a, wrapNotFound(err)
+		FROM agents WHERE id = ?`, func(a *Agent) []any {
+		return []any{&a.ID, &a.ServerID, &a.Name, &a.Role, &a.Country, &a.KeyHash, &a.Status, &a.Version, &a.Hostname, &a.PublicIP, &a.LastSeen, &a.AppliedRevision,
+			&a.Arch, &a.OS, &a.CPUCores, &a.CPUPct, &a.Load1, &a.MemTotalMB, &a.MemUsedMB, &a.DiskTotalGB, &a.DiskUsedGB, &a.UptimeS, &a.Virt, &a.PublicIPOverride, &a.CPUModel}
+	}, id)
 }
 
 // --- audit log ---
