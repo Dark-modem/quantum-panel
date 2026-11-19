@@ -41,20 +41,11 @@ const (
 // shrink it and still exercise the batched path quickly.
 var agentPersistEvery = 2 * time.Second
 
-var agentHubUpgrader = websocket.Upgrader{
-	ReadBufferSize:  4096,
-	WriteBufferSize: 4096,
-	CheckOrigin: func(r *http.Request) bool {
-		// Agents are not browsers and never send Origin. Any browser-origin
-		// upgrade is rejected (there is no cookie auth here, but keep the
-		// cross-site WebSocket hijacking surface closed, like the terminal).
-		origin := r.Header.Get("Origin")
-		if origin == "" {
-			return true
-		}
-		return strings.EqualFold(CleanHost(origin), CleanHost(r.Host))
-	},
-}
+// agentHubUpgrader is the shared wsUpgrader (wsupgrade.go). Agents are
+// not browsers and never send Origin; any browser-origin upgrade is
+// rejected (there is no cookie auth here, but the cross-site WebSocket
+// hijacking surface stays closed, like the terminal).
+var agentHubUpgrader = wsUpgrader
 
 // Hooks the coordinator (tunnel orchestration layer) wires at startup:
 //   - agentAckObserver fires when an agent acks the pending desired
@@ -97,9 +88,9 @@ func agentHubTrackRun(runDone chan struct{}) {
 	agentHubRunDonesMu.Unlock()
 }
 
-// AgentObserverWait quiesces the async ack/relay goroutines so tests can
+// agentObserverWait quiesces the async ack/relay goroutines so tests can
 // assert on their file/state effects without racing the observer path.
-func AgentObserverWait() { agentObserverWG.Wait() }
+func agentObserverWait() { agentObserverWG.Wait() }
 
 // agentHubDrainAll closes every live agent session and waits for all session
 // goroutines — current and superseded — to fully exit, including their final
@@ -185,7 +176,7 @@ func agentHubCloseAll() {
 	for _, c := range conns {
 		c.shutdown("test drain")
 	}
-	AgentObserverWait()
+	agentObserverWait()
 	deadline := time.Now().Add(2 * time.Second)
 	for {
 		agentHubMu.Lock()
@@ -680,6 +671,15 @@ func (c *agentConn) handleAck(data json.RawMessage) {
 	if json.Unmarshal(data, &ack) != nil || ack.Revision == "" {
 		return
 	}
+	// Round-4 input security: an ack is agent-owned input bounded only by
+	// the 256 KiB WS envelope before this point — both the legacy registry
+	// (LastAck/LastError/AppliedRevision) and the store's v2 mirror
+	// (AckDesiredV2 stores the error verbatim in last_error + last_ack)
+	// would otherwise persist envelope-sized strings. Same bounds as the
+	// v2 report path (revision ≤128, error ≤512) plus the round-2 secret
+	// redaction on the error text.
+	ack.Revision = capReportString(ack.Revision, 128)
+	ack.Error = redactErrorText(capReportString(ack.Error, maxReportString))
 	matched := false
 	err := agentRegistryUpdate(c.id, func(rec *agentRecord) {
 		if rec.Desired == nil || rec.Desired.Revision != ack.Revision {

@@ -11,7 +11,29 @@ import (
 	"time"
 
 	"github.com/Dark-modem/quantum-panel/internal/store"
+	"github.com/Dark-modem/quantum-protocol"
 )
+
+// uiAgentResourceViews builds the cpu/mem/disk maps the UI renders — the
+// SAME shape at both serving spots (§2.3 rows and the §2.4 detail object),
+// so the agents pages' resource columns carry the detail page's semantics:
+// a metric stays nil until the agent's heartbeat reported it (mem/disk need
+// their totals, cpu needs cores).
+func uiAgentResourceViews(ag store.Agent) (cpu, mem, disk any) {
+	mem = nil
+	if ag.MemTotalMB > 0 {
+		mem = map[string]any{"total_mb": ag.MemTotalMB, "used_mb": ag.MemUsedMB}
+	}
+	disk = nil
+	if ag.DiskTotalGB > 0 {
+		disk = map[string]any{"total_gb": ag.DiskTotalGB, "used_gb": ag.DiskUsedGB}
+	}
+	cpu = nil
+	if ag.CPUCores > 0 {
+		cpu = map[string]any{"cores": ag.CPUCores, "percent": ag.CPUPct, "load1": ag.Load1}
+	}
+	return cpu, mem, disk
+}
 
 func handleUIAgentsList(w http.ResponseWriter, r *http.Request) {
 	h, ok := uiOpen(w, r)
@@ -64,6 +86,13 @@ func handleUIAgentsList(w http.ResponseWriter, r *http.Request) {
 			"linked": a.ServerID != 0,
 		})
 	}
+	// BACKEND-28: the rows carry the SAME cpu/mem/disk views the §2.4
+	// detail serves. Both accepted agents pages render their resource
+	// columns from this list; the store rows already hold the heartbeat
+	// values, so this enrichment costs no extra queries on the poll.
+	for i := range out {
+		out[i]["cpu"], out[i]["mem"], out[i]["disk"] = uiAgentResourceViews(agents[i])
+	}
 	writeJSON(w, map[string]any{"agents": out})
 }
 
@@ -104,18 +133,7 @@ func handleUIAgentDetail(w http.ResponseWriter, r *http.Request) {
 		uiErrWrite(w, r, "E-NOTFOUND", map[string]any{"agent": id}, "")
 		return
 	}
-	mem := any(nil)
-	if ag.MemTotalMB > 0 {
-		mem = map[string]any{"total_mb": ag.MemTotalMB, "used_mb": ag.MemUsedMB}
-	}
-	disk := any(nil)
-	if ag.DiskTotalGB > 0 {
-		disk = map[string]any{"total_gb": ag.DiskTotalGB, "used_gb": ag.DiskUsedGB}
-	}
-	cpu := any(nil)
-	if ag.CPUCores > 0 {
-		cpu = map[string]any{"cores": ag.CPUCores, "percent": ag.CPUPct, "load1": ag.Load1}
-	}
+	cpu, mem, disk := uiAgentResourceViews(ag)
 	effective := ag.PublicIP
 	if ag.PublicIPOverride != "" {
 		effective = ag.PublicIPOverride
@@ -138,14 +156,7 @@ func handleUIAgentDetail(w http.ResponseWriter, r *http.Request) {
 	tunRows := []map[string]any{}
 	// serverID -> agent country (the servers table carries no country; the
 	// agent enrolled against it does) — feeds the destination flag cell.
-	tnCountry := map[int64]string{}
-	if ags, aerr := h.ListAgents(); aerr == nil {
-		for _, a2 := range ags {
-			if a2.ServerID != 0 {
-				tnCountry[a2.ServerID] = a2.Country
-			}
-		}
-	}
+	tnCountry := h.uiAgentCountries()
 	if ag.ServerID != 0 {
 		if allTopos, err := h.ListTopologies(); err == nil {
 			verdicts := uiVerdictsFn()
@@ -161,12 +172,7 @@ func handleUIAgentDetail(w http.ResponseWriter, r *http.Request) {
 					if tn.LocalServerID != ag.ServerID && tn.RemoteServerID != ag.ServerID {
 						continue
 					}
-					state := "unknown"
-					if !tn.Enabled {
-						state = "disabled"
-					} else if v, ok := verdicts[tn.TunnelKey]; ok {
-						state = v
-					}
+					state := uiTunnelVerdict(tn, verdicts)
 					usage, _, uerr := h.RangeUsageDetailed([]int64{tn.ID}, now-now%86400, now)
 					var todayBytes uint64
 					if uerr == nil {
@@ -275,14 +281,7 @@ func (h uiStoreHandle) uiAgentTopologies(s *store.Store, ag store.Agent, withTun
 	now := timeNowUnix()
 	// serverID → agent country (the servers table carries no country; the
 	// agent enrolled against it does). Feeds the per-side diagram summary.
-	agentCountry := map[int64]string{}
-	if ags, aerr := h.ListAgents(); aerr == nil {
-		for _, a2 := range ags {
-			if a2.ServerID != 0 {
-				agentCountry[a2.ServerID] = a2.Country
-			}
-		}
-	}
+	agentCountry := h.uiAgentCountries()
 	for _, topoID := range members {
 		topo, err := h.GetTopology(topoID)
 		if err != nil {
@@ -432,6 +431,15 @@ func handleUIAgentEngines(w http.ResponseWriter, r *http.Request) {
 // enable-before-use flow (requirement 5): desired flag + immediate
 // compile+push; enable validates the artifact for the agent's arch
 // (non-kernel engines), disable refuses while enabled tunnels exist.
+//
+// Phase 31 (contract §2.6, UI-API-REQUESTS §10.4): enable of an ALREADY
+// desired-enabled artifact engine is the Update re-POST. An engine with
+// tunnels upgrades through the compile-time version stamp (the restart
+// re-resolves the manifest); an IDLE installed engine has nothing to
+// restart, so a stale one re-syncs through a disable→enable cycle — the
+// agent uninstalls the idle engine and reinstalls from the latest
+// artifact. The cycle never runs while enabled tunnels exist and is
+// skipped honestly when the agent is offline or versions are unknown.
 func handleUIEngineEnable(w http.ResponseWriter, r *http.Request) {
 	h, ok := uiOpen(w, r)
 	if !ok {
@@ -448,10 +456,7 @@ func handleUIEngineEnable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if uiArtifactEngines[engine] {
-		arch := ag.Arch
-		if arch == "" {
-			arch = "amd64"
-		}
+		arch := agentArchForArtifacts(ag)
 		artifacts, _ := h.ListEngineArtifacts()
 		found := false
 		for _, a := range artifacts {
@@ -466,14 +471,100 @@ func handleUIEngineEnable(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if err := h.SetAgentEngineDesired(agentID, engine, true); err != nil {
-		uiErrWrite(w, r, "E-STORE", map[string]any{"op": "engine enable"}, err.Error())
-		return
+	var push map[string]any
+	update := ""
+	cycled := false
+	if desired, _ := h.AgentEngineDesired(agentID, engine); desired && uiArtifactEngines[engine] {
+		latest := latestArtifactVersionFor(h.Store, engine, agentArchForArtifacts(ag))
+		if latest != "" && !uiEngineHasEnabledTunnel(h.Store, ag, engine) &&
+			uiEngineStaleInstalled(h.Store, agentID, engine, latest) {
+			// The cycle needs a LIVE v2 session: both pushes must actually
+			// reach the agent (a durable pending is not enough — the disable
+			// document would be overwritten by the enable one before hello).
+			if uiEngineLiveV2Session(agentID) >= protocol.ProtoVersionV2 {
+				if err := h.SetAgentEngineDesired(agentID, engine, false); err != nil {
+					uiErrWrite(w, r, "E-STORE", map[string]any{"op": "engine enable"}, err.Error())
+					return
+				}
+				pre := uiPushAgent(w, r, h.Store, agentID)
+				if pushed, _ := pre["pushed"].(bool); pushed && pre["error"] == nil {
+					if err := h.SetAgentEngineDesired(agentID, engine, true); err != nil {
+						// Revert: the operator asked for ENABLED — the store
+						// must not keep the engine disabled after a failure.
+						_ = h.SetAgentEngineDesired(agentID, engine, true)
+						_ = uiPushAgent(w, r, h.Store, agentID)
+						uiErrWrite(w, r, "E-STORE", map[string]any{"op": "engine enable"}, err.Error())
+						return
+					}
+					push = uiPushAgent(w, r, h.Store, agentID)
+					update = "cycled"
+					cycled = true
+				}
+			}
+			if !cycled {
+				// Offline, tunnel-less compile skip, or a session that died
+				// mid-cycle: restore the desired-enabled flag (the flow below
+				// recompiles and queues the ENABLED document — overwriting any
+				// half-delivered disable) and say the update did not run.
+				_ = h.SetAgentEngineDesired(agentID, engine, true)
+				update = "skipped"
+			}
+		}
 	}
-	push := uiPushAgent(w, r, h.Store, agentID)
-	writeJSON(w, map[string]any{
+	if !cycled {
+		if err := h.SetAgentEngineDesired(agentID, engine, true); err != nil {
+			uiErrWrite(w, r, "E-STORE", map[string]any{"op": "engine enable"}, err.Error())
+			return
+		}
+		push = uiPushAgent(w, r, h.Store, agentID)
+	}
+	resp := map[string]any{
 		"status": "ok", "engine": engine, "desired": true, "agent": agentID, "push": push,
-	})
+	}
+	if update != "" {
+		resp["update"] = update
+	}
+	writeJSON(w, resp)
+}
+
+// uiEngineLiveV2Session reports the live agent session's negotiated
+// protocol version (0 = no session). Package var: tests stub it.
+var uiEngineLiveV2Session = agentHubSessionVersion
+
+// uiEngineHasEnabledTunnel: does the agent have enabled tunnels of the
+// engine? Unknown (store error) counts as YES — the update cycle must
+// never risk stopping live tunnels.
+func uiEngineHasEnabledTunnel(s *store.Store, ag store.Agent, engine string) bool {
+	if ag.ServerID == 0 {
+		return false
+	}
+	tunnels, err := s.TunnelsForServer(ag.ServerID)
+	if err != nil {
+		return true
+	}
+	for _, t := range tunnels {
+		if t.Enabled && t.Engine == engine {
+			return true
+		}
+	}
+	return false
+}
+
+// uiEngineStaleInstalled: the agent's last report says the engine is
+// installed with a version that differs from the latest artifact for its
+// arch. Unknown/empty reported versions never count as stale (no churn
+// without evidence).
+func uiEngineStaleInstalled(s *store.Store, agentID, engine, latest string) bool {
+	rows, err := s.AgentEngines(agentID)
+	if err != nil {
+		return false
+	}
+	for _, e := range rows {
+		if e.Engine == engine {
+			return e.Installed && e.Version != "" && e.Version != latest
+		}
+	}
+	return false
 }
 
 func handleUIEngineDisable(w http.ResponseWriter, r *http.Request) {

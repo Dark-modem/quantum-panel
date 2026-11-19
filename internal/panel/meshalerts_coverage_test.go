@@ -55,8 +55,8 @@ func r3TestStore(t *testing.T) *store.Store {
 	if err != nil {
 		t.Fatal(err)
 	}
-	MeshStoreSetForTest(s)
-	t.Cleanup(MeshStoreCloseForTest)
+	meshStoreSetForTest(s)
+	t.Cleanup(meshStoreCloseForTest)
 	return s
 }
 

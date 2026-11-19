@@ -10,7 +10,7 @@ require (
 )
 
 require (
-	github.com/Dark-modem/quantum-protocol v0.0.0-20261115154811-9b9a27ca7eed
+	github.com/Dark-modem/quantum-protocol v0.0.0-20261119230114-b663ea58ca88
 	modernc.org/sqlite v1.34.5
 )
 

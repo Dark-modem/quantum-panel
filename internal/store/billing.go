@@ -119,7 +119,22 @@ func (b *billingAcc) observe(stream string, hour int64, wireKnown, payloadKnown 
 	b.stHas[stream] = true
 }
 
+// billingTunnelMeta / billingServerMeta are the catalog rows the report
+// shapes its output with (S4: were function-local types inside
+// BillingReport — same fields, hoisted so the aggregation helper can take
+// them; verbatim definitions).
+type billingTunnelMeta struct {
+	key, topo, local, remote, engine string
+}
+
+type billingServerMeta struct {
+	name, dc, dcEn string
+	dcID           int64
+}
+
 // BillingReport computes the three billing scopes over [from, to].
+// S4: the folded/raw ingest passes and the aggregation moved verbatim
+// into billingIngestFolded / billingIngestRaw / billingAggregateRows.
 func (s *Store) BillingReport(from, to int64) (dcs []BillingDCRow, servers []BillingServerRow, tunnels []BillingTunnelRow, err error) {
 	b := newBillingAcc()
 	done := s.rollupDoneUntil()
@@ -158,29 +173,7 @@ func (s *Store) BillingReport(from, to int64) (dcs []BillingDCRow, servers []Bil
 
 	// 1. folded hours (fully inside the window, past the watermark).
 	if foldHi > foldLo {
-		rows, err := s.db.Query(`SELECT h.tunnel_id, h.agent_id, h.hour, h.last_rx, h.last_tx, h.last_prx, h.last_ptx,
-			h.wire_known, h.payload_known, COALESCE(a.role,''), COALESCE(a.server_id,0)
-			FROM traffic_hourly h LEFT JOIN agents a ON a.id = h.agent_id
-			WHERE h.hour >= ? AND h.hour < ? ORDER BY h.agent_id, h.tunnel_id, h.hour`, foldLo, foldHi)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		err = func() error {
-			defer rows.Close()
-			for rows.Next() {
-				var tid, hour, lrx, ltx, lprx, lptx, serverID int64
-				var agent, role string
-				var wk, pk bool
-				if err := rows.Scan(&tid, &agent, &hour, &lrx, &ltx, &lprx, &lptx, &wk, &pk, &role, &serverID); err != nil {
-					return err
-				}
-				k := b.stream(tid, agent)
-				b.qServers[k] = serverID
-				ingest(k, role, hour, lrx, ltx, lprx, lptx, wk, pk)
-			}
-			return rows.Err()
-		}()
-		if err != nil {
+		if err := billingIngestFolded(s, b, ingest, foldLo, foldHi); err != nil {
 			return nil, nil, nil, err
 		}
 	}
@@ -205,38 +198,13 @@ func (s *Store) BillingReport(from, to int64) (dcs []BillingDCRow, servers []Bil
 		if rr[1] < rr[0] {
 			continue
 		}
-		rows, err := s.db.Query(`SELECT ts.tunnel_id, ts.agent_id, ts.at, ts.wire_rx, ts.wire_tx, ts.payload_rx, ts.payload_tx,
-			ts.counters_known, ts.payload_known, COALESCE(a.role,''), COALESCE(a.server_id,0)
-			FROM traffic_samples ts LEFT JOIN agents a ON a.id = ts.agent_id
-			WHERE ts.at >= ? AND ts.at <= ? ORDER BY ts.agent_id, ts.tunnel_id, ts.at`, rr[0], rr[1])
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		err = func() error {
-			defer rows.Close()
-			for rows.Next() {
-				var tid, at, rx, tx, prx, ptx, serverID int64
-				var agent, role string
-				var wk, pk bool
-				if err := rows.Scan(&tid, &agent, &at, &rx, &tx, &prx, &ptx, &wk, &pk, &role, &serverID); err != nil {
-					return err
-				}
-				k := b.stream(tid, agent)
-				b.qServers[k] = serverID
-				ingest(k, role, hourOf(at), rx, tx, prx, ptx, wk, pk)
-			}
-			return rows.Err()
-		}()
-		if err != nil {
+		if err := billingIngestRaw(s, b, ingest, hourOf, rr[0], rr[1]); err != nil {
 			return nil, nil, nil, err
 		}
 	}
 
 	// 3. shape the rows (names/coefficients from the catalog tables).
-	type tunnelMeta struct {
-		key, topo, local, remote, engine string
-	}
-	tm := map[int64]*tunnelMeta{}
+	tm := map[int64]*billingTunnelMeta{}
 	trows, err := s.db.Query(`SELECT t.id, t.tunnel_key, COALESCE(tp.name,''), COALESCE(ls.name,''), COALESCE(rs.name,''), t.engine
 		FROM tunnels t LEFT JOIN topologies tp ON tp.id = t.topology_id
 		LEFT JOIN servers ls ON ls.id = t.local_server_id LEFT JOIN servers rs ON rs.id = t.remote_server_id`)
@@ -245,7 +213,7 @@ func (s *Store) BillingReport(from, to int64) (dcs []BillingDCRow, servers []Bil
 	}
 	for trows.Next() {
 		var id int64
-		m := &tunnelMeta{}
+		m := &billingTunnelMeta{}
 		if err := trows.Scan(&id, &m.key, &m.topo, &m.local, &m.remote, &m.engine); err != nil {
 			trows.Close()
 			return nil, nil, nil, err
@@ -254,11 +222,7 @@ func (s *Store) BillingReport(from, to int64) (dcs []BillingDCRow, servers []Bil
 	}
 	trows.Close()
 
-	type serverMeta struct {
-		name, dc, dcEn string
-		dcID           int64
-	}
-	sm := map[int64]*serverMeta{}
+	sm := map[int64]*billingServerMeta{}
 	srows, err := s.db.Query(`SELECT s.id, s.name, COALESCE(d.id,0), COALESCE(d.name,''), COALESCE(d.datacenter_en,''), COALESCE(d.price_coefficient,1.0)
 		FROM servers s LEFT JOIN datacenters d ON d.id = s.datacenter_id`)
 	if err != nil {
@@ -267,7 +231,7 @@ func (s *Store) BillingReport(from, to int64) (dcs []BillingDCRow, servers []Bil
 	for srows.Next() {
 		var id int64
 		var price float64
-		m := &serverMeta{}
+		m := &billingServerMeta{}
 		if err := srows.Scan(&id, &m.name, &m.dcID, &m.dc, &m.dcEn, &price); err != nil {
 			srows.Close()
 			return nil, nil, nil, err
@@ -276,6 +240,68 @@ func (s *Store) BillingReport(from, to int64) (dcs []BillingDCRow, servers []Bil
 	}
 	srows.Close()
 
+	dcs, servers, tunnels = billingAggregateRows(s, b, tm, sm)
+	return dcs, servers, tunnels, nil
+}
+
+// billingIngestFolded folds the hourly rollup rows fully inside the window
+// into the billing accumulator (S4 extract — query and loop verbatim).
+func billingIngestFolded(s *Store, b *billingAcc, ingest func(stream, role string, hour int64, rx, tx, prx, ptx int64, wk, pk bool), foldLo, foldHi int64) error {
+	rows, err := s.db.Query(`SELECT h.tunnel_id, h.agent_id, h.hour, h.last_rx, h.last_tx, h.last_prx, h.last_ptx,
+		h.wire_known, h.payload_known, COALESCE(a.role,''), COALESCE(a.server_id,0)
+		FROM traffic_hourly h LEFT JOIN agents a ON a.id = h.agent_id
+		WHERE h.hour >= ? AND h.hour < ? ORDER BY h.agent_id, h.tunnel_id, h.hour`, foldLo, foldHi)
+	if err != nil {
+		return err
+	}
+	return func() error {
+		defer rows.Close()
+		for rows.Next() {
+			var tid, hour, lrx, ltx, lprx, lptx, serverID int64
+			var agent, role string
+			var wk, pk bool
+			if err := rows.Scan(&tid, &agent, &hour, &lrx, &ltx, &lprx, &lptx, &wk, &pk, &role, &serverID); err != nil {
+				return err
+			}
+			k := b.stream(tid, agent)
+			b.qServers[k] = serverID
+			ingest(k, role, hour, lrx, ltx, lprx, lptx, wk, pk)
+		}
+		return rows.Err()
+	}()
+}
+
+// billingIngestRaw folds one raw edge range into the billing accumulator
+// (S4 extract — query and loop verbatim; the caller skips empty ranges).
+func billingIngestRaw(s *Store, b *billingAcc, ingest func(stream, role string, hour int64, rx, tx, prx, ptx int64, wk, pk bool), hourOf func(int64) int64, rrLo, rrHi int64) error {
+	rows, err := s.db.Query(`SELECT ts.tunnel_id, ts.agent_id, ts.at, ts.wire_rx, ts.wire_tx, ts.payload_rx, ts.payload_tx,
+		ts.counters_known, ts.payload_known, COALESCE(a.role,''), COALESCE(a.server_id,0)
+		FROM traffic_samples ts LEFT JOIN agents a ON a.id = ts.agent_id
+		WHERE ts.at >= ? AND ts.at <= ? ORDER BY ts.agent_id, ts.tunnel_id, ts.at`, rrLo, rrHi)
+	if err != nil {
+		return err
+	}
+	return func() error {
+		defer rows.Close()
+		for rows.Next() {
+			var tid, at, rx, tx, prx, ptx, serverID int64
+			var agent, role string
+			var wk, pk bool
+			if err := rows.Scan(&tid, &agent, &at, &rx, &tx, &prx, &ptx, &wk, &pk, &role, &serverID); err != nil {
+				return err
+			}
+			k := b.stream(tid, agent)
+			b.qServers[k] = serverID
+			ingest(k, role, hourOf(at), rx, tx, prx, ptx, wk, pk)
+		}
+		return rows.Err()
+	}()
+}
+
+// billingAggregateRows aggregates the accumulated streams into the three
+// billing scopes, names/coefficients from the catalog maps, deterministic
+// order at the end (S4 extract — body verbatim).
+func billingAggregateRows(s *Store, b *billingAcc, tm map[int64]*billingTunnelMeta, sm map[int64]*billingServerMeta) (dcs []BillingDCRow, servers []BillingServerRow, tunnels []BillingTunnelRow) {
 	// Aggregate streams → tunnels / servers / datacenters.
 	dcRows := map[int64]*BillingDCRow{}
 	svRows := map[int64]*BillingServerRow{}
@@ -299,7 +325,7 @@ func (s *Store) BillingReport(from, to int64) (dcs []BillingDCRow, servers []Bil
 		if tr == nil {
 			meta := tm[tid]
 			if meta == nil {
-				meta = &tunnelMeta{}
+				meta = &billingTunnelMeta{}
 			}
 			tr = &BillingTunnelRow{TunnelID: tid, TunnelKey: meta.key, Topology: meta.topo,
 				LocalServer: meta.local, RemoteServer: meta.remote, Engine: meta.engine}
@@ -325,7 +351,7 @@ func (s *Store) BillingReport(from, to int64) (dcs []BillingDCRow, servers []Bil
 		if sid := b.qServers[k]; sid != 0 {
 			smeta := sm[sid]
 			if smeta == nil {
-				smeta = &serverMeta{}
+				smeta = &billingServerMeta{}
 			}
 			sr := svRows[sid]
 			if sr == nil {
@@ -387,7 +413,7 @@ func (s *Store) BillingReport(from, to int64) (dcs []BillingDCRow, servers []Bil
 		dcs = append(dcs, *r)
 	}
 	sortBilling(dcs, servers, tunnels)
-	return dcs, servers, tunnels, nil
+	return dcs, servers, tunnels
 }
 
 func sortBilling(dcs []BillingDCRow, servers []BillingServerRow, tunnels []BillingTunnelRow) {

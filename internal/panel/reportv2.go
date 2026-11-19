@@ -137,9 +137,12 @@ func ingestStateReportV2(agentID string, rep *protocol.StateReportV2) {
 	recordTunnelEvents(s, agentID, rep, now)
 
 	// Mirror the session facts into the store's agents table (the store has
-	// no revoked concept; revocation lives in the legacy registry).
-	if rep.AppliedRevision != "" {
-		_, _ = s.DB().Exec(`UPDATE agents SET applied_revision = ? WHERE id = ?`, rep.AppliedRevision, agentID)
+	// no revoked concept; revocation lives in the legacy registry). Round-4
+	// bound: the revision string is agent-owned input (WS-envelope-sized
+	// before this) — cap it like every other report string before it lands
+	// in the agents row the UI renders.
+	if rev := capReportString(rep.AppliedRevision, 128); rev != "" {
+		_, _ = s.DB().Exec(`UPDATE agents SET applied_revision = ? WHERE id = ?`, rev, agentID)
 	}
 	_, _ = s.DB().Exec(`UPDATE agents SET status = 'online', last_seen = ? WHERE id = ?`, now, agentID)
 

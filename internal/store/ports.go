@@ -52,21 +52,10 @@ type ListenRow struct {
 // ListPortAllocations lists the panel's reservations for one server,
 // lowest port first.
 func (s *Store) ListPortAllocations(serverID int64) ([]PortAllocation, error) {
-	rows, err := s.db.Query(`SELECT id, server_id, port, proto, purpose, owner_key, allocated_at
-		FROM port_allocations WHERE server_id = ? ORDER BY port`, serverID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []PortAllocation
-	for rows.Next() {
-		var a PortAllocation
-		if err := rows.Scan(&a.ID, &a.ServerID, &a.Port, &a.Proto, &a.Purpose, &a.OwnerKey, &a.AllocatedAt); err != nil {
-			return nil, err
-		}
-		out = append(out, a)
-	}
-	return out, rows.Err()
+	return scanList(s, `SELECT id, server_id, port, proto, purpose, owner_key, allocated_at
+		FROM port_allocations WHERE server_id = ? ORDER BY port`, func(a *PortAllocation) []any {
+		return []any{&a.ID, &a.ServerID, &a.Port, &a.Proto, &a.Purpose, &a.OwnerKey, &a.AllocatedAt}
+	}, serverID)
 }
 
 // AllocatePort records one reservation. The (server_id, port) UNIQUE

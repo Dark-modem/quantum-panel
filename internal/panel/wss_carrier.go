@@ -368,11 +368,7 @@ func (m *wssCarrierManager) runServer() {
 		m.setErr(fmt.Errorf("WSS carrier server needs an auth token (set auth_token in wss.json or re-run setup); not listening"))
 		return
 	}
-	var upgrader = websocket.Upgrader{
-		// Carrier peers are not browsers and never send Origin. Rejecting any
-		// browser-originated upgrade blocks cross-site WebSocket hijacking (M-02).
-		CheckOrigin: wssOriginAllowed,
-	}
+	upgrader := wssUpgrader()
 
 	// Prepare local UDP socket to send/recv to/from FOU
 	fouPort := m.cfg.LocalBridgeUDP
@@ -669,6 +665,16 @@ func (m *wssCarrierManager) bridgePump(ws *websocket.Conn, udpConn *net.UDPConn,
 
 // wssOriginAllowed accepts only non-browser clients (no Origin header).
 func wssOriginAllowed(r *http.Request) bool { return r.Header.Get("Origin") == "" }
+
+// wssUpgrader derives the carrier's listener from the shared wsUpgrader
+// (wsupgrade.go). Carrier peers are not browsers and never send Origin —
+// rejecting ANY browser-originated upgrade (even a same-host one) blocks
+// cross-site WebSocket hijacking (M-02).
+func wssUpgrader() websocket.Upgrader {
+	u := wsUpgrader
+	u.CheckOrigin = wssOriginAllowed
+	return u
+}
 
 // wssTokenEqual compares the carrier token in constant time.
 func wssTokenEqual(got, want string) bool {

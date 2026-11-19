@@ -10,13 +10,3 @@ package store
 func MigrationCount() int {
 	return len(migrations)
 }
-
-// MigrationVersions returns the migration version numbers in order (the
-// // N: comments above each entry).
-func MigrationVersions() []int64 {
-	out := make([]int64, 0, len(migrations))
-	for i := range migrations {
-		out = append(out, int64(i+1))
-	}
-	return out
-}

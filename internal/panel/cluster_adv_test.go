@@ -222,7 +222,7 @@ func TestClusterServiceCheck(t *testing.T) {
 	lbGo = func(fn func()) { fn() }
 	defer func() { lbProbe, lbGo = oldProbe, oldGo }()
 
-	_ = saveClusterConfig(ClusterConfig{Version: 2, NodeID: "hub-a", Health: LBHealth{}.norm(),
+	_ = saveClusterConfig(ClusterConfig{Version: 2, NodeID: "hub-a", Health: lbHealth{}.norm(),
 		Pools: []LBPool{{Port: 443, Proto: "tcp", Mode: lbFailover, Check: "tcp", CheckEvery: 1,
 			Members: []LBMember{{Link: 1, Weight: 1}, {Link: 2, Weight: 1, Priority: 1}}}}})
 	now := time.Now()
@@ -370,7 +370,7 @@ func TestClusterDisabledPoolPassesThrough(t *testing.T) {
 	f.peer(2, 7002, "2.2.2.2", 443)
 	f.pings = map[string]float64{"10.0.1.2": 30, "10.0.2.2": 60}
 	f.sockets([]string{"169.254.77.2:443", "169.254.77.3:443"}, []string{"7001>10.0.1.2", "7002>10.0.2.2"})
-	_ = saveClusterConfig(ClusterConfig{Version: 2, NodeID: "hub-a", Health: LBHealth{}.norm(),
+	_ = saveClusterConfig(ClusterConfig{Version: 2, NodeID: "hub-a", Health: lbHealth{}.norm(),
 		Pools: []LBPool{{Port: 443, Proto: "tcp", Mode: lbBalance, Members: []LBMember{{Link: 1, Weight: 1}, {Link: 2, Weight: 1}}}}})
 	now := time.Now()
 	clusterTick(now)

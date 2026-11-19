@@ -42,27 +42,49 @@ func meshDefaultFailover() protocol.FailoverRules {
 // compileDesiredV2 builds the DesiredV2 for one agent + its warnings.
 // skip (non-nil error nil, skip non-empty) means "nothing to do for this
 // agent" — not linked, no tunnels, nothing changed.
+// S4: the phases are compileDesiredTunnelSpecs (linked server + enabled
+// tunnel specs), compileDesiredEngines (artifact stamping + engine flags),
+// compileDesiredBalancing (weights/health/failover + scoped forwards) and
+// stampDesiredSelf (R6 self stamp + alignment warnings) — bodies verbatim,
+// every early return's exact (nil/skip/warnings/err) shape preserved.
 func compileDesiredV2(s *store.Store, ag store.Agent) (desired *protocol.DesiredV2, skip string, warnings []string, err error) {
-	if ag.ServerID == 0 {
-		return nil, "agent not linked to a configured server (link it first)", nil, nil
+	server, specs, engineUsed, topoSeen, warnings, skip, err := compileDesiredTunnelSpecs(s, ag)
+	if err != nil || skip != "" {
+		return nil, skip, warnings, err
 	}
-	server, err := s.GetServer(ag.ServerID)
-	if err != nil {
-		return nil, "", nil, fmt.Errorf("linked server: %v", err)
-	}
-	tunnels, err := s.TunnelsForServer(server.ID)
+	engines, err := compileDesiredEngines(s, ag, specs, engineUsed)
 	if err != nil {
 		return nil, "", nil, err
 	}
-	var specs []protocol.TunnelSpec
-	engineUsed := map[string]bool{}
-	topoSeen := map[int64]bool{}
-	var (
-		forwards     []protocol.ForwardRule
-		targetGroups []protocol.TargetGroup
-		groupSeen    = map[string]bool{}
-		groupDefs    = map[string]protocol.TargetGroup{}
-	)
+	bal, forwards, targetGroups, warnings := compileDesiredBalancing(s, server, engineUsed, topoSeen, warnings)
+	desired = &protocol.DesiredV2{
+		Engines: engines, Tunnels: specs, Balancing: &bal,
+		TargetGroups: targetGroups, Forwards: forwards,
+	}
+	warnings = stampDesiredSelf(server, specs, desired, warnings)
+	return desired, "", warnings, nil
+}
+
+// compileDesiredTunnelSpecs resolves the agent's linked server and compiles
+// the enabled-tunnel specs (S4 extract, body verbatim): per-tunnel topology
+// checks feed warnings, the engine/topology usage sets feed the later
+// phases, and the tunnel-less mis-link warning (BACKLOG P18-1) rides the
+// skip return. Hard errors return nil warnings exactly like the inline
+// original's early returns.
+func compileDesiredTunnelSpecs(s *store.Store, ag store.Agent) (server store.Server, specs []protocol.TunnelSpec, engineUsed map[string]bool, topoSeen map[int64]bool, warnings []string, skip string, err error) {
+	if ag.ServerID == 0 {
+		return server, nil, nil, nil, nil, "agent not linked to a configured server (link it first)", nil
+	}
+	server, err = s.GetServer(ag.ServerID)
+	if err != nil {
+		return store.Server{}, nil, nil, nil, nil, "", fmt.Errorf("linked server: %v", err)
+	}
+	tunnels, err := s.TunnelsForServer(server.ID)
+	if err != nil {
+		return store.Server{}, nil, nil, nil, nil, "", err
+	}
+	engineUsed = map[string]bool{}
+	topoSeen = map[int64]bool{}
 	for _, t := range tunnels {
 		if !t.Enabled {
 			continue
@@ -117,8 +139,24 @@ func compileDesiredV2(s *store.Store, ag store.Agent) (desired *protocol.Desired
 				"server %q compiles NO tunnels but is still named by %d tunnel(s) of enabled topologies (%s%s) — the agent would receive a tunnel-less document; check disabled tunnels, missing engines, or a mis-link (R6)",
 				server.Name, total, strings.Join(named, ", "), more))
 		}
-		return nil, "no enabled tunnels reference this server yet", warnings, nil
+		return server, nil, engineUsed, topoSeen, warnings, "no enabled tunnels reference this server yet", nil
 	}
+	return server, specs, engineUsed, topoSeen, warnings, "", nil
+}
+
+// compileDesiredEngines stamps the artifact engines' tunnel params (phase
+// 31 §10.4) and builds the desired engine list (S4 extract, body verbatim).
+// Hard errors return exactly like the inline original — the caller's
+// accumulated warnings are discarded.
+func compileDesiredEngines(s *store.Store, ag store.Agent, specs []protocol.TunnelSpec, engineUsed map[string]bool) (engines []protocol.EngineSpec, err error) {
+	// Phase 31 (contract §2.6, UI-API-REQUESTS §10.4): stamp the artifact
+	// engines' tunnel params with the LATEST artifact version for this
+	// agent's arch. A newly uploaded artifact then changes the desired
+	// document → the push reaches the agent → the tunnels restart (artifact
+	// engines never live-reload) → the restart re-resolves the signed
+	// manifest and downloads the new version. Stored engine_params are
+	// never modified; the stamp is derived per compile.
+	stampArtifactVersions(s, specs, agentArchForArtifacts(ag))
 
 	// Engines (Phase 11): a tunnel's engine is always enabled; the
 	// per-agent DESIRED flags (the enable/disable endpoints) also enable
@@ -141,20 +179,19 @@ func compileDesiredV2(s *store.Store, ag store.Agent) (desired *protocol.Desired
 	if on, derr := s.AgentEngineDesired(ag.ID, "matrix"); derr == nil && on {
 		engEnabled["matrix"] = true
 	}
-	var engines []protocol.EngineSpec
 	for e, on := range engEnabled {
 		engines = append(engines, protocol.EngineSpec{ID: e, Enabled: on})
 	}
 	v2state, err := s.AgentV2(ag.ID)
 	if err != nil {
-		return nil, "", nil, fmt.Errorf("agent v2 state: %v", err)
+		return nil, fmt.Errorf("agent v2 state: %v", err)
 	}
 	if strings.TrimSpace(v2state.EngineCatalog) != "" {
 		var catalog []struct {
 			ID string `json:"id"`
 		}
 		if err := json.Unmarshal([]byte(v2state.EngineCatalog), &catalog); err != nil {
-			return nil, "", nil, fmt.Errorf("engine catalog: %v", err)
+			return nil, fmt.Errorf("engine catalog: %v", err)
 		}
 		for _, c := range catalog {
 			if c.ID != "" && !engEnabled[c.ID] {
@@ -164,10 +201,23 @@ func compileDesiredV2(s *store.Store, ag store.Agent) (desired *protocol.Desired
 	}
 	sort.Slice(engines, func(i, j int) bool { return engines[i].ID < engines[j].ID })
 	sort.Slice(specs, func(i, j int) bool { return specs[i].ID < specs[j].ID })
+	return engines, nil
+}
 
+// compileDesiredBalancing resolves the per-tunnel weight rules with the
+// store's specificity chain scoped to the topologies this agent tunnels
+// for, the topology health/failover overrides and the topology-scoped
+// forward rules with their target groups (S4 extract, body verbatim).
+// Returns the policy, the sorted rules/groups and the possibly-extended
+// warnings slice.
+func compileDesiredBalancing(s *store.Store, server store.Server, engineUsed map[string]bool, topoSeen map[int64]bool, warnings []string) (bal protocol.BalancingPolicy, forwards []protocol.ForwardRule, targetGroups []protocol.TargetGroup, _ []string) {
 	// Balancing: per-tunnel weight rules resolved with the store's
 	// specificity chain, scoped to the topologies this agent tunnels for.
-	bal := protocol.BalancingPolicy{HealthCheck: meshDefaultHealth(), Failover: meshDefaultFailover()}
+	bal = protocol.BalancingPolicy{HealthCheck: meshDefaultHealth(), Failover: meshDefaultFailover()}
+	var (
+		groupSeen = map[string]bool{}
+		groupDefs = map[string]protocol.TargetGroup{}
+	)
 	for topoID := range topoSeen {
 		tp, err := s.GetTopology(topoID)
 		if err != nil {
@@ -243,11 +293,12 @@ func compileDesiredV2(s *store.Store, ag store.Agent) (desired *protocol.Desired
 	}
 	sort.Slice(targetGroups, func(i, j int) bool { return targetGroups[i].ID < targetGroups[j].ID })
 	sort.Slice(forwards, func(i, j int) bool { return forwards[i].ID < forwards[j].ID })
+	return bal, forwards, targetGroups, warnings
+}
 
-	desired = &protocol.DesiredV2{
-		Engines: engines, Tunnels: specs, Balancing: &bal,
-		TargetGroups: targetGroups, Forwards: forwards,
-	}
+// stampDesiredSelf stamps the receiving agent's SELF (R6) and validates
+// spec alignment against it, extending warnings (S4 extract, body verbatim).
+func stampDesiredSelf(server store.Server, specs []protocol.TunnelSpec, desired *protocol.DesiredV2, warnings []string) []string {
 	// R6 (PROTOCOL-REQUESTS.md): stamp the receiving agent's SELF — the
 	// mesh server name it is linked to (the enrollment name), spelled
 	// exactly like the LocalServer/RemoteServer strings above — so the
@@ -264,7 +315,86 @@ func compileDesiredV2(s *store.Store, ag store.Agent) (desired *protocol.Desired
 			}
 		}
 	}
-	return desired, "", warnings, nil
+	return warnings
+}
+
+// agentArchForArtifacts resolves the arch an agent's artifacts resolve
+// against (the enable handler's same default).
+func agentArchForArtifacts(ag store.Agent) string {
+	if strings.TrimSpace(ag.Arch) == "" {
+		return "amd64"
+	}
+	return ag.Arch
+}
+
+// latestArtifactVersionFor picks the artifact version the agent's own
+// manifest resolution would download: highest version string for the
+// engine+arch, ties resolved to the newest upload (ListEngineArtifacts
+// is uploaded_at DESC — the same order the R5 manifest serves and the
+// agent's strict `>` walk keeps). "" = no artifact for that arch.
+func latestArtifactVersionFor(s *store.Store, engine, arch string) string {
+	arts, err := s.ListEngineArtifacts()
+	if err != nil {
+		return ""
+	}
+	return latestArtifactVersionIn(arts, engine, arch)
+}
+
+func latestArtifactVersionIn(arts []store.EngineArtifact, engine, arch string) string {
+	best := ""
+	for _, a := range arts {
+		if a.Engine != engine || a.Goarch != arch || a.Version == "" {
+			continue
+		}
+		if best == "" || a.Version > best {
+			best = a.Version
+		}
+	}
+	return best
+}
+
+// stampArtifactVersions is the phase-31 re-sync-on-enable lever (§2.6):
+// every artifact-engine tunnel spec whose operator params are a JSON
+// object gains `_artifact_version` = the latest artifact version for the
+// agent's arch. Params that are absent, invalid JSON, or not objects stay
+// untouched (the operator's params are opaque and never rewritten in the
+// store). The stamp is what makes a newly uploaded artifact change the
+// desired document — the minimal-revision rule then delivers the push and
+// the agent's restart re-resolves the manifest.
+func stampArtifactVersions(s *store.Store, specs []protocol.TunnelSpec, arch string) {
+	arts, err := s.ListEngineArtifacts()
+	if err != nil || len(arts) == 0 {
+		return
+	}
+	latest := map[string]string{}
+	for _, a := range arts {
+		if a.Goarch != arch || !uiArtifactEngines[a.Engine] {
+			continue
+		}
+		if v := latestArtifactVersionIn(arts, a.Engine, arch); v != "" {
+			latest[a.Engine] = v
+		}
+	}
+	if len(latest) == 0 {
+		return
+	}
+	for i := range specs {
+		version, ok := latest[specs[i].Engine]
+		if !ok || len(specs[i].EngineParams) == 0 {
+			continue
+		}
+		var fields map[string]any
+		if json.Unmarshal(specs[i].EngineParams, &fields) != nil || fields == nil {
+			continue // arrays/scalars stay untouched: only object params get the stamp
+		}
+		if s2, _ := fields["_artifact_version"].(string); s2 == version {
+			continue // already stamped at this version — keep the bytes stable
+		}
+		fields["_artifact_version"] = version
+		if b, merr := json.Marshal(fields); merr == nil {
+			specs[i].EngineParams = json.RawMessage(b)
+		}
+	}
 }
 
 // compileForwardRule maps one store forward rule to its wire form and
@@ -539,7 +669,17 @@ func (c *agentConn) recordSessionV2() {
 
 // recordEngineCatalog persists the engine catalog the agent reported in
 // hello (PROTOCOL-REQUESTS R3): rich entries when present, else the id
-// list. Best effort like recordSessionV2.
+// list. Best effort like recordSessionV2. Round-4 input security: the
+// hello path had NO caps (bounded only by the 256 KiB WS envelope) while
+// the operator-side catalog route enforces ≤256 entries — apply the same
+// policy plus per-field string bounds.
+const (
+	maxHelloCatalogEntries = 256
+	maxHelloCatalogIDLen   = 128
+	maxHelloCatalogVerLen  = 128
+	maxHelloCatalogSchema  = 4 << 10
+)
+
 func (c *agentConn) recordEngineCatalog(h *agentHello) {
 	if len(h.Engines) == 0 && len(h.EngineCatalog) == 0 {
 		return
@@ -562,12 +702,27 @@ func (c *agentConn) recordEngineCatalog(h *agentHello) {
 		if e.ID == "" {
 			continue
 		}
-		entries = append(entries, catEntry{ID: e.ID, Version: e.Version, ParamsSchema: e.ParamsSchema})
+		schema := e.ParamsSchema
+		if len(schema) > maxHelloCatalogSchema {
+			schema = nil // an oversized schema is dropped, not truncated (must stay valid JSON)
+		}
+		entries = append(entries, catEntry{
+			ID:           capReportString(e.ID, maxHelloCatalogIDLen),
+			Version:      capReportString(e.Version, maxHelloCatalogVerLen),
+			ParamsSchema: schema,
+		})
+		if len(entries) >= maxHelloCatalogEntries {
+			break
+		}
 	}
 	if len(entries) == 0 {
 		for _, id := range h.EngineCatalog {
-			if id != "" {
-				entries = append(entries, catEntry{ID: id})
+			if id == "" {
+				continue
+			}
+			entries = append(entries, catEntry{ID: capReportString(id, maxHelloCatalogIDLen)})
+			if len(entries) >= maxHelloCatalogEntries {
+				break
 			}
 		}
 	}

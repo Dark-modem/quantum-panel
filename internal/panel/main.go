@@ -615,76 +615,104 @@ func validateConfigDirs() {
 	}
 }
 
+// Main is the process entry (cmd/quantum-panel → panel.Main): phase one
+// dispatches explicit CLI subcommands, phase two loads env/config, phase
+// three starts the background tickers, phase four builds the route mux
+// and phase five serves until SIGTERM. The route block itself stays in
+// buildPanelMux verbatim (route parity is guarded by the later S5 stage).
 func Main(args []string) int {
 	if len(args) > 0 {
-		switch args[0] {
-		case "--version", "-v", "version":
-			// 'version' prints the flat string; 'version --json' prints the
-			// full provenance stamp (phase 14 release integrity).
-			if len(args) > 1 && args[1] == "--json" {
-				fmt.Println(versionJSONString())
-			} else {
-				fmt.Println(panelVersion)
-			}
-			return 0
-		case "--help", "-h", "help":
-			fmt.Println("Usage: gre-panel [backup --out F --passphrase-file F | restore --in F --passphrase-file F [--force] | password <new-password> | info | version | tls [status|issue|renew|remove|ip|custom] | settings [show|2fa off|terminal on|off|idle N] | doctor [check|fix] | tls-proxy | pathtest | cluster [status|pool|member|join-code|add-hub|events|rules|reset] | firewall [detect|snapshot|plan|apply|teardown] | ports [list|check]]")
-			return 0
-		case "tls-proxy":
-			os.Exit(tlsProxyCmd(args[1:]))
-		case "matrix-local-proxy":
-			os.Exit(matrixLocalProxyCmd(args[1:]))
-		case "bagher-carrier":
-			os.Exit(bagherCarrierCmd(args[1:]))
-		case "pathtest":
-			os.Exit(cliPathTest(args[1:]))
-		case "cluster", "mesh":
-			os.Exit(cliCluster(args[1:]))
-		case "backup":
-			// The backup/restore CLIs must honor GRE_PANEL_DIR like the
-			// other subcommands do — otherwise the documented env-driven
-			// workflow backs up /etc/gre-panel regardless.
-			if v := os.Getenv("GRE_PANEL_DIR"); v != "" {
-				configDir = v
-			}
-			return BackupCmd(args[1:])
-		case "report":
-			return cliReport(args[1:])
-		case "selfcheck":
-			return cliSelfcheck(args[1:])
-		case "restore":
-			if v := os.Getenv("GRE_PANEL_DIR"); v != "" {
-				configDir = v
-			}
-			return RestoreCmd(args[1:])
-		case "password", "pass", "set-password":
-			os.Exit(cliSetPassword(args[1:]))
-		case "info", "status", "url":
-			os.Exit(cliShowInfo())
-		case "tls":
-			os.Exit(cliTLS(args[1:]))
-		case "settings":
-			os.Exit(cliSettings(args[1:]))
-		case "doctor":
-			os.Exit(cliDoctor(args[1:]))
-		case "netopt":
-			// Network Optimization subsystem (Session 2): measure, plan,
-			// apply/rollback owned tuning. See docs/NETOPT-INVENTORY.md.
-			// Never touches SSH, firewall or ports (Sessions 1/6 own them).
-			os.Exit(cliNetOpt(args[1:]))
-		case "firewall", "ports":
-			// Firewall & port engine CLI (Session 1): plan is dry-run,
-			// apply/teardown are --yes-gated; all output is JSON.
-			os.Exit(firewallCLI(args[0], args[1:]))
-		default:
-			// Unknown subcommand: fail fast with usage. Falling through
-			// would silently start a full second panel instance and look
-			// exactly like a hang to any caller probing a subcommand this
-			// binary does not have (the reported installer "detect hang").
-			fmt.Fprintf(os.Stderr, "unknown command %q — see: gre-panel --help\n", args[0])
-			os.Exit(2)
+		if code, handled := mainDispatchSubcommand(args); handled {
+			return code
 		}
 	}
+	mainLoadEnvDirs()
+	validateConfigDirs()
+	loadOrInit()
+	mainInitSubsystems()
+	go mainReloadAndNonceTicker()
+	mux := buildPanelMux("/" + cfg.BasePath)
+	return mainServe(mux)
+}
+
+// mainDispatchSubcommand handles the explicit CLI subcommands
+// (`gre-panel <cmd> …`). Returns (exitCode, true) when args[0] named a
+// subcommand — the caller returns immediately — or (0, false) when there
+// is none and the server should start. The os.Exit cases never return.
+func mainDispatchSubcommand(args []string) (int, bool) {
+	switch args[0] {
+	case "--version", "-v", "version":
+		// 'version' prints the flat string; 'version --json' prints the
+		// full provenance stamp (phase 14 release integrity).
+		if len(args) > 1 && args[1] == "--json" {
+			fmt.Println(versionJSONString())
+		} else {
+			fmt.Println(panelVersion)
+		}
+		return 0, true
+	case "--help", "-h", "help":
+		fmt.Println("Usage: gre-panel [backup --out F --passphrase-file F | restore --in F --passphrase-file F [--force] | password <new-password> | info | version | tls [status|issue|renew|remove|ip|custom] | settings [show|2fa off|terminal on|off|idle N] | doctor [check|fix] | tls-proxy | pathtest | cluster [status|pool|member|join-code|add-hub|events|rules|reset] | firewall [detect|snapshot|plan|apply|teardown] | ports [list|check]]")
+		return 0, true
+	case "tls-proxy":
+		os.Exit(tlsProxyCmd(args[1:]))
+	case "matrix-local-proxy":
+		os.Exit(matrixLocalProxyCmd(args[1:]))
+	case "bagher-carrier":
+		os.Exit(bagherCarrierCmd(args[1:]))
+	case "pathtest":
+		os.Exit(cliPathTest(args[1:]))
+	case "cluster", "mesh":
+		os.Exit(cliCluster(args[1:]))
+	case "backup":
+		// The backup/restore CLIs must honor GRE_PANEL_DIR like the
+		// other subcommands do — otherwise the documented env-driven
+		// workflow backs up /etc/gre-panel regardless.
+		if v := os.Getenv("GRE_PANEL_DIR"); v != "" {
+			configDir = v
+		}
+		return BackupCmd(args[1:]), true
+	case "report":
+		return cliReport(args[1:]), true
+	case "selfcheck":
+		return cliSelfcheck(args[1:]), true
+	case "restore":
+		if v := os.Getenv("GRE_PANEL_DIR"); v != "" {
+			configDir = v
+		}
+		return RestoreCmd(args[1:]), true
+	case "password", "pass", "set-password":
+		os.Exit(cliSetPassword(args[1:]))
+	case "info", "status", "url":
+		os.Exit(cliShowInfo())
+	case "tls":
+		os.Exit(cliTLS(args[1:]))
+	case "settings":
+		os.Exit(cliSettings(args[1:]))
+	case "doctor":
+		os.Exit(cliDoctor(args[1:]))
+	case "netopt":
+		// Network Optimization subsystem (Session 2): measure, plan,
+		// apply/rollback owned tuning. See docs/NETOPT-INVENTORY.md.
+		// Never touches SSH, firewall or ports (Sessions 1/6 own them).
+		os.Exit(cliNetOpt(args[1:]))
+	case "firewall", "ports":
+		// Firewall & port engine CLI (Session 1): plan is dry-run,
+		// apply/teardown are --yes-gated; all output is JSON.
+		os.Exit(firewallCLI(args[0], args[1:]))
+	default:
+		// Unknown subcommand: fail fast with usage. Falling through
+		// would silently start a full second panel instance and look
+		// exactly like a hang to any caller probing a subcommand this
+		// binary does not have (the reported installer "detect hang").
+		fmt.Fprintf(os.Stderr, "unknown command %q — see: gre-panel --help\n", args[0])
+		os.Exit(2)
+	}
+	return 0, true // unreachable: every case above returns or exits
+}
+
+// mainLoadEnvDirs honors the GRE_PANEL_DIR / GRE_FRP_DIR / GRE_BACKHAUL_DIR
+// / GRE_SYSCTL_CONF overrides before any file is touched.
+func mainLoadEnvDirs() {
 	if v := os.Getenv("GRE_PANEL_DIR"); v != "" {
 		configDir = v
 	}
@@ -697,8 +725,11 @@ func Main(args []string) int {
 	if v := os.Getenv("GRE_SYSCTL_CONF"); v != "" {
 		revpathSysctlConf = v
 	}
-	validateConfigDirs()
-	loadOrInit()
+}
+
+// mainInitSubsystems wires the agent channel, resolves the HTTP port,
+// applies the Bagher one-time migrations and seeds the rotating nonce.
+func mainInitSubsystems() {
 	wireAgentSubsystem()
 	ensureFreeHTTPPort()
 	if n, err := upgradeBagherKeyLocks(); err != nil {
@@ -719,23 +750,28 @@ func Main(args []string) int {
 	if _, err := rand.Read(nonce[:]); err != nil {
 		log.Fatal(err)
 	}
+}
 
-	go func() {
-		ticker := time.NewTicker(3 * time.Second)
-		defer ticker.Stop()
-		nonceTicker := time.NewTicker(12 * time.Hour)
-		defer nonceTicker.Stop()
-		for {
-			select {
-			case <-ticker.C:
-				reloadConfigIfChanged()
-			case <-nonceTicker.C:
-				rotateNonce()
-			}
+// mainReloadAndNonceTicker reloads changed config every 3 s and rotates
+// the nonce every 12 h (the anonymous goroutine Main used to inline).
+func mainReloadAndNonceTicker() {
+	ticker := time.NewTicker(3 * time.Second)
+	defer ticker.Stop()
+	nonceTicker := time.NewTicker(12 * time.Hour)
+	defer nonceTicker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			reloadConfigIfChanged()
+		case <-nonceTicker.C:
+			rotateNonce()
 		}
-	}()
+	}
+}
 
-	base := "/" + cfg.BasePath
+// buildPanelMux assembles the panel's route table. VERBATIM block: route
+// parity is guarded by the later S5 route-surface stage.
+func buildPanelMux(base string) *http.ServeMux {
 	mux := http.NewServeMux()
 	panelMux = mux
 	mux.HandleFunc("GET "+base+"/", serveIndex)
@@ -866,6 +902,12 @@ func Main(args []string) int {
 	mux.HandleFunc("POST "+base+"/api/agent-tunnels/{id}/power", requireAuth(requireLegacy(requireCSRF(handleAgentTunnelPower))))
 	mux.HandleFunc("POST "+base+"/api/agent-tunnels/{id}/restart", requireAuth(requireLegacy(requireCSRF(handleAgentTunnelRestart))))
 	mux.HandleFunc("DELETE "+base+"/api/agent-tunnels/{id}", requireAuth(requireLegacy(requireCSRF(handleAgentTunnelDelete))))
+	// BACKEND-34 (contract §2.20): GitHub-centric agent-update discovery —
+	// what GitHub has, per-agent outdatedness, and the light group queue;
+	// the update itself still rides the M2 verify-then-hand-off path.
+	mux.HandleFunc("GET "+base+"/api/update/available", requireAuth(handleUpdateAvailable))
+	mux.HandleFunc("GET "+base+"/api/agents/updates", requireAuth(handleAgentUpdates))
+	mux.HandleFunc("POST "+base+"/api/agents/update-outdated", requireAuth(requireCSRF(handleAgentUpdateOutdatedPost)))
 
 	// Mesh management plane (Phase 2B): the SQLite store is the authority
 	// for the new model; legacy JSON features above stay frozen and never
@@ -978,7 +1020,12 @@ func Main(args []string) int {
 	// Path test: which transports cross between the two servers, before any tunnel
 	mux.HandleFunc("GET "+base+"/api/pathtest", requireAuth(handlePathTestGet))
 	mux.HandleFunc("POST "+base+"/api/pathtest", requireAuth(requireCSRF(handlePathTestPost)))
+	return mux
+}
 
+// mainServe starts the background workers, binds the listeners and serves
+// until SIGTERM (the systemd stop flushes history, then shuts down).
+func mainServe(mux *http.ServeMux) int {
 	addr := panelHTTPBindAddr(cfg.Port)
 	log.Printf("gre-panel listening on %s under /%s", addr, cfg.BasePath)
 	histStop := make(chan struct{})

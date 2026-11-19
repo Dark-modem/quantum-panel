@@ -24,10 +24,10 @@ import (
 	"github.com/Dark-modem/quantum-panel/internal/store"
 )
 
-// SSH_PORT is the well-known SSH listener; reserving it by default keeps
+// sshPort is the well-known SSH listener; reserving it by default keeps
 // a port-forward allocation from colliding with the only door into the
 // box. Operators with a moved sshd declare it via the "ssh_ports" setting.
-const SSH_PORT = 22
+const sshPort = 22
 
 // Pasarguard defaults (pg_nodes.node_port / the upstream API port).
 const (
@@ -108,7 +108,7 @@ func sshPortsFor(s *store.Store) []int {
 func reservedPortsFor(s *store.Store, serverID int64) (map[int]bool, error) {
 	reserved := map[int]bool{}
 	for _, p := range []int{
-		SSH_PORT, 80, 443,
+		sshPort, 80, 443,
 		cfg.Port, effectiveTLSPort(),
 		pasarguardNodePort, pasarguardAPIPort,
 	} {

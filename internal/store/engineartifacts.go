@@ -1,8 +1,10 @@
-// models3.go — Phase 5 R5 engine artifact store. One row per signed
-// engine binary the operator uploaded (engine id, version, arch, sha256,
-// size, ed25519 signature). The FILE lives in <configDir>/engine-artifacts/
-// (0600); this table carries only the pins the agent re-verifies on its
-// side — the panel is never trusted for integrity (R5's trust model).
+// engineartifacts.go — Phase 5 R5 engine artifact store (ex-models3.go,
+// REFACTOR-S3: the phase-history file split is dissolved into per-subsystem
+// files). One row per signed engine binary the operator uploaded (engine
+// id, version, arch, sha256, size, ed25519 signature). The FILE lives in
+// <configDir>/engine-artifacts/ (0600); this table carries only the pins
+// the agent re-verifies on its side — the panel is never trusted for
+// integrity (R5's trust model).
 //
 // The duplicate rule lives at the UNIQUE(engine, version, goos, goarch)
 // constraint plus the handler's hash check: re-uploading the SAME build
@@ -101,44 +103,27 @@ func (s *Store) engineArtifactNameTaken(name string, rowID int64) error {
 
 // ListEngineArtifacts returns every uploaded artifact, newest first.
 func (s *Store) ListEngineArtifacts() ([]EngineArtifact, error) {
-	rows, err := s.db.Query(`SELECT id, engine, version, goos, goarch, artifact, sha256, size, signature, uploader, uploaded_at
-		FROM engine_artifacts ORDER BY uploaded_at DESC, id DESC`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []EngineArtifact
-	for rows.Next() {
-		var a EngineArtifact
-		if err := rows.Scan(&a.ID, &a.Engine, &a.Version, &a.Goos, &a.Goarch, &a.Artifact, &a.SHA256, &a.Size, &a.Signature, &a.Uploader, &a.UploadedAt); err != nil {
-			return nil, err
-		}
-		out = append(out, a)
-	}
-	return out, rows.Err()
+	return scanList(s, `SELECT id, engine, version, goos, goarch, artifact, sha256, size, signature, uploader, uploaded_at
+		FROM engine_artifacts ORDER BY uploaded_at DESC, id DESC`, func(a *EngineArtifact) []any {
+		return []any{&a.ID, &a.Engine, &a.Version, &a.Goos, &a.Goarch, &a.Artifact, &a.SHA256, &a.Size, &a.Signature, &a.Uploader, &a.UploadedAt}
+	})
 }
 
 // GetEngineArtifact returns one artifact row by id.
 func (s *Store) GetEngineArtifact(id int64) (EngineArtifact, error) {
-	var a EngineArtifact
-	err := s.db.QueryRow(`SELECT id, engine, version, goos, goarch, artifact, sha256, size, signature, uploader, uploaded_at
-		FROM engine_artifacts WHERE id = ?`, id).Scan(&a.ID, &a.Engine, &a.Version, &a.Goos, &a.Goarch, &a.Artifact, &a.SHA256, &a.Size, &a.Signature, &a.Uploader, &a.UploadedAt)
-	if err == sql.ErrNoRows {
-		return a, ErrNotFound
-	}
-	return a, err
+	return scanOne(s, `SELECT id, engine, version, goos, goarch, artifact, sha256, size, signature, uploader, uploaded_at
+		FROM engine_artifacts WHERE id = ?`, func(a *EngineArtifact) []any {
+		return []any{&a.ID, &a.Engine, &a.Version, &a.Goos, &a.Goarch, &a.Artifact, &a.SHA256, &a.Size, &a.Signature, &a.Uploader, &a.UploadedAt}
+	}, id)
 }
 
 // GetEngineArtifactByName resolves the download name → pins (the agent
 // file endpoint uses it for a consistent 404 on unknown names).
 func (s *Store) GetEngineArtifactByName(name string) (EngineArtifact, error) {
-	var a EngineArtifact
-	err := s.db.QueryRow(`SELECT id, engine, version, goos, goarch, artifact, sha256, size, signature, uploader, uploaded_at
-		FROM engine_artifacts WHERE artifact = ?`, name).Scan(&a.ID, &a.Engine, &a.Version, &a.Goos, &a.Goarch, &a.Artifact, &a.SHA256, &a.Size, &a.Signature, &a.Uploader, &a.UploadedAt)
-	if err == sql.ErrNoRows {
-		return a, ErrNotFound
-	}
-	return a, err
+	return scanOne(s, `SELECT id, engine, version, goos, goarch, artifact, sha256, size, signature, uploader, uploaded_at
+		FROM engine_artifacts WHERE artifact = ?`, func(a *EngineArtifact) []any {
+		return []any{&a.ID, &a.Engine, &a.Version, &a.Goos, &a.Goarch, &a.Artifact, &a.SHA256, &a.Size, &a.Signature, &a.Uploader, &a.UploadedAt}
+	}, name)
 }
 
 // DeleteEngineArtifact removes the row (the caller deletes the file).

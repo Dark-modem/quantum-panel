@@ -29,7 +29,7 @@ func xrayTestLink(t *testing.T, preset, mode, side string) XrayLink {
 	if preset == "cdn" {
 		l.Profile.SNI, l.Profile.Address = "tun.example.com", "104.16.0.1"
 	}
-	l.Keys = XrayKeys{UUID: "0f8d5c7e-1a2b-4c3d-8e9f-0123456789ab", ShortID: "a1b2c3d4"}
+	l.Keys = xrayKeys{UUID: "0f8d5c7e-1a2b-4c3d-8e9f-0123456789ab", ShortID: "a1b2c3d4"}
 	if p.Security == "reality" {
 		l.Keys.PrivateKey = "cGVwcGVycGVwcGVycGVwcGVycGVwcGVycGVwcGVyMDA" // 32 bytes, base64url
 		l.Keys.PublicKey, _ = xrayRealityPub(l.Keys.PrivateKey)
@@ -232,7 +232,7 @@ func TestXrayConfigTransports(t *testing.T) {
 
 func TestXrayConfigTuning(t *testing.T) {
 	l := xrayTestLink(t, "xhttp", xrayModeDirect, xraySideIran)
-	l.Profile.Fragment = &XrayFragment{Packets: "tlshello", Length: "100-200", Delay: "10-20"}
+	l.Profile.Fragment = &xrayFragment{Packets: "tlshello", Length: "100-200", Delay: "10-20"}
 	l.Profile.Mux, l.Profile.XUDP = 8, 16
 	l.Profile.TFO, l.Profile.Congestion, l.Profile.MPTCP, l.Profile.Mark = true, "bbr", true, 255
 	l.Profile.SpiderX = "/search?q=1"
@@ -294,8 +294,8 @@ func TestXrayValidate(t *testing.T) {
 		"short id":        func(l *XrayLink) { l.Keys.ShortID = "xyz" },
 		"public key":      func(l *XrayLink) { l.Keys.PublicKey = "AAAA" },
 		"congestion":      func(l *XrayLink) { l.Profile.Congestion = "vegas" },
-		"fragment":        func(l *XrayLink) { l.Profile.Fragment = &XrayFragment{Packets: "tlshello", Length: "0-10"} },
-		"fragment pkts":   func(l *XrayLink) { l.Profile.Fragment = &XrayFragment{Packets: "all", Length: "10-20"} },
+		"fragment":        func(l *XrayLink) { l.Profile.Fragment = &xrayFragment{Packets: "tlshello", Length: "0-10"} },
+		"fragment pkts":   func(l *XrayLink) { l.Profile.Fragment = &xrayFragment{Packets: "all", Length: "10-20"} },
 		"expert not obj":  func(l *XrayLink) { l.Expert = json.RawMessage(`[1]`) },
 		"expert not json": func(l *XrayLink) { l.Expert = json.RawMessage(`{`) },
 	}
@@ -393,7 +393,7 @@ func xrayTestMatrix(t *testing.T) map[string]XrayLink {
 	}
 	m["tls-xhttp-direct-foreign-owncert"] = xrayTLSLink(t, "xhttp", xrayModeDirect, xraySideForeign)
 	// mKCP with noise (every packet type) on the dialing end
-	for _, n := range []XrayNoise{{Type: "rand", Length: "10-60", Delay: "5-10", Count: 3}, {Type: "str", Packet: "hello"},
+	for _, n := range []xrayNoise{{Type: "rand", Length: "10-60", Delay: "5-10", Count: 3}, {Type: "str", Packet: "hello"},
 		{Type: "hex", Packet: "deadbeef"}, {Type: "base64", Packet: "aGVsbG8="}} {
 		n := n
 		dial := map[string]string{xrayModeDirect: xraySideIran, xrayModeReverse: xraySideForeign}
@@ -565,7 +565,7 @@ func TestXrayTLSAndCDN(t *testing.T) {
 
 func TestXrayNoise(t *testing.T) {
 	l := xrayTestLink(t, "kcp", xrayModeDirect, xraySideIran)
-	l.Profile.Noise = &XrayNoise{Type: "rand", Length: "10-60", Delay: "10-20", Count: 2}
+	l.Profile.Noise = &xrayNoise{Type: "rand", Length: "10-60", Delay: "10-20", Count: 2}
 	cfg, err := buildXrayConfig(l)
 	if err != nil {
 		t.Fatal(err)
@@ -582,12 +582,12 @@ func TestXrayNoise(t *testing.T) {
 	if s := xrayJSON(t, cfg); strings.Contains(s, `"noise"`) {
 		t.Errorf("the listening end sends noise:\n%s", s)
 	}
-	l.Profile.Noise = &XrayNoise{Type: "hex", Packet: "deadbeef"}
+	l.Profile.Noise = &xrayNoise{Type: "hex", Packet: "deadbeef"}
 	cfg, _ = buildXrayConfig(l)
 	if s := xrayJSON(t, cfg); !strings.Contains(s, `"noise":[{"packet":"deadbeef","type":"hex"}]`) {
 		t.Errorf("hex noise:\n%s", s)
 	}
-	for name, n := range map[string]XrayNoise{
+	for name, n := range map[string]xrayNoise{
 		"type":       {Type: "zero", Packet: "x"},
 		"no length":  {Type: "rand"},
 		"zero":       {Type: "rand", Length: "0-10"},
@@ -605,7 +605,7 @@ func TestXrayNoise(t *testing.T) {
 		}
 	}
 	r := xrayTestLink(t, "reality", xrayModeDirect, xraySideIran)
-	r.Profile.Noise = &XrayNoise{Type: "str", Packet: "x"}
+	r.Profile.Noise = &xrayNoise{Type: "str", Packet: "x"}
 	if err := r.validate(); err == nil || !strings.Contains(err.Error(), "UDP") {
 		t.Errorf("noise on a TCP link: %v", err)
 	}

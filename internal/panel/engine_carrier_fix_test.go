@@ -176,7 +176,7 @@ func TestBenchmarkUDPCarriersUnmeasured(t *testing.T) {
 	old := configDir
 	configDir = t.TempDir()
 	t.Cleanup(func() { configDir = old })
-	rep := runCarrierBenchmark(BenchmarkRunRequest{TargetHost: "127.0.0.1"})
+	rep := runCarrierBenchmark(benchmarkRunRequest{TargetHost: "127.0.0.1"})
 	if rep == nil {
 		t.Fatal("no report")
 	}

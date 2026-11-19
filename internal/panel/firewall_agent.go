@@ -8,13 +8,13 @@ package panel
 //
 // Wire proposal (agentproto v1 command ops → handlers below):
 //
-//	fw.detect      → AgentFirewallDetect()
-//	fw.snapshot    → AgentFirewallSnapshot()
-//	fw.plan        → AgentFirewallPlan(params)      — ALWAYS dry-run
-//	fw.apply       → AgentFirewallApply(params)     — needs Confirmed
-//	fw.teardown    → AgentFirewallTeardown(params)  — needs Confirmed
-//	port.check     → AgentPortCheck(params)
-//	port.list      → AgentPortList()
+//	fw.detect      → agentFirewallDetect()
+//	fw.snapshot    → agentFirewallSnapshot()
+//	fw.plan        → agentFirewallPlan(params)      — ALWAYS dry-run
+//	fw.apply       → agentFirewallApply(params)     — needs Confirmed
+//	fw.teardown    → agentFirewallTeardown(params)  — needs Confirmed
+//	port.check     → agentPortCheck(params)
+//	port.list      → agentPortList()
 //
 // Every parameter struct is JSON-typed and validated BEFORE any engine
 // call; results are plain JSON structs. There is no shell/string command
@@ -70,16 +70,16 @@ type fwAgentDetectResult struct {
 	Detail  string    `json:"detail"`
 }
 
-// AgentFirewallDetect reports which single backend this host manages.
-func AgentFirewallDetect() fwAgentDetectResult {
+// agentFirewallDetect reports which single backend this host manages.
+func agentFirewallDetect() fwAgentDetectResult {
 	backend, detail := fwDetect()
 	return fwAgentDetectResult{Backend: backend, Detail: detail}
 }
 
 // ---- fw.snapshot ----
 
-// AgentFirewallSnapshot captures the live ruleset (read-only).
-func AgentFirewallSnapshot() (fwSnapshot, error) {
+// agentFirewallSnapshot captures the live ruleset (read-only).
+func agentFirewallSnapshot() (fwSnapshot, error) {
 	return fwCaptureSnapshot()
 }
 
@@ -102,10 +102,10 @@ type fwAgentPlanResult struct {
 	Refusal     string     `json:"refusal,omitempty"`
 }
 
-// AgentFirewallPlan builds and dry-runs a plan. It fails on invalid
+// agentFirewallPlan builds and dry-runs a plan. It fails on invalid
 // arguments and returns the backend's refusal (native nftables /
 // no-backend) in Refusal without executing anything.
-func AgentFirewallPlan(p fwAgentPlanParams) (fwAgentPlanResult, error) {
+func agentFirewallPlan(p fwAgentPlanParams) (fwAgentPlanResult, error) {
 	out := fwAgentPlanResult{}
 	if _, _, err := fwAgentSplitOwner(p.Owner); err != nil {
 		return out, err
@@ -156,9 +156,9 @@ type fwAgentApplyParams struct {
 	Confirmed bool   `json:"confirmed"`
 }
 
-// AgentFirewallApply executes the confirmed ops with full engine safety:
+// agentFirewallApply executes the confirmed ops with full engine safety:
 // same validators, forbidden-command refusal, snapshots, rollback, audit.
-func AgentFirewallApply(p fwAgentApplyParams) (fwApplyResult, error) {
+func agentFirewallApply(p fwAgentApplyParams) (fwApplyResult, error) {
 	if !p.Confirmed {
 		return fwApplyResult{}, fmt.Errorf("apply refused: the controller must confirm the dry-run first (confirmed=true)")
 	}
@@ -184,11 +184,11 @@ type fwAgentTeardownResult struct {
 	Firewall      fwApplyResult `json:"firewall"`
 }
 
-// AgentFirewallTeardown removes only the firewall rules tagged with that
+// agentFirewallTeardown removes only the firewall rules tagged with that
 // owner (the registry is the plan's source of truth), and THEN releases
 // the owner's registry entries — this order keeps a failed rule removal
 // retriable, since the registry still says who owns what.
-func AgentFirewallTeardown(p fwAgentTeardownParams) (fwAgentTeardownResult, error) {
+func agentFirewallTeardown(p fwAgentTeardownParams) (fwAgentTeardownResult, error) {
 	out := fwAgentTeardownResult{}
 	if !p.Confirmed {
 		return out, fmt.Errorf("teardown refused: the controller must confirm it first (confirmed=true)")
@@ -220,7 +220,7 @@ type fwAgentPortCheckParams struct {
 	Proto string `json:"proto,omitempty"`
 }
 
-func AgentPortCheck(p fwAgentPortCheckParams) (any, error) {
+func agentPortCheck(p fwAgentPortCheckParams) (any, error) {
 	if p.Port < 1 || p.Port > 65535 {
 		return nil, fmt.Errorf("port %d out of range", p.Port)
 	}
@@ -242,8 +242,8 @@ type fwAgentPortListResult struct {
 	Conflicts []map[string]any `json:"conflicts"`
 }
 
-// AgentPortList is the one-call overview the controller UI needs.
-func AgentPortList() (fwAgentPortListResult, error) {
+// agentPortList is the one-call overview the controller UI needs.
+func agentPortList() (fwAgentPortListResult, error) {
 	out := fwAgentPortListResult{}
 	out.Backend, out.Detail = fwDetect()
 	out.Entries = portEntries()

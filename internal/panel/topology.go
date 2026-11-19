@@ -334,7 +334,10 @@ func handleTopologiesGet(w http.ResponseWriter, r *http.Request) {
 		topologyError(w, http.StatusInternalServerError, "cannot read topology collection")
 		return
 	}
-	writeJSON(w, map[string]any{"topologies": topologies, "tunnels": inventory})
+	// Phase 31 (contract §2.19): additive enrichment — per-side identity
+	// (§10.2) and per-tunnel weight/today_traffic (§10.1). The stored
+	// fields keep their exact names and shapes.
+	writeJSON(w, topologyEnrichedPayload(topologies, inventory))
 }
 
 func handleTopologiesPost(w http.ResponseWriter, r *http.Request) {
@@ -363,6 +366,13 @@ func handleTopologiesPost(w http.ResponseWriter, r *http.Request) {
 	}
 	if status, err := validateTopologyBindings(t, all, inventory, true); err != nil {
 		topologyError(w, status, err.Error())
+		return
+	}
+	// Phase 31 (§10.3): the owner's one-DC-per-side invariant on the manual
+	// attach path — the topogen side carries the same rule (topogen.go).
+	view := loadTopologyIdentityView()
+	if issues := topologyDCViolations(t, inventory, view); len(issues) > 0 {
+		topologyDCConflictWrite(w, r, t, issues)
 		return
 	}
 	if err := saveTopologies(append(all, t)); err != nil {
@@ -419,6 +429,15 @@ func handleTopologyPatch(w http.ResponseWriter, r *http.Request) {
 		if status, err := validateTopologyBindings(t, all, inventory, identityChanged || bindingsChanged); err != nil {
 			topologyError(w, status, err.Error())
 			return
+		}
+		// Phase 31 (§10.3): the invariant gates the candidate tunnel set on
+		// every attach/identity edit — same rule, same error as POST.
+		if identityChanged || bindingsChanged {
+			view := loadTopologyIdentityView()
+			if issues := topologyDCViolations(t, inventory, view); len(issues) > 0 {
+				topologyDCConflictWrite(w, r, t, issues)
+				return
+			}
 		}
 		all[i] = t
 		if err := saveTopologies(all); err != nil {

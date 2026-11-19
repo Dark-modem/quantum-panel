@@ -118,8 +118,8 @@ func d2j(jdn int) (jy, jm, jd int, err error) {
 	return jy, 7 + jdiv(k, 30), jmod(k, 30) + 1, nil
 }
 
-// JalaliIsLeap reports whether the Jalali year has 366 days.
-func JalaliIsLeap(jy int) bool {
+// jalaliIsLeap reports whether the Jalali year has 366 days.
+func jalaliIsLeap(jy int) bool {
 	leap, _, _, err := jalCal(jy)
 	return err == nil && leap == 0
 }
@@ -134,14 +134,14 @@ func jalaliMonthLen(jy, jm int) (int, error) {
 	if jm <= 11 {
 		return 30, nil
 	}
-	if JalaliIsLeap(jy) {
+	if jalaliIsLeap(jy) {
 		return 30, nil
 	}
 	return 29, nil
 }
 
-// JalaliToGregorian converts a Jalali date to a Gregorian date.
-func JalaliToGregorian(jy, jm, jd int) (gy, gm, gd int, err error) {
+// jalaliToGregorian converts a Jalali date to a Gregorian date.
+func jalaliToGregorian(jy, jm, jd int) (gy, gm, gd int, err error) {
 	d, err := j2d(jy, jm, jd)
 	if err != nil {
 		return 0, 0, 0, err
@@ -163,11 +163,11 @@ func TehranMonthRange(jy, jm int) (from, to int64, err error) {
 	if err != nil {
 		return 0, 0, err
 	}
-	gy1, gm1, gd1, err := JalaliToGregorian(jy, jm, 1)
+	gy1, gm1, gd1, err := jalaliToGregorian(jy, jm, 1)
 	if err != nil {
 		return 0, 0, err
 	}
-	gy2, gm2, gd2, err := JalaliToGregorian(jy, jm, ml)
+	gy2, gm2, gd2, err := jalaliToGregorian(jy, jm, ml)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -176,8 +176,8 @@ func TehranMonthRange(jy, jm int) (from, to int64, err error) {
 	return start.Unix(), end.Unix(), nil
 }
 
-// TehranDayRange returns [start, end) unix seconds of one Tehran day.
-func TehranDayRange(y, m, d int) (from, to int64) {
+// tehranDayRange returns [start, end) unix seconds of one Tehran day.
+func tehranDayRange(y, m, d int) (from, to int64) {
 	start := time.Date(y, time.Month(m), d, 0, 0, 0, 0, tehranZone)
 	return start.Unix(), start.Add(24 * time.Hour).Unix()
 }

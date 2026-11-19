@@ -539,6 +539,10 @@ type setupRequest struct {
 	OrigBundle string `json:"-"` // internal; not sent by client
 }
 
+// handleSetupPost serves the setup wizard POST. S4: the decode/trim/name
+// prologue stays inline; each subsequent phase moved verbatim into its
+// setupXxx helper (validation helpers return ok=false after writing their
+// error; body rides by pointer where a phase mutates it).
 func handleSetupPost(w http.ResponseWriter, r *http.Request) {
 	var body setupRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -555,70 +559,104 @@ func handleSetupPost(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, r, "E-SETUP-01", err.Error())
 		return
 	}
+	if !setupAddPeerToken(w, r, &body) {
+		return
+	}
+	if !setupApplyBundlePaste(w, r, &body) {
+		return
+	}
+	if !setupValidateFields(w, r, body) {
+		return
+	}
+	ports, rawPorts := setupParsePorts(body)
+	if !setupValidateForeign(w, r, body, ports, rawPorts) {
+		return
+	}
+	if !setupAddPeerPrecheck(w, r, body, ports) {
+		return
+	}
+	if !setupOverwriteGuard(w, r, body) {
+		return
+	}
+	setupInstallAndRespond(w, r, body, ports, rawPorts)
+}
 
-	// add-peer mode: each new foreign server gets its own token + tunnel.
-	// Port conflicts (same remotePort on two peers) are rejected with 409
-	// so the user picks another port instead of silently breaking a peer.
+// setupAddPeerToken is the add-peer mode prologue: each new foreign server
+// gets its own token + tunnel (S4 extract, body verbatim). Port conflicts
+// (same remotePort on two peers) are rejected with 409 so the user picks
+// another port instead of silently breaking a peer.
+func setupAddPeerToken(w http.ResponseWriter, r *http.Request, body *setupRequest) (ok bool) {
 	if body.Role == "add-peer" {
 		if body.Autogen || body.Token == "" {
 			body.Token = randomToken(32)
 		}
 		if len(loadPeers()) >= maxPeers() {
 			writeAPIError(w, r, "E-PEER-01", "")
-			return
+			return false
 		}
 	}
+	return true
+}
 
-	// bundle paste: a foreign-setup string in the token field auto-fills
-	// whatever the user left empty (explicit fields always win).
-	// Malformed bundles fail fast with E-SETUP-08, before field checks.
+// setupApplyBundlePaste handles the bundle paste: a foreign-setup string in
+// the token field auto-fills whatever the user left empty (explicit fields
+// always win). Malformed bundles fail fast with E-SETUP-08, before field
+// checks (S4 extract, body verbatim).
+func setupApplyBundlePaste(w http.ResponseWriter, r *http.Request, body *setupRequest) (ok bool) {
 	if body.Role == "foreign" && isBundle(body.Token) {
 		b, err := ParseBundle(body.Token)
 		if err != nil {
 			writeAPIError(w, r, "E-SETUP-08", "bad setup bundle: "+err.Error())
-			return
+			return false
 		}
 		// Preserve the original bundle string for runInstaller before
 		// applyBundle() replaces body.Token with the inner token.
 		body.OrigBundle = body.Token
-		applyBundle(&body, b)
+		applyBundle(body, b)
 	}
+	return true
+}
 
-	// validation (mirrors quantum.sh prompt_* / validate_setup_common rules)
+// setupValidateFields is the field validation (mirrors quantum.sh prompt_* /
+// validate_setup_common rules) (S4 extract, body verbatim).
+func setupValidateFields(w http.ResponseWriter, r *http.Request, body setupRequest) (ok bool) {
 	if body.Role != "iran" && body.Role != "foreign" && body.Role != "add-peer" {
 		writeAPIError(w, r, "E-SETUP-02", "")
-		return
+		return false
 	}
 	if net.ParseIP(body.LocalPub) == nil {
 		writeAPIError(w, r, "E-SETUP-03", "")
-		return
+		return false
 	}
 	if net.ParseIP(body.RemotePub) == nil {
 		writeAPIError(w, r, "E-SETUP-04", "")
-		return
+		return false
 	}
 	if body.Engine != "backhaul" {
 		// GRE runs between the two IPv4 addresses
 		if !isV4(body.LocalPub) || !isV4(body.RemotePub) {
 			writeAPIError(w, r, "E-SETUP-04", "a tunnel over GRE needs the IPv4 addresses of both servers; for IPv6 use Backhaul without GRE")
-			return
+			return false
 		}
 		if net.ParseIP(body.LocalGre) == nil || !isV4(body.LocalGre) {
 			writeAPIError(w, r, "E-SETUP-05", "")
-			return
+			return false
 		}
 		if net.ParseIP(body.PeerGre) == nil || !isV4(body.PeerGre) {
 			writeAPIError(w, r, "E-SETUP-06", "")
-			return
+			return false
 		}
 	}
 	if body.FrpPort < 1 || body.FrpPort > 65535 {
 		writeAPIError(w, r, "E-SETUP-07", "")
-		return
+		return false
 	}
+	return true
+}
 
-	var ports []int
-	var rawPorts []string
+// setupParsePorts resolves the forwarded ports from the request (S4
+// extract, body verbatim — backhaul keeps raw forms, GRE numbers only).
+func setupParsePorts(body setupRequest) (ports []int, rawPorts []string) {
 	if body.Ports != "" {
 		if body.Engine == "backhaul" || body.Engine == "gre-backhaul" {
 			rawPorts = parseRawPorts(body.Ports)
@@ -630,48 +668,67 @@ func handleSetupPost(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	return ports, rawPorts
+}
+
+// setupValidateForeign validates the token/ports a foreign or add-peer run
+// requires (S4 extract, body verbatim).
+func setupValidateForeign(w http.ResponseWriter, r *http.Request, body setupRequest, ports []int, rawPorts []string) (ok bool) {
 	if body.Role == "foreign" || body.Role == "add-peer" {
 		if body.Token == "" {
 			writeAPIError(w, r, "E-SETUP-08", "")
-			return
+			return false
 		}
 		if !isBundle(body.Token) && len(body.Token) > 128 {
 			writeAPIError(w, r, "E-SETUP-09", "")
-			return
+			return false
 		}
 		if isBundle(body.Token) && len(body.Token) > 256 {
 			writeAPIError(w, r, "E-SETUP-09", "")
-			return
+			return false
 		}
 		if len(rawPorts) == 0 && len(ports) == 0 {
 			writeAPIError(w, r, "E-SETUP-10", "")
-			return
+			return false
 		}
 	}
+	return true
+}
 
-	// add-peer pre-check: reject ports another tunnel already serves (409 + peer name)
+// setupAddPeerPrecheck rejects ports another tunnel already serves
+// (409 + peer name) (S4 extract, body verbatim).
+func setupAddPeerPrecheck(w http.ResponseWriter, r *http.Request, body setupRequest, ports []int) (ok bool) {
 	if body.Role == "add-peer" {
 		if clash := peerDuplicateIPClash(body.RemotePub, -1); clash != "" {
 			writeAPIError(w, r, "E-PEER-08", "Foreign IP is already used by tunnel '"+clash+"' — you cannot add multiple tunnels to the exact same server")
-			return
+			return false
 		}
 		if clash := matrixPortClash(ports); clash != "" {
 			writeAPIError(w, r, "E-PEER-02", "port is already reserved by "+clash+" — pick a different port")
-			return
+			return false
 		}
 		if clash := peerPortClash(ports, -1); clash != "" {
 			writeAPIError(w, r, "E-PEER-02", "port "+clash+" is already served by another tunnel — pick a different port")
-			return
+			return false
 		}
 	}
+	return true
+}
 
-	// overwrite guard: warn first, proceed only with force
-	// add-peer never overwrites: it appends a new tunnel instead.
+// setupOverwriteGuard warns first and proceeds only with force; add-peer
+// never overwrites — it appends a new tunnel instead (S4 extract, verbatim).
+func setupOverwriteGuard(w http.ResponseWriter, r *http.Request, body setupRequest) (ok bool) {
 	if body.Role != "add-peer" && tunnelExists() && !body.Force {
 		writeAPIError(w, r, "E-PEER-03", "tunnel already exists — resubmit with force:true to overwrite")
-		return
+		return false
 	}
+	return true
+}
 
+// setupInstallAndRespond runs the shared installer and writes the success
+// or error response, then the peer-sync auto-configuration and the first
+// tunnel's link name (S4 extract, body verbatim).
+func setupInstallAndRespond(w http.ResponseWriter, r *http.Request, body setupRequest, ports []int, rawPorts []string) {
 	// run the shared installer: GRE_SKIP_PANEL=1 because the panel is already
 	// running here — reinstalling/downloading it mid-request would be slow and
 	// could restart this very process.

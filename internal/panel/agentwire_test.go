@@ -18,7 +18,7 @@ import (
 
 func TestAgentHubEmptyCredentialsRejected(t *testing.T) {
 	withTempConfig(t)
-	t.Cleanup(MeshStoreCloseForTest) // the enroll mirror opens quantum.db; close before the temp-dir race (BACKEND-24)
+	t.Cleanup(meshStoreCloseForTest) // the enroll mirror opens quantum.db; close before the temp-dir race (BACKEND-24)
 	srv := agentHubTestServer(t)
 	id, key := agentHubEnrollAgent(t, srv, []string{agentCapMatrix})
 

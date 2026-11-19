@@ -76,7 +76,7 @@ type XrayLink struct {
 	// Listen is the address the users' ports bind on Iran ("" = every address).
 	Listen  string          `json:"listen,omitempty"`
 	Profile XrayProfile     `json:"profile"`
-	Keys    XrayKeys        `json:"keys"`
+	Keys    xrayKeys        `json:"keys"`
 	Expert  json.RawMessage `json:"expert,omitempty"` // merged over the generated config
 
 	// Iran only: the loopback port the panel probes the link through.
@@ -84,9 +84,9 @@ type XrayLink struct {
 	Disabled  bool `json:"disabled,omitempty"` // stopped by the user
 }
 
-// XrayKeys are the link's secrets. The Reality private key lives only on the
+// xrayKeys are the link's secrets. The Reality private key lives only on the
 // end that serves Reality.
-type XrayKeys struct {
+type xrayKeys struct {
 	UUID       string `json:"uuid"`
 	PrivateKey string `json:"private_key,omitempty"`
 	PublicKey  string `json:"public_key,omitempty"`
@@ -130,22 +130,22 @@ type XrayProfile struct {
 	MPTCP      bool   `json:"mptcp,omitempty"`
 	Mark       int    `json:"mark,omitempty"`
 
-	Fragment *XrayFragment `json:"fragment,omitempty"` // dialing end only
-	Noise    *XrayNoise    `json:"noise,omitempty"`    // dialing end, UDP (mKCP) only
-	KCP      *XrayKCP      `json:"kcp,omitempty"`
+	Fragment *xrayFragment `json:"fragment,omitempty"` // dialing end only
+	Noise    *xrayNoise    `json:"noise,omitempty"`    // dialing end, UDP (mKCP) only
+	KCP      *xrayKCP      `json:"kcp,omitempty"`
 }
 
-// XrayFragment splits the dialing end's first packets (finalmask "fragment").
-type XrayFragment struct {
+// xrayFragment splits the dialing end's first packets (finalmask "fragment").
+type xrayFragment struct {
 	Packets string `json:"packets"` // "tlshello" or a range such as "1-3"
 	Length  string `json:"length"`  // "100-200"
 	Delay   string `json:"delay"`   // "10-20" ms
 }
 
-// XrayNoise is what the dialing end sends before its first real UDP packet
+// xrayNoise is what the dialing end sends before its first real UDP packet
 // (finalmask "noise"): Count packets of random bytes (Length) or of a fixed
 // Packet (str, hex or base64), Delay ms apart.
-type XrayNoise struct {
+type xrayNoise struct {
 	Type   string `json:"type"`             // rand | str | hex | base64
 	Packet string `json:"packet,omitempty"` // str / hex / base64
 	Length string `json:"length,omitempty"` // rand: bytes, "10-60"
@@ -153,7 +153,7 @@ type XrayNoise struct {
 	Count  int    `json:"count,omitempty"`  // 1-10, default 1
 }
 
-func (n XrayNoise) validate() error {
+func (n xrayNoise) validate() error {
 	if n.Delay != "" && !xrayRangeRe.MatchString(n.Delay) {
 		return fmt.Errorf("noise: the delay is a range in ms, like 10-20")
 	}
@@ -195,7 +195,7 @@ func (n XrayNoise) validate() error {
 }
 
 // xrayNoiseMask is a noise setting as Xray's finalmask.
-func xrayNoiseMask(n XrayNoise) map[string]any {
+func xrayNoiseMask(n xrayNoise) map[string]any {
 	item := map[string]any{}
 	if n.Type == "rand" {
 		item["rand"] = n.Length
@@ -216,9 +216,9 @@ func xrayNoiseMask(n XrayNoise) map[string]any {
 	return map[string]any{"type": "noise", "settings": map[string]any{"noise": items}}
 }
 
-// XrayKCP is mKCP's tuning. Password keys the mkcp-aes128gcm mask (what the
+// xrayKCP is mKCP's tuning. Password keys the mkcp-aes128gcm mask (what the
 // old "seed" did), which both ends need.
-type XrayKCP struct {
+type xrayKCP struct {
 	MTU        int    `json:"mtu,omitempty"`
 	TTI        int    `json:"tti,omitempty"`
 	Up         int    `json:"up,omitempty"`   // uplinkCapacity, MB/s
@@ -255,7 +255,7 @@ var xrayPresets = map[string]XrayProfile{
 	"cdn":  {Preset: "cdn", Transport: "xhttp", Security: "tls", CDN: true, XHTTPMode: "packet-up", Fingerprint: "chrome"},
 	"grpc": {Preset: "grpc", Transport: "grpc", Security: "reality", Fingerprint: "chrome"},
 	// UDP: for when TCP is throttled.
-	"kcp": {Preset: "kcp", Transport: "kcp", Security: "none", KCP: &XrayKCP{MTU: 1350, TTI: 20, Up: 20, Down: 100, Congestion: true}},
+	"kcp": {Preset: "kcp", Transport: "kcp", Security: "none", KCP: &xrayKCP{MTU: 1350, TTI: 20, Up: 20, Down: 100, Congestion: true}},
 }
 
 // xraySNIDirect and xraySNIReverse are the sites Reality borrows a handshake
@@ -360,7 +360,7 @@ func newXrayLink(l XrayLink) (XrayLink, error) {
 		}
 	}
 	if l.Profile.Transport == "kcp" {
-		k := XrayKCP{} // a copy: the presets share their pointer
+		k := xrayKCP{} // a copy: the presets share their pointer
 		if l.Profile.KCP != nil {
 			k = *l.Profile.KCP
 		}
@@ -873,7 +873,7 @@ func xrayStream(l XrayLink, server bool) map[string]any {
 	case "grpc":
 		s["grpcSettings"] = map[string]any{"serviceName": p.Path}
 	case "kcp":
-		k := XrayKCP{}
+		k := xrayKCP{}
 		if p.KCP != nil {
 			k = *p.KCP
 		}

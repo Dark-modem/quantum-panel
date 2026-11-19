@@ -274,7 +274,7 @@ func TestFetchScriptPrefersReleaseTag(t *testing.T) {
 	}
 
 	// correct checksum passes
-	h, _ := ComputeSHA256(strings.NewReader(body))
+	h, _ := computeSHA256(strings.NewReader(body))
 	manifestFetcher = func(string) (map[string]string, error) { return map[string]string{"quantum.sh": h}, nil }
 	urls = nil
 	if err := fetchScript("dev-r7", "quantum.sh", scriptURL, dst); err != nil {
