@@ -191,7 +191,7 @@
     tuKeyBad: ['کلید تانل باید ۱ تا ۱۲۸ نویسه از a-z 0-9 - _ . باشد', 'Tunnel key must be 1-128 chars of a-z 0-9 - _ .'],
     d7: ['۷ روز', '7d'], d30: ['۳۰ روز', '30d'],
     tunnelKey: ['تونل', 'Tunnel'], topologyCol: ['توپولوژی', 'Topology'],
-    engineCol: ['موتور', 'Engine'], engineDef: ['پیش‌فرض', 'default'],
+    engineCol: ['هسته', 'Engine'], engineDef: ['پیش‌فرض', 'default'],
     weightCol: ['وزن', 'Weight'], shareCol: ['سهم', 'Share'],
     stateCol: ['وضعیت', 'State'], peerCol: ['طرف مقابل', 'Peer'],
     billable: ['دانلود قابل‌قبض', 'Billable download'], upload: ['آپلود', 'Upload'],
@@ -441,10 +441,11 @@
     '.mtb-pending { opacity: .55; }',
     '.mtb-month { max-width: 130px; }',
     '@media (max-width: 640px) { .mtb-key { max-width: 150px; } }',
+    '.mtb-tunhead .mtb-agintro-row { flex-direction:row; }',
     '.mtb-tunhead-id { display:flex; align-items:center; gap:10px; }',
     '.mtb-tuncount { min-width:34px; text-align:center; padding:3px 10px; border-radius:999px; background:color-mix(in srgb, var(--ac) 12%, transparent); color:var(--ac); font-weight:700; font-size:13px; }',
     '.mtb-keycopy { display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; margin-inline-start:6px; border:1px solid var(--ln, rgba(148,163,184,.25)); border-radius:6px; background:transparent; color:var(--mu, #94a3b8); cursor:pointer; vertical-align:middle; transition:color .15s, border-color .15s; }',
-    '.mtb-keycopy svg { width:13px; height:13px; fill:none; stroke:currentColor; stroke-width:1.7; }',
+    '.mtb-keycopy svg { width:13px; height:13px; flex:none; fill:none; stroke:currentColor; stroke-width:1.7; }',
     '.mtb-keycopy:hover { color:var(--ac); border-color:var(--ac); }',
     '.mtb-topobadge { display:inline-flex; align-items:center; gap:6px; padding:3px 10px; border-radius:999px; border:1px solid color-mix(in srgb, var(--ac) 35%, transparent); background:color-mix(in srgb, var(--ac) 8%, transparent); color:var(--ac); font-size:12px; font-weight:600; cursor:pointer; transition:background .15s, border-color .15s; }',
     '.mtb-topobadge svg { width:13px; height:13px; fill:none; stroke:currentColor; stroke-width:1.8; }',
@@ -462,6 +463,7 @@
     '.mtb-eng-def { font-size:11px; }',
     '.mtb-wtx { cursor:help; border-bottom:1px dotted var(--ln, rgba(148,163,184,.4)); padding-bottom:1px; }',
     '.mtb-agstat-i.warn .mtb-agico { background:color-mix(in srgb, var(--warn, #f59e0b) 14%, transparent); color:var(--warn, #f59e0b); }',
+    '.mtb-tunhead .mtb-agstatbig { flex-wrap:wrap; gap:10px 18px; }',
     '@media (max-width: 900px) { .mtb-tun-tbl .mtb-tupath { min-width:180px; } }',
     '@media (max-width: 760px) { .mtb-tun-tbl thead { display:none; } .mtb-tun-tbl tr { display:block; border:1px solid var(--ln, rgba(148,163,184,.22)); border-radius:12px; padding:10px 12px; margin:0 0 10px; } .mtb-tun-tbl td { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:5px 0; border:none; } .mtb-tun-tbl td::before { content:attr(data-l); color:var(--mu, #94a3b8); font-size:12px; flex:none; } .mtb-tun-tbl td[colspan] { justify-content:center; } .mtb-tun-tbl td[colspan]::before { content:none; } }',
     '@media (prefers-reduced-motion: reduce) { main.page section[id^="tab-m"] * { animation: none !important; transition: none !important; } }'
@@ -669,7 +671,7 @@
   }
 
   // ---- tunnels-page cell helpers ---------------------------------------------
-  var TU_COPY = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+  var TU_COPY = '<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
   var TU_WTH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6a3 3 0 0 1 6 0"/><path d="M6.5 6h11l2.5 12h-16l2.5-12z"/></svg>';
   var TU_STTH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg>';
   var TU_CHTH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>';
@@ -803,7 +805,7 @@
       return '<tr data-tu-row="' + esc(r.key) + '">' +
         '<td data-l="' + esc(L('tunnelKey')) + '"><b class="mono mtb-tun-key" dir="ltr" title="' + esc(r.key) + '">' + esc(r.key) + '</b>' +
         '<button type="button" class="mtb-keycopy" data-copyval="' + esc(r.key) + '" title="' + esc(L('copy')) + '" aria-label="' + esc(L('copy')) + '">' + TU_COPY + '</button></td>' +
-        '<td data-l="' + esc(L('topologyCol')) + '"><button type="button" class="mtb-topobadge" data-tutopo="' + esc(r.topoId) + '" title="' + esc(L('tuOpenTopo')) + '">' + MTB_ICO.mesh + esc(r.topo) + '</button></td>' +
+        '<td data-l="' + esc(L('topologyCol')) + '"><button type="button" class="mtb-topobadge" data-tutopo="' + esc(r.topoId) + '" data-tuname="' + esc(r.topo) + '" title="' + esc(L('tuOpenTopo')) + '">' + MTB_ICO.mesh + esc(r.topo) + '</button></td>' +
         '<td data-l="' + esc(L('tuPath')) + '"><div class="mtb-tupath">' + tuSideChip(r.local) + '<span class="mtb-tuarrow">' + MTB_ICO.tun + '</span>' + tuSideChip(r.remote) + '</div></td>' +
         '<td data-l="' + esc(L('engineCol')) + '"><div class="mtb-engpair">' + engBadge + '</div></td>' +
         '<td class="num" data-l="' + esc(L('weightCol')) + '"><span class="mtb-wtx" data-tu-w="' + esc(r.weight != null ? r.weight : '') + '" title="' + wTitle + '"><bdi dir="ltr">' + wt + '</bdi></span></td>' +
@@ -812,7 +814,7 @@
         '<td class="num' + (d30 ? '' : ' mtb-pending') + '" data-l="' + esc(L('d30')) + '" data-tu-d30>' + tuBytesPair(d30) + '</td>' +
         '<td><div class="mtb-acts-row">' +
         '<div class="mtb-acts-pop">' +
-        '<button type="button" class="mtb-act mtb-act-view" data-tuview="' + esc(r.topoId) + '" title="' + esc(L('tuOpenTopo')) + '">' + MTB_ICO.eye + '</button>' +
+        '<button type="button" class="mtb-act mtb-act-view" data-tuview="' + esc(r.topoId) + '" data-tuname="' + esc(r.topo) + '" title="' + esc(L('tuOpenTopo')) + '">' + MTB_ICO.eye + '</button>' +
         '<button type="button" class="mtb-act mtb-act-edit" data-tuweight="' + esc(r.topoId) + '|' + esc(r.key) + '" title="' + esc(L('tuWeightT')) + '">' + MTB_ICO.pen + '</button>' +
         '<button type="button" class="mtb-act mtb-act-del" data-tudel="' + esc(r.id) + '|' + esc(r.key) + '" title="' + esc(L('agActDel')) + '">' + MTB_ICO.trash + '</button>' +
         '</div>' +
@@ -2544,12 +2546,31 @@
     var tuv = e.target && e.target.closest ? e.target.closest('[data-tuview],[data-tutopo]') : null;
     if (tuv) {
       var tid = tuv.getAttribute('data-tuview') || tuv.getAttribute('data-tutopo');
+      var tname = tuv.getAttribute('data-tuname') || '';
       goTab('tunnel');
-      if (typeof window.topologyOpen === 'function') window.topologyOpen(parseInt(tid, 10));
+      // The legacy topology page keys its selection by ITS string ids
+      // (topo_…); the mesh packs carry numeric ids — bridge by name once
+      // the legacy list has loaded (bounded wait, then give up quietly).
+      (function openTopo(n) {
+        var pool = (typeof topologyData !== 'undefined' && topologyData.topologies) || null;
+        var hit = null;
+        if (pool && pool.length) {
+          for (var i = 0; i < pool.length; i++) {
+            if (String(pool[i].id) === String(tid) || (tname && pool[i].name === tname)) { hit = pool[i]; break; }
+          }
+        }
+        if (hit) { window.topologyOpen(hit.id); return; }
+        if (n > 0) setTimeout(function () { openTopo(n - 1); }, 150);
+      })(60);
       return;
     }
     var tua = e.target && e.target.closest ? e.target.closest('[data-tuagt]') : null;
-    if (tua) { window.openAgtDetail(tua.getAttribute('data-tuagt')); return; }
+    if (tua) {
+      // detail view first (so activate's loadAgt sees view=detail), then switch
+      window.openAgtDetail(tua.getAttribute('data-tuagt'));
+      goTab('magt');
+      return;
+    }
     var tuw = e.target && e.target.closest ? e.target.closest('[data-tuweight]') : null;
     if (tuw) {
       var wparts = (tuw.getAttribute('data-tuweight') || '').split('|');
