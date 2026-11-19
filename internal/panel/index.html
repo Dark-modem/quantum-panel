@@ -2088,22 +2088,24 @@
       </section>
       <!-- ==================== CORES TAB ==================== -->
       <section id="tab-cores" role="tabpanel" hidden>
-        <div class="eng-head">
-          <span class="eng-head-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4.5 16.5c-1.5 1.3-2 5-2 5s3.7-.5 5-2c.7-.8.7-2 0-2.8-.7-.7-2.2-.9-3-.2z"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.9A12.9 12.9 0 0 1 22 2c0 2.7-.9 7.4-6 11a22.4 22.4 0 0 1-4 2z"/><path d="M9 12H4s.5-3.9 1.5-4.5c1-.6 4 0 4 0"/><path d="M12 15v5s3.9-.5 4.5-1.5c.6-1 0-4 0-4"/></svg></span>
-          <div class="eng-head-tx">
-            <p class="tc-title" data-i18n="eng_title">Engines</p>
-            <p class="eng-head-sub" data-i18n="eng_sub">Manage and deploy tunnel engines across your agents.</p>
+        <div class="eng-page-card">
+          <div class="eng-head">
+            <span class="eng-head-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4.5 16.5c-1.5 1.3-2 5-2 5s3.7-.5 5-2c.7-.8.7-2 0-2.8-.7-.7-2.2-.9-3-.2z"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.9A12.9 12.9 0 0 1 22 2c0 2.7-.9 7.4-6 11a22.4 22.4 0 0 1-4 2z"/><path d="M9 12H4s.5-3.9 1.5-4.5c1-.6 4 0 4 0"/><path d="M12 15v5s3.9-.5 4.5-1.5c.6-1 0-4 0-4"/></svg></span>
+            <div class="eng-head-tx">
+              <p class="tc-title" data-i18n="eng_title">Engines</p>
+              <p class="eng-head-sub" data-i18n="eng_sub">Manage and deploy tunnel engines across your agents.</p>
+            </div>
           </div>
-        </div>
-        <div class="eng-tools">
-          <div class="eng-search">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-            <input id="engSearch" type="search" data-i18n-ph="eng_search_ph" placeholder="Search engines by name..." aria-label="Search engines by name">
+          <div class="eng-tools">
+            <div class="eng-search">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+              <input id="engSearch" type="search" data-i18n-ph="eng_search_ph" placeholder="Search engines by name..." aria-label="Search engines by name">
+            </div>
+            <div class="mtb-eng-filters" id="engFilters"></div>
+            <span class="eng-meta" id="engMeta"></span>
           </div>
-          <div class="mtb-eng-filters" id="engFilters"></div>
-          <span class="eng-meta" id="engMeta"></span>
+          <div id="engList"></div>
         </div>
-        <div id="engList"></div>
       </section>
       <!-- ==================== CLUSTER TAB ==================== -->
       <section id="tab-cluster" role="tabpanel" hidden>
