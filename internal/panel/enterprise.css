@@ -66,8 +66,12 @@ table.ent-tbl { width: 100%; border-collapse: collapse; font-size: var(--ent-tbl
 .ent-modal-h b { color: var(--tx); font-size: var(--fs-h4); }
 .ent-modal-b { padding: 16px; display: grid; gap: 12px; }
 .ent-modal-f { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; padding: 14px 16px; border-top: 1px solid var(--ln); }
-.ent-x { width: 32px; height: 32px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: var(--mu); cursor: pointer; font-size: 16px; line-height: 1; }
-.ent-x:hover { background: var(--sunk); color: var(--tx); }
+.ent-x { width: 32px; height: 32px; border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--ent-ac, var(--ac)) 45%, transparent);
+  background: color-mix(in srgb, var(--ent-ac, var(--ac)) 8%, transparent);
+  color: var(--ent-ac, var(--ac)); cursor: pointer; font-size: 16px; line-height: 1;
+  box-shadow: 0 0 10px color-mix(in srgb, var(--ent-ac, var(--ac)) 18%, transparent); transition: background .15s, border-color .15s, box-shadow .15s; }
+.ent-x:hover { background: color-mix(in srgb, var(--ent-ac, var(--ac)) 16%, transparent); border-color: var(--ent-ac, var(--ac)); color: var(--ent-ac, var(--ac)); box-shadow: 0 0 14px color-mix(in srgb, var(--ent-ac, var(--ac)) 30%, transparent); }
 
 /* ---------- Matrix setup: transport selection and read-only help ---------- */
 .mx-field-label { display: flex; align-items: center; gap: 7px; min-height: 28px; }
