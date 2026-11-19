@@ -191,6 +191,11 @@
     tuEventsT: ['رویددها', 'Events'],
     tuNoEvents: ['رویددی ثبت نشده است', 'No events recorded'],
     tuEvFrom: ['از', 'from'],
+    tuSettingsT: ['تنظیمات', 'Settings'],
+    tuParams: ['پارامترهای هسته (JSON)', 'Engine params (JSON)'],
+    tuParamsHint: ['خالی بگذارید تا مقادیر فعلی — از جمله کلیدها — دست‌نخورده بماند.', 'Leave empty to keep the stored values — secrets included.'],
+    tuSaved: ['تنظیمات ذخیره شد', 'Settings saved'],
+    tuBadJson: ['JSON نامعتبر است', 'Invalid JSON'],
     tuStIran: ['سرور ایران', 'Iran server'],
     tuStForeign: ['سرور خارج', 'Foreign server'],
     tuStKey: ['کلید و بازبینی', 'Key & review'],
@@ -548,6 +553,11 @@
     '.mtb-wstep.done .mtb-wstep-lbl { color:var(--tx2); }',
     '.tu-review { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:8px; margin-bottom:10px; }',
     '.tu-rev { display:flex; flex-direction:column; gap:2px; padding:8px 12px; border:1px solid var(--ln, rgba(148,163,184,.22)); border-radius:10px; }',
+    '.tu-set-grid { display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-top:10px; }',
+    '.tu-set-toggle { font-size:13.5px; }',
+    '.tu-set-grid select { min-width:200px; }',
+    '.tu-pl { display:block; margin:12px 0 6px; }',
+    '.tu-params { font-family:ui-monospace, Menlo, monospace; font-size:12.5px; resize:vertical; }',
     '@media (prefers-reduced-motion: reduce) { main.page section[id^="tab-m"] * { animation: none !important; transition: none !important; } }'
   ].join('\n');
 
@@ -1157,6 +1167,20 @@
       tuBarChart(pts, hist.granularity) +
       '</div>' +
 
+      // settings: the PATCH route (enabled / engine / params) finally wired
+      '<div class="tunnel-card tu-settings">' +
+      '<p class="tc-title dcard-title">' + MTB_ICO.gear + esc(L('tuSettingsT')) + '</p>' +
+      '<div class="tu-set-grid">' +
+      '<label class="mtb-check tu-set-toggle"><input type="checkbox" id="tuSetEn"' + (t.enabled !== false ? ' checked' : '') + '> ' + esc(L('enabled')) + '</label>' +
+      '<select id="tuSetEng" class="quantum-input" aria-label="' + esc(L('engineCol')) + '">' +
+      Object.keys(TU_ENG_DISP).map(function (n) { return '<option value="' + esc(n) + '"' + (n === t.engine ? ' selected' : '') + '>' + esc(TU_ENG_DISP[n]) + '</option>'; }).join('') +
+      '</select>' +
+      '</div>' +
+      '<label class="tu-pl mtb-muted">' + esc(L('tuParams')) + '</label>' +
+      '<textarea id="tuSetParams" class="quantum-input tu-params" dir="ltr" rows="4" placeholder="{&quot;port&quot;: 443}" spellcheck="false"></textarea>' +
+      '<p class="qs-hint">' + esc(L('tuParamsHint')) + '</p>' +
+      '<div class="mtb-acts"><button type="button" class="quantum-btn quantum-btn-primary u-btn-xs" id="tuSetSave" data-tuset="' + esc(t.id) + '" data-tueng="' + esc(t.engine || '') + '">' + esc(L('agSave')) + '</button></div>' +
+      '</div>' +
       '<div class="tunnel-card tu-events">' +
       '<p class="tc-title dcard-title">' + MTB_ICO.clock + esc(L('tuEventsT')) + '</p>' +
       evHtml +
@@ -2921,6 +2945,22 @@
       tuView = { key: tupg2.getAttribute('data-tuopen') };
       tuRange = '24h';
       renderTun();
+      return;
+    }
+    var tset = e.target && e.target.closest ? e.target.closest('[data-tuset]') : null;
+    if (tset) {
+      var body = { enabled: document.getElementById('tuSetEn').checked };
+      var engSel = document.getElementById('tuSetEng').value;
+      if (engSel !== (tset.getAttribute('data-tueng') || '')) body.engine = engSel;
+      var ptxt = (document.getElementById('tuSetParams').value || '').trim();
+      if (ptxt) {
+        try { body.engine_params = JSON.parse(ptxt); } catch (e3) { mtbToast(L('tuBadJson'), 'err'); return; }
+      }
+      var sb = tset; sb.disabled = true;
+      apiSend('PATCH', 'api/mesh/tunnels/' + encodeURIComponent(tset.getAttribute('data-tuset')), body).then(function () {
+        mtbToast(L('tuSaved'));
+        renderTuDetail();
+      }).catch(function (e2) { sb.disabled = false; tuFail(e2); });
       return;
     }
     var tubk = e.target && e.target.closest ? e.target.closest('[data-tuback]') : null;
