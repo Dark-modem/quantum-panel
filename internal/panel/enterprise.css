@@ -1782,7 +1782,7 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 
 /* Agent detail tunnel table: the tunnel key is the first column, so it must
    truncate inside the cell instead of widening the whole table. */
-.ent-tbl .mtb-tun-key { display:inline-block; max-width:min(150px, 24vw); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; vertical-align:middle; cursor:help; }
+.ent-tbl .mtb-tun-key { display:inline-block; max-width:min(120px, 22vw); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; vertical-align:middle; cursor:help; }
 
 /* Topbar page-title chip: every tab shows its name in a glass pill that is
    vertically level with the 38px topbar controls, in LTR and RTL. */

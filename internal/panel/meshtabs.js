@@ -172,8 +172,8 @@
     tuNewHint: ['ترتیب را دنبال کنید: توپولوژی، سرور ایران، سرور خارج، هسته — سپس کلید تانل.', 'Follow the flow: topology, Iran server, foreign server, engine — then the tunnel key.'],
     tuNeedTopo: ['اول یک توپولوژی بسازید — تانل بدون توپولوژی معنا ندارد.', 'Build a topology first — a tunnel needs one.'],
     tuPath: ['مسیر', 'Path'],
-    tuD7: ['ترافیک ۷ روزه', '7d traffic'],
-    tuD30: ['ترافیک ۳۰ روزه', '30d traffic'],
+    tuD7: ['ترافیک ۷\u00a0روزه', '7d\u00a0traffic'],
+    tuD30: ['ترافیک ۳۰\u00a0روزه', '30d\u00a0traffic'],
     tuAllTopos: ['همه توپولوژی‌ها', 'All topologies'],
     tuAllAgents: ['همه ایجنت‌ها', 'All agents'],
     tuAllEngines: ['همه هسته‌ها', 'All engines'],
@@ -465,6 +465,21 @@
     '.mtb-wtx { cursor:help; border-bottom:1px dotted var(--ln, rgba(148,163,184,.4)); padding-bottom:1px; }',
     '.mtb-agstat-i.warn .mtb-agico { background:color-mix(in srgb, var(--warn, #f59e0b) 14%, transparent); color:var(--warn, #f59e0b); }',
     '.mtb-tunhead .mtb-agstatbig { flex:1; justify-content:space-around; flex-wrap:wrap; gap:10px 18px; }',
+    // one table, no h-scrollbar: the path stacks its two ends, cells wrap
+    // instead of pushing the row wider, paddings and action buttons tighten
+    '.mtb-tun-tbl tbody td { padding:8px 9px; white-space:normal; }',
+    '.mtb-tun-tbl tbody td .mtb-tuside-tx b, .mtb-tun-tbl tbody td .mtb-topobadge, .mtb-tun-tbl tbody td .badge { white-space:nowrap; }',
+    '.mtb-tun-tbl .mtb-tupath { flex-direction:column; align-items:flex-start; gap:3px; }',
+    '.mtb-tun-tbl .mtb-tuarrow svg { transform:rotate(90deg); }',
+    '.mtb-tun-tbl .mtb-acts-row { gap:4px; }',
+    '.mtb-tun-tbl .mtb-act { width:26px; height:26px; border-radius:7px; }',
+    '.mtb-tun-tbl .mtb-act svg { width:13px; height:13px; }',
+    '.mtb-tun-tbl .mtb-topobadge { font-size:11.5px; padding:2px 8px; }',
+    '.mtb-tun-tbl th.num { white-space:normal; }',
+    '.mtb-tun-tbl [data-tu-d7] bdi, .mtb-tun-tbl [data-tu-d30] bdi { display:inline-block; max-width:96px; white-space:normal; line-height:1.5; }',
+    '.mtb-tun-tbl .mtb-topobadge { font-size:11px; padding:2px 6px; }',
+    '.mtb-tun-tbl .mtb-tuside-fl svg { width:16px; height:11px; }',
+    '.mtb-tun-tbl td:last-child { padding-inline:6px; }',
     '@media (max-width: 900px) { .mtb-tun-tbl .mtb-tupath { min-width:180px; } }',
     '.mtb-tun-tbl td.num, .mtb-tun-tbl th.num { text-align:center; }',
     '[dir="rtl"] .mtb-tun-tbl td.num { text-align:center; }',
@@ -674,7 +689,7 @@
   }
 
   // ---- tunnels-page cell helpers ---------------------------------------------
-  var TU_COPY = '<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+    var TU_COPY = '<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
   var TU_WTH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6a3 3 0 0 1 6 0"/><path d="M6.5 6h11l2.5 12h-16l2.5-12z"/></svg>';
   var TU_STTH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg>';
   var TU_CHTH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>';
