@@ -172,6 +172,8 @@
     tuNewHint: ['ترتیب را دنبال کنید: توپولوژی، سرور ایران، سرور خارج، هسته — سپس کلید تانل.', 'Follow the flow: topology, Iran server, foreign server, engine — then the tunnel key.'],
     tuNeedTopo: ['اول یک توپولوژی بسازید — تانل بدون توپولوژی معنا ندارد.', 'Build a topology first — a tunnel needs one.'],
     tuPath: ['مسیر', 'Path'],
+    tuD7: ['ترافیک ۷ روزه', '7d traffic'],
+    tuD30: ['ترافیک ۳۰ روزه', '30d traffic'],
     tuAllTopos: ['همه توپولوژی‌ها', 'All topologies'],
     tuAllAgents: ['همه ایجنت‌ها', 'All agents'],
     tuAllEngines: ['همه هسته‌ها', 'All engines'],
@@ -811,8 +813,8 @@
         '<td data-l="' + esc(L('engineCol')) + '"><div class="mtb-engpair">' + engBadge + '</div></td>' +
         '<td class="num" data-l="' + esc(L('weightCol')) + '"><span class="mtb-wtx" data-tu-w="' + esc(r.weight != null ? r.weight : '') + '" title="' + wTitle + '"><bdi dir="ltr">' + wt + '</bdi></span></td>' +
         '<td data-l="' + esc(L('stateCol')) + '">' + stateBadge(r.state) + '</td>' +
-        '<td class="num' + (d7 ? '' : ' mtb-pending') + '" data-l="' + esc(L('d7')) + '" data-tu-d7>' + tuBytesPair(d7) + '</td>' +
-        '<td class="num' + (d30 ? '' : ' mtb-pending') + '" data-l="' + esc(L('d30')) + '" data-tu-d30>' + tuBytesPair(d30) + '</td>' +
+        '<td class="num' + (d7 ? '' : ' mtb-pending') + '" data-l="' + esc(L('tuD7')) + '" data-tu-d7>' + tuBytesPair(d7) + '</td>' +
+        '<td class="num' + (d30 ? '' : ' mtb-pending') + '" data-l="' + esc(L('tuD30')) + '" data-tu-d30>' + tuBytesPair(d30) + '</td>' +
         '<td><div class="mtb-acts-row">' +
         '<div class="mtb-acts-pop">' +
         '<button type="button" class="mtb-act mtb-act-view" data-tuview="' + esc(r.topoId) + '" data-tuname="' + esc(r.topo) + '" title="' + esc(L('tuOpenTopo')) + '">' + MTB_ICO.eye + '</button>' +
@@ -861,8 +863,8 @@
       '<th><span class="mtb-th">' + MTB_ICO.cube + esc(L('engineCol')) + '</span></th>' +
       '<th class="num"><span class="mtb-th">' + TU_WTH + esc(L('weightCol')) + '</span></th>' +
       '<th><span class="mtb-th">' + TU_STTH + esc(L('stateCol')) + '</span></th>' +
-      '<th class="num"><span class="mtb-th">' + MTB_ICO.dl + esc(L('d7')) + ' \u2193/\u2191</span></th>' +
-      '<th class="num"><span class="mtb-th">' + TU_CHTH + esc(L('d30')) + ' \u2193/\u2191</span></th>' +
+      '<th class="num"><span class="mtb-th">' + MTB_ICO.dl + esc(L('tuD7')) + ' \u2193/\u2191</span></th>' +
+      '<th class="num"><span class="mtb-th">' + TU_CHTH + esc(L('tuD30')) + ' \u2193/\u2191</span></th>' +
       '<th><span class="mtb-th">' + MTB_ICO.sliders + esc(L('agActs')) + '</span></th>' +
       '</tr></thead><tbody>' +
       (filtered.length ? trs : '<tr><td colspan="9">' + entEmpty(rows.length ? L('tuNoMatch') : L('tunnelsEmpty')) + '</td></tr>') +
