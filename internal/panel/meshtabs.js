@@ -924,8 +924,9 @@
         : esc(L('tuNoShare'));
       var wt = r.weight != null ? num0(r.weight) : '\u2014';
       return '<tr data-tu-row="' + esc(r.key) + '">' +
-        '<td data-l="' + esc(L('tunnelKey')) + '"><b class="mono mtb-tun-key tu-open" dir="ltr" data-tuopen="' + esc(r.key) + '" title="' + esc(r.key) + '">' + esc(r.key) + '</b>' +
-        '<button type="button" class="mtb-keycopy" data-copyval="' + esc(r.key) + '" title="' + esc(L('copy')) + '" aria-label="' + esc(L('copy')) + '">' + TU_COPY + '</button></td>' +
+        // the copy button went away on request — the key still opens the
+        // tunnel's page on click and keeps its hover tooltip
+        '<td data-l="' + esc(L('tunnelKey')) + '"><b class="mono mtb-tun-key tu-open" dir="ltr" data-tuopen="' + esc(r.key) + '" title="' + esc(r.key) + '">' + esc(r.key) + '</b></td>' +
         '<td data-l="' + esc(L('topologyCol')) + '"><button type="button" class="mtb-topobadge" data-tutopo="' + esc(r.topoId) + '" data-tuname="' + esc(r.topo) + '" title="' + esc(L('tuOpenTopo')) + '">' + MTB_ICO.mesh + esc(r.topo) + '</button></td>' +
         '<td data-l="' + esc(L('tuPath')) + '"><div class="mtb-tupath">' + tuSideChip(r.local) + '<span class="mtb-tuarrow">' + MTB_ICO.tun + '</span>' + tuSideChip(r.remote) + '</div></td>' +
         '<td data-l="' + esc(L('engineCol')) + '"><div class="mtb-engpair">' + engBadge + '</div></td>' +
