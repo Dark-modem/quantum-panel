@@ -1866,8 +1866,8 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
     radial-gradient(circle at 88% 90%, color-mix(in srgb, var(--ac) 6%, transparent) 0%, transparent 50%),
     var(--s2);
   padding:14px 16px; }
-.eng-headcard::after { content:""; position:absolute; width:130px; height:130px; border-radius:50%;
-  top:-46px; inset-inline-start:-46px; pointer-events:none;
+.eng-headcard::after { content:""; position:absolute; width:96px; height:96px; border-radius:50%;
+  top:-34px; inset-inline-start:-34px; pointer-events:none;
   background:radial-gradient(circle at 35% 35%, color-mix(in srgb, var(--ac) 26%, transparent) 0%, color-mix(in srgb, var(--ac) 9%, transparent) 72%); }
 .eng-headcard > * { position:relative; z-index:1; }
 .eng-gridcard { margin-top:12px; padding:14px; }
