@@ -762,11 +762,12 @@
     });
     topoOpts.sort(); agentOpts.sort(); engOpts.sort();
 
+    // one row: title — stats — button, all on the same level (like the agents head)
     var head = '<div class="tunnel-card mtb-tunhead"><div class="mtb-agintro-row">' +
       '<div class="mtb-tunhead-id"><p class="tc-title dcard-title">' + MTB_ICO.tun + esc(L('mtun')) + '</p></div>' +
-      '<span class="mtb-agdiv"></span>' +
+      tuStats(filtered) +
       '<button type="button" class="quantum-btn quantum-btn-primary" id="mtbNewTunnel">+ ' + esc(L('tuNew')).replace('+ ', '') + '</button>' +
-      '</div>' + tuStats(filtered) + '</div>';
+      '</div></div>';
 
     var tcbar = '<div class="tc-header mtb-tcbar">' +
       '<div class="mtb-search">' +
