@@ -497,7 +497,6 @@ const I18N = {
     nav_topology: "Topology",
     nav_cores: "Engines",
     eng_title: "Engines",
-    eng_sub: "Manage and deploy tunnel engines across your agents.",
     eng_search_ph: "Search engines by name...",
     eng_refresh: "Refresh",
     topo_tunnels_t: "Established tunnels",
@@ -12662,9 +12661,6 @@ function coresEngineCard(g) {
 function renderCores() {
   const list = $('engList');
   if (!list) return;
-  const meta = $('engMeta');
-  if (meta) meta.textContent = tr('', '{n} engines in catalog · {m} agents managed')
-    .replace('{n}', String((coresCache || []).length)).replace('{m}', String((window.__coresAgents || []).length));
   const chips = [
     ['all', tr('', 'All')],
     ['installed', tr('', 'Installed')],
