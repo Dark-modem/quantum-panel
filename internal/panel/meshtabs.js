@@ -199,6 +199,12 @@
     tuStIran: ['سرور ایران', 'Iran server'],
     tuStForeign: ['سرور خارج', 'Foreign server'],
     tuStKey: ['کلید و بازبینی', 'Key & review'],
+    tuWizHint1: ['یک توپولوژی انتخاب کنید', 'Pick a topology'],
+    tuWizHint2: ['سرور سمت ایران را انتخاب کنید', 'Pick the Iran-side server'],
+    tuWizHint3: ['سرور سمت خارج را انتخاب کنید', 'Pick the foreign-side server'],
+    tuWizHint4: ['هسته تانل را انتخاب کنید', 'Pick the tunnel engine'],
+    tuWizHint5: ['کلید را بنویسید و بازبینی کنید', 'Type the key and review'],
+    tuAutoOn: ['فعال — خودکار', 'Enabled — automatic'],
     tuPickNeed: ['اول انتخاب این مرحله را انجام دهید', 'Make the choice for this step first'],
     tuNoneSide: ['سروری در این سمت نیست', 'No server on this side'],
     tuAllTopos: ['همه توپولوژی‌ها', 'All topologies'],
@@ -542,8 +548,14 @@
     '.tu-range { min-width:110px; }',
     '.mtb-tun-key.tu-open { cursor:pointer; } .mtb-tun-key.tu-open:hover { color:var(--ac); text-decoration:underline; }',
     '@media (max-width: 760px) { .tu-ends-row { grid-template-columns:1fr; } .tu-ends-mid { justify-content:center; transform:rotate(90deg); } .tu-key { max-width:200px; } }',
-    '.mtb-modal-ov .mtb-modal:has(#tuWiz) { width:min(600px, 94vw); }',
-    '#tuWiz { flex-wrap:wrap; justify-content:center; row-gap:8px; }',
+    '.mtb-modal-ov .mtb-modal:has(.tu-cards) { width:min(600px, 94vw); }',
+    '.tu-wiz-ring-row { display:flex; align-items:center; gap:14px; margin:12px 0 16px; }',
+    '.tu-wiz-ring { width:52px; height:52px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; flex:none; background: conic-gradient(var(--ac, #38bdf8) var(--p, 0%), var(--ln, rgba(148,163,184,.3)) 0); position:relative; }',
+    '.tu-wiz-ring::before { content:""; position:absolute; inset:5px; border-radius:50%; background:var(--s1, #12161f); }',
+    '.tu-wiz-ring span { position:relative; font-weight:800; font-size:14px; }',
+    '.tu-wiz-ring-tx { display:flex; flex-direction:column; gap:2px; min-width:0; }',
+    '.tu-wiz-ring-tx b { font-size:15px; }',
+    '.tu-wiz-ring-tx .mtb-muted { font-size:12.5px; }',
     '.tu-cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:8px; }',
     '.tu-cards .mtb-agent-card { position:relative; text-align:start; padding:10px 12px; }',
     '.tu-enggrid { grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); }',
@@ -1244,7 +1256,7 @@
 
     var TU_PLUS = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
     var TU_CHECK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>';
-    var sel = { topo: null, iran: null, foreign: null, engine: 'matrix', key: '', enabled: true };
+    var sel = { topo: null, iran: null, foreign: null, engine: 'matrix', key: '' }; // created enabled, always
     var step = 1, TOTAL = 5;
     var stepLbl = [L('topoCol'), L('tuStIran'), L('tuStForeign'), L('engineCol'), L('tuStKey')];
 
@@ -1298,11 +1310,11 @@
         reviewRow(L('tuSideIran'), (iran && iran.name) || '\u2014') +
         reviewRow(L('tuSideForeign'), (foreign && foreign.name) || '\u2014') +
         reviewRow(L('engineCol'), TU_ENG_DISP[sel.engine] || sel.engine) +
+        reviewRow(L('enabled'), L('tuAutoOn')) +
         '</div>' +
         '<div class="mtb-field"><span class="mtb-field-ico">' + MTB_ICO.tun + '</span>' +
         '<input id="mtbTuKey" class="quantum-input" dir="ltr" placeholder="main" maxlength="128" aria-label="' + esc(L('tunnelKey')) + '">' +
-        '</div>' +
-        '<label class="mtb-check"><input type="checkbox" id="mtbTuEn" checked> ' + esc(L('enabled')) + '</label>';
+        '</div>';
     }
     function paintPages() {
       document.getElementById('tuWizPages').innerHTML = '<div class="mtb-wpage" data-pg="1">' + page(1) + '</div>' +
@@ -1310,14 +1322,6 @@
         '<div class="mtb-wpage" data-pg="3" hidden>' + page(3) + '</div>' +
         '<div class="mtb-wpage" data-pg="4" hidden>' + page(4) + '</div>' +
         '<div class="mtb-wpage" data-pg="5" hidden>' + page(5) + '</div>';
-    }
-    function stepDots() {
-      var h = '';
-      for (var i = 1; i <= TOTAL; i++) {
-        if (i > 1) h += '<span class="mtb-wline"></span>';
-        h += '<div class="mtb-wstep' + (i === step ? ' on' : '') + '" data-st="' + i + '"><span class="mtb-wstep-dot">' + i + '</span><span class="mtb-wstep-lbl">' + esc(stepLbl[i - 1]) + '</span></div>';
-      }
-      return h;
     }
     function valid() {
       if (step === 1) return sel.topo != null;
@@ -1327,8 +1331,14 @@
     }
     function sync() {
       paintPages(); // pages bake their cards from the current selections
-      var dots = document.getElementById('tuWiz');
-      if (dots) dots.innerHTML = stepDots();
+      var ring = document.getElementById('tuWizRing');
+      if (ring) ring.style.setProperty('--p', Math.round(step / TOTAL * 100) + '%');
+      var cnt = document.getElementById('tuWizCount');
+      if (cnt) cnt.textContent = step + '/' + TOTAL;
+      var cur = document.getElementById('tuWizCur');
+      if (cur) cur.textContent = stepLbl[step - 1];
+      var hint = document.getElementById('tuWizHint');
+      if (hint) hint.textContent = L('tuWizHint' + step);
       ov.querySelectorAll('.mtb-wpage').forEach(function (p2) {
         p2.hidden = parseInt(p2.getAttribute('data-pg'), 10) !== step;
       });
@@ -1341,7 +1351,9 @@
     var ov = tuModal(
       '<button type="button" class="mtb-x" data-mtb-close aria-label="' + esc(L('cancel')) + '">\u00d7</button>' +
       '<div class="tc-header"><div class="mtb-wiz-hero"><span class="mtb-wiz-plus">' + TU_PLUS + '</span><div class="mtb-wiz-hero-tx"><p class="tc-title">' + esc(L('tuNew')) + '</p><p class="qs-hint">' + esc(L('tuNewHint')) + '</p></div></div></div>' +
-      '<div class="mtb-wiz" id="tuWiz">' + stepDots() + '</div>' +
+      '<div class="tu-wiz-ring-row">' +
+      '<div class="tu-wiz-ring" id="tuWizRing"><span id="tuWizCount">1/' + TOTAL + '</span></div>' +
+      '<div class="tu-wiz-ring-tx"><b id="tuWizCur">' + esc(stepLbl[0]) + '</b><span class="mtb-muted" id="tuWizHint">' + esc(L('tuWizHint1')) + '</span></div></div>' +
       '<div class="mtb-form" id="tuWizPages"></div>' +
       '<div class="mtb-acts"><button type="button" class="quantum-btn quantum-btn-secondary" data-mtb-close>' + esc(L('cancel')) + '</button>' +
       '<button type="button" class="quantum-btn quantum-btn-secondary" id="tuWizBack" hidden>' + esc(L('agWizBack')) + '</button>' +
@@ -1378,14 +1390,13 @@
       // final page = review + create
       var key = (ov.querySelector('#mtbTuKey').value || '').trim();
       sel.key = key;
-      sel.enabled = ov.querySelector('#mtbTuEn').checked;
       if (!/^[a-z0-9-_.]{1,128}$/.test(key)) { mtbToast(L('tuKeyBad'), 'err'); return; }
       if (!sel.topo || !sel.iran || !sel.foreign) { mtbToast(L('pickBoth'), 'err'); return; }
       var btn = this; btn.disabled = true;
       // the mesh create route is flat: POST /api/mesh/tunnels with topology_id in the body
       apiSend('POST', 'api/mesh/tunnels', {
         topology_id: Number(sel.topo), local_server_id: Number(sel.iran), remote_server_id: Number(sel.foreign),
-        tunnel_key: key, engine: sel.engine, enabled: sel.enabled
+        tunnel_key: key, engine: sel.engine, enabled: true
       }).then(function () {
         ov.remove(); mtbToast(L('created'));
         loadTun();
