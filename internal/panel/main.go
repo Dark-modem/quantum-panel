@@ -902,6 +902,12 @@ func buildPanelMux(base string) *http.ServeMux {
 	mux.HandleFunc("POST "+base+"/api/agent-tunnels/{id}/power", requireAuth(requireLegacy(requireCSRF(handleAgentTunnelPower))))
 	mux.HandleFunc("POST "+base+"/api/agent-tunnels/{id}/restart", requireAuth(requireLegacy(requireCSRF(handleAgentTunnelRestart))))
 	mux.HandleFunc("DELETE "+base+"/api/agent-tunnels/{id}", requireAuth(requireLegacy(requireCSRF(handleAgentTunnelDelete))))
+	// BACKEND-34 (contract §2.20): GitHub-centric agent-update discovery —
+	// what GitHub has, per-agent outdatedness, and the light group queue;
+	// the update itself still rides the M2 verify-then-hand-off path.
+	mux.HandleFunc("GET "+base+"/api/update/available", requireAuth(handleUpdateAvailable))
+	mux.HandleFunc("GET "+base+"/api/agents/updates", requireAuth(handleAgentUpdates))
+	mux.HandleFunc("POST "+base+"/api/agents/update-outdated", requireAuth(requireCSRF(handleAgentUpdateOutdatedPost)))
 
 	// Mesh management plane (Phase 2B): the SQLite store is the authority
 	// for the new model; legacy JSON features above stay frozen and never

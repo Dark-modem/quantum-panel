@@ -74,7 +74,7 @@ import (
 // token-authed legacy surface), 1 notfound catch-all (/_hp/), 2 meshHandler
 // (/_hc hello/beat). Contract docs: 00-ADMIN/UI-API-CONTRACT.md (§2.x /api/ui
 // surface) and the registerer file headers for the legacy/mesh/peer families.
-const expectedRouteRegistrationSites = 359
+const expectedRouteRegistrationSites = 362
 
 // unroutedHandlerExceptions lists handler-shaped package functions that are
 // intentionally NOT mux-registered, each with the reason. Everything else
@@ -127,6 +127,7 @@ var goldenRouteManifest = []routeRow{
 	{"GET {base}/api/agent/ws", "bare"},
 	{"GET {base}/api/agents", "requireAuth"},
 	{"GET {base}/api/agents/tokens", "requireAuth"},
+	{"GET {base}/api/agents/updates", "requireAuth"},
 	{"GET {base}/api/agents/{id}", "requireAuth"},
 	{"GET {base}/api/alerts", "requireAuth"},
 	{"GET {base}/api/audit", "requireAuth"},
@@ -236,6 +237,7 @@ var goldenRouteManifest = []routeRow{
 	{"GET {base}/api/ui/traffic-series", "requireAuth"},
 	{"GET {base}/api/ui/tunnels/{key}", "requireAuth"},
 	{"GET {base}/api/ui/tunnels/{key}/dependencies", "requireAuth"},
+	{"GET {base}/api/update/available", "requireAuth"},
 	{"GET {base}/api/update/channel", "requireAuth"},
 	{"GET {base}/api/update/github-token", "requireAuth"},
 	{"GET {base}/api/update/peer", "requireAuth"},
@@ -327,6 +329,7 @@ var goldenRouteManifest = []routeRow{
 	{"POST {base}/api/agent/enroll", "limitUnauth"},
 	{"POST {base}/api/agents/tokens", "requireAuth>requireCSRF"},
 	{"POST {base}/api/agents/tokens/{id}/revoke", "requireAuth>requireCSRF"},
+	{"POST {base}/api/agents/update-outdated", "requireAuth>requireCSRF"},
 	{"POST {base}/api/agents/{id}/command", "requireAuth>requireCSRF"},
 	{"POST {base}/api/agents/{id}/desired", "requireAuth>requireCSRF"},
 	{"POST {base}/api/agents/{id}/op", "requireAuth>requireCSRF"},
