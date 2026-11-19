@@ -3052,7 +3052,7 @@ window.FA_TEXT = {
  "Local bridge removed.": "پل محلی حذف شد.",
  "Local service connected to Matrix. Xray configuration unchanged.": "سرویس محلی به ماتریکس متصل شد. کانفیگ Xray تغییر نکرد.",
  "Topology": "توپولوژی",
- "Engines": "موتورها",
+ "Cores": "هسته‌ها",
  "Search engines by name...": "جست‌وجوی نام موتور...",
  "Recommended": "پیشنهادی",
  "Default": "پیش‌فرض",

@@ -495,8 +495,8 @@ const I18N = {
     topology_view_list: "List view",
     topology_view_grid: "Grid view",
     nav_topology: "Topology",
-    nav_cores: "Engines",
-    eng_title: "Engines",
+    nav_cores: "Cores",
+    eng_title: "Cores",
     eng_search_ph: "Search engines by name...",
     eng_refresh: "Refresh",
     topo_tunnels_t: "Established tunnels",
@@ -12751,8 +12751,8 @@ async function coresPickInstall() {
   const results = await Promise.allSettled(ids.map(id =>
     api('/api/ui/agents/' + encodeURIComponent(id) + '/engines/' + encodeURIComponent(coresPick.engine) + '/enable', {}, 'POST')));
   const bad = results.filter(r => r.status === 'rejected');
-  if (bad.length) toastErr(tr('', 'Engines'), bad.map(r => (r.reason && r.reason.message) || 'HTTP ' + (r.reason && r.reason.status)).join(' · '));
-  else toastOk(tr('', 'Engines'), tr('', 'Install requested on {n} agent(s)').replace('{n}', String(ids.length)));
+  if (bad.length) toastErr(tr('', 'Cores'), bad.map(r => (r.reason && r.reason.message) || 'HTTP ' + (r.reason && r.reason.status)).join(' · '));
+  else toastOk(tr('', 'Cores'), tr('', 'Install requested on {n} agent(s)').replace('{n}', String(ids.length)));
   go.disabled = false;
   ov.hidden = true;
   loadCores(true);
@@ -12766,8 +12766,8 @@ async function coresUpdateAll(engine) {
   const results = await Promise.allSettled(stale.map(id =>
     api('/api/ui/agents/' + encodeURIComponent(id) + '/engines/' + encodeURIComponent(engine) + '/enable', {}, 'POST')));
   const bad = results.filter(r => r.status === 'rejected');
-  if (bad.length) toastErr(tr('', 'Engines'), bad.map(r => (r.reason && r.reason.message) || 'HTTP ' + (r.reason && r.reason.status)).join(' · '));
-  else toastOk(tr('', 'Engines'), tr('', 'Update requested on {n} agent(s)').replace('{n}', String(stale.length)));
+  if (bad.length) toastErr(tr('', 'Cores'), bad.map(r => (r.reason && r.reason.message) || 'HTTP ' + (r.reason && r.reason.status)).join(' · '));
+  else toastOk(tr('', 'Cores'), tr('', 'Update requested on {n} agent(s)').replace('{n}', String(stale.length)));
   loadCores(true);
 }
 (function coresWire() {
