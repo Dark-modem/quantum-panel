@@ -476,6 +476,11 @@
     '.mtb-pending { opacity: .55; }',
     '.mtb-month { max-width: 130px; }',
     '@media (max-width: 640px) { .mtb-key { max-width: 150px; } }',
+    // the head card wears the same blue dress as the Cores head card:
+    // a blue-tinted wash plus the corner bubble
+    '.mtb-tunhead { position:relative; overflow:hidden; border-radius:14px; background: radial-gradient(circle at 16% 20%, color-mix(in srgb, var(--ac) 9%, transparent) 0%, transparent 55%), radial-gradient(circle at 88% 90%, color-mix(in srgb, var(--ac) 6%, transparent) 0%, transparent 50%), var(--s2); }',
+    '.mtb-tunhead::after { content:""; position:absolute; width:96px; height:96px; border-radius:50%; top:-34px; inset-inline-start:-34px; pointer-events:none; background:radial-gradient(circle at 35% 35%, color-mix(in srgb, var(--ac) 26%, transparent) 0%, color-mix(in srgb, var(--ac) 9%, transparent) 72%); }',
+    '.mtb-tunhead > * { position:relative; z-index:1; }',
     '.mtb-tunhead .mtb-agintro-row { flex-direction:row; }',
     '.mtb-tunhead-id { display:flex; align-items:center; gap:10px; }',
     '.mtb-keycopy { display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; margin-inline-start:6px; border:1px solid var(--ln, rgba(148,163,184,.25)); border-radius:6px; background:transparent; color:var(--mu, #94a3b8); cursor:pointer; vertical-align:middle; transition:color .15s, border-color .15s; }',
