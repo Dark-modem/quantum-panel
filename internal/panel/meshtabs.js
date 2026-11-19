@@ -799,8 +799,10 @@
     var trs = pageRows.map(function (r) {
       var d7 = (topoTraffic[r.key] || {}).d7, d30 = (topoTraffic[r.key] || {}).d30;
       var engN = TU_ENG_DISP[r.engine] || r.engine || '\u2014';
+      // the experimental chip is gone (noise on every row); only the default
+      // mark on matrix stays, since that one carries real information
       var engBadge = '<span class="badge info mtb-eng-badge">' + tuEngLogo(r.engine, engN) + ' ' + esc(engN) + '</span>' +
-        '<span class="badge ' + (r.engine === 'matrix' ? 'ok' : 'dim') + ' mtb-eng-def">' + esc(r.engine === 'matrix' ? L('engineDef') : L('tuExp')) + '</span>';
+        (r.engine === 'matrix' ? '<span class="badge ok mtb-eng-def">' + esc(L('engineDef')) + '</span>' : '');
       var wTitle = (r.resolved != null && r.resolved > 0)
         ? esc(Lf('tuShare', { n: String(Math.round(r.resolved * 10) / 10) }))
         : esc(L('tuNoShare'));
