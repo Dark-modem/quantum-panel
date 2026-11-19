@@ -34,9 +34,10 @@ var uiArtifactEngines = map[string]bool{
 // uiKnownEngines is the full panel-known engine set. The agent engines
 // grid shows every one of them with its per-agent state — an engine the
 // agent never reported renders as «not installed» so the operator sees
-// what CAN be installed (install-first lifecycle).
+// what CAN be installed (install-first lifecycle). bagher is the panel's
+// own SSH-pool carrier (the Bagher topology type's engine).
 var uiKnownEngines = []string{
-	"aestun", "rakhsh", "backpack", "backhaul", "chisel", "dagger", "easytier", "frp", "gost",
+	"aestun", "rakhsh", "backpack", "backhaul", "bagher", "chisel", "dagger", "easytier", "frp", "gost",
 	"hysteria", "matrix", "midos", "narnia", "paqet", "pengo", "rathole",
 	"singbox", "spoof", "tinc", "udp2raw", "waterwall", "wattunnel",
 	"wireguard", "wst", "xray",
