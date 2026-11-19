@@ -32,8 +32,11 @@ func agentStatePath() string {
 // agentUpdateMaxArtifact caps agent update artifact size (64 MB).
 const agentUpdateMaxArtifact = 64 << 20
 
-// agentUpdateVersionRe matches valid version markers (e.g. v1.29.0).
-var agentUpdateVersionRe = regexp.MustCompile(`^v[0-9][0-9A-Za-z._-]{0,63}$`)
+// agentUpdateVersionRe matches valid version markers: semver (v1.29.0)
+// and the dev-rN prerelease tags (BACKEND-34 — the GitHub-discovered
+// prerelease flow targets them; the gate stays a strict allow-list, the
+// same tag families the panel update accepts).
+var agentUpdateVersionRe = regexp.MustCompile(`^(v[0-9][0-9A-Za-z._-]{0,63}|dev-r[0-9]{1,6})$`)
 
 // agentUpdateSHARe matches a lowercase-or-uppercase sha256 hex digest.
 var agentUpdateSHARe = regexp.MustCompile(`^[0-9a-f]{64}$`)

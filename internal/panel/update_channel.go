@@ -112,13 +112,24 @@ func handleUpdateChannelPost(w http.ResponseWriter, r *http.Request) {
 }
 
 // ghRelease is the subset of the GitHub release object the updater needs.
+// Assets (BACKEND-34) carries the agent-update discovery's per-release
+// artifact list (agent artifacts look like quantum-agent-linux-<arch>
+// with a detached .sig next to each).
 type ghRelease struct {
-	Tag         string `json:"tag_name"`
-	Name        string `json:"name"`
-	Draft       bool   `json:"draft"`
-	Prerelease  bool   `json:"prerelease"`
-	PublishedAt string `json:"published_at"`
-	Body        string `json:"body"`
+	Tag         string    `json:"tag_name"`
+	Name        string    `json:"name"`
+	Draft       bool      `json:"draft"`
+	Prerelease  bool      `json:"prerelease"`
+	PublishedAt string    `json:"published_at"`
+	Body        string    `json:"body"`
+	Assets      []ghAsset `json:"assets,omitempty"`
+}
+
+// ghAsset is the subset of a GitHub release asset the discovery surfaces.
+type ghAsset struct {
+	Name               string `json:"name"`
+	Size               int64  `json:"size"`
+	BrowserDownloadURL string `json:"browser_download_url"`
 }
 
 // releasesFetcher / latestTagFetcher are swapped in tests.
