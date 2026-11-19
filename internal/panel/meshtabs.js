@@ -478,7 +478,6 @@
     '.mtb-tuside-tx .mtb-muted { font-size:11px; }',
     '.mtb-tuarrow { color:var(--mu, #94a3b8); display:inline-flex; } .mtb-tuarrow svg { width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:1.8; }',
     '.mtb-engpair { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }',
-    '.mtb-eng-def { font-size:11px; }',
     '.mtb-wtx { cursor:help; border-bottom:1px dotted var(--ln, rgba(148,163,184,.4)); padding-bottom:1px; }',
     '.mtb-agstat-i.warn .mtb-agico { background:color-mix(in srgb, var(--warn, #f59e0b) 14%, transparent); color:var(--warn, #f59e0b); }',
     '.mtb-tunhead .mtb-agstatbig { flex:1; justify-content:space-around; flex-wrap:wrap; gap:10px 18px; }',
@@ -879,10 +878,9 @@
     var trs = pageRows.map(function (r) {
       var d7 = (topoTraffic[r.key] || {}).d7, d30 = (topoTraffic[r.key] || {}).d30;
       var engN = TU_ENG_DISP[r.engine] || r.engine || '\u2014';
-      // the experimental chip is gone (noise on every row); only the default
-      // mark on matrix stays, since that one carries real information
-      var engBadge = '<span class="badge info mtb-eng-badge">' + tuEngLogo(r.engine, engN) + ' ' + esc(engN) + '</span>' +
-        (r.engine === 'matrix' ? '<span class="badge ok mtb-eng-def">' + esc(L('engineDef')) + '</span>' : '');
+      // the cell is logo + name only — the companion chips (experimental,
+      // then default) both went away on request
+      var engBadge = '<span class="badge info mtb-eng-badge">' + tuEngLogo(r.engine, engN) + ' ' + esc(engN) + '</span>';
       var wTitle = (r.resolved != null && r.resolved > 0)
         ? esc(Lf('tuShare', { n: String(Math.round(r.resolved * 10) / 10) }))
         : esc(L('tuNoShare'));
