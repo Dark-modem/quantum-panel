@@ -12562,7 +12562,6 @@ async function loadCores(force) {
   if (!force && coresCache && !coresError) { renderCores(); return; }
   coresLoading = true;
   coresError = null;
-  const rf = $('engRefresh'); if (rf) rf.disabled = true;
   renderCores();
   try {
     const d = await api('/api/ui/engines');
@@ -12611,7 +12610,6 @@ async function loadCores(force) {
     renderCores();
   } finally {
     coresLoading = false;
-    if (rf) rf.disabled = false;
   }
 }
 function a_name(ag) { return ag.name || ''; }
@@ -12780,7 +12778,6 @@ async function coresUpdateAll(engine) {
   const tab = $('tab-cores');
   if (!tab) return;
   tab.addEventListener('click', e => {
-    if (e.target.closest('[data-cores-refresh]')) { loadCores(true); return; }
     const f = e.target.closest('[data-cores-filter]');
     if (f) { coresFilter = f.getAttribute('data-cores-filter') || 'all'; renderCores(); return; }
     const p = e.target.closest('[data-cores-pick]');
