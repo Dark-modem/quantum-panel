@@ -289,6 +289,12 @@ function topTitleSync(id) {
       return;
     }
   }
+  if (nid === 'mtun' && window.mtbTunDetail) {
+    h1.innerHTML = '<span class="mtb-bc"><a href="#t=mtun" data-tuback class="mtb-bc-link"></a><span class="mtb-bc-sep"> \u2039 </span><span class="mtb-bc-cur"></span></span>';
+    h1.querySelector('.mtb-bc-link').textContent = lbl ? lbl.textContent : 'Tunnels';
+    h1.querySelector('.mtb-bc-cur').textContent = window.mtbTunDetail;
+    return;
+  }
   if (nid === 'magt' && window.mtbAgtDetail) {
     h1.innerHTML = '<span class="mtb-bc"><a href="#t=magt" data-bc-back class="mtb-bc-link"></a><span class="mtb-bc-sep"> \u2039 </span><span class="mtb-bc-cur"></span></span>';
     h1.querySelector('.mtb-bc-link').textContent = lbl ? lbl.textContent : 'Agents';

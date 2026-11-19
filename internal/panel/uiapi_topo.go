@@ -338,13 +338,33 @@ func handleUITunnelDetail(w http.ResponseWriter, r *http.Request) {
 		eventRows = append(eventRows, row)
 	}
 
+	// The detail page's endpoint cards need the same real-relation stamps the
+	// topology rows carry: the agent country (flag) and agent id (deep link).
+	// The header strip also reports the tunnel's weight and resolved share.
+	stampRef := func(serverID int64) map[string]any {
+		ref, _ := h.uiServerRef(serverID).(map[string]any)
+		if ref == nil {
+			return nil
+		}
+		if ag, aerr := h.AgentByServer(serverID); aerr == nil {
+			ref["agent_id"] = ag.ID
+			ref["country"] = ag.Country
+		}
+		return ref
+	}
+	tw, _ := h.WeightFor(topo.ID, t.LocalServerID, t.RemoteServerID, t.ID)
+	resolved := any(nil)
+	if p := h.uiResolvedPercents(topo.ID, mustListTunnels(h.Store, topo.ID), verdicts)[t.ID]; p > 0 {
+		resolved = p
+	}
 	writeJSON(w, map[string]any{
 		"tunnel": map[string]any{
 			"id": t.ID, "tunnel_key": t.TunnelKey,
 			"topology":      map[string]any{"id": topo.ID, "name": topo.Name},
-			"local_server":  h.uiServerRef(t.LocalServerID),
-			"remote_server": h.uiServerRef(t.RemoteServerID),
+			"local_server":  stampRef(t.LocalServerID),
+			"remote_server": stampRef(t.RemoteServerID),
 			"engine":        t.Engine, "enabled": t.Enabled, "created_at": t.CreatedAt,
+			"weight": tw, "resolved_percent": resolved,
 		},
 		"now": map[string]any{
 			"state": state, "cpu_percent": cpu, "rss_bytes": rss,

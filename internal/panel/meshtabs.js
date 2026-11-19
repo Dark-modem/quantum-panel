@@ -174,6 +174,23 @@
     tuPath: ['مسیر', 'Path'],
     tuD7: ['ترافیک ۷\u00a0روزه', '7d\u00a0traffic'],
     tuD30: ['ترافیک ۳۰\u00a0روزه', '30d\u00a0traffic'],
+    tuOpen: ['مشاهده تانل', 'View tunnel'],
+    tuBackList: ['بازگشت به تانل‌ها', 'Back to tunnels'],
+    tuEndsT: ['دو سر تانل', 'Tunnel endpoints'],
+    tuSideIran: ['سمت ایران', 'Iran side'],
+    tuSideForeign: ['سمت خارج', 'Foreign side'],
+    tuTrafficT: ['ترافیک', 'Traffic'],
+    tuRateNow: ['نرخ فعلی', 'Current rate'],
+    tuShareT: ['سهم از توپولوژی', 'Topology share'],
+    tuLoss: ['اتلاف بسته', 'Packet loss'],
+    tuUptime: ['آپ‌تایم', 'Uptime'],
+    tuRange24: ['۲۴ ساعت', '24h'],
+    tuDown: ['دانلود', 'download'],
+    tuUp: ['آپلود', 'upload'],
+    tuNoSeries: ['برای این بازه داده‌ای نیست', 'No data for this range'],
+    tuEventsT: ['رویددها', 'Events'],
+    tuNoEvents: ['رویددی ثبت نشده است', 'No events recorded'],
+    tuEvFrom: ['از', 'from'],
     tuAllTopos: ['همه توپولوژی‌ها', 'All topologies'],
     tuAllAgents: ['همه ایجنت‌ها', 'All agents'],
     tuAllEngines: ['همه هسته‌ها', 'All engines'],
@@ -484,6 +501,38 @@
     '.mtb-tun-tbl td.num, .mtb-tun-tbl th.num { text-align:center; }',
     '[dir="rtl"] .mtb-tun-tbl td.num { text-align:center; }',
     '@media (max-width: 760px) { .mtb-tun-tbl thead { display:none; } .mtb-tun-tbl tr { display:block; border:1px solid var(--ln, rgba(148,163,184,.22)); border-radius:12px; padding:10px 12px; margin:0 0 10px; } .mtb-tun-tbl td { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:5px 0; border:none; } .mtb-tun-tbl td::before { content:attr(data-l); color:var(--mu, #94a3b8); font-size:12px; flex:none; } .mtb-tun-tbl td[colspan] { justify-content:center; } .mtb-tun-tbl td[colspan]::before { content:none; } }',
+    '.tu-backrow { display:flex; }',
+    '.tu-head-row { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }',
+    '.tu-id { display:flex; align-items:center; gap:8px; flex-wrap:wrap; min-width:0; }',
+    '.tu-key { font-size:14px; font-weight:700; max-width:340px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }',
+    '.tu-head-num { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }',
+    '.tu-wt { display:flex; flex-direction:column; align-items:center; line-height:1.3; } .tu-wt b { font-size:15px; }',
+    '.tu-head-acts { display:flex; gap:6px; }',
+    '.tu-vitals { display:flex; flex-wrap:wrap; gap:8px 22px; margin-top:12px; padding-top:10px; border-top:1px solid var(--ln, rgba(148,163,184,.2)); }',
+    '.tu-vital { display:flex; flex-direction:column; } .tu-vital b { font-size:13px; }',
+    '.tu-err { display:flex; align-items:center; gap:7px; width:100%; color:var(--er, #f87171); font-size:12.5px; margin-top:4px; } .tu-err svg { width:15px; height:15px; flex:none; fill:none; stroke:currentColor; stroke-width:1.8; }',
+    '.tu-ends-row { display:grid; grid-template-columns:1fr auto 1fr; gap:12px; align-items:stretch; margin-top:10px; }',
+    '.tu-side { display:flex; flex-direction:column; gap:4px; padding:12px 14px; border:1px solid var(--ln, rgba(148,163,184,.22)); border-radius:12px; background:var(--sunk, rgba(148,163,184,.05)); align-items:flex-start; }',
+    '.tu-side-role { display:flex; align-items:center; gap:7px; margin:0; font-size:12px; color:var(--mu, #94a3b8); text-transform:uppercase; letter-spacing:.05em; } .tu-side-role svg { border-radius:2px; }',
+    '.tu-side-name { font-size:15px; font-weight:700; }',
+    '.tu-side-ag { margin-top:4px; }',
+    '.tu-ends-mid { display:flex; align-items:center; color:var(--mu, #94a3b8); } .tu-ends-mid svg { width:26px; height:26px; fill:none; stroke:currentColor; stroke-width:1.6; } body.is-rtl .tu-ends-mid svg { transform:scaleX(-1); }',
+    '.tu-tots { display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; margin-top:12px; }',
+    '.tu-tot { display:flex; flex-direction:column; gap:2px; padding:9px 12px; border:1px solid var(--ln, rgba(148,163,184,.22)); border-radius:10px; font-family:ui-monospace, Menlo, monospace; font-size:13px; }',
+    '.tu-bars { display:flex; align-items:flex-end; gap:3px; height:120px; margin-top:16px; padding:10px; border:1px solid var(--ln, rgba(148,163,184,.22)); border-radius:12px; }',
+    '.tu-bar { flex:1; display:flex; align-items:flex-end; justify-content:center; gap:2px; height:100%; min-width:3px; }',
+    '.tu-bar i { display:block; width:42%; border-radius:2px 2px 0 0; }',
+    '.tu-bar i.rx { background:color-mix(in srgb, var(--ac, #38bdf8) 75%, transparent); }',
+    '.tu-bar i.tx { background:color-mix(in srgb, var(--ok, #34d399) 75%, transparent); }',
+    '.tu-bars-leg { display:flex; gap:16px; margin-top:6px; font-size:12px; color:var(--mu, #94a3b8); }',
+    '.tu-bars-leg i { display:inline-block; width:10px; height:10px; border-radius:3px; margin-inline-end:5px; }',
+    '.tu-bars-leg i.rx { background:var(--ac, #38bdf8); } .tu-bars-leg i.tx { background:var(--ok, #34d399); }',
+    '.tu-ev { display:flex; align-items:center; gap:10px; padding:7px 0; border-bottom:1px solid var(--ln, rgba(148,163,184,.15)); flex-wrap:wrap; } .tu-ev:last-child { border-bottom:0; }',
+    '.tu-ev-tx { font-size:12.5px; color:var(--tx2, #cbd5e1); }',
+    '.tu-ev-at { margin-inline-start:auto; font-size:12px; }',
+    '.tu-range { min-width:110px; }',
+    '.mtb-tun-key.tu-open { cursor:pointer; } .mtb-tun-key.tu-open:hover { color:var(--ac); text-decoration:underline; }',
+    '@media (max-width: 760px) { .tu-ends-row { grid-template-columns:1fr; } .tu-ends-mid { justify-content:center; transform:rotate(90deg); } .tu-key { max-width:200px; } }',
     '@media (prefers-reduced-motion: reduce) { main.page section[id^="tab-m"] * { animation: none !important; transition: none !important; } }'
   ].join('\n');
 
@@ -573,7 +622,10 @@
     markNav(name);
     try {
       var agm = (location.hash || '').match(/[?&]ag=([^&]+)/);
-      history.replaceState(null, '', '#t=' + name + (name === 'magt' && agm ? '&ag=' + agm[1] : ''));
+      var tum = (location.hash || '').match(/[?&]tun=([^&]+)/);
+      history.replaceState(null, '', '#t=' + name +
+        (name === 'magt' && agm ? '&ag=' + agm[1] : '') +
+        (name === 'mtun' && tum ? '&tun=' + tum[1] : ''));
     } catch (e) { /* best effort */ }
     loadTab(name); // lazy-load on first open, refresh on re-open
     if (window.topTitleSync) window.topTitleSync(name);
@@ -621,6 +673,7 @@
   // ===========================================================================
   var tuQuery = '', tuFilters = { topo: '', agent: '', engine: '', state: '' };
   var tuPage = 1, tuPerPage = 10;
+  var tuView = null; // null = the list; { key } = the tunnel's own page
 
   function loadTun() {
     var my = (seq.mtun = seq.mtun + 1);
@@ -759,7 +812,19 @@
 
   function renderTun(my) {
     if (my == null) my = seq.mtun;
+    // a deep link (#t=mtun&tun=KEY) or an in-session open selects the detail page
+    var tunHash = (location.hash || '').match(/[?&]tun=([^&]+)/);
+    if (tunHash) {
+      var hk = decodeURIComponent(tunHash[1]);
+      if (!tuView || tuView.key !== hk) tuView = { key: hk };
+    }
+    if (!tuView) window.mtbTunDetail = null;
     if (window.topTitleSync) window.topTitleSync('mtun');
+    if (tuView) {
+      try { if (location.hash !== '#t=mtun&tun=' + encodeURIComponent(tuView.key)) history.replaceState(null, '', '#t=mtun&tun=' + encodeURIComponent(tuView.key)); } catch (e) { /* non-fatal */ }
+      renderTuDetail();
+      return;
+    }
     try { if (location.hash !== '#t=mtun') history.replaceState(null, '', '#t=mtun'); } catch (e) { /* non-fatal */ }
     var rows = tuAllRows();
     var filtered = tuFiltered(rows);
@@ -823,7 +888,7 @@
         : esc(L('tuNoShare'));
       var wt = r.weight != null ? num0(r.weight) : '\u2014';
       return '<tr data-tu-row="' + esc(r.key) + '">' +
-        '<td data-l="' + esc(L('tunnelKey')) + '"><b class="mono mtb-tun-key" dir="ltr" title="' + esc(r.key) + '">' + esc(r.key) + '</b>' +
+        '<td data-l="' + esc(L('tunnelKey')) + '"><b class="mono mtb-tun-key tu-open" dir="ltr" data-tuopen="' + esc(r.key) + '" title="' + esc(r.key) + '">' + esc(r.key) + '</b>' +
         '<button type="button" class="mtb-keycopy" data-copyval="' + esc(r.key) + '" title="' + esc(L('copy')) + '" aria-label="' + esc(L('copy')) + '">' + TU_COPY + '</button></td>' +
         '<td data-l="' + esc(L('topologyCol')) + '"><button type="button" class="mtb-topobadge" data-tutopo="' + esc(r.topoId) + '" data-tuname="' + esc(r.topo) + '" title="' + esc(L('tuOpenTopo')) + '">' + MTB_ICO.mesh + esc(r.topo) + '</button></td>' +
         '<td data-l="' + esc(L('tuPath')) + '"><div class="mtb-tupath">' + tuSideChip(r.local) + '<span class="mtb-tuarrow">' + MTB_ICO.tun + '</span>' + tuSideChip(r.remote) + '</div></td>' +
@@ -834,7 +899,7 @@
         '<td class="num' + (d30 ? '' : ' mtb-pending') + '" data-l="' + esc(L('tuD30')) + '" data-tu-d30>' + tuBytesPair(d30) + '</td>' +
         '<td><div class="mtb-acts-row">' +
         '<div class="mtb-acts-pop">' +
-        '<button type="button" class="mtb-act mtb-act-view" data-tuview="' + esc(r.topoId) + '" data-tuname="' + esc(r.topo) + '" title="' + esc(L('tuOpenTopo')) + '">' + MTB_ICO.eye + '</button>' +
+        '<button type="button" class="mtb-act mtb-act-view" data-tuopen="' + esc(r.key) + '" title="' + esc(L('tuOpen')) + '">' + MTB_ICO.eye + '</button>' +
         '<button type="button" class="mtb-act mtb-act-edit" data-tuweight="' + esc(r.topoId) + '|' + esc(r.key) + '" title="' + esc(L('tuWeightT')) + '">' + MTB_ICO.pen + '</button>' +
         '<button type="button" class="mtb-act mtb-act-del" data-tudel="' + esc(r.id) + '|' + esc(r.key) + '" title="' + esc(L('agActDel')) + '">' + MTB_ICO.trash + '</button>' +
         '</div>' +
@@ -918,6 +983,172 @@
         if (c30) { c30.classList.remove('mtb-pending'); c30.innerHTML = tuBytesPair(t30, true); }
       });
     });
+  }
+
+  // ===========================================================================
+  // 1b) A tunnel's own page — the dedicated drill-down for one tunnel:
+  //     header strip, endpoints, live vitals, traffic with a bar chart,
+  //     recent events, and the danger zone. Deep link: #t=mtun&tun=KEY
+  // ===========================================================================
+  var tuRange = '24h';
+
+  function renderTuDetail() {
+    var my = (seq.mtun = seq.mtun + 1);
+    setBody('mtun', skel(5));
+    apiGet('api/ui/tunnels/' + encodeURIComponent(tuView.key) + '?range=' + tuRange).then(function (d) {
+      if (seq.mtun !== my) return;
+      renderTuDetailBody(d);
+    }).catch(function (e) {
+      if (seq.mtun !== my) return;
+      var card = entError(e, function () { renderTuDetail(); });
+      setBody('mtun', card.html); wireRetry('mtun', card.wire);
+    });
+  }
+
+  // one end of the tunnel as a card: flag + role, server name, datacenter,
+  // and the agent deep-link when the backend relation gives us an agent
+  function tuSideCard(side, roleLbl) {
+    if (!side || !side.name) {
+      return '<div class="tu-side"><p class="tu-side-role">' + esc(roleLbl) + '</p><span class="mtb-muted">\u2014</span></div>';
+    }
+    var cc = side.role === 'iran' ? 'ir' : String(side.country || '').toLowerCase();
+    var dc = dcDisp(side.datacenter || '', side.datacenter_en);
+    return '<div class="tu-side">' +
+      '<p class="tu-side-role">' + (/^[a-z]{2}$/.test(cc) ? topologyFlagSvg(cc) : '') + esc(roleLbl) + '</p>' +
+      '<b class="mono tu-side-name" dir="ltr">' + esc(side.name) + '</b>' +
+      (dc ? '<span class="mtb-muted tu-side-dc">' + esc(dc) + '</span>' : '') +
+      (side.agent_id ? '<button type="button" class="quantum-btn quantum-btn-secondary u-btn-xs tu-side-ag" data-tuagt="' + esc(side.agent_id) + '">' + ICO_AGT + esc(L('tuOpenAgent')) + '</button>' : '') +
+      '</div>';
+  }
+
+  // paired rx/tx bars; one per bucket of the selected range
+  function tuBarChart(points, gran) {
+    if (!points || !points.length) return entEmpty(L('tuNoSeries'));
+    var max = 0;
+    points.forEach(function (p) { max = Math.max(max, (p.wire_rx_bytes || 0) + (p.wire_tx_bytes || 0)); });
+    if (!max) max = 1;
+    var bars = points.map(function (p) {
+      var rx = Math.round((p.wire_rx_bytes || 0) / max * 100);
+      var tx = Math.round((p.wire_tx_bytes || 0) / max * 100);
+      var when;
+      try {
+        when = gran === 'hour'
+          ? new Date(p.t * 1000).toLocaleTimeString(isFa() ? 'fa-IR' : 'en-US', { hour: '2-digit', minute: '2-digit' })
+          : new Date(p.t * 1000).toLocaleDateString(isFa() ? 'fa-IR' : 'en-US', { month: 'short', day: 'numeric' });
+      } catch (e) { when = num0(p.t); }
+      return '<div class="tu-bar" title="' + esc(when + ' \u00b7 \u2193 ' + bytes(p.wire_rx_bytes || 0) + ' \u00b7 \u2191 ' + bytes(p.wire_tx_bytes || 0)) + '">' +
+        '<i class="rx" style="height:' + Math.max(rx, 2) + '%"></i>' +
+        '<i class="tx" style="height:' + Math.max(tx, 2) + '%"></i></div>';
+    }).join('');
+    return '<div class="tu-bars">' + bars + '</div>' +
+      '<div class="tu-bars-leg"><span><i class="rx"></i>' + esc(L('tuDown')) + '</span><span><i class="tx"></i>' + esc(L('tuUp')) + '</span></div>';
+  }
+
+  function tuTotalCell(lbl, v) {
+    return '<div class="tu-tot"><span class="mtb-muted">' + esc(lbl) + '</span>' +
+      '<bdi dir="ltr">' + esc(v) + '</bdi></div>';
+  }
+
+  function tuVital(lbl, v) {
+    return '<div class="tu-vital"><span class="mtb-muted">' + esc(lbl) + '</span><b>' + esc(v) + '</b></div>';
+  }
+
+  function renderTuDetailBody(d) {
+    var t = d.tunnel || {};
+    var now = d.now || {};
+    var tot = d.totals || {};
+    var rat = d.ratios || {};
+    var hist = d.history || {};
+    var pts = hist.points || [];
+    var key = t.tunnel_key || tuView.key;
+    window.mtbTunDetail = key;
+    if (window.topTitleSync) window.topTitleSync('mtun');
+
+    var stB = stateBadge(now.state || (t.enabled === false ? 'disabled' : 'unknown'));
+    var engN = TU_ENG_DISP[t.engine] || t.engine || '\u2014';
+    var engB = '<span class="badge info mtb-eng-badge">' + tuEngLogo(t.engine, engN) + ' ' + esc(engN) + '</span>';
+    var topoB = '<button type="button" class="mtb-topobadge" data-tuview="' + esc(t.topology && t.topology.id) + '" data-tuname="' + esc(t.topology && t.topology.name) + '" title="' + esc(L('tuOpenTopo')) + '">' + MTB_ICO.mesh + esc((t.topology && t.topology.name) || '\u2014') + '</button>';
+
+    // vitals — only fields the backend actually measured
+    var vitals = '';
+    if (now.latency_ms != null && now.latency_ms > 0) vitals += tuVital(L('agLatency'), (now.latency_ms < 1 ? '<1' : Math.round(now.latency_ms)) + ' ms');
+    if (now.loss_pct != null && now.loss_pct > 0) vitals += tuVital(L('tuLoss'), num(now.loss_pct, 1) + '%');
+    if (now.uptime_s != null && now.uptime_s > 0) vitals += tuVital(L('tuUptime'), dur(now.uptime_s));
+    if (now.cpu_percent != null) vitals += tuVital(L('cpuCol'), pct(now.cpu_percent));
+    if (now.rss_bytes != null) vitals += tuVital(L('memCol'), bytes(now.rss_bytes));
+    if (now.rate && now.rate.wire_rx_bps != null) vitals += tuVital(L('tuRateNow'), bytes(now.rate.wire_rx_bps) + '/s \u2193 \u00b7 ' + bytes(now.rate.wire_tx_bps || 0) + '/s \u2191');
+    if (now.last_error) vitals += '<div class="tu-err" role="alert">' + MTB_ICO.alerc + esc(String(now.last_error).split('\n')[0].slice(0, 180)) + '</div>';
+
+    // traffic totals — today / 7d / 30d, real wire bytes
+    var mkT = function (k, lbl) {
+      var v = tot[k] || {};
+      return tuTotalCell(lbl + ' \u2193', bytes(v.wire_rx_bytes || 0)) + tuTotalCell(lbl + ' \u2191', bytes(v.wire_tx_bytes || 0));
+    };
+
+    var ranges = ['24h', '7d', '30d'].map(function (r) {
+      var lbl = r === '24h' ? L('tuRange24') : (r === '7d' ? L('d7') : L('d30'));
+      return '<button type="button" class="mtb-cdd-opt' + (tuRange === r ? ' on' : '') + '" data-turange="' + r + '">' + esc(lbl) + '</button>';
+    }).join('');
+
+    // events: state flips and errors the backend recorded (already redacted)
+    var evs = (d.events || []).slice(0, 24);
+    var evHtml = evs.length ? evs.map(function (ev) {
+      var inner;
+      if (ev.kind === 'state') {
+        inner = stateBadge(ev.to) + '<span class="mtb-muted">' + esc(L('tuEvFrom')) + ' ' + esc(L('st_' + ev.from) !== 'st_' + ev.from ? L('st_' + ev.from) : (ev.from || '\u2014')) + '</span>';
+      } else {
+        inner = '<span class="badge err">' + esc(ev.code || 'error') + '</span><span class="tu-ev-tx">' + esc(String(ev.text || '').slice(0, 160)) + '</span>';
+      }
+      return '<div class="tu-ev">' + inner + '<span class="mtb-muted tu-ev-at">' + esc(fmtDate(ev.at)) + '</span></div>';
+    }).join('') : entEmpty(L('tuNoEvents'));
+
+    var html =
+      '<div class="tunnel-card tu-backrow"><button type="button" class="quantum-btn mtb-backbtn" data-tuback>' + esc(L('tuBackList')) + ' <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg></button></div>' +
+
+      '<div class="tunnel-card tu-head">' +
+      '<div class="tu-head-row">' +
+      '<div class="tu-id"><b class="mono tu-key" dir="ltr">' + esc(key) + '</b>' +
+      '<button type="button" class="mtb-keycopy" data-copyval="' + esc(key) + '" title="' + esc(L('copy')) + '" aria-label="' + esc(L('copy')) + '">' + TU_COPY + '</button>' +
+      stB + engB + topoB + '</div>' +
+      '<div class="tu-head-num">' +
+      '<div class="tu-wt"><span class="mtb-muted">' + esc(L('weightCol')) + '</span><b>' + (t.weight != null ? num0(t.weight) : '\u2014') + '</b></div>' +
+      (t.resolved_percent != null ? '<div class="tu-wt"><span class="mtb-muted">' + esc(L('shareCol')) + '</span><b>' + esc(num(t.resolved_percent, 1) + '%') + '</b></div>' : '') +
+      '<div class="tu-head-acts">' +
+      '<button type="button" class="quantum-btn quantum-btn-secondary u-btn-xs" data-tuweight="' + esc(t.topology && t.topology.id) + '|' + esc(key) + '">' + MTB_ICO.pen + esc(L('tuWeightT')) + '</button>' +
+      '<button type="button" class="quantum-btn quantum-btn-secondary u-btn-xs mtb-act-del" data-tudel="' + esc(t.id) + '|' + esc(key) + '">' + MTB_ICO.trash + esc(L('agActDel')) + '</button>' +
+      '</div></div></div>' +
+      (vitals ? '<div class="tu-vitals">' + vitals + '</div>' : '') +
+      '</div>' +
+
+      '<div class="tunnel-card tu-ends">' +
+      '<p class="tc-title dcard-title">' + MTB_ICO.chain + esc(L('tuEndsT')) + '</p>' +
+      '<div class="tu-ends-row">' +
+      tuSideCard(t.local_server, L('tuSideIran')) +
+      '<div class="tu-ends-mid">' + MTB_ICO.tun + '</div>' +
+      tuSideCard(t.remote_server, L('tuSideForeign')) +
+      '</div></div>' +
+
+      '<div class="tunnel-card tu-traffic">' +
+      '<div class="tc-header dcard-head"><p class="tc-title dcard-title">' + MTB_ICO.dl + esc(L('tuTrafficT')) + '</p>' +
+      '<div class="mtb-cdd mtb-fcdd tu-range"><button type="button" class="mtb-cdd-btn" data-cdd-toggle><span class="mtb-cdd-cur">' + esc(tuRange === '24h' ? L('tuRange24') : (tuRange === '7d' ? L('d7') : L('d30'))) + '</span>' +
+      '<span class="mtb-cdd-arrow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span></button>' +
+      '<div class="mtb-cdd-pop" hidden>' + ranges + '</div></div></div>' +
+      '<div class="tu-tots">' +
+      mkT('today', L('today')) +
+      mkT('7d', L('d7')) +
+      mkT('30d', L('d30')) +
+      (rat.topology_share_pct != null ? tuTotalCell(L('tuShareT'), num(rat.topology_share_pct, 1) + '%') : '') +
+      (rat.overhead_ratio != null ? tuTotalCell(L('overhead'), '×' + num(rat.overhead_ratio, 2)) : '') +
+      '</div>' +
+      tuBarChart(pts, hist.granularity) +
+      '</div>' +
+
+      '<div class="tunnel-card tu-events">' +
+      '<p class="tc-title dcard-title">' + MTB_ICO.clock + esc(L('tuEventsT')) + '</p>' +
+      evHtml +
+      '</div>';
+
+    setBody('mtun', html);
   }
 
   // ---- modal shell (same grammar as the agent wizard) -------------------------
@@ -1711,6 +1942,7 @@
       '</div></div>';
   }
   window.openAgtDetail = openAgtDetail;
+  window.mtbTunOpen = function (key) { tuView = { key: key }; };
   function openAgtDetail(id) {
     agtView = { view: 'detail', id: id };
     renderAgtDetail(id);
@@ -2508,7 +2740,11 @@
       return;
     }
     var opt = e.target && e.target.closest ? e.target.closest('[data-agopentun]') : null;
-    if (opt) { goTab('mtun'); return; }
+    if (opt) {
+      if (window.mtbTunOpen && opt.getAttribute('data-agopentun')) window.mtbTunOpen(opt.getAttribute('data-agopentun'));
+      goTab('mtun');
+      return;
+    }
     var fop = e.target && e.target.closest ? e.target.closest('[data-cdd-opt]') : null;
     if (fop) {
       var fk = fop.getAttribute('data-cdd-opt');
@@ -2561,6 +2797,27 @@
       else if (v === 'next') agtPage = agtPage + 1;
       else agtPage = parseInt(v, 10) || 1;
       renderAgt();
+      return;
+    }
+    var tupg2 = e.target && e.target.closest ? e.target.closest('[data-tuopen]') : null;
+    if (tupg2) {
+      tuView = { key: tupg2.getAttribute('data-tuopen') };
+      tuRange = '24h';
+      renderTun();
+      return;
+    }
+    var tubk = e.target && e.target.closest ? e.target.closest('[data-tuback]') : null;
+    if (tubk) {
+      tuView = null;
+      // drop &tun= BEFORE re-rendering, or renderTun's hash re-read reopens it
+      try { history.replaceState(null, '', '#t=mtun'); } catch (e) { /* non-fatal */ }
+      renderTun();
+      return;
+    }
+    var turg = e.target && e.target.closest ? e.target.closest('[data-turange]') : null;
+    if (turg) {
+      tuRange = turg.getAttribute('data-turange') || '24h';
+      renderTuDetail();
       return;
     }
     var tuv = e.target && e.target.closest ? e.target.closest('[data-tuview],[data-tutopo]') : null;
