@@ -164,6 +164,34 @@ func handleUITopologyDetail(w http.ResponseWriter, r *http.Request) {
 			foreignRows = append(foreignRows, entry)
 		}
 	}
+	// Tunnels-page path column: each end's flag comes from the agent
+	// enrolled against that server (the servers table carries no country),
+	// and the deep-link needs the agent id. Stamped onto the ref maps so
+	// the frontend reads one shape everywhere.
+	agCountry := map[int64]string{}
+	agBySrv := map[int64]string{}
+	if ags, aerr := h.ListAgents(); aerr == nil {
+		for _, a := range ags {
+			if a.ServerID != 0 {
+				if a.Country != "" {
+					agCountry[a.ServerID] = a.Country
+				}
+				agBySrv[a.ServerID] = a.ID
+			}
+		}
+	}
+	for _, row := range allRows {
+		for _, side := range []string{"local_server", "remote_server"} {
+			if m, ok := row[side].(map[string]any); ok {
+				if id, ok2 := m["id"].(int64); ok2 {
+					m["country"] = agCountry[id]
+					if aid := agBySrv[id]; aid != "" {
+						m["agent_id"] = aid
+					}
+				}
+			}
+		}
+	}
 	writeJSON(w, map[string]any{
 		"topology": map[string]any{"id": topo.ID, "name": topo.Name, "enabled": topo.Enabled},
 		"members": map[string]any{

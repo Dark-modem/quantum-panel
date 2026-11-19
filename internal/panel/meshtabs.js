@@ -168,6 +168,27 @@
     st_offline: ['آفلاین', 'offline'], st_revoked: ['باطل‌شده', 'revoked'],
     up: ['برقرار', 'up'], down: ['قطع', 'down'],
     trafficToday: ['ترافیک امروز', 'Traffic today'], today: ['امروز', 'Today'],
+    tuNew: ['تانل جدید', 'New tunnel'],
+    tuNewHint: ['ترتیب را دنبال کنید: توپولوژی، سرور ایران، سرور خارج، هسته — سپس کلید تانل.', 'Follow the flow: topology, Iran server, foreign server, engine — then the tunnel key.'],
+    tuNeedTopo: ['اول یک توپولوژی بسازید — تانل بدون توپولوژی معنا ندارد.', 'Build a topology first — a tunnel needs one.'],
+    tuPath: ['مسیر', 'Path'],
+    tuAllTopos: ['همه توپولوژی‌ها', 'All topologies'],
+    tuAllAgents: ['همه ایجنت‌ها', 'All agents'],
+    tuAllEngines: ['همه هسته‌ها', 'All engines'],
+    tuAllStates: ['همه وضعیت‌ها', 'All states'],
+    tuSearchPh: ['جستوجوی تانل‌ها...', 'Search tunnels...'],
+    tuNoMatch: ['تانلی مطابق جستوجو/فیلتر نیست', 'No tunnels match the search/filters'],
+    tuExp: ['آزمایشی', 'experimental'],
+    tuShare: ['سهم حل‌شده در توپولوژی: {n}%', 'Resolved share of the topology: {n}%'],
+    tuNoShare: ['بدون سهم حل‌شده — تانل قطع یا غیرفعال است', 'No resolved share — tunnel is down or disabled'],
+    tuWeightT: ['ویرایش وزن', 'Edit weight'],
+    tuWRange: ['وزن باید عددی بین ۰ تا ۱۰۰۰ باشد', 'Weight must be a number between 0 and 1000'],
+    tuWSaved: ['وزن ذخیره شد', 'Weight saved'],
+    tuOpenTopo: ['مشاهده توپولوژی', 'View topology'],
+    tuOpenAgent: ['مشاهده ایجنت', 'View agent'],
+    tuDelT: ['حذف تانل', 'Delete tunnel'],
+    tuDelQ: ['تانل «{k}» برای همیشه حذف می‌شود. ادامه می‌دهید؟', 'Tunnel "{k}" will be removed permanently. Continue?'],
+    tuKeyBad: ['کلید تانل باید ۱ تا ۱۲۸ نویسه از a-z 0-9 - _ . باشد', 'Tunnel key must be 1-128 chars of a-z 0-9 - _ .'],
     d7: ['۷ روز', '7d'], d30: ['۳۰ روز', '30d'],
     tunnelKey: ['تونل', 'Tunnel'], topologyCol: ['توپولوژی', 'Topology'],
     engineCol: ['موتور', 'Engine'], engineDef: ['پیش‌فرض', 'default'],
@@ -420,6 +441,29 @@
     '.mtb-pending { opacity: .55; }',
     '.mtb-month { max-width: 130px; }',
     '@media (max-width: 640px) { .mtb-key { max-width: 150px; } }',
+    '.mtb-tunhead-id { display:flex; align-items:center; gap:10px; }',
+    '.mtb-tuncount { min-width:34px; text-align:center; padding:3px 10px; border-radius:999px; background:color-mix(in srgb, var(--ac) 12%, transparent); color:var(--ac); font-weight:700; font-size:13px; }',
+    '.mtb-keycopy { display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; margin-inline-start:6px; border:1px solid var(--ln, rgba(148,163,184,.25)); border-radius:6px; background:transparent; color:var(--mu, #94a3b8); cursor:pointer; vertical-align:middle; transition:color .15s, border-color .15s; }',
+    '.mtb-keycopy svg { width:13px; height:13px; fill:none; stroke:currentColor; stroke-width:1.7; }',
+    '.mtb-keycopy:hover { color:var(--ac); border-color:var(--ac); }',
+    '.mtb-topobadge { display:inline-flex; align-items:center; gap:6px; padding:3px 10px; border-radius:999px; border:1px solid color-mix(in srgb, var(--ac) 35%, transparent); background:color-mix(in srgb, var(--ac) 8%, transparent); color:var(--ac); font-size:12px; font-weight:600; cursor:pointer; transition:background .15s, border-color .15s; }',
+    '.mtb-topobadge svg { width:13px; height:13px; fill:none; stroke:currentColor; stroke-width:1.8; }',
+    '.mtb-topobadge:hover { background:color-mix(in srgb, var(--ac) 16%, transparent); border-color:var(--ac); }',
+    '.mtb-tupath { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }',
+    '.mtb-tuside { display:inline-flex; align-items:center; gap:7px; padding:2px 8px; border-radius:8px; border:1px solid transparent; }',
+    '.mtb-tuside.clk { cursor:pointer; } .mtb-tuside.clk:hover { border-color:var(--ln, rgba(148,163,184,.3)); background:var(--sunk, rgba(148,163,184,.06)); }',
+    '.mtb-tuside.na { color:var(--mu, #94a3b8); }',
+    '.mtb-tuside-fl { display:inline-flex; } .mtb-tuside-fl svg { border-radius:2px; }',
+    '.mtb-tuside-tx { display:flex; flex-direction:column; line-height:1.25; }',
+    '.mtb-tuside-tx b { font-size:12.5px; font-weight:600; }',
+    '.mtb-tuside-tx .mtb-muted { font-size:11px; }',
+    '.mtb-tuarrow { color:var(--mu, #94a3b8); display:inline-flex; } .mtb-tuarrow svg { width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:1.8; }',
+    '.mtb-engpair { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }',
+    '.mtb-eng-def { font-size:11px; }',
+    '.mtb-wtx { cursor:help; border-bottom:1px dotted var(--ln, rgba(148,163,184,.4)); padding-bottom:1px; }',
+    '.mtb-agstat-i.warn .mtb-agico { background:color-mix(in srgb, var(--warn, #f59e0b) 14%, transparent); color:var(--warn, #f59e0b); }',
+    '@media (max-width: 900px) { .mtb-tun-tbl .mtb-tupath { min-width:180px; } }',
+    '@media (max-width: 760px) { .mtb-tun-tbl thead { display:none; } .mtb-tun-tbl tr { display:block; border:1px solid var(--ln, rgba(148,163,184,.22)); border-radius:12px; padding:10px 12px; margin:0 0 10px; } .mtb-tun-tbl td { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:5px 0; border:none; } .mtb-tun-tbl td::before { content:attr(data-l); color:var(--mu, #94a3b8); font-size:12px; flex:none; } .mtb-tun-tbl td[colspan] { justify-content:center; } .mtb-tun-tbl td[colspan]::before { content:none; } }',
     '@media (prefers-reduced-motion: reduce) { main.page section[id^="tab-m"] * { animation: none !important; transition: none !important; } }'
   ].join('\n');
 
@@ -551,11 +595,16 @@
   }
 
   // ===========================================================================
-  // 1) Topologies — list + detail (back button returns to the list)
+  // 1) Tunnels — the management page: header, search + 4 combined filters,
+  //    live table (key / topology / path / engine / weight / state / 7d / 30d
+  //    / actions), per-page pager, create + weight + delete flows.
   // ===========================================================================
+  var tuQuery = '', tuFilters = { topo: '', agent: '', engine: '', state: '' };
+  var tuPage = 1, tuPerPage = 10;
+
   function loadTun() {
     var my = (seq.mtun = seq.mtun + 1);
-    setBody('mtun', skel(4));
+    setBody('mtun', skel(6));
     apiGet('api/mesh/topologies').then(function (j) {
       if (seq.mtun !== my) return;
       var topos = (j && j.topologies) || [];
@@ -576,68 +625,380 @@
       setBody('mtun', card.html); wireRetry('mtun', card.wire);
     });
   }
-  function renderTun(my) {
-    var packs = cache.mtun || [];
-    var rows = [];
+
+  // Flat tunnel rows built ONLY from real backend relations: each pack's
+  // ui.tunnels already carries the numeric id, live state, weight, resolved
+  // share and both server refs (name/role/datacenter/country/agent_id) —
+  // nothing is ever parsed out of display names.
+  function tuAllRows() {
+    var packs = cache.mtun || [], rows = [];
     packs.forEach(function (pk) {
-      if (!pk || !pk.det || !pk.tp) return;
-      var weights = {};
-      (pk.det.weights || []).forEach(function (w) { weights[w.tunnel_id] = w.weight; });
-      var uiByKey = {};
-      ((pk.ui && pk.ui.tunnels) || []).forEach(function (t) { uiByKey[t.tunnel_key] = t; });
-      (pk.det.tunnels || []).forEach(function (t) {
-        var u = uiByKey[t.tunnel_key] || {};
+      if (!pk || !pk.tp || !pk.ui) return;
+      (pk.ui.tunnels || []).forEach(function (u) {
         rows.push({
-          key: t.tunnel_key,
-          topo: pk.tp.name || ('#' + pk.tp.id),
-          engine: t.engine,
-          enabled: t.enabled !== false,
-          weight: weights[t.id] != null ? weights[t.id] : (u.weight != null ? u.weight : null),
-          state: u.state != null ? u.state : null
+          topoId: pk.tp.id, topo: pk.tp.name || ('#' + pk.tp.id),
+          id: u.id, key: u.tunnel_key || '', engine: u.engine || '',
+          enabled: u.enabled !== false,
+          state: u.state != null ? u.state : (u.enabled === false ? 'disabled' : 'unknown'),
+          weight: u.weight, resolved: u.resolved_percent,
+          local: u.local_server || null, remote: u.remote_server || null
         });
       });
     });
     rows.sort(function (a, b) { return (a.topo + a.key).localeCompare(b.topo + b.key); });
-    if (!rows.length) { setBody('mtun', '<div class="tunnel-card">' + entEmpty(L('tunnelsEmpty')) + '</div>'); return; }
-    var trs = rows.map(function (r) {
+    return rows;
+  }
+
+  function tuFiltered(rows) {
+    var q = tuQuery.toLowerCase();
+    return rows.filter(function (r) {
+      if (tuFilters.topo && r.topo !== tuFilters.topo) return false;
+      if (tuFilters.agent) {
+        var ln = (r.local && r.local.name) || '', rn = (r.remote && r.remote.name) || '';
+        if (ln !== tuFilters.agent && rn !== tuFilters.agent) return false;
+      }
+      if (tuFilters.engine && r.engine !== tuFilters.engine) return false;
+      if (tuFilters.state && r.state !== tuFilters.state) return false;
+      if (q) {
+        var hay = (r.key + ' ' + r.topo + ' ' + r.engine + ' ' +
+          ((r.local && r.local.name) || '') + ' ' + ((r.remote && r.remote.name) || '')).toLowerCase();
+        if (hay.indexOf(q) < 0) return false;
+      }
+      return true;
+    });
+  }
+
+  // ---- tunnels-page cell helpers ---------------------------------------------
+  var TU_COPY = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+  var TU_WTH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6a3 3 0 0 1 6 0"/><path d="M6.5 6h11l2.5 12h-16l2.5-12z"/></svg>';
+  var TU_STTH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg>';
+  var TU_CHTH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>';
+  var TU_ENG_DISP = { aestun: 'AESTun', rakhsh: 'Rakhsh', matrix: 'Matrix', frp: 'FRP', backhaul: 'Backhaul', gost: 'Gost', xray: 'Xray', wireguard: 'WireGuard', wst: 'wstunnel', wstunnel: 'wstunnel', chisel: 'Chisel', rathole: 'Rathole', tinc: 'Tinc', backpack: 'BackPack', dagger: 'DaggerConnect', easytier: 'EasyTier', hysteria: 'Hysteria', midos: 'Midos', narnia: 'Narnia', paqet: 'Paqet', pengo: 'Pengo', singbox: 'sing-box', spoof: 'Spoof', udp2raw: 'udp2raw', waterwall: 'WaterWall', wattunnel: 'WatTunnel' };
+  var TU_ENG_IMG = { aestun: 'img/engines/aestun.png', rakhsh: 'img/engines/rakhsh.png', gost: 'img/engines/gost.png', xray: 'img/engines/xray.svg', wireguard: 'img/engines/wireguard.png', rathole: 'img/engines/rathole.png', wst: 'img/engines/wstunnel.png', wstunnel: 'img/engines/wstunnel.png', tinc: 'img/engines/tinc.svg', hysteria: 'img/engines/hysteria.png', singbox: 'img/engines/singbox.png', midos: 'img/engines/midos.png', dagger: 'img/engines/dagger.png', pengo: 'img/engines/pengo.png', backhaul: 'img/engines/backhaul.png', backpack: 'img/engines/backpack.png', narnia: 'img/engines/narnia.png', waterwall: 'img/engines/waterwall.png', wattunnel: 'img/engines/wattunnel.png', udp2raw: 'img/engines/udp2raw.png', paqet: 'img/engines/paqet.png', frp: 'img/engines/frp.png', easytier: 'img/engines/easytier.png', chisel: 'img/engines/chisel.png' };
+  var TU_ENG_Q = (typeof engImgTag !== 'undefined' && engImgTag) ? '?v=' + engImgTag : '';
+  function tuEngLogo(eng, disp) {
+    var img = TU_ENG_IMG[eng] ? TU_ENG_IMG[eng] + TU_ENG_Q : '';
+    if (img) return '<img src="' + img + '" alt="' + esc(disp) + '" draggable="false">';
+    if (eng === 'spoof') return MTB_ICO.spoofmark;
+    return MTB_ICO.qmark;
+  }
+  function tuBytesPair(t, done) {
+    if (!t) return done ? '<bdi dir="ltr">\u2014</bdi>' : '<bdi dir="ltr">\u2026</bdi>';
+    // a real 0 renders as "0 B" — never an em dash
+    return '<bdi dir="ltr">' + esc(bytes(t.wire_rx_bytes || 0) + ' / ' + bytes(t.wire_tx_bytes || 0)) + '</bdi>';
+  }
+  // one end of the path: flag + mono server name (+ datacenter subline);
+  // clickable only when the backend gave us the agent id for this server
+  function tuSideChip(side) {
+    if (!side || !side.name) return '<span class="mtb-tuside na">\u2014</span>';
+    var cc = side.role === 'iran' ? 'ir' : String(side.country || '').toLowerCase();
+    var dc = dcDisp(side.datacenter || '', side.datacenter_en);
+    var aid = side.agent_id || '';
+    var clk = aid ? ' data-tuagt="' + esc(aid) + '" title="' + esc(L('tuOpenAgent')) + '"' : '';
+    return '<span class="mtb-tuside' + (aid ? ' clk' : '') + '"' + clk + '>' +
+      '<span class="mtb-tuside-fl">' + (/^[a-z]{2}$/.test(cc) ? topologyFlagSvg(cc) : '') + '</span>' +
+      '<span class="mtb-tuside-tx"><b class="mono" dir="ltr">' + esc(side.name) + '</b>' +
+      (dc ? '<span class="mtb-muted">' + esc(dc) + '</span>' : '') + '</span></span>';
+  }
+  function tuFilterCdd(key, label, allLbl, fico, opts) {
+    var cur = tuFilters[key];
+    var curLbl = allLbl;
+    if (cur) {
+      var hit = opts.filter(function (o) { return o.v === cur; })[0];
+      curLbl = label + ': ' + ((hit && hit.lbl) || cur);
+    }
+    var list = ['<button type="button" class="mtb-cdd-opt' + (!cur ? ' on' : '') + '" data-tuopt="' + key + '" data-tuv="">' + esc(allLbl) + '</button>'];
+    opts.forEach(function (o) {
+      list.push('<button type="button" class="mtb-cdd-opt' + (cur === o.v ? ' on' : '') + '" data-tuopt="' + key + '" data-tuv="' + esc(o.v) + '">' + (o.ico || '') + esc(o.lbl) + '</button>');
+    });
+    return '<div class="mtb-cdd mtb-fcdd">' +
+      '<button type="button" class="mtb-cdd-btn mtb-fbtn' + (cur ? ' on' : '') + '" data-cdd-toggle>' +
+      '<span class="mtb-fico">' + fico + '</span>' +
+      '<span class="mtb-cdd-cur">' + esc(curLbl) + '</span>' +
+      '<span class="mtb-cdd-arrow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span>' +
+      '</button>' +
+      '<div class="mtb-cdd-pop" hidden>' + list.join('') + '</div></div>';
+  }
+  function tuStats(filtered) {
+    var c = { healthy: 0, degraded: 0, down: 0 };
+    filtered.forEach(function (r) {
+      if (r.state === 'healthy') c.healthy++;
+      else if (r.state === 'degraded') c.degraded++;
+      else if (r.state === 'down') c.down++;
+    });
+    function item(kls, ico, n, lbl) {
+      return '<div class="mtb-agstat-i ' + kls + '"><span class="mtb-agico">' + ico + '</span><span class="mtb-agtx"><b>' + num0(n) + '</b><span>' + esc(lbl) + '</span></span></div>';
+    }
+    return '<div class="mtb-agstatbig">' +
+      item('all', MTB_ICO.stack, filtered.length, L('agStatAll')) +
+      item('ok', MTB_ICO.okc, c.healthy, L('st_healthy')) +
+      item('warn', MTB_ICO.alerc, c.degraded, L('st_degraded')) +
+      item('err', MTB_ICO.act, c.down, L('st_down')) +
+      '</div>';
+  }
+
+  function renderTun(my) {
+    if (my == null) my = seq.mtun;
+    if (window.topTitleSync) window.topTitleSync('mtun');
+    try { if (location.hash !== '#t=mtun') history.replaceState(null, '', '#t=mtun'); } catch (e) { /* non-fatal */ }
+    var rows = tuAllRows();
+    var filtered = tuFiltered(rows);
+    var PS = tuPerPage;
+    var maxPg = Math.max(1, Math.ceil(filtered.length / PS));
+    var pg = Math.min(tuPage, maxPg);
+    tuPage = pg;
+    var pageRows = filtered.slice((pg - 1) * PS, pg * PS);
+    var anyF = tuQuery || tuFilters.topo || tuFilters.agent || tuFilters.engine || tuFilters.state;
+
+    // filter option pools — derived from the rows themselves, never guessed
+    var topoOpts = [], agentOpts = [], engOpts = [];
+    rows.forEach(function (r) {
+      if (r.topo && topoOpts.indexOf(r.topo) < 0) topoOpts.push(r.topo);
+      if (r.engine && engOpts.indexOf(r.engine) < 0) engOpts.push(r.engine);
+      [r.local, r.remote].forEach(function (s) {
+        if (s && s.name && agentOpts.indexOf(s.name) < 0) agentOpts.push(s.name);
+      });
+    });
+    topoOpts.sort(); agentOpts.sort(); engOpts.sort();
+
+    var head = '<div class="tunnel-card mtb-tunhead"><div class="mtb-agintro-row">' +
+      '<div class="mtb-tunhead-id"><p class="tc-title dcard-title">' + MTB_ICO.tun + esc(L('mtun')) + '</p>' +
+      '<span class="mtb-tuncount">' + num0(filtered.length) + '</span></div>' +
+      '<span class="mtb-agdiv"></span>' +
+      '<button type="button" class="quantum-btn quantum-btn-primary" id="mtbNewTunnel">+ ' + esc(L('tuNew')).replace('+ ', '') + '</button>' +
+      '</div>' + tuStats(filtered) + '</div>';
+
+    var tcbar = '<div class="tc-header mtb-tcbar">' +
+      '<div class="mtb-search">' +
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>' +
+      '<input id="mtbTuSearch" class="quantum-input" placeholder="' + esc(L('tuSearchPh')) + '" value="' + esc(tuQuery) + '" aria-label="' + esc(L('tuSearchPh')) + '">' +
+      '</div>' +
+      '<div class="mtb-filters">' +
+      tuFilterCdd('topo', L('topoCol'), L('tuAllTopos'), MTB_ICO.mesh, topoOpts.map(function (t) {
+        return { v: t, lbl: t, ico: '<span class="mtb-optico">' + MTB_ICO.mesh + '</span>' };
+      })) +
+      tuFilterCdd('agent', L('agentCol'), L('tuAllAgents'), ICO_AGT, agentOpts.map(function (n) {
+        return { v: n, lbl: n, ico: '<span class="mtb-optico">' + ICO_AGT + '</span>' };
+      })) +
+      tuFilterCdd('engine', L('engineCol'), L('tuAllEngines'), MTB_ICO.cube, engOpts.map(function (n) {
+        return { v: n, lbl: TU_ENG_DISP[n] || n, ico: '<span class="mtb-eng-logo e-' + esc(n) + '">' + tuEngLogo(n, TU_ENG_DISP[n] || n) + '</span>' };
+      })) +
+      tuFilterCdd('state', L('stateCol'), L('tuAllStates'), MTB_ICO.act, ['healthy', 'degraded', 'down', 'disabled', 'unknown'].map(function (s) {
+        var ico = s === 'healthy' ? '<span class="mtb-optico ok">' + MTB_ICO.okc + '</span>'
+          : (s === 'down' ? '<span class="mtb-optico er">' + MTB_ICO.alerc + '</span>' : '');
+        return { v: s, lbl: L('st_' + s), ico: ico };
+      })) +
+      (anyF ? '<button type="button" class="mtb-fclear" data-tuclear title="' + esc(L('engAll')) + '">\u00d7</button>' : '') +
+      '</div></div>';
+
+    var trs = pageRows.map(function (r) {
       var d7 = (topoTraffic[r.key] || {}).d7, d30 = (topoTraffic[r.key] || {}).d30;
-      return '<tr data-mtb-row="' + esc(r.key) + '">' +
-        tdKey(r.key) +
-        '<td>' + esc(r.topo) + '</td>' +
-        '<td>' + esc(r.engine || '—') + (r.engine === 'matrix' ? ' ' + badge('info', L('engineDef')) : '') + '</td>' +
-        tdNum(r.weight != null ? num0(r.weight) : '—') +
-        '<td>' + stateBadge(r.state != null ? r.state : (r.enabled ? 'unknown' : 'disabled')) + '</td>' +
-        '<td class="num' + (d7 ? '' : ' mtb-pending') + '" data-mtb-d7>' + (d7 ? '<bdi dir="ltr">' + esc(bytes(d7.wire_rx_bytes) + ' / ' + bytes(d7.wire_tx_bytes)) + '</bdi>' : '…') + '</td>' +
-        '<td class="num' + (d30 ? '' : ' mtb-pending') + '" data-mtb-d30>' + (d30 ? '<bdi dir="ltr">' + esc(bytes(d30.wire_rx_bytes) + ' / ' + bytes(d30.wire_tx_bytes)) + '</bdi>' : '…') + '</td>' +
+      var engN = TU_ENG_DISP[r.engine] || r.engine || '\u2014';
+      var engBadge = '<span class="badge info mtb-eng-badge">' + tuEngLogo(r.engine, engN) + ' ' + esc(engN) + '</span>' +
+        '<span class="badge ' + (r.engine === 'matrix' ? 'ok' : 'dim') + ' mtb-eng-def">' + esc(r.engine === 'matrix' ? L('engineDef') : L('tuExp')) + '</span>';
+      var wTitle = (r.resolved != null && r.resolved > 0)
+        ? esc(Lf('tuShare', { n: String(Math.round(r.resolved * 10) / 10) }))
+        : esc(L('tuNoShare'));
+      var wt = r.weight != null ? num0(r.weight) : '\u2014';
+      return '<tr data-tu-row="' + esc(r.key) + '">' +
+        '<td data-l="' + esc(L('tunnelKey')) + '"><b class="mono mtb-tun-key" dir="ltr" title="' + esc(r.key) + '">' + esc(r.key) + '</b>' +
+        '<button type="button" class="mtb-keycopy" data-copyval="' + esc(r.key) + '" title="' + esc(L('copy')) + '" aria-label="' + esc(L('copy')) + '">' + TU_COPY + '</button></td>' +
+        '<td data-l="' + esc(L('topologyCol')) + '"><button type="button" class="mtb-topobadge" data-tutopo="' + esc(r.topoId) + '" title="' + esc(L('tuOpenTopo')) + '">' + MTB_ICO.mesh + esc(r.topo) + '</button></td>' +
+        '<td data-l="' + esc(L('tuPath')) + '"><div class="mtb-tupath">' + tuSideChip(r.local) + '<span class="mtb-tuarrow">' + MTB_ICO.tun + '</span>' + tuSideChip(r.remote) + '</div></td>' +
+        '<td data-l="' + esc(L('engineCol')) + '"><div class="mtb-engpair">' + engBadge + '</div></td>' +
+        '<td class="num" data-l="' + esc(L('weightCol')) + '"><span class="mtb-wtx" data-tu-w="' + esc(r.weight != null ? r.weight : '') + '" title="' + wTitle + '"><bdi dir="ltr">' + wt + '</bdi></span></td>' +
+        '<td data-l="' + esc(L('stateCol')) + '">' + stateBadge(r.state) + '</td>' +
+        '<td class="num' + (d7 ? '' : ' mtb-pending') + '" data-l="' + esc(L('d7')) + '" data-tu-d7>' + tuBytesPair(d7) + '</td>' +
+        '<td class="num' + (d30 ? '' : ' mtb-pending') + '" data-l="' + esc(L('d30')) + '" data-tu-d30>' + tuBytesPair(d30) + '</td>' +
+        '<td><div class="mtb-acts-row">' +
+        '<div class="mtb-acts-pop">' +
+        '<button type="button" class="mtb-act mtb-act-view" data-tuview="' + esc(r.topoId) + '" title="' + esc(L('tuOpenTopo')) + '">' + MTB_ICO.eye + '</button>' +
+        '<button type="button" class="mtb-act mtb-act-edit" data-tuweight="' + esc(r.topoId) + '|' + esc(r.key) + '" title="' + esc(L('tuWeightT')) + '">' + MTB_ICO.pen + '</button>' +
+        '<button type="button" class="mtb-act mtb-act-del" data-tudel="' + esc(r.id) + '|' + esc(r.key) + '" title="' + esc(L('agActDel')) + '">' + MTB_ICO.trash + '</button>' +
+        '</div>' +
+        '<button type="button" class="mtb-act mtb-acts-kebab" data-actskebab title="' + esc(L('agActMore')) + '" aria-label="' + esc(L('agActMore')) + '"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="19" r="1.7"/></svg></button>' +
+        '</div></td>' +
         '</tr>';
     }).join('');
+
+    var pager = (function () {
+      var pages;
+      if (maxPg <= 7) { pages = []; for (var i = 1; i <= maxPg; i++) pages.push(i); }
+      else if (pg <= 4) { pages = [1, 2, 3, 4, 5, '\u2026', maxPg]; }
+      else if (pg >= maxPg - 3) { pages = [1, '\u2026', maxPg - 4, maxPg - 3, maxPg - 2, maxPg - 1, maxPg]; }
+      else { pages = [1, '\u2026', pg - 1, pg, pg + 1, '\u2026', maxPg]; }
+      var btns = pages.map(function (p) {
+        if (p === '\u2026') return '<span class="mtb-pg-dots">\u2026</span>';
+        return '<button type="button" class="mtb-pg-btn' + (p === pg ? ' on' : '') + '" data-tupg="' + p + '">' + num0(p) + '</button>';
+      }).join('');
+      var sizes = [10, 25, 50].map(function (p) {
+        return '<button type="button" class="mtb-cdd-opt' + (p === tuPerPage ? ' on' : '') + '" data-tusize="' + p + '">' + num0(p) + '</button>';
+      }).join('');
+      return '<div class="mtb-pager mtb-pager2">' +
+        '<div class="mtb-pg-size">' +
+        '<div class="mtb-cdd mtb-fcdd"><button type="button" class="mtb-cdd-btn" data-cdd-toggle><span class="mtb-cdd-cur">' + num0(tuPerPage) + '</span>' +
+        '<span class="mtb-cdd-arrow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span></button>' +
+        '<div class="mtb-cdd-pop" hidden>' + sizes + '</div></div>' +
+        '<span class="mtb-pg-szlbl">' + esc(L('agPerPage')) + '</span></div>' +
+        '<div class="mtb-pg-nav">' +
+        '<button type="button" class="mtb-pg-navbtn" data-tupg="prev"' + (pg <= 1 ? ' disabled' : '') + '><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>' + esc(L('agPrev')) + '</button>' +
+        btns +
+        '<button type="button" class="mtb-pg-navbtn" data-tupg="next"' + (pg >= maxPg ? ' disabled' : '') + '>' + esc(L('agNext')) + '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>' +
+        '</div></div>';
+    })();
+
     setBody('mtun',
-      '<div class="tunnel-card"><div class="tc-header"><p class="tc-title">' + esc(L('mtun')) + '</p>' +
-      '<span class="mtb-muted">' + rows.length + '</span></div>' +
-      '<p class="qs-hint">' + esc(L('d7')) + ' / ' + esc(L('d30')) + ' — wire ↓/↑</p>' +
-      '<div class="ent-tbl-wrap"><table class="ent-tbl"><thead><tr>' +
-      '<th>' + esc(L('tunnelKey')) + '</th><th>' + esc(L('topologyCol')) + '</th>' +
-      '<th>' + esc(L('engineCol')) + '</th><th class="num">' + esc(L('weightCol')) + '</th>' +
-      '<th>' + esc(L('stateCol')) + '</th>' +
-      '<th class="num">' + esc(L('d7')) + ' ↓/↑</th><th class="num">' + esc(L('d30')) + ' ↓/↑</th>' +
-      '</tr></thead><tbody>' + trs + '</tbody></table></div></div>');
+      head +
+      '<div class="tunnel-card mtb-agfilter">' + tcbar + '</div>' +
+      '<div class="tunnel-card">' +
+      '<div class="ent-tbl-wrap"><table class="ent-tbl mtb-tun-tbl"><thead><tr>' +
+      '<th><span class="mtb-th">' + MTB_ICO.tun + esc(L('tunnelKey')) + '</span></th>' +
+      '<th><span class="mtb-th">' + MTB_ICO.mesh + esc(L('topologyCol')) + '</span></th>' +
+      '<th><span class="mtb-th">' + MTB_ICO.chain + esc(L('tuPath')) + '</span></th>' +
+      '<th><span class="mtb-th">' + MTB_ICO.cube + esc(L('engineCol')) + '</span></th>' +
+      '<th class="num"><span class="mtb-th">' + TU_WTH + esc(L('weightCol')) + '</span></th>' +
+      '<th><span class="mtb-th">' + TU_STTH + esc(L('stateCol')) + '</span></th>' +
+      '<th class="num"><span class="mtb-th">' + MTB_ICO.dl + esc(L('d7')) + ' \u2193/\u2191</span></th>' +
+      '<th class="num"><span class="mtb-th">' + TU_CHTH + esc(L('d30')) + ' \u2193/\u2191</span></th>' +
+      '<th><span class="mtb-th">' + MTB_ICO.sliders + esc(L('agActs')) + '</span></th>' +
+      '</tr></thead><tbody>' +
+      (filtered.length ? trs : '<tr><td colspan="9">' + entEmpty(rows.length ? L('tuNoMatch') : L('tunnelsEmpty')) + '</td></tr>') +
+      '</tbody></table></div>' +
+      pager +
+      '</div>');
+
+    // search box keeps focus/-caret across re-renders (same as the agents page)
+    var si = document.getElementById('mtbTuSearch');
+    if (si) {
+      si.addEventListener('input', function () {
+        tuQuery = this.value;
+        tuPage = 1;
+        var pos = this.selectionStart;
+        renderTun();
+        var si2 = document.getElementById('mtbTuSearch');
+        if (si2) { si2.focus(); try { si2.setSelectionRange(pos, pos); } catch (e2) {} }
+      });
+      if (tuQuery) { si.focus(); try { si.setSelectionRange(tuQuery.length, tuQuery.length); } catch (e2) {} }
+    }
     void my;
-    // progressive 7d/30d fill: ONE GET per tunnel returns both windows
-    pool(rows.map(function (r) { return r.key; }), 4, function (key) {
+    // progressive 7d/30d fill: ONE GET per tunnel returns both windows;
+    // a stored 0 stays "0 B", a missing window turns into an em dash
+    pool(filtered.map(function (r) { return r.key; }), 4, function (key) {
       return apiGet('api/ui/tunnels/' + encodeURIComponent(key) + '?range=7d').then(function (j) {
         var tot = (j && j.totals) || {};
         topoTraffic[key] = { d7: tot['7d'] || null, d30: tot['30d'] || null };
         if (seq.mtun !== my) return;
-        var trEl = document.querySelector('tr[data-mtb-row="' + cssEscape(key) + '"]');
+        var trEl = document.querySelector('tr[data-tu-row="' + cssEscape(key) + '"]');
         if (!trEl) return;
         var t7 = topoTraffic[key].d7, t30 = topoTraffic[key].d30;
-        var c7 = trEl.querySelector('[data-mtb-d7]'), c30 = trEl.querySelector('[data-mtb-d30]');
-        if (c7) { c7.classList.remove('mtb-pending'); c7.innerHTML = t7 ? '<bdi dir="ltr">' + esc(bytes(t7.wire_rx_bytes) + ' / ' + bytes(t7.wire_tx_bytes)) + '</bdi>' : '—'; }
-        if (c30) { c30.classList.remove('mtb-pending'); c30.innerHTML = t30 ? '<bdi dir="ltr">' + esc(bytes(t30.wire_rx_bytes) + ' / ' + bytes(t30.wire_tx_bytes)) + '</bdi>' : '—'; }
+        var c7 = trEl.querySelector('[data-tu-d7]'), c30 = trEl.querySelector('[data-tu-d30]');
+        if (c7) { c7.classList.remove('mtb-pending'); c7.innerHTML = tuBytesPair(t7, true); }
+        if (c30) { c30.classList.remove('mtb-pending'); c30.innerHTML = tuBytesPair(t30, true); }
       });
     });
   }
 
+  // ---- modal shell (same grammar as the agent wizard) -------------------------
+  function tuModal(html) {
+    var ov = document.createElement('div');
+    ov.className = 'mtb-modal-ov';
+    ov.innerHTML = '<div class="mtb-modal">' + html + '</div>';
+    document.body.appendChild(ov);
+    ov.querySelectorAll('[data-mtb-close]').forEach(function (b) { b.addEventListener('click', function () { ov.remove(); }); });
+    ov.addEventListener('click', function (e) { if (e.target === ov) ov.remove(); });
+    return ov;
+  }
+  function tuFail(e) {
+    mtbToast((e && e.body && (e.body.error || e.body.message || e.body.detail)) || (e && e.message) || (e ? 'HTTP ' + e.status : ''), 'err');
+  }
+
+  function openTuWeight(topoId, key, cur) {
+    var ov = tuModal(
+      '<button type="button" class="mtb-x" data-mtb-close aria-label="' + esc(L('cancel')) + '">\u00d7</button>' +
+      '<p class="tc-title">' + esc(L('tuWeightT')) + '</p>' +
+      '<p class="qs-hint mono" dir="ltr">' + esc(key) + '</p>' +
+      '<div class="mtb-form"><label>' + esc(L('weightCol')) + ' (0\u20131000)</label>' +
+      '<input id="mtbTuW" class="quantum-input" type="number" min="0" max="1000" value="' + esc(cur != null && cur !== '' ? cur : 0) + '"></div>' +
+      '<div class="mtb-acts"><button type="button" class="quantum-btn quantum-btn-secondary" data-mtb-close>' + esc(L('cancel')) + '</button>' +
+      '<button type="button" class="quantum-btn quantum-btn-primary" id="mtbTuWSave">' + esc(L('agSave')) + '</button></div>');
+    ov.querySelector('#mtbTuWSave').addEventListener('click', function () {
+      var v = parseInt(ov.querySelector('#mtbTuW').value, 10);
+      if (isNaN(v) || v < 0 || v > 1000) { mtbToast(L('tuWRange'), 'err'); return; }
+      var btn = this; btn.disabled = true;
+      apiSend('POST', 'api/ui/topologies/' + encodeURIComponent(topoId) + '/tunnels/' + encodeURIComponent(key) + '/weight', { weight: v }).then(function () {
+        ov.remove(); mtbToast(L('tuWSaved'));
+        loadTun();
+      }).catch(function (e) { btn.disabled = false; tuFail(e); });
+    });
+  }
+
+  function tuDel(id, key) {
+    entConfirm(L('tuDelT'), Lf('tuDelQ', { k: key }), L('agActDel')).then(function (ok) {
+      if (!ok) return;
+      apiSend('DELETE', 'api/mesh/tunnels/' + encodeURIComponent(id)).then(function () {
+        delete topoTraffic[key];
+        mtbToast(L('delDone'));
+        loadTun();
+      }).catch(tuFail);
+    });
+  }
+
+  // create flow: topology \u2192 iran \u2192 foreign \u2192 engine \u2192 key, in one
+  // modal with cascading selects fed by the cached packs (real member lists)
+  function openTuCreate() {
+    var packs = (cache.mtun || []).filter(function (p) { return p && p.tp; });
+    if (!packs.length) { mtbToast(L('tuNeedTopo'), 'err'); return; }
+    var ov = tuModal(
+      '<button type="button" class="mtb-x" data-mtb-close aria-label="' + esc(L('cancel')) + '">\u00d7</button>' +
+      '<p class="tc-title">' + esc(L('tuNew')) + '</p>' +
+      '<p class="qs-hint">' + esc(L('tuNewHint')) + '</p>' +
+      '<div class="mtb-form">' +
+      '<label>' + esc(L('topoCol')) + '</label><select id="mtbTuTopo" class="quantum-input"></select>' +
+      '<label>' + esc(L('iranSrv')) + '</label><select id="mtbTuIran" class="quantum-input"></select>' +
+      '<label>' + esc(L('forSrv')) + '</label><select id="mtbTuFor" class="quantum-input"></select>' +
+      '<label>' + esc(L('engineCol')) + '</label><select id="mtbTuEng" class="quantum-input"></select>' +
+      '<label>' + esc(L('tunnelKey')) + '</label><input id="mtbTuKey" class="quantum-input" dir="ltr" placeholder="main" maxlength="128">' +
+      '<label class="mtb-check"><input type="checkbox" id="mtbTuEn" checked> ' + esc(L('enabled')) + '</label>' +
+      '</div>' +
+      '<div class="mtb-acts"><button type="button" class="quantum-btn quantum-btn-secondary" data-mtb-close>' + esc(L('cancel')) + '</button>' +
+      '<button type="button" class="quantum-btn quantum-btn-primary" id="mtbTuGo">' + esc(L('create')) + '</button></div>');
+    var sT = ov.querySelector('#mtbTuTopo'), sI = ov.querySelector('#mtbTuIran'),
+      sF = ov.querySelector('#mtbTuFor'), sE = ov.querySelector('#mtbTuEng');
+    sT.innerHTML = packs.map(function (p) {
+      return '<option value="' + esc(p.tp.id) + '">' + esc(p.tp.name || ('#' + p.tp.id)) + '</option>';
+    }).join('');
+    sE.innerHTML = Object.keys(TU_ENG_DISP).map(function (n) {
+      return '<option value="' + esc(n) + '"' + (n === 'matrix' ? ' selected' : '') + '>' + esc(TU_ENG_DISP[n]) + '</option>';
+    }).join('');
+    function packOf() {
+      return packs.filter(function (p) { return String(p.tp.id) === String(sT.value); })[0];
+    }
+    function fillSides() {
+      var ui = (packOf() && packOf().ui && packOf().ui.members) || {};
+      var iran = ui.iran || [], foreign = ui.foreign || [];
+      sI.innerHTML = iran.map(function (m) {
+        return '<option value="' + esc(m.id) + '">' + esc(m.name || ('#' + m.id)) + '</option>';
+      }).join('') || '<option value="">\u2014</option>';
+      sF.innerHTML = foreign.map(function (m) {
+        return '<option value="' + esc(m.id) + '">' + esc(m.name || ('#' + m.id)) + '</option>';
+      }).join('') || '<option value="">\u2014</option>';
+    }
+    fillSides();
+    sT.addEventListener('change', fillSides);
+    ov.querySelector('#mtbTuGo').addEventListener('click', function () {
+      var key = (ov.querySelector('#mtbTuKey').value || '').trim();
+      if (!/^[a-z0-9-_.]{1,128}$/.test(key)) { mtbToast(L('tuKeyBad'), 'err'); return; }
+      if (!sI.value || !sF.value) { mtbToast(L('pickBoth'), 'err'); return; }
+      var btn = this; btn.disabled = true;
+      apiSend('POST', 'api/mesh/topologies/' + encodeURIComponent(sT.value) + '/tunnels', {
+        topology_id: Number(sT.value), local_server_id: Number(sI.value), remote_server_id: Number(sF.value),
+        tunnel_key: key, engine: sE.value, enabled: ov.querySelector('#mtbTuEn').checked
+      }).then(function () {
+        ov.remove(); mtbToast(L('created'));
+        loadTun();
+      }).catch(function (e) { btn.disabled = false; tuFail(e); });
+    });
+  }
   // ===========================================================================
   // 3) Agents
   // ===========================================================================
@@ -2153,7 +2514,7 @@
     if (ftg) {
       var fcdd = ftg.closest('.mtb-cdd');
       var fpop = fcdd ? fcdd.querySelector('.mtb-cdd-pop') : null;
-      document.querySelectorAll('#tab-magt .mtb-cdd-pop').forEach(function (p2) { if (!p2.hidden && p2 !== fpop) p2.hidden = true; });
+      document.querySelectorAll('#tab-magt .mtb-cdd-pop, #tab-mtun .mtb-cdd-pop').forEach(function (p2) { if (!p2.hidden && p2 !== fpop) p2.hidden = true; });
       if (fpop) {
         fpop.style.top = '';
         fpop.style.bottom = '';
@@ -2169,7 +2530,7 @@
       return;
     }
     if (!e.target.closest('.mtb-cdd')) {
-      document.querySelectorAll('#tab-magt .mtb-cdd-pop').forEach(function (p2) { if (!p2.hidden) p2.hidden = true; });
+      document.querySelectorAll('#tab-magt .mtb-cdd-pop, #tab-mtun .mtb-cdd-pop').forEach(function (p2) { if (!p2.hidden) p2.hidden = true; });
     }
     var pg = e.target && e.target.closest ? e.target.closest('[data-agpg]') : null;
     if (pg && !pg.disabled) {
@@ -2180,6 +2541,56 @@
       renderAgt();
       return;
     }
+    var tuv = e.target && e.target.closest ? e.target.closest('[data-tuview],[data-tutopo]') : null;
+    if (tuv) {
+      var tid = tuv.getAttribute('data-tuview') || tuv.getAttribute('data-tutopo');
+      goTab('tunnel');
+      if (typeof window.topologyOpen === 'function') window.topologyOpen(parseInt(tid, 10));
+      return;
+    }
+    var tua = e.target && e.target.closest ? e.target.closest('[data-tuagt]') : null;
+    if (tua) { window.openAgtDetail(tua.getAttribute('data-tuagt')); return; }
+    var tuw = e.target && e.target.closest ? e.target.closest('[data-tuweight]') : null;
+    if (tuw) {
+      var wparts = (tuw.getAttribute('data-tuweight') || '').split('|');
+      var wrow = tuw.closest('tr');
+      var wspan = wrow ? wrow.querySelector('[data-tu-w]') : null;
+      var wcur = wspan ? wspan.getAttribute('data-tu-w') : '';
+      openTuWeight(wparts[0], wparts.slice(1).join('|'), wcur);
+      return;
+    }
+    var tud = e.target && e.target.closest ? e.target.closest('[data-tudel]') : null;
+    if (tud) {
+      var dparts = (tud.getAttribute('data-tudel') || '').split('|');
+      tuDel(dparts[0], dparts.slice(1).join('|'));
+      return;
+    }
+    var tup = e.target && e.target.closest ? e.target.closest('[data-tuopt]') : null;
+    if (tup) {
+      tuFilters[tup.getAttribute('data-tuopt')] = tup.getAttribute('data-tuv') || '';
+      tuPage = 1;
+      renderTun();
+      return;
+    }
+    var tusz = e.target && e.target.closest ? e.target.closest('[data-tusize]') : null;
+    if (tusz) { tuPerPage = parseInt(tusz.getAttribute('data-tusize'), 10) || 10; tuPage = 1; renderTun(); return; }
+    var tupg = e.target && e.target.closest ? e.target.closest('[data-tupg]') : null;
+    if (tupg && !tupg.disabled) {
+      var tv = tupg.getAttribute('data-tupg');
+      if (tv === 'prev') tuPage = Math.max(1, tuPage - 1);
+      else if (tv === 'next') tuPage = tuPage + 1;
+      else tuPage = parseInt(tv, 10) || 1;
+      renderTun();
+      return;
+    }
+    var tuc = e.target && e.target.closest ? e.target.closest('[data-tuclear]') : null;
+    if (tuc) {
+      tuQuery = ''; tuFilters = { topo: '', agent: '', engine: '', state: '' }; tuPage = 1;
+      renderTun();
+      return;
+    }
+    var tun = e.target && e.target.closest ? e.target.closest('#mtbNewTunnel') : null;
+    if (tun) { openTuCreate(); return; }
     var dl = e.target && e.target.closest ? e.target.closest('[data-agdel]') : null;
     if (dl) { agtDel(dl.getAttribute('data-agdel'), dl.getAttribute('data-agdelname') || ''); }
   });
