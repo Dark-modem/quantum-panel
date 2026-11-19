@@ -443,7 +443,6 @@
     '@media (max-width: 640px) { .mtb-key { max-width: 150px; } }',
     '.mtb-tunhead .mtb-agintro-row { flex-direction:row; }',
     '.mtb-tunhead-id { display:flex; align-items:center; gap:10px; }',
-    '.mtb-tuncount { min-width:34px; text-align:center; padding:3px 10px; border-radius:999px; background:color-mix(in srgb, var(--ac) 12%, transparent); color:var(--ac); font-weight:700; font-size:13px; }',
     '.mtb-keycopy { display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; margin-inline-start:6px; border:1px solid var(--ln, rgba(148,163,184,.25)); border-radius:6px; background:transparent; color:var(--mu, #94a3b8); cursor:pointer; vertical-align:middle; transition:color .15s, border-color .15s; }',
     '.mtb-keycopy svg { width:13px; height:13px; flex:none; fill:none; stroke:currentColor; stroke-width:1.7; }',
     '.mtb-keycopy:hover { color:var(--ac); border-color:var(--ac); }',
@@ -764,8 +763,7 @@
     topoOpts.sort(); agentOpts.sort(); engOpts.sort();
 
     var head = '<div class="tunnel-card mtb-tunhead"><div class="mtb-agintro-row">' +
-      '<div class="mtb-tunhead-id"><p class="tc-title dcard-title">' + MTB_ICO.tun + esc(L('mtun')) + '</p>' +
-      '<span class="mtb-tuncount">' + num0(filtered.length) + '</span></div>' +
+      '<div class="mtb-tunhead-id"><p class="tc-title dcard-title">' + MTB_ICO.tun + esc(L('mtun')) + '</p></div>' +
       '<span class="mtb-agdiv"></span>' +
       '<button type="button" class="quantum-btn quantum-btn-primary" id="mtbNewTunnel">+ ' + esc(L('tuNew')).replace('+ ', '') + '</button>' +
       '</div>' + tuStats(filtered) + '</div>';
