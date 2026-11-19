@@ -462,7 +462,7 @@
     '.mtb-eng-def { font-size:11px; }',
     '.mtb-wtx { cursor:help; border-bottom:1px dotted var(--ln, rgba(148,163,184,.4)); padding-bottom:1px; }',
     '.mtb-agstat-i.warn .mtb-agico { background:color-mix(in srgb, var(--warn, #f59e0b) 14%, transparent); color:var(--warn, #f59e0b); }',
-    '.mtb-tunhead .mtb-agstatbig { flex-wrap:wrap; gap:10px 18px; }',
+    '.mtb-tunhead .mtb-agstatbig { flex:1; justify-content:space-around; flex-wrap:wrap; gap:10px 18px; }',
     '@media (max-width: 900px) { .mtb-tun-tbl .mtb-tupath { min-width:180px; } }',
     '@media (max-width: 760px) { .mtb-tun-tbl thead { display:none; } .mtb-tun-tbl tr { display:block; border:1px solid var(--ln, rgba(148,163,184,.22)); border-radius:12px; padding:10px 12px; margin:0 0 10px; } .mtb-tun-tbl td { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:5px 0; border:none; } .mtb-tun-tbl td::before { content:attr(data-l); color:var(--mu, #94a3b8); font-size:12px; flex:none; } .mtb-tun-tbl td[colspan] { justify-content:center; } .mtb-tun-tbl td[colspan]::before { content:none; } }',
     '@media (prefers-reduced-motion: reduce) { main.page section[id^="tab-m"] * { animation: none !important; transition: none !important; } }'
