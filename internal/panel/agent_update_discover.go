@@ -38,13 +38,23 @@ type agentReleaseArtifact struct {
 	Size    int64  `json:"size,omitempty"`
 }
 
+// assetView is the WIRE shape of one release asset (contract §2.20:
+// {name, size, url}). ghAsset is GitHub's own decode shape
+// (browser_download_url) — the two are mapped apart so the wire stays
+// exactly as the contract spells it.
+type assetView struct {
+	Name string `json:"name"`
+	Size int64  `json:"size"`
+	URL  string `json:"url"`
+}
+
 // releaseInfo is the discovery view of one release: tag, date and the
 // release's own asset list (name/size/url).
 type releaseInfo struct {
-	Tag         string    `json:"tag"`
-	Name        string    `json:"name,omitempty"`
-	PublishedAt string    `json:"published_at,omitempty"`
-	Assets      []ghAsset `json:"assets"`
+	Tag         string      `json:"tag"`
+	Name        string      `json:"name,omitempty"`
+	PublishedAt string      `json:"published_at,omitempty"`
+	Assets      []assetView `json:"assets"`
 }
 
 // latestChannelRelease picks the newest release of a channel from the
@@ -57,16 +67,16 @@ func latestChannelRelease(ch string, rels []ghRelease) *releaseInfo {
 	}
 	for i := range rels {
 		if rels[i].Tag == tag && !rels[i].Draft {
-			assets := append([]ghAsset(nil), rels[i].Assets...)
-			if assets == nil {
-				assets = []ghAsset{}
+			assets := make([]assetView, 0, len(rels[i].Assets))
+			for _, ga := range rels[i].Assets {
+				assets = append(assets, assetView{Name: ga.Name, Size: ga.Size, URL: ga.BrowserDownloadURL})
 			}
 			return &releaseInfo{Tag: tag, Name: rels[i].Name, PublishedAt: rels[i].PublishedAt, Assets: assets}
 		}
 	}
 	// Tag known but the release body unavailable (should not happen with a
 	// fresh list): still answer the tag, honestly without assets.
-	return &releaseInfo{Tag: tag, Assets: []ghAsset{}}
+	return &releaseInfo{Tag: tag, Assets: []assetView{}}
 }
 
 // agentReleaseArtifactFor resolves the release asset for one arch under a
@@ -89,8 +99,8 @@ func agentReleaseArtifactFor(ch, tag, arch string, rel *releaseInfo) *agentRelea
 		for _, ga := range rel.Assets {
 			if ga.Name == asset {
 				a.Size = ga.Size
-				if ga.BrowserDownloadURL != "" {
-					a.URL = ga.BrowserDownloadURL
+				if ga.URL != "" {
+					a.URL = ga.URL
 				}
 				break
 			}
@@ -206,8 +216,12 @@ func handleUpdateAvailable(w http.ResponseWriter, r *http.Request) {
 	if rerr != nil {
 		resp["error"] = rerr.Error()
 	}
-	if t := releaseCheckedAt(); !t.IsZero() {
-		resp["checked_at"] = t.Unix()
+	// checked_at = the last SUCCESSFUL release fetch (contract §2.20.1);
+	// a failed fetch leaves it out rather than dating the failure.
+	if rerr == nil {
+		if t := releaseCheckedAt(); !t.IsZero() {
+			resp["checked_at"] = t.Unix()
+		}
 	}
 	commit, cerr := fetchDevCommitCached()
 	resp["commit"] = commitWire(commit)
