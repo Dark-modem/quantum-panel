@@ -591,7 +591,7 @@ function topologyGraph(topo, tunnels) {
     const online = !!(agRow && agRow.status === 'online');
     const info = { name: s.name, dc: s.dc, cc: s.cc || (side === 'iran' ? 'IR' : String(topo.country || '').toUpperCase()), ip: s.ip || (side === 'iran' ? iranIp : foreignIp) };
     const title = s.name || (side === 'iran' ? tr('', 'Iran server') : countryLabel);
-    const flag = side === 'iran' ? 'ir' : topoDcCc(t, side);
+    const flag = side === 'iran' ? 'ir' : topoDcCc(topo, side);
     const pk = portKind[(side === 'iran' ? 'iran:' : 'foreign:') + i] || 'off';
     // the glowing port on the edge facing the other column (top/bottom in
     // the vertical stack)
@@ -687,7 +687,7 @@ function topologyGraph(topo, tunnels) {
     const lbl = side === 'iran' ? tr('', 'IRAN SERVERS') : tr('', 'FOREIGN SERVERS');
     const m = rtl && !vert;
     const x = col.x - 12, y = col.y - 8;
-    const flag = side === 'iran' ? 'ir' : topoDcCc(t, side);
+    const flag = side === 'iran' ? 'ir' : topoDcCc(topo, side);
     const fx = m ? x + w + 12 - 14 - 22 : x + 14;
     return `<g class="topo-colbox ${side}"><rect class="topo-col-bg" x="${x}" y="${y}" width="${w + 24}" height="${h}" rx="16"/>` +
       tFlag(flag, `x="${fx}" y="${y + 12}" width="22" height="15"`) +
