@@ -6,15 +6,16 @@ let topologyData = { topologies: [], tunnels: [] };
 // serves; /api/mesh/servers contributes the per-server address. A topology
 // side renders every server it has — one line per datacenter group.
 let topoServersByTopo = {};
-let topoDcLoaded = false;
+let topoDcLoaded = ''; // the topology name the cache belongs to
 let topologyDcFilter = 'all';
 let topoPage = 1;
 let topoPerPage = 10;
 let topoTunFilter = 'all';
 function topoIsFa() { return typeof currentLang !== 'undefined' && currentLang === 'fa'; }
 async function topoDcLoad(topo) {
-  if (topoDcLoaded) return;
-  topoDcLoaded = true;
+  const key = topo ? topo.name : '';
+  if (topoDcLoaded === key) return;
+  topoDcLoaded = key;
   try {
     const [ag, sv] = await Promise.all([api('/api/ui/agents'), api('/api/mesh/servers')]);
     window.__topoAgents = (ag.agents || []);
@@ -590,7 +591,7 @@ function topologyGraph(topo, tunnels) {
     const online = !!(agRow && agRow.status === 'online');
     const info = { name: s.name, dc: s.dc, cc: s.cc || (side === 'iran' ? 'IR' : String(topo.country || '').toUpperCase()), ip: s.ip || (side === 'iran' ? iranIp : foreignIp) };
     const title = s.name || (side === 'iran' ? tr('', 'Iran server') : countryLabel);
-    const flag = side === 'iran' ? 'ir' : topo.country;
+    const flag = side === 'iran' ? 'ir' : topoDcCc(t, side);
     const pk = portKind[(side === 'iran' ? 'iran:' : 'foreign:') + i] || 'off';
     // the glowing port on the edge facing the other column (top/bottom in
     // the vertical stack)
@@ -686,7 +687,7 @@ function topologyGraph(topo, tunnels) {
     const lbl = side === 'iran' ? tr('', 'IRAN SERVERS') : tr('', 'FOREIGN SERVERS');
     const m = rtl && !vert;
     const x = col.x - 12, y = col.y - 8;
-    const flag = side === 'iran' ? 'ir' : topo.country;
+    const flag = side === 'iran' ? 'ir' : topoDcCc(t, side);
     const fx = m ? x + w + 12 - 14 - 22 : x + 14;
     return `<g class="topo-colbox ${side}"><rect class="topo-col-bg" x="${x}" y="${y}" width="${w + 24}" height="${h}" rx="16"/>` +
       tFlag(flag, `x="${fx}" y="${y + 12}" width="22" height="15"`) +
@@ -745,7 +746,7 @@ function topoAgentTunnels(topo) {
     return true;
   });
 }
-function topoDcReset() { topoDcLoaded = false; topoServersByTopo = {}; }
+function topoDcReset() { topoDcLoaded = ''; topoServersByTopo = {}; }
 function renderTopoMembers(topo) {
   const card = $('topoMembersCard');
   if (!card || !topo) { if (card) card.innerHTML = ''; return; }
@@ -2114,7 +2115,8 @@ async function topoCreateFinish() {
       const first = list.map(id => (topoCreate.pool.agents.find(a => a.id === id) || {}).server || {}).find(s => s && s.id != null);
       return first ? (topoCreate.pool.addr[first.id] || '') : '';
     };
-    const r = await api('/api/topologies', { name: v.name, role: 'iran', local_ip: ipOf(v.agentsIran), remote_ip: ipOf(v.agentsForeign), country: '', tunnel_ids: [] });
+    const firstForeign = topoCreateAgentsOf('foreign', v.dcForeign).find(a => v.agentsForeign.indexOf(a.id) >= 0);
+    const r = await api('/api/topologies', { name: v.name, role: 'iran', local_ip: ipOf(v.agentsIran), remote_ip: ipOf(v.agentsForeign), country: (firstForeign && firstForeign.country || '').toLowerCase(), tunnel_ids: [] });
     // the chosen agents join: the same member-add the map's + button uses
     let added = 0, failed = 0;
     for (const id of [...v.agentsIran, ...v.agentsForeign]) {
