@@ -60,7 +60,14 @@ func meshStoreOr503(w http.ResponseWriter, r *http.Request) *store.Store {
 	s, err := MeshStore()
 	if err != nil {
 		noteStoreRetry()
-		writeAPIError(w, r, "E-SYS-01", "mesh store unavailable: "+err.Error())
+		// BACKEND-36 (PHASE35 leftover): the store-open error text carries
+		// filesystem paths and driver internals — L1-gray on the wire.
+		// B-AG2 discipline, the same split as meshErr below: the full raw
+		// detail goes to the durable log (panel.log), while the client and
+		// the client-served error journal keep only the masked string.
+		log.Printf("[mesh] store open failed behind E-SYS-01 on %s %s (masked in the API response): %s",
+			r.Method, r.URL.Path, capReportString(err.Error(), maxReportString))
+		writeAPIError(w, r, "E-SYS-01", "mesh store unavailable (details in the panel error journal)")
 		return nil
 	}
 	return s
@@ -111,6 +118,15 @@ func meshErr(w http.ResponseWriter, r *http.Request, err error) {
 	case err != nil && strings.Contains(err.Error(), "referenced by other records"):
 		writeAPIError(w, r, "E-IN-05", err.Error())
 	default:
+		// B-AG2 (REFACTOR-A1 §3.2): the client AND this error journal see
+		// only the masked string (L1 — sqlite internals must not reach the
+		// client), so the underlying store error was persisted nowhere and
+		// masked failures were undiagnosable. The raw detail goes to the
+		// durable log (panel.log) here, capped like every reported string.
+		if err != nil {
+			log.Printf("[mesh] store error behind E-SYS-01 on %s %s (masked in the API response): %s",
+				r.Method, r.URL.Path, capReportString(err.Error(), maxReportString))
+		}
 		writeAPIError(w, r, "E-SYS-01", meshSafeDetail(err))
 	}
 }

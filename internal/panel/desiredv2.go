@@ -340,17 +340,17 @@ func latestArtifactVersionFor(s *store.Store, engine, arch string) string {
 	return latestArtifactVersionIn(arts, engine, arch)
 }
 
+// latestArtifactVersionIn delegates the artifact-pin pick to the shared
+// protocol.PickArtifactVersion (REFACTOR-S6/A6 D5: the logic was mirrored
+// panel-side; the protocol now owns it — same plain-string comparison
+// with the pinned "1.9">"1.10" lexicographic quirk, first row wins ties,
+// empty versions never win).
 func latestArtifactVersionIn(arts []store.EngineArtifact, engine, arch string) string {
-	best := ""
+	rows := make([]protocol.ArtifactVersionRow, 0, len(arts))
 	for _, a := range arts {
-		if a.Engine != engine || a.Goarch != arch || a.Version == "" {
-			continue
-		}
-		if best == "" || a.Version > best {
-			best = a.Version
-		}
+		rows = append(rows, protocol.ArtifactVersionRow{Engine: a.Engine, Goarch: a.Goarch, Version: a.Version})
 	}
-	return best
+	return protocol.PickArtifactVersion(rows, engine, arch)
 }
 
 // stampArtifactVersions is the phase-31 re-sync-on-enable lever (§2.6):
