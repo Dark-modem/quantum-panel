@@ -91,6 +91,7 @@
     tuDownWarn: ['این تانل قطع است — اتصال برقرار نیست.', 'This tunnel is down — the connection is not established.'],
     tuTechT: ['جزئیات فنی', 'Technical details'],
     tuConnQ: ['کیفیت اتصال', 'Connection quality'],
+    tuQualityT: ['کیفیت اتصال و مصرف موتور', 'Connection quality & engine usage'],
     tuEngineUse: ['مصرف موتور', 'Engine usage'],
     tuLiveRate: ['سرعت لحظه‌ای', 'Live rate'],
     tuDownRate: ['دانلود', 'Download rate'],
@@ -208,7 +209,7 @@
     tuD30: ['ترافیک ۳۰\u00a0روزه', '30d\u00a0traffic'],
     tuOpen: ['مشاهده تانل', 'View tunnel'],
     tuBackList: ['بازگشت به تانل‌ها', 'Back to tunnels'],
-    tuEndsT: ['دو سر تانل', 'Tunnel endpoints'],
+    tuEndsT: ['مسیر تانل', 'Tunnel route'],
     tuSideIran: ['سمت ایران', 'Iran side'],
     tuSideForeign: ['سمت خارج', 'Foreign side'],
     tuTrafficT: ['ترافیک', 'Traffic'],
@@ -643,7 +644,7 @@
     '.tu-side-dc { font-size:12.5px; }',
     '.tu-side-chips { display:flex; gap:6px; flex-wrap:wrap; margin-top:2px; }',
     '.tu-chip { display:inline-flex; align-items:center; gap:5px; padding:2px 9px; border:1px solid var(--ln); border-radius:999px; font-size:12px; } .tu-chip svg { border-radius:2px; }',
-    '.tu-side-ag { margin-top:6px; }',
+    '.tu-side-ag { margin-top:6px; } .tu-side-ag svg { width:15px; height:15px; flex:none; fill:none; stroke:currentColor; stroke-width:1.8; }',
     '.tun-conn { position:relative; display:flex; align-items:center; justify-content:center; min-height:96px; }',
     '.tun-conn-svg { position:absolute; inset:0; width:100%; height:100%; }',
     '.tu-conn-pill { position:relative; z-index:1; display:inline-flex; align-items:center; gap:7px; padding:5px 14px; border-radius:999px; background:var(--s1); border:1px solid; font-size:12.5px; font-weight:700; white-space:nowrap; }',
@@ -1413,9 +1414,9 @@
       '<div class="tunnel-card">' +
       '<p class="tc-title dcard-title">' + MTB_ICO.tun + esc(L('tuEndsT')) + '</p>' +
       '<div class="tu-route' + (state === 'down' ? ' down' : '') + '">' +
-      tuSideCard(t.local_server, ipOf('iran'), L('tuSideIran')) +
+      tuSideCard('iran', t.local_server, ipOf('iran'), L('tuSideIran')) +
       tuConnector(state) +
-      tuSideCard(t.remote_server, ipOf('foreign'), L('tuSideForeign')) +
+      tuSideCard('foreign', t.remote_server, ipOf('foreign'), L('tuSideForeign')) +
       '</div>' +
       '</div>' +
 
@@ -1458,6 +1459,15 @@
       '</div>';
 
     setBody('mtun', html);
+
+    // the channel toggle re-renders the cached payload — no refetch needed
+    document.querySelectorAll('#tab-mtun [data-tuchan]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (tunChannel === b.getAttribute('data-tuchan')) return;
+        tunChannel = b.getAttribute('data-tuchan');
+        renderTuDetailBody(d, svList);
+      });
+    });
 
     // the chart tooltip: nearest bucket on hover, exact time + byte counts
     var svgEl = document.getElementById('tuChartSvg');
