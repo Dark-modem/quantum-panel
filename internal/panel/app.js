@@ -9239,6 +9239,8 @@ async function loadBenchWizard() {
   try {
     const [topos, st] = await Promise.all([api('/api/mesh/topologies'), api('/api/benchmark/pair')]);
     if (st.running) { bwState.running = true; bwState.view = st; bwTimer = setTimeout(bwPoll, 2000); bwRenderRun(st); return; }
+    // a finished (or restart-interrupted) run keeps its results on show
+    if ((st.results || []).length) { bwState.running = false; bwState.view = st; bwRenderRun(st); return; }
     bwState.pool = topos.topologies || [];
     bwRender();
   } catch (err) {

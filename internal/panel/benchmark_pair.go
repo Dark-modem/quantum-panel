@@ -13,6 +13,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -58,7 +60,80 @@ var (
 	pairCur *pairBenchState
 )
 
+// The pair benchmark lives in memory while it runs — a panel restart kills
+// the goroutine — but its partial results must NOT vanish with it: the
+// state file is rewritten on every progress step and restored on boot, so
+// the operator always sees what completed before the restart.
+func benchmarkPairFile() string {
+	return filepath.Join(configDir, "benchmark-pair.json")
+}
+
+func savePairStateLocked() {
+	if pairCur == nil {
+		return
+	}
+	pairMu.Unlock()
+	defer pairMu.Lock()
+	blob, err := json.MarshalIndent(map[string]any{
+		"topo_name": pairCur.topoName,
+		"engines":   pairCur.engines,
+		"cur":       pairCur.cur,
+		"phase":     pairCur.phase,
+		"results":   pairCur.results,
+		"started":   pairCur.startedAt.Unix(),
+		"finished":  pairCur.finishedAt.Unix(),
+	}, "", "  ")
+	if err != nil {
+		return
+	}
+	tmp := benchmarkPairFile() + ".tmp"
+	if err := os.WriteFile(tmp, blob, 0o600); err != nil {
+		return
+	}
+	_ = os.Rename(tmp, benchmarkPairFile())
+}
+
+func restorePairState() {
+	blob, err := os.ReadFile(benchmarkPairFile())
+	if err != nil {
+		return
+	}
+	var saved struct {
+		TopoName string            `json:"topo_name"`
+		Engines  []string          `json:"engines"`
+		Cur      int               `json:"cur"`
+		Phase    string            `json:"phase"`
+		Results  []pairBenchResult `json:"results"`
+		Started  int64             `json:"started"`
+		Finished int64             `json:"finished"`
+	}
+	if err := json.Unmarshal(blob, &saved); err != nil {
+		return
+	}
+	if len(saved.Results) == 0 {
+		return
+	}
+	pairCur = &pairBenchState{
+		topoName:   saved.TopoName,
+		engines:    saved.Engines,
+		cur:        saved.Cur,
+		phase:      saved.Phase,
+		results:    saved.Results,
+		startedAt:  time.Unix(saved.Started, 0),
+		finishedAt: time.Unix(saved.Finished, 0),
+	}
+	if saved.Finished == 0 && pairCur.cur < len(saved.Engines) {
+		pairCur.results = append(pairCur.results, pairBenchResult{
+			Engine: saved.Engines[pairCur.cur], Status: "stopped",
+			Note: "the panel restarted while this engine was running",
+		})
+	}
+}
+
+var pairRestored sync.Once
+
 func pairBenchSnapshot() map[string]any {
+	pairRestored.Do(restorePairState)
 	pairMu.Lock()
 	defer pairMu.Unlock()
 	if pairCur == nil {
@@ -179,6 +254,9 @@ func handleBenchmarkPairRun(w http.ResponseWriter, r *http.Request) {
 		startedAt:    time.Now(),
 	}
 	pairCur = st
+	pairMu.Lock()
+	savePairStateLocked()
+	pairMu.Unlock()
 	LogSecurityAudit("pair_bench_start", cfg.Username, clientIP(r),
 		fmt.Sprintf("topology=%q iran=%d foreign=%d engines=%d", topo.Name, body.IranServer, body.ForeignServer, len(engines)))
 	go st.run()
@@ -210,6 +288,9 @@ func (p *pairBenchState) finish() {
 	p.running = false
 	p.finishedAt = time.Now()
 	p.mu.Unlock()
+	pairMu.Lock()
+	savePairStateLocked()
+	pairMu.Unlock()
 }
 
 func (p *pairBenchState) run() {
@@ -307,6 +388,9 @@ func (p *pairBenchState) pushResult(r pairBenchResult) {
 	p.mu.Lock()
 	p.results = append(p.results, r)
 	p.mu.Unlock()
+	pairMu.Lock()
+	savePairStateLocked()
+	pairMu.Unlock()
 }
 
 func (p *pairBenchState) finishEngine(engStart time.Time) {
