@@ -913,6 +913,9 @@ const I18N = {
     bench_tbl_status: "Status",
     bench_tbl_action: "Action",
 
+    bench_wiz_title: "Pair Benchmark",
+    bench_wiz_sub: "Pick a topology, then its Iran and foreign agents, and run a full benchmark through the engines you choose. Real temporary tunnels are built, measured and removed — no invented numbers.",
+
     // Diagnostics / Doctor Tab
     doc_title: "Network Doctor & Diagnostic Suite",
     doc_sub: "Automated end-to-end path tests, MTU probe, socket exhaustion check, and routing health",
@@ -9426,7 +9429,9 @@ function bwRenderRun(st) {
     '<td class="u-text-center">' + (r.rtt_ms ? esc(Math.round(r.rtt_ms) + ' ms') : '—') + '</td>' +
     '<td class="u-text-center">' + (r.score ? esc(String(r.score)) : '—') + '</td>' +
     '<td class="u-text-center">' + (r.note ? '<span class="qs-hint">' + esc(r.note) + '</span>' : '—') + '</td></tr>').join('');
-  const cur = st.running ? '<div class="u-hint-12 u-mb-12">' + esc(tr('', 'Running')) + ': <b>' + esc(String(st.cur_engine || '')) + '</b> — ' + esc(String(st.phase || '')) + '</div>' : '';
+  // the orchestration phases read as status text, not machine words
+  const bwPhase = { create: 'Building the temporary tunnel', converge: 'Waiting for the tunnel to come up', measure: 'Measuring the counters', cleanup: 'Removing the tunnel' };
+  const cur = st.running ? '<div class="u-hint-12 u-mb-12">' + esc(tr('', 'Running')) + ': <b>' + esc(String(st.cur_engine || '')) + '</b> — ' + esc(tr('', bwPhase[String(st.phase || '')] || String(st.phase || ''))) + '</div>' : '';
   host.innerHTML =
     '<div class="tc-header u-bb-ln u-pb-16 u-mb-16"><div><span class="tc-title u-fs-18 u-fw-700">' + esc(tr('', 'Pair benchmark')) + '</span>' +
     '<div class="qs-hint u-mt-4">' + esc(String(st.topo_name || '')) + '</div></div></div>' +
