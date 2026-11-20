@@ -75,6 +75,7 @@
     agDelPh: ['اسم ایجنت', 'agent name'],
     agDelNo: ['اسم ایجنت را دقیق بنویس تا دکمه حذف فعال شود', 'Type the exact agent name to enable Delete'],
     agDelQ: ['این عملیات قابل بازگشت نیست. برای ادامه، نام ایجنت را دقیقاً وارد کنید.', 'This action cannot be undone. To continue, enter the agent name exactly.'],
+    agDelDone: ['ایجنت حذف شد', 'Agent deleted'],
     agDelEnable: ['برای فعال شدن حذف، نام ایجنت را دقیق وارد کنید.', 'Enter the exact agent name to enable Delete'],
     agDelWarn2: ['این عملیات غیرقابل بازگشت است و تمام اطلاعات مربوط به این ایجنت حذف خواهد شد.', 'This action is irreversible and everything belonging to this agent will be removed.'],
     agCopied: ['کپی شد!', 'Copied!'],
@@ -2682,9 +2683,17 @@
     });
     ov.querySelector('#mtbAgDelGo').addEventListener('click', function () {
       if (delGo.disabled) return;
+      var btn = this;
       apiSend('DELETE', 'api/ui/agents/' + encodeURIComponent(id)).then(function () {
-        ov.remove(); agtView = { view: 'table' }; renderAgt();
-      }).catch(function () { ov.remove(); });
+        ov.remove();
+        toastOk(L('agDelT'), L('agDelDone'));
+        agtView = { view: 'table' }; renderAgt();
+      }).catch(function (e2) {
+        btn.disabled = false;
+        var msg = (e2.body && e2.body.ui && e2.body.ui.title) ? (isFa() ? e2.body.ui.title.fa : e2.body.ui.title.en)
+          : ((e2.body && (e2.body.error || e2.body.message)) || e2.message || ('HTTP ' + e2.status));
+        toastErr(L('agDelT'), msg);
+      });
     });
   }
 
