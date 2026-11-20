@@ -1339,6 +1339,7 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
    direction mirroring. */
 .topo-back { display:inline-flex; align-items:center; gap:8px; color:var(--ac); background:color-mix(in srgb, var(--ac) 12%, transparent); border:1px solid color-mix(in srgb, var(--ac) 38%, transparent); }
 .topo-back .topo-back-ic { width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; flex:none; }
+.topo-addtun-ic { width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; flex:none; margin-inline-end:2px; }
 /* RTL: the back arrow flips so its head points left, with the reading flow */
 [dir="rtl"] .topo-back .topo-back-ic { transform:scaleX(-1); }
 .topo-back:hover, .topo-back:focus-visible { color:var(--ac); background:color-mix(in srgb, var(--ac) 20%, transparent); border-color:var(--ac); }
