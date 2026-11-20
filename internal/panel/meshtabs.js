@@ -1710,6 +1710,9 @@
     });
     document.getElementById('mtbExpiry').addEventListener('input', function () {
       var v = parseInt(this.value, 10);
+      // live-clamp to the backend's 1-365 window so the field never shows
+      // a value the mint would silently rewrite
+      if (!isNaN(v) && v > 365) { v = 365; this.value = v; }
       ov.querySelectorAll('.mtb-chip').forEach(function (c2) { c2.classList.toggle('on', parseInt(c2.getAttribute('data-days'), 10) === v); });
     });
     if (typeof wizSave === 'function') { /* wired below after wizSave exists */ }
