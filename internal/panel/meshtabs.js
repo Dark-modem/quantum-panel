@@ -646,7 +646,7 @@
     '.tu-chip { display:inline-flex; align-items:center; gap:5px; padding:2px 9px; border:1px solid var(--ln); border-radius:999px; font-size:12px; } .tu-chip svg { border-radius:2px; }',
     '.tu-side-ag { margin-top:6px; } .tu-side-ag svg { width:15px; height:15px; flex:none; fill:none; stroke:currentColor; stroke-width:1.8; }',
     '.tun-conn { position:relative; display:flex; align-items:center; justify-content:center; min-height:96px; }',
-    '.tun-conn-svg { position:absolute; inset:0; width:100%; height:100%; }',
+    '.tun-conn-line { position:absolute; left:14px; right:14px; top:50%; height:3px; transform:translateY(-50%); border-radius:3px; opacity:.85; }',
     '.tu-conn-pill { position:relative; z-index:1; display:inline-flex; align-items:center; gap:7px; padding:5px 14px; border-radius:999px; background:var(--s1); border:1px solid; font-size:12.5px; font-weight:700; white-space:nowrap; }',
     '.tu-conn-pill i { width:9px; height:9px; border-radius:50%; display:inline-block; }',
     '.tu-updated { display:inline-flex; align-items:center; gap:6px; font-size:12px; } .tu-updated svg { width:13px; height:13px; fill:none; stroke:currentColor; stroke-width:1.8; }',
@@ -687,7 +687,7 @@
     '.tu-downwarn { display:flex; align-items:center; gap:10px; padding:10px 16px; border:1px solid color-mix(in srgb, var(--er) 40%, transparent); background:color-mix(in srgb, var(--er) 9%, transparent); border-radius:12px; color:var(--er); font-weight:700; } .tu-downwarn svg { width:17px; height:17px; flex:none; fill:none; stroke:currentColor; stroke-width:1.9; }',
     '.tu-tech { margin-top:10px; } .tu-tech summary { cursor:pointer; color:var(--mu); font-size:12.5px; } .tu-tech-err { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:6px 0 0; font-size:12px; }',
     '@media (max-width: 900px) { .tu-head-grid { grid-template-columns:1fr; } .tu-ws { border:none; padding-inline:0; } .tu-ops { justify-content:flex-start; } }',
-    '@media (max-width: 760px) { .tu-route { grid-template-columns:1fr; } .tun-conn { min-height:56px; } .tun-conn-svg { transform:rotate(90deg); } .tu-ops button { min-height:44px; } .tu-key { max-width:260px; } }',
+    '@media (max-width: 760px) { .tu-route { grid-template-columns:1fr; } .tun-conn { min-height:56px; } .tun-conn-line { left:50%; right:auto; top:14px; bottom:14px; width:3px; height:auto; transform:translateX(-50%); background:repeating-linear-gradient(180deg, var(--mu) 0 10px, transparent 10px 17px) !important; } .tu-ops button { min-height:44px; } .tu-key { max-width:260px; } }',
     '@media (prefers-reduced-motion: reduce) { main.page section[id^="tab-m"] * { animation: none !important; transition: none !important; } }'
   ].join('\n');
 
@@ -1202,10 +1202,12 @@
   function tuConnector(state) {
     var col = tuStateColor(state);
     var stLbl = L('st_' + (state || 'unknown')) !== 'st_' + (state || 'unknown') ? L('st_' + (state || 'unknown')) : (state || '');
+    // a plain CSS line: the stretched svg distorted its stroke into a fat bar
+    var lineStyle = state === 'down'
+      ? 'background:repeating-linear-gradient(90deg, ' + col + ' 0 10px, transparent 10px 17px)'
+      : 'background:' + col;
     return '<div class="tun-conn">' +
-      '<svg class="tun-conn-svg" viewBox="0 0 200 12" preserveAspectRatio="none" aria-hidden="true">' +
-      '<line x1="0" y1="6" x2="200" y2="6" stroke="' + col + '" stroke-width="3" stroke-linecap="round" stroke-dasharray="' + (state === 'down' ? '10 8' : 'none') + '" opacity=".9"/>' +
-      '</svg>' +
+      '<div class="tun-conn-line" style="' + lineStyle + '"></div>' +
       '<span class="tu-conn-pill" style="border-color:' + col + ';color:' + col + '"><i style="background:' + col + '"></i>' + esc(stLbl) + '</span>' +
       '</div>';
   }
@@ -1402,9 +1404,9 @@
       '</div>' +
       // group 3: operations — delete stays separated from the regular actions
       '<div class="tu-ops">' +
-      '<button type="button" class="quantum-btn mtb-backbtn" data-tuback>' + esc(L('tuBackList')) + '</button>' +
       '<button type="button" class="quantum-btn quantum-btn-secondary u-btn-xs" data-tuweight="' + esc(t.topology && t.topology.id) + '|' + esc(key) + '">' + MTB_ICO.pen + esc(L('tuWeightT')) + '</button>' +
       '<button type="button" class="quantum-btn quantum-btn-danger u-btn-xs" data-tudel="' + esc(t.id) + '|' + esc(key) + '">' + MTB_ICO.trash + esc(L('agActDel')) + '</button>' +
+      '<button type="button" class="quantum-btn mtb-backbtn" data-tuback>' + esc(L('tuBackList')) + ' <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg></button>' +
       '</div>' +
       '</div></div>' +
 
@@ -1413,7 +1415,7 @@
       // the route: two side cards joined by the state-colored line
       '<div class="tunnel-card">' +
       '<p class="tc-title dcard-title">' + MTB_ICO.tun + esc(L('tuEndsT')) + '</p>' +
-      '<div class="tu-route' + (state === 'down' ? ' down' : '') + '">' +
+      '<div class="tu-route">' +
       tuSideCard('iran', t.local_server, ipOf('iran'), L('tuSideIran')) +
       tuConnector(state) +
       tuSideCard('foreign', t.remote_server, ipOf('foreign'), L('tuSideForeign')) +
