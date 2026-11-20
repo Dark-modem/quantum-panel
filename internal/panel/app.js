@@ -115,7 +115,7 @@ function stateError(msg, actionKey, compact) {
 }
 // Retry / action buttons re-run the loader that rendered them.
 const STATE_ACTIONS = {
-  benchmark: () => loadBenchmark(), runbench: () => runBenchmarkClick(), logs: () => loadLogs(),
+  benchmark: () => loadBenchWizard(), logs: () => loadLogs(),
   errors: () => loadErrors(), status: () => refresh(), rslogs: () => refreshRightSidebarLogs(),
   setup: () => goTab('setup'),
 };
@@ -351,7 +351,7 @@ function goTab(name) {
   if (name === 'dashboard') loadUsage();
   if (name === 'watchdog') loadWatchdog();
   if (name === 'doctor') loadDoctor();
-  if (name === 'benchmark') { loadBenchmark(); loadPathTest(); }
+  if (name === 'benchmark') { loadBenchWizard(); }
   if (name === 'spoof') loadSpoof();
   if (name === 'xray') loadXray();
   if (name === 'update') loadVersion();
@@ -9226,623 +9226,221 @@ function editMainPortsClick() {
   if (ov) ov.addEventListener('click', e => { if (e.target === ov) closeEditPorts(); });
 })();
 
-// ---------- Benchmark & Peer Link (tab-benchmark) ----------
-let benchData = null;
-let peerData = null;
-let benchRunning = false;
+// ---------- Pair Benchmark (tab-benchmark): topology -> Iran agent ->
+// foreign agent -> every engine enabled on both -> real temporary tunnels,
+// measured and removed. Replaces the old carrier-benchmark leftovers.
+let bwState = { step: 1, topo: null, topoName: '', iran: null, iranAgent: '', foreign: null, foreignAgent: '', engines: [], picked: [], pool: null, running: false, view: null, timer: null };
 
-async function loadBenchmark(forceRun = false) {
-  let benchErr = null;
-  const _tb = $('benchTableBody');
-  if (_tb && !(benchData && benchData.metrics && benchData.metrics.length)) _tb.innerHTML = '<tr><td colspan="10">' + skel(3) + '</td></tr>';
+async function loadBenchWizard() {
+  const host = $('benchWizard');
+  if (!host) return;
+  if (bwState.running) { bwPoll(); return; }
+  host.innerHTML = '<div class="u-grid u-gap-8">' + skel(4) + '</div>';
   try {
-    if (forceRun) {
-      const targetHost = ($('benchTargetHost') ? $('benchTargetHost').value.trim() : '');
-      const targetRole = ($('benchTargetRole') ? $('benchTargetRole').value : 'iran');
-      const frpPort = parseInt($('benchFrpPort') ? $('benchFrpPort').value : 7000) || 7000;
-      const wssPort = parseInt($('benchWssPort') ? $('benchWssPort').value : 8443) || 8443;
-      const backhaulPort = parseInt($('benchBackhaulPort') ? $('benchBackhaulPort').value : 3080) || 3080;
-      const bagherPort = parseInt($('benchBagherPort') ? $('benchBagherPort').value : 22) || 22;
-
-      const payload = {
-        target_host: targetHost,
-        target_role: targetRole,
-        frp_port: frpPort,
-        wss_port: wssPort,
-        backhaul_port: backhaulPort,
-        bagher_port: bagherPort
-      };
-      benchData = await api('/api/benchmark/run', payload);
-    } else {
-      benchData = await api('/api/benchmark');
-    }
+    const [topos, st] = await Promise.all([api('/api/mesh/topologies'), api('/api/benchmark/pair')]);
+    if (st.running) { bwState.running = true; bwState.view = st; bwTimer = setTimeout(bwPoll, 2000); bwRenderRun(st); return; }
+    bwState.pool = topos.topologies || [];
+    bwRender();
   } catch (err) {
-    benchErr = err;
-    reportErr('benchmark', err);
-  }
-
-  try {
-    peerData = await api('/api/peer/status');
-  } catch (err) {
-    reportErr('peerlink', err);
-  }
-
-  // Auto-detect target IP if empty and known from config or peer
-  const hostInput = $('benchTargetHost');
-  if (hostInput && !hostInput.value.trim()) {
-    if (peerData && peerData.peer_url) {
-      try {
-        const u = new URL(peerData.peer_url.startsWith('http') ? peerData.peer_url : 'http://' + peerData.peer_url);
-        if (u.hostname) {
-          hostInput.value = u.hostname;
-          if ($('benchAutoDetectBadge')) $('benchAutoDetectBadge').style.display = 'inline-block';
-        }
-      } catch (_) {}
-    } else if (benchData && benchData.target_host) {
-      hostInput.value = benchData.target_host;
-      if ($('benchAutoDetectBadge')) $('benchAutoDetectBadge').style.display = 'inline-block';
-    }
-  }
-
-  renderBenchmark(benchData, peerData);
-  if (benchErr && !(benchData && benchData.metrics && benchData.metrics.length) && _tb) {
-    _tb.innerHTML = '<tr><td colspan="10" class="u-text-center">' + stateError(benchErr.message, 'benchmark', true) + '</td></tr>';
+    host.innerHTML = stateError(err.message, 'benchwiz', true);
   }
 }
 
-function renderBenchmark(bench, peer) {
-  // Render Peer Link Status
-  if (peer) {
-    const isConn = peer.is_connected;
-    const badge = $('peerLinkBadge');
-    if (badge) {
-      badge.className = 'badge ' + (isConn ? 'ok' : 'err');
-      badge.textContent = isConn ? 'Connected' : (peer.peer_url ? 'Unreachable' : 'Not configured');
-    }
-    if ($('peerRoleVal')) $('peerRoleVal').textContent = (peer.role === 'master' ? 'Master (Iran)' : 'Worker (Foreign)');
-    if ($('peerUrlVal')) $('peerUrlVal').textContent = peer.peer_url || '—';
-    if ($('peerInternalVal')) $('peerInternalVal').textContent = peer.internal_ip || '—';
-    if ($('peerLatencyVal')) $('peerLatencyVal').textContent = (peer.latency_ms > 0 ? peer.latency_ms.toFixed(1) + ' ms' : '—');
-    if ($('peerLastSyncVal')) $('peerLastSyncVal').textContent = peer.last_sync || 'Never';
+function bwCard(icon, title, sub, on) {
+  return '<button type="button" class="mtb-agent-card bw-card' + (on ? ' on' : '') + '">' +
+    '<span class="mtb-agc-ico">' + icon + '</span>' +
+    '<span class="mtb-agc-tx"><b>' + esc(title) + '</b>' + (sub ? '<i>' + esc(sub) + '</i>' : '') + '</span>' +
+    (on ? '<span class="tu-pick-ok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg></span>' : '') +
+    '</button>';
+}
 
-    // Automatic Failover Policy
-    if ($('autoPilotToggle')) $('autoPilotToggle').checked = !!peer.autopilot;
-    if ($('autoPilotThresholdInput')) $('autoPilotThresholdInput').value = peer.threshold || 20;
-    if ($('autoPilotBadge')) {
-      const b = $('autoPilotBadge');
-      b.className = 'badge ' + (peer.autopilot ? 'warn' : 'dim');
-      b.textContent = peer.autopilot ? '[ ON ] Auto Switch' : '[ OFF ] Manual';
-    }
-  }
-
-  if (bench && bench.metrics && bench.metrics.length > 0) {
-    const winner = bench.metrics.find(m => m.is_recommended) || bench.metrics[0];
-    const active = bench.metrics.find(m => m.is_active) || { name: bench.active_carrier || 'Direct GRE', id: bench.active_carrier || 'direct' };
-    const minRtt = bench.metrics.reduce((acc, m) => (m.avg_rtt_ms > 0 && (acc === 0 || m.avg_rtt_ms < acc)) ? m.avg_rtt_ms : acc, 0);
-
-    const winnerName = winner ? (winner.name || winner.id).replace(/\s*\(.*?\)/, '') : '—';
-    const activeName = active ? (active.name || active.id).replace(/\s*\(.*?\)/, '') : '—';
-
-    // Winner Banner Showcase
-    const winnerBanner = $('benchWinnerBanner');
-    // A "winner" that never answered (score 0 / 100% loss) is not a recommendation.
-    const usable = !!winner && winner.score > 0 && winner.packet_loss < 100;
-    const runB = $('benchRunBtn');
-    if (runB) { runB.classList.toggle('quantum-btn-primary', !usable); runB.classList.toggle('quantum-btn-secondary', usable); }
-    if ($('benchRecBadge')) $('benchRecBadge').classList.toggle('hidden', !usable);
-    if (winnerBanner) { winnerBanner.classList.toggle('u-bd-ok', usable); winnerBanner.classList.toggle('u-bd-ln', !usable); }
-    if ($('benchWinnerScore')) { $('benchWinnerScore').classList.toggle('u-c-ok', usable); $('benchWinnerScore').classList.toggle('u-c-mu', !usable); }
-    if ($('benchApplyWinnerBtn')) $('benchApplyWinnerBtn').classList.toggle('hidden', !usable);
-    if (winner && !usable && winnerBanner) {
-      winnerBanner.classList.remove('hidden');
-      $('benchWinnerTitle').textContent = tr('bench_none_t', 'No Carrier Answered');
-      $('benchWinnerScore').textContent = '— / 100';
-      $('benchWinnerBadge').className = 'badge dim'; $('benchWinnerBadge').textContent = tr('bench_none_b', 'No Result');
-      $('benchWinnerDesc').textContent = tr('bench_none_d', 'Every probe was lost. Check the destination address and that the other server is online, then run the benchmark again.');
-    } else if (winner && winnerBanner) {
-      winnerBanner.classList.remove('hidden');
-      if ($('benchWinnerTitle')) $('benchWinnerTitle').textContent = winner.name || winner.id;
-      if ($('benchWinnerScore')) $('benchWinnerScore').textContent = `${winner.score} / 100`;
-      if ($('benchWinnerBadge')) {
-        const wb = $('benchWinnerBadge');
-        wb.className = 'badge ' + (winner.status === 'healthy' ? 'ok' : (winner.status === 'good' ? 'info' : 'warn'));
-        wb.textContent = winner.status === 'healthy' ? 'Highest Stability' : (winner.status === 'good' ? 'Good Quality' : 'Conditional');
+function bwRender() {
+  const host = $('benchWizard');
+  if (!host) return;
+  const steps = ['Topology', 'Iran agent', 'Foreign agent', 'Engines'];
+  let html = '<div class="mtb-wiz" id="bwSteps">' + steps.map((lb, i) =>
+    '<div class="mtb-wstep' + (i + 1 === bwState.step ? ' on' : '') + (i + 1 < bwState.step ? ' done' : '') + '" data-st="' + (i + 1) + '"><span class="mtb-wstep-dot">' + (i + 1 < bwState.step ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>' : (i + 1)) + '</span><span class="mtb-wstep-lbl">' + esc(tr('', lb)) + '</span></div>' +
+    (i < steps.length - 1 ? '<span class="mtb-wline"></span>' : '')).join('') + '</div>';
+  html += '<div id="bwBody"></div>';
+  html += '<div class="mtb-acts"><button type="button" class="quantum-btn quantum-btn-secondary" id="bwBack"' + (bwState.step === 1 ? ' hidden' : '') + '>' + esc(tr('', 'Back')) + '</button>' +
+    '<button type="button" class="quantum-btn quantum-btn-primary" id="bwNext"' + (bwState.step === 4 ? '' : '') + '>' + esc(bwState.step === 4 ? tr('', 'Run full benchmark') : tr('', 'Next')) + '</button></div>';
+  host.innerHTML = html;
+  bwRenderBody();
+  const back = $('bwBack'), next = $('bwNext');
+  if (back) back.onclick = () => { if (bwState.step > 1) { bwState.step--; bwRender(); } };
+  if (next) next.onclick = bwNext;
+  // delegation: the step bodies render async, so the card handlers ride the
+  // host element once instead of chasing every re-render
+  if (!host.__bwWired) {
+    host.__bwWired = true;
+    host.addEventListener('click', ev => {
+      const pick = ev.target && ev.target.closest ? ev.target.closest('[data-bwpick]') : null;
+      if (pick) {
+        const kind = pick.getAttribute('data-bwpick'), v = pick.getAttribute('data-bwv');
+        if (kind === 'topo') { bwState.topo = v; bwState.topoName = pick.getAttribute('data-bwname') || v; bwState.iran = null; bwState.foreign = null; bwState.engines = null; bwState.picked = null; }
+        if (kind === 'iran') { bwState.iran = v; bwState.iranAgent = pick.getAttribute('data-bwagent') || ''; bwState.foreign = null; bwState.foreignAgent = ''; bwState.engines = null; bwState.picked = null; }
+        if (kind === 'foreign') { bwState.foreign = v; bwState.foreignAgent = pick.getAttribute('data-bwagent') || ''; bwState.engines = null; bwState.picked = null; }
+        bwState.step++;
+        bwRender();
+        return;
       }
-      if ($('benchWinnerDesc')) {
-        const rttTxt = winner.avg_rtt_ms > 0 ? `${winner.avg_rtt_ms} ms RTT` : 'Fast response';
-        $('benchWinnerDesc').textContent = `Based on live test, this protocol with packet loss ${winner.packet_loss}% and ${rttTxt} offers the best throughput for bypassing filtering and network disruption.`;
-      }
-      const applyBtn = $('benchApplyWinnerBtn');
-      if (applyBtn) {
-        applyBtn.onclick = () => smartApplyOrSetupCarrier(winner.id, winner.name);
-      }
-    } else if (winnerBanner) {
-      winnerBanner.classList.add('hidden');
-    }
-
-    if ($('benchStatWinner')) $('benchStatWinner').textContent = usable ? winnerName : '—';
-    if ($('benchStatWinnerSub')) $('benchStatWinnerSub').textContent = usable ? `Score: ${winner.score}/100 · ${winner.avg_rtt_ms} ms` : tr('bench_none_b', 'No Result');
-    if ($('benchStatActive')) $('benchStatActive').textContent = activeName;
-    if ($('benchStatActiveSub')) $('benchStatActiveSub').textContent = 'Active Network Carrier';
-    if ($('benchStatMinRtt')) $('benchStatMinRtt').textContent = minRtt > 0 ? `${minRtt.toFixed(1)} ms` : (winner && winner.avg_rtt_ms > 0 ? `${winner.avg_rtt_ms} ms` : '—');
-    if ($('benchStatMinRttSub')) $('benchStatMinRttSub').textContent = 'Minimum Round Trip Time';
-    if ($('benchStatLoss')) $('benchStatLoss').textContent = winner ? `${winner.packet_loss}%` : '0%';
-    if ($('benchStatLossSub')) $('benchStatLossSub').textContent = (winner && winner.packet_loss === 0) ? 'No Packet Loss' : 'Best Carrier Packet Loss';
-
-    if ($('benchMetaSub')) {
-      const tgt = bench.target_host ? `to ${bench.target_host}` : '';
-      $('benchMetaSub').textContent = `Last benchmark: ${bench.timestamp || '—'} · Tested ${bench.metrics.length} carriers ${tgt}`;
-    }
-  }
-
-  if (bench && bench.auto_pilot) {
-    if ($('autoPilotLastVal')) $('autoPilotLastVal').textContent = bench.auto_pilot.last_triggered || 'None';
-    if ($('autoPilotCountVal')) $('autoPilotCountVal').textContent = bench.auto_pilot.trigger_count || 0;
-  }
-
-  // Render Table
-  const tbody = $('benchTableBody');
-  if (!tbody) return;
-
-  if (!bench || !bench.metrics || bench.metrics.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="10" class="u-text-center">${stateEmpty({ title: 'No benchmark run yet', msg: 'Enter foreign server address and click Run Smart Benchmark.', actionKey: 'runbench', actionLabel: 'Run Smart Benchmark', compact: true })}</td></tr>`;
-    return;
-  }
-
-  let html = '';
-  bench.metrics.forEach((m, idx) => {
-    const isWinner = !!m.is_recommended;
-    const isActive = !!m.is_active;
-
-    let statusClass = 'dim';
-    let statusLabel = m.status;
-    if (m.status === 'healthy') {
-      statusClass = 'ok';
-      statusLabel = 'Excellent';
-    } else if (m.status === 'good') {
-      statusClass = 'info';
-      statusLabel = 'Good';
-    } else if (m.status === 'warning') {
-      statusClass = 'warn';
-      statusLabel = 'Lossy';
-    } else if (m.status === 'critical' || m.status === 'down') {
-      statusClass = 'err';
-      statusLabel = 'Down';
-    } else if (m.status === 'unmeasured') {
-      statusClass = 'dim';
-      statusLabel = 'Not measured';
-    }
-
-    let lossClass = 'ok';
-    if (m.packet_loss > 0 && m.packet_loss <= 15) lossClass = 'warn';
-    else if (m.packet_loss > 15) lossClass = 'err';
-
-    const rank = idx + 1;
-    const rankBadge = `<span class="bench-rank-num ${rank === 1 ? 'bench-rank-1' : ''}">${rank}</span>`;
-
-    const cleanName = (m.name || m.id).replace(/\s*\(.*?\)/, '');
-    const cleanSub = m.name && m.name.includes('(') ? m.name.match(/\((.*?)\)/)[1] : '';
-
-    const portStr = m.port > 0 ? m.port : 'Raw 47';
-
-    // Protocol pill: one neutral style, the label carries the meaning (status colors stay for status).
-    const tLower = (m.type || '').toLowerCase();
-    const protoLabel = (tLower === 'gre' || tLower === 'direct') ? 'GRE DIRECT'
-      : tLower === 'frp_tcp' ? 'FRP TCP' : tLower === 'frp_kcp' ? 'FRP KCP' : tLower === 'frp_quic' ? 'FRP QUIC'
-      : (tLower === 'frp_ws' || tLower === 'websocket') ? 'WEBSOCKET' : (tLower === 'frp_wss' || tLower === 'wss') ? 'WSS'
-      : tLower.includes('backhaul') ? 'BACKHAUL' : (tLower.includes('ssh') || tLower.includes('bagher')) ? 'BAGHER SSH'
-      : (m.type || '').toUpperCase();
-    const protoPill = `<span class="bench-proto-pill">${esc(protoLabel)}</span>`;
-
-    const rowBg = isActive
-      ? 'background:color-mix(in srgb, var(--info) 6%, transparent);'
-      : (isWinner ? 'background:color-mix(in srgb, var(--ok) 4%, transparent);' : '');
-
-    html += `<tr class="${isActive ? 'row-active' : ''}" style="${rowBg}">
-      <td class="u-text-center u-w-44">${rankBadge}</td>
-      <td>
-        <div class="u-flex-center-gap8">
-          <strong class="u-c-tx u-fs-14">${esc(cleanName)}</strong>
-          ${isActive ? `<span class="badge ok">Active</span>` : ''}
-          ${isWinner ? `<span class="badge info">Recommended</span>` : ''}
-        </div>
-        ${cleanSub ? `<div class="u-fs-12 u-c-mu u-mt-2">${esc(cleanSub)}</div>` : ''}
-      </td>
-      <td>${protoPill}</td>
-      <td><code class="mono u-fs-12 u-bg-sunk u-p-4x8 u-r-4 u-bd-ln">${portStr}</code></td>
-      <td><span class="u-fw-700 u-mono u-fs-13 u-c-tx">${m.avg_rtt_ms > 0 ? m.avg_rtt_ms + ' ms' : '—'}</span></td>
-      <td><span class="badge ${lossClass} u-fs-12 u-fw-700">${m.packet_loss}%</span></td>
-      <td><span class="u-c-mu u-fs-12 u-mono">${m.jitter_ms > 0 ? m.jitter_ms + ' ms' : '—'}</span></td>
-      <td>
-        <div class="bench-score-bar-wrap">
-          <div class="bench-score-track">
-            <div class="bench-score-fill" style="width:${Math.max(4, m.score)}%;background:${m.score >= 70 ? 'linear-gradient(90deg, #10b981, #34d399)' : (m.score >= 40 ? 'linear-gradient(90deg, #f59e0b, #fbbf24)' : 'linear-gradient(90deg, #ef4444, #f87171)')};box-shadow:0 0 8px ${m.score >= 70 ? 'rgba(16,185,129,0.35)' : 'rgba(239,68,68,0.35)'};"></div>
-          </div>
-          <strong class="u-fs-12 u-mono u-minw-26 u-c-tx">${m.score}</strong>
-        </div>
-      </td>
-      <td><span class="badge ${statusClass} u-fs-12">${esc(statusLabel)}</span></td>
-      <td>
-        ${isActive ? `<button class="quantum-btn quantum-btn-ghost u-btn-xs u-btn-30 u-o-65" disabled>Current Carrier</button>` :
-          `<button class="quantum-btn ${isWinner ? 'quantum-btn-primary' : 'quantum-btn-secondary'} u-btn-xs u-btn-30" onclick="smartApplyOrSetupCarrier(${jsArg(m.id)}, ${jsArg(m.name || m.id)})">${isWinner ? 'Top Pick' : 'Switch'}</button>`}
-      </td>
-    </tr>`;
-  });
-
-  tbody.innerHTML = html;
-}
-
-async function runBenchmarkClick() {
-  if (benchRunning) return;
-  const targetHost = ($('benchTargetHost') ? $('benchTargetHost').value.trim() : '');
-  const isConn = peerData && peerData.is_connected;
-  
-  if (!targetHost && !isConn) {
-    toastWarn('Enter Destination', 'Please enter foreign server IP or domain name before benchmarking.');
-    if ($('benchTargetHost')) $('benchTargetHost').focus();
-    return;
-  }
-
-  benchRunning = true;
-  const btn = $('benchRunBtn');
-  const txt = $('benchRunBtnTxt');
-  if (btn) btn.disabled = true;
-  if (txt) txt.textContent = 'Benchmarking carriers...';
-  toast('Running Benchmark', 'Probing all Quantum carriers concurrently...');
-
-  try {
-    await loadBenchmark(true);
-    toastOk('Benchmark Complete', `Best Carrier: ${benchData ? (benchData.best_carrier_name || benchData.best_carrier || '—') : '—'}`);
-  } catch (err) {
-    toastErr('Benchmark failed', err.message || err);
-  } finally {
-    benchRunning = false;
-    if (btn) btn.disabled = false;
-    if (txt) txt.textContent = 'Run Carrier Benchmark';
-  }
-}
-
-async function smartApplyOrSetupCarrier(carrierId, carrierName) {
-  const cleanName = carrierName || carrierId;
-  const targetHost = ($('benchTargetHost') ? $('benchTargetHost').value.trim() : '');
-  const isConn = peerData && peerData.is_connected;
-
-  // Case 1: Servers are already paired & active -> instant carrier switch with confirmation modal
-  if (isConn) {
-    entConfirm({
-      title: 'Switch to Best Carrier',
-      msg: `Switch both Iran and Foreign servers to carrier "${esc(cleanName)}"?`,
-      okText: 'Confirm Switch',
-      cancelText: 'Cancel',
-      danger: false
-    }, async () => {
-      toast('Applying Carrier', `${cleanName}...`);
-      try {
-        const res = await api('/api/benchmark/apply', { carrier: carrierId });
-        toastOk('Carrier Applied', res.detail || `Active carrier switched to ${cleanName}.`);
-        await loadBenchmark();
-      } catch (err) {
-        toastErr('Apply failed', err.message || err);
-      }
-    });
-    return;
-  }
-
-  // Case 2: Pre-connection benchmark -> smart navigate to setup and pre-fill fields
-  toastOk('Carrier Selected', `Opening setup for recommended carrier ${cleanName}...`);
-
-  // If Bagher (SSH forward) selected
-  if (carrierId.startsWith('bagher') || carrierId === 'sshfwd') {
-    openBagherSetup(targetHost);
-    toast(tr('', 'Bagher Setup'), tr('', 'Fill in the ports and apply.'));
-    return;
-  }
-
-  // Quick Setup tab navigation
-  if (typeof goTab === 'function') goTab('setup');
-
-  // Pre-fill target host in setup
-  if (targetHost && $('sRemotePub')) {
-    $('sRemotePub').value = targetHost;
-  }
-
-  // Set appropriate engine & transport
-  if (carrierId.startsWith('backhaul')) {
-    _bhGre = false;
-    setIranEngine('backhaul');
-  } else if (carrierId === 'direct') {
-    const greBtn = $('engGreFrp');
-    if (greBtn) greBtn.click();
-    const trans = $('sTransport');
-    if (trans) trans.value = 'tcp';
-  } else if (carrierId.startsWith('frp:')) {
-    const greBtn = $('engGreFrp');
-    if (greBtn) greBtn.click();
-    const trans = $('sTransport');
-    const sub = carrierId.replace('frp:', '');
-    if (trans) {
-      if (sub === 'kcp') trans.value = 'kcp';
-      else if (sub === 'quic') trans.value = 'quic';
-      else if (sub === 'ws' || sub === 'websocket') trans.value = 'websocket';
-      else if (sub === 'wss') trans.value = 'wss';
-      else trans.value = 'tcp';
-    }
-  } else if (carrierId.startsWith('wss')) {
-    const greBtn = $('engGreFrp');
-    if (greBtn) greBtn.click();
-    const trans = $('sTransport');
-    if (trans) trans.value = 'wss';
-  }
-
-  toast('Carrier Configured', `Config loaded for ${cleanName}. Apply when ready.`);
-}
-
-async function applyCarrierClick(carrierId) {
-  smartApplyOrSetupCarrier(carrierId);
-}
-
-async function testPeerLinkClick() {
-  toast('Testing Peer Link', 'Sending probe to peer panel...');
-  try {
-    const res = await api('/api/peer/config', { action: 'test' });
-    if (res.reachable) {
-      toastOk('Peer Connected', `RTT: ${res.latency_ms.toFixed(1)} ms`);
-    } else {
-      toastWarn('Peer Unreachable', 'Could not reach remote panel web endpoint.');
-    }
-    await loadBenchmark();
-  } catch (err) {
-    toastErr('Peer probe failed', err.message || err);
-  }
-}
-
-async function saveAutoPilotClick() {
-  const btn = $('autoPilotSaveBtn');
-  const enabled = $('autoPilotToggle') ? $('autoPilotToggle').checked : false;
-  const thresh = $('autoPilotThresholdInput') ? parseFloat($('autoPilotThresholdInput').value) || 20 : 20;
-
-  setBtnLoading(btn, true, 'Saving…');
-  try {
-    await api('/api/benchmark/autopilot', { enabled: enabled, threshold: thresh });
-    toastOk('Failover Policy Saved', enabled ? `Auto failover enabled (Threshold: ${thresh}%)` : 'Auto failover disabled (Manual mode)');
-    await loadBenchmark();
-  } catch (err) {
-    toastErr('Failed to save failover policy', err.message || err);
-  } finally {
-    setBtnLoading(btn, false);
-  }
-}
-
-function openPeerConfig() {
-  const card = $('peerConfigCard');
-  if (!card) return;
-  card.classList.remove('hidden');
-  if (peerData) {
-    if ($('cfgPeerRole')) $('cfgPeerRole').value = peerData.role || 'master';
-    if ($('cfgPeerUrl')) $('cfgPeerUrl').value = peerData.peer_url || '';
-    if ($('cfgPeerInternal')) $('cfgPeerInternal').value = peerData.internal_ip || '';
-  }
-}
-
-function closePeerConfig() {
-  const card = $('peerConfigCard');
-  if (card) card.classList.add('hidden');
-}
-
-async function savePeerConfigClick() {
-  const role = $('cfgPeerRole') ? $('cfgPeerRole').value : 'master';
-  const url = $('cfgPeerUrl') ? $('cfgPeerUrl').value.trim() : '';
-  const internal = $('cfgPeerInternal') ? $('cfgPeerInternal').value.trim() : '';
-  const secret = $('cfgPeerSecret') ? $('cfgPeerSecret').value.trim() : '';
-
-  try {
-    const payload = { role, peer_url: url, internal_ip: internal };
-    if (secret) payload.peer_secret = secret;
-    await api('/api/peer/config', payload);
-    toastOk('Peer Config Saved', 'Remote panel link updated.');
-    closePeerConfig();
-    await loadBenchmark();
-  } catch (err) {
-    toastErr('Failed to save peer config', err.message || err);
-  }
-}
-
-// Wire up events
-(function initBenchmarkEvents() {
-  function on(id, ev, fn) { const el = $(id); if (el) el.addEventListener(ev, fn); }
-  on('benchRunBtn', 'click', runBenchmarkClick);
-  on('peerTestBtn', 'click', testPeerLinkClick);
-  on('peerConfigBtn', 'click', openPeerConfig);
-  on('peerConfigCloseBtn', 'click', closePeerConfig);
-  on('cfgPeerSaveBtn', 'click', savePeerConfigClick);
-  on('autoPilotSaveBtn', 'click', saveAutoPilotClick);
-
-  // Role buttons
-  const iranBtn = $('benchRoleIranBtn');
-  const forBtn = $('benchRoleForeignBtn');
-  const roleInput = $('benchTargetRole');
-  const roleHint = $('benchRoleHint');
-  const hostLabel = document.querySelector('label[for="benchTargetHost"] span');
-
-  if (iranBtn && forBtn && roleInput) {
-    iranBtn.addEventListener('click', () => {
-      iranBtn.classList.add('active');
-      iranBtn.setAttribute('aria-pressed', 'true');
-      forBtn.classList.remove('active');
-      forBtn.setAttribute('aria-pressed', 'false');
-      roleInput.value = 'iran';
-      if (roleHint) roleHint.textContent = 'On Iran server, enter foreign server address to probe all 7 protocols outwards.';
-      if (hostLabel) hostLabel.textContent = 'Foreign Server Public IP or Domain (Destination)';
-    });
-
-    forBtn.addEventListener('click', () => {
-      forBtn.classList.add('active');
-      forBtn.setAttribute('aria-pressed', 'true');
-      iranBtn.classList.remove('active');
-      iranBtn.setAttribute('aria-pressed', 'false');
-      roleInput.value = 'foreign';
-      if (roleHint) roleHint.textContent = 'On foreign server, enter Iran server address to probe inbound connectivity.';
-      if (hostLabel) hostLabel.textContent = 'Iran Server Public IP or Domain (Destination)';
-    });
-  }
-
-  // Advanced options accordion
-  const advToggle = $('benchAdvToggle');
-  const advWrap = $('benchAdvWrap');
-  const advChevron = $('benchAdvChevron');
-  if (advToggle && advWrap) {
-    advToggle.addEventListener('click', () => {
-      advWrap.classList.toggle('hidden');
-      if (advChevron) {
-        advChevron.textContent = advWrap.classList.contains('hidden') ? '▼ Expand' : '▲ Collapse';
+      const eng = ev.target && ev.target.closest ? ev.target.closest('[data-bweng]') : null;
+      if (eng) {
+        const e = eng.getAttribute('data-bweng');
+        const k = bwState.picked.indexOf(e);
+        if (k >= 0) bwState.picked.splice(k, 1); else bwState.picked.push(e);
+        eng.classList.toggle('on', bwState.picked.indexOf(e) >= 0);
+        const ok = $('bwNext');
+        if (ok) ok.disabled = !bwState.picked.length;
       }
     });
   }
-})();
-
-// ---------- Path test (tab-benchmark): which transports cross, before any tunnel ----------
-let _pt = null, _ptRole = null, _ptTimer = null;
-const PT_STATUS = { ok: ['ok', 'pt_ok', 'Works'], fail: ['err', 'pt_fail', 'Blocked'], waiting: ['dim', 'pt_wait', 'Waiting'], skip: ['warn', 'pt_skip', 'Not tested'] };
-
-function ptSetRole(role) {
-  _ptRole = /foreign/.test(role || '') ? 'foreign' : 'iran'; // role_hint is e.g. "foreign (client)"
-  const iran = _ptRole === 'iran';
-  [['ptRoleIran', iran], ['ptRoleForeign', !iran]].forEach(([id, on]) => {
-    const b = $(id);
-    if (b) { b.classList.toggle('active', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); }
-  });
-  $('ptIranForm').hidden = !iran;
-  $('ptForeignForm').hidden = iran;
 }
 
-function ptWarn(msg) {
-  const w = $('ptWarn');
-  if (w) { w.textContent = msg || ''; w.classList.toggle('hidden', !msg); }
-}
-
-async function loadPathTest() {
-  try { _pt = await api('/api/pathtest'); } catch (e) { reportErr('pathtest', e); return; }
-  renderPathTest();
-}
-
-function ptSchedule() {
-  clearTimeout(_ptTimer);
-  if (_pt && _pt.active && !$('tab-benchmark').hidden) _ptTimer = setTimeout(loadPathTest, 2000);
-}
-
-function ptLeft(sec) {
-  const m = Math.floor(sec / 60), s = sec % 60;
-  return tr('pt_left', '{t} left').replace('{t}', m + ':' + String(s).padStart(2, '0'));
-}
-
-function ptRowName(c) {
-  if (c.id === 'gre') return ['GRE', tr('pt_gre', 'protocol 47')];
-  if (c.id === 'ssh') return [tr('pt_eng_bagher', 'Bagher'), 'SSH'];
-  if (c.engine === 'Network') return [tr('pt_eng_net', 'Plain'), c.name];
-  return [c.engine, c.name];
-}
-
-function renderPathTest() {
-  const v = _pt || {};
-  if (_ptRole === null) ptSetRole(v.role || v.role_hint);
-  if (v.ip_hint && !$('ptForeign').value) $('ptForeign').value = v.ip_hint; // the running tunnel's foreign server
-  const checks = v.checks || [];
-  const remote = v.remote && v.remote.checks && v.remote.checks.length ? v.remote : null;
-  const rows = remote ? remote.checks : checks;
-  $('ptForm').hidden = !!v.active;
-  $('ptRun').hidden = !rows.length;
-  const st = v.active ? (v.phase === 'cores' ? ['info', 'pt_cores', 'Downloading cores'] : ['info', 'pt_running', 'Running'])
-    : (rows.length ? ['dim', 'pt_done', 'Finished'] : ['dim', 'pt_idle', 'Not running']);
-  const badge = $('ptBadge');
-  badge.className = 'badge ' + st[0];
-  badge.textContent = tr(st[1], st[2]);
-  if (!rows.length) { ptSchedule(); return; }
-
-  const showCode = !!(v.active && v.role === 'iran' && v.code);
-  $('ptCodeWrap').hidden = !showCode;
-  if (showCode && $('ptCodeOut').value !== v.code) $('ptCodeOut').value = v.code;
-
-  const ok = rows.filter(c => c.status === 'ok');
-  const settled = remote ? remote.settled : v.settled;
-  let sum;
-  if (v.role === 'foreign' && !remote) {
-    const tcp = checks.find(c => c.id === 'tcp');
-    sum = tcp && tcp.status === 'fail'
-      ? tr('pt_sum_noreach', "Plain TCP to the Iran server does not get through, so its results cannot be shown here. Open the Iran server's Benchmark tab to see them.")
-      : tr('pt_sum_connecting', 'Connecting to the Iran server...');
-  } else if (v.role === 'iran' && !v.joined) {
-    sum = tr('pt_sum_wait', 'Waiting for the foreign server. Paste the code on its Benchmark tab.');
-  } else {
-    sum = tr('pt_sum_works', '{n} of {m} work').replace('{n}', ok.length).replace('{m}', rows.length);
-    const fast = ok.filter(c => c.mbps > 0).sort((a, b) => b.mbps - a.mbps)[0];
-    if (fast) sum += ' · ' + tr('pt_sum_fast', 'Fastest: {x}').replace('{x}', ptRowName(fast).join(' ') + ' (' + fast.mbps + ' Mbit/s)');
-    if (!settled) sum += ' · ' + tr('pt_sum_testing', 'still testing');
+async function bwRenderBody() {
+  const body = $('bwBody');
+  if (!body) return;
+  if (bwState.step === 1) {
+    body.innerHTML = '<p class="qs-hint u-m-0">' + esc(tr('', 'Pick one of your existing topologies')) + '</p>' +
+      '<div class="tu-cards">' + (bwState.pool || []).map(t =>
+        bwCard('<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="6" r="2.5"/><circle cx="19" cy="6" r="2.5"/><circle cx="12" cy="19" r="2.5"/><path d="M7.5 6h9M6.3 8l4.7 8.8M17.7 8l-4.7 8.8"/></svg>', t.name, t.address || '', t.name === bwState.topoName).replace('class="mtb-agent-card', 'data-bwpick="topo" data-bwv="' + esc(t.id) + '" data-bwname="' + esc(t.name) + '" class="mtb-agent-card')) + '</div>';
+    return;
   }
-  if (v.active && v.expires_in) sum += ' · ' + ptLeft(v.expires_in);
-  $('ptSummary').textContent = sum;
-
-  const order = { ok: 0, fail: 1, waiting: 2, skip: 3 };
-  const sorted = settled ? rows.slice().sort((a, b) => (order[a.status] - order[b.status]) || ((b.mbps || 0) - (a.mbps || 0))) : rows;
-  $('ptBody').innerHTML = sorted.map(c => {
-    const s = PT_STATUS[c.status] || PT_STATUS.waiting;
-    const [eng, name] = ptRowName(c);
-    const port = c.proto === 'gre' ? '47' : (c.port ? c.port + '/' + c.proto : '—');
-    return '<tr><td>' + esc(eng) + '</td><td class="mono">' + esc(name) + '</td>'
-      + '<td><span class="badge ' + s[0] + '">' + esc(tr(s[1], s[2])) + '</span>'
-      + (c.note ? '<div class="qs-hint u-mt-4" dir="ltr" data-no-i18n>' + esc(c.note) + '</div>' : '') + '</td>'
-      + '<td class="mono u-ltr">' + (c.rtt_ms ? esc(c.rtt_ms + ' ms') : '—') + '</td>'
-      + '<td class="mono u-ltr">' + (c.mbps ? esc(c.mbps + ' Mbit/s') : '—') + '</td>'
-      + '<td class="mono u-ltr">' + esc(port) + '</td></tr>';
-  }).join('');
-  const notes = v.notes || [];
-  $('ptNotes').hidden = !notes.length;
-  $('ptNotes').innerHTML = notes.map(n => '<li>' + esc(n) + '</li>').join('');
-  $('ptStopBtn').hidden = !v.active;
-  ptSchedule();
-}
-
-async function ptPost(body, btnId) {
-  const b = btnId && $(btnId);
-  if (b) b.disabled = true;
-  ptWarn('');
+  if (bwState.step === 2 || bwState.step === 3) {
+    const side = bwState.step === 2 ? 'iran' : 'foreign';
+    const lbl = bwState.step === 2 ? tr('', 'Pick the Iran agent of this topology') : tr('', 'Pick the foreign agent of this topology');
+    body.innerHTML = '<p class="qs-hint u-m-0">' + esc(lbl) + '</p><div class="u-grid u-gap-8">' + skel(3) + '</div>';
+    try {
+      const d = await api('/api/ui/topologies/' + encodeURIComponent(bwState.topo));
+      const members = (d.members && d.members[side]) || [];
+      const others = bwState.step === 2 ? (d.members && d.members.iran) || [] : (d.members && d.members.foreign) || [];
+      void others;
+      body.innerHTML = '<p class="qs-hint u-m-0">' + esc(lbl) + '</p>' +
+        (members.length ? '<div class="tu-cards">' + members.map(m => {
+          const ag = m.agent || {};
+          const flag = bwState.step === 2 ? topologyFlagSvg('ir') : topologyFlagSvg(String(ag.country || m.country || '').toLowerCase());
+          const picked = (bwState.step === 2 ? bwState.iran : bwState.foreign) === String(m.id);
+          return '<button type="button" class="mtb-agent-card bw-card' + (picked ? ' on' : '') + '" data-bwpick="' + side + '" data-bwv="' + esc(m.id) + '" data-bwagent="' + esc((m.agent || {}).id || '') + '">' +
+            '<span class="mtb-agc-ico">' + flag + '</span>' +
+            '<span class="mtb-agc-tx"><b>' + esc(m.name || ('#' + m.id)) + '</b><i>' + esc(m.datacenter_en || m.datacenter || '') + '</i></span>' +
+            (picked ? '<span class="tu-pick-ok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg></span>' : '') +
+            '</button>';
+        }).join('') + '</div>' : '<p class="qs-hint u-m-0">' + esc(tr('', 'No agents on this side yet')) + '</p>');
+    } catch (err) {
+      body.innerHTML = stateError(err.message, 'bwmem', true);
+    }
+    return;
+  }
+  // step 4: the engines enabled on BOTH agents
+  body.innerHTML = '<p class="qs-hint u-m-0">' + esc(tr('', 'Engines enabled on both agents — pick the ones to benchmark')) + '</p><div class="u-grid u-gap-8">' + skel(3) + '</div>';
   try {
-    _pt = await api('/api/pathtest', body);
-    renderPathTest();
-  } catch (e) {
-    ptWarn(e.message || String(e));
-  } finally {
-    if (b) b.disabled = false;
+    const [a, b] = await Promise.all([
+      api('/api/ui/agents/' + encodeURIComponent(bwState.iranAgent) + '/engines'),
+      api('/api/ui/agents/' + encodeURIComponent(bwState.foreignAgent) + '/engines')
+    ]);
+    // «installed and usable for a tunnel» = the engine is ENABLED on that
+    // agent — the same rule the pair-run endpoint re-checks server-side
+    const runOf = list => { const m = {}; (list.engines || []).forEach(e => { if (e.enabled === true) m[e.engine] = true; }); return m; };
+    const mA = runOf(a), mB = runOf(b);
+    const common = Object.keys(mA).filter(e => mB[e]).sort();
+    bwState.engines = common;
+    bwState.picked = common.slice();
+    if (!common.length) {
+      body.innerHTML = '<p class="qs-hint u-m-0">' + esc(tr('', 'No engine is enabled on both agents — enable one on both and come back.')) + '</p>';
+      const nx = $('bwNext'); if (nx) nx.disabled = true;
+      return;
+    }
+    body.innerHTML = '<p class="qs-hint u-m-0">' + esc(tr('', 'Engines enabled on both agents — pick the ones to benchmark')) + '</p>' +
+      '<div class="tu-cards">' + common.map(e =>
+        '<button type="button" class="mtb-agent-card bw-card on" data-bweng="' + esc(e) + '">' +
+        '<span class="mtb-agc-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2"/></svg></span>' +
+        '<span class="mtb-agc-tx"><b>' + esc(e) + '</b></span>' +
+        '<span class="tu-pick-ok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg></span></button>').join('') + '</div>';
+  } catch (err) {
+    body.innerHTML = stateError(err.message, 'bweng', true);
   }
 }
 
-(function initPathTest() {
-  function on(id, ev, fn) { const el = $(id); if (el) el.addEventListener(ev, fn); }
-  on('ptRoleIran', 'click', () => ptSetRole('iran'));
-  on('ptRoleForeign', 'click', () => ptSetRole('foreign'));
-  on('ptStartBtn', 'click', () => ptPost({
-    action: 'start', foreign_ip: $('ptForeign').value.trim(), iran_ip: $('ptIranIp').value.trim(),
-    base_port: parseInt($('ptBase').value, 10) || 0, ssh_port: parseInt($('ptSsh').value, 10) || 22,
-    minutes: parseInt($('ptMinutes').value, 10) || 10,
-  }, 'ptStartBtn'));
-  on('ptJoinBtn', 'click', () => {
-    const code = $('ptCode').value.trim();
-    if (!code) { ptWarn(tr('pt_need_code', 'Paste the test code from the Iran server first.')); return; }
-    ptPost({ action: 'join', code }, 'ptJoinBtn');
-  });
-  on('ptStopBtn', 'click', () => ptPost({ action: 'stop' }, 'ptStopBtn'));
-  on('ptCopyBtn', 'click', () => copyTextSafe($('ptCodeOut').value, tr('pt_copied', 'Code copied'), ''));
-})();
+function bwNext() {
+  if (bwState.running) return;
+  if (bwState.step === 1 && !bwState.topo) { toastWarn(tr('', 'Benchmark'), tr('', 'Pick a topology first')); return; }
+  if (bwState.step === 2 && !bwState.iran) { toastWarn(tr('', 'Benchmark'), tr('', 'Pick the Iran agent first')); return; }
+  if (bwState.step === 3 && !bwState.foreign) { toastWarn(tr('', 'Benchmark'), tr('', 'Pick the foreign agent first')); return; }
+  if (bwState.step === 4) {
+    if (!bwState.picked || !bwState.picked.length) { toastWarn(tr('', 'Benchmark'), tr('', 'Pick at least one engine')); return; }
+    bwRun();
+    return;
+  }
+  bwState.step++;
+  bwRender();
+}
 
-// Expose on window for inline handlers
-window.loadBenchmark = loadBenchmark;
-window.runBenchmarkClick = runBenchmarkClick;
-window.applyCarrierClick = applyCarrierClick;
-window.smartApplyOrSetupCarrier = smartApplyOrSetupCarrier;
-window.testPeerLinkClick = testPeerLinkClick;
-window.saveAutoPilotClick = saveAutoPilotClick;
-window.openPeerConfig = openPeerConfig;
-window.closePeerConfig = closePeerConfig;
-window.savePeerConfigClick = savePeerConfigClick;
+async function bwRun() {
+  const host = $('benchWizard');
+  bwState.running = true;
+  host.innerHTML = '<div class="u-grid u-gap-8">' + skel(3) + '</div>';
+  try {
+    const st = await api('/api/benchmark/pair-run', {
+      topology_id: Number(bwState.topo),
+      iran_server: Number(bwState.iran),
+      foreign_server: Number(bwState.foreign),
+      engines: bwState.picked
+    });
+    bwState.view = st;
+  } catch (err) {
+    host.innerHTML = stateError(err.message, 'bwrun', true);
+    bwState.running = false;
+    return;
+  }
+  bwPoll();
+}
+
+async function bwPoll() {
+  if (!bwState.running) return;
+  try {
+    const st = await api('/api/benchmark/pair');
+    bwState.view = st;
+    bwRenderRun(st);
+    if (st.running) bwTimer = setTimeout(bwPoll, 2000);
+    else { bwState.running = false; toastOk(tr('', 'Benchmark'), tr('', 'Benchmark finished')); }
+  } catch (err) {
+    bwTimer = setTimeout(bwPoll, 3000);
+  }
+}
+
+function bwStop() {
+  api('/api/benchmark/pair-stop', {}, 'POST').catch(() => {});
+}
+
+function bwRenderRun(st) {
+  const host = $('benchWizard');
+  if (!host) return;
+  const res = st.results || [];
+  const rows = res.map(r => '<tr><td class="mono" dir="ltr">' + esc(r.engine) + '</td>' +
+    '<td>' + (r.status === 'ok' ? '<span class="badge ok">' + esc(tr('', 'Measured')) + '</span>' : (r.status === 'stopped' ? '<span class="badge dim">' + esc(tr('', 'Stopped')) + '</span>' : '<span class="badge err">' + esc(tr('', r.status === 'converge-timeout' ? 'Did not come up' : 'Failed')) + '</span>')) + '</td>' +
+    '<td class="u-text-center">' + (r.converge_s != null ? esc(Number(r.converge_s).toFixed(1) + 's') : '—') + '</td>' +
+    '<td class="u-text-center">' + (r.down_bps ? '<bdi dir="ltr">' + esc(fmtSpeedRate(r.down_bps)) + '</bdi>' : '—') + '</td>' +
+    '<td class="u-text-center">' + (r.up_bps ? '<bdi dir="ltr">' + esc(fmtSpeedRate(r.up_bps)) + '</bdi>' : '—') + '</td>' +
+    '<td class="u-text-center">' + (r.rtt_ms ? esc(Math.round(r.rtt_ms) + ' ms') : '—') + '</td>' +
+    '<td class="u-text-center">' + (r.score ? esc(String(r.score)) : '—') + '</td>' +
+    '<td class="u-text-center">' + (r.note ? '<span class="qs-hint">' + esc(r.note) + '</span>' : '—') + '</td></tr>').join('');
+  const cur = st.running ? '<div class="u-hint-12 u-mb-12">' + esc(tr('', 'Running')) + ': <b>' + esc(String(st.cur_engine || '')) + '</b> — ' + esc(String(st.phase || '')) + '</div>' : '';
+  host.innerHTML =
+    '<div class="tc-header u-bb-ln u-pb-16 u-mb-16"><div><span class="tc-title u-fs-18 u-fw-700">' + esc(tr('', 'Pair benchmark')) + '</span>' +
+    '<div class="qs-hint u-mt-4">' + esc(String(st.topo_name || '')) + '</div></div></div>' +
+    cur +
+    '<div class="bench-table-wrap"><table class="quantum-table"><thead><tr>' +
+    '<th>' + esc(tr('', 'Engine')) + '</th><th>' + esc(tr('', 'Status')) + '</th><th>' + esc(tr('', 'Converge')) + '</th>' +
+    '<th>' + esc(tr('', 'Download')) + '</th><th>' + esc(tr('', 'Upload')) + '</th><th>' + esc(tr('', 'RTT')) + '</th>' +
+    '<th>' + esc(tr('', 'Score')) + '</th><th>' + esc(tr('', 'Note')) + '</th></tr></thead><tbody>' +
+    (rows || '<tr><td colspan="8" class="u-text-center">' + skel(2) + '</td></tr>') + '</tbody></table></div>' +
+    '<p class="qs-hint">' + esc(tr('', 'Real temporary tunnels: built through each engine, measured from the agents\u2019 own counter samples, then removed.')) + '</p>' +
+    '<div class="mtb-acts"><button type="button" class="quantum-btn quantum-btn-secondary" id="bwStop">' + esc(tr('', 'Stop')) + '</button>' +
+    '<button type="button" class="quantum-btn quantum-btn-secondary" id="bwAgain">' + esc(tr('', 'Run again')) + '</button></div>';
+  const stopB = $('bwStop'), againB = $('bwAgain');
+  if (stopB) stopB.onclick = bwStop;
+  if (againB) againB.onclick = () => { bwState.running = false; clearTimeout(bwTimer); loadBenchWizard(); };
+}
 
 // ---------- Bagher (SSH pool carrier): created in Setup, run from the Tunnel tab ----------
 _sshfwdData = null;
