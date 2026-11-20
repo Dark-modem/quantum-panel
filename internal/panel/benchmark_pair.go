@@ -254,9 +254,9 @@ func handleBenchmarkPairRun(w http.ResponseWriter, r *http.Request) {
 		startedAt:    time.Now(),
 	}
 	pairCur = st
-	pairMu.Lock()
+	// savePairStateLocked manages the pairMu unlock/lock itself — the
+	// handler already holds it, so an extra Lock here deadlocked the POST
 	savePairStateLocked()
-	pairMu.Unlock()
 	LogSecurityAudit("pair_bench_start", cfg.Username, clientIP(r),
 		fmt.Sprintf("topology=%q iran=%d foreign=%d engines=%d", topo.Name, body.IranServer, body.ForeignServer, len(engines)))
 	go st.run()
