@@ -334,7 +334,7 @@ func mustRange(s *store.Store, ids []int64, from, to int64) (store.Usage, store.
 // uiTunnelRates computes the current per-direction rate from the two
 // newest samples (any reporter; the newest wins, gaps > 10 min → null).
 func (h uiStoreHandle) uiTunnelRates(tunnelID int64) map[string]any {
-	zero := map[string]any{"wire_rx_bps": nil, "wire_tx_bps": nil, "payload_rx_bps": nil, "payload_tx_bps": nil}
+	zero := map[string]any{"wire_rx_bps": nil, "wire_tx_bps": nil, "payload_rx_bps": nil, "payload_tx_bps": nil, "sampled_at": nil}
 	samples, err := h.RecentSamples(tunnelID, 8)
 	if err != nil || len(samples) < 2 {
 		return zero
@@ -360,6 +360,7 @@ func (h uiStoreHandle) uiTunnelRates(tunnelID int64) map[string]any {
 			"wire_tx_bps":    rate(newest.WireTx, older.WireTx, newest.CountersKnown && older.CountersKnown),
 			"payload_rx_bps": rate(newest.PayloadRx, older.PayloadRx, newest.PayloadKnown && older.PayloadKnown),
 			"payload_tx_bps": rate(newest.PayloadTx, older.PayloadTx, newest.PayloadKnown && older.PayloadKnown),
+			"sampled_at":     newest.At,
 		}
 	}
 	return zero

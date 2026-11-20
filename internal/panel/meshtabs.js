@@ -76,6 +76,25 @@
     agDelNo: ['اسم ایجنت را دقیق بنویس تا دکمه حذف فعال شود', 'Type the exact agent name to enable Delete'],
     agDelQ: ['این عملیات قابل بازگشت نیست. برای ادامه، نام ایجنت را دقیقاً وارد کنید.', 'This action cannot be undone. To continue, enter the agent name exactly.'],
     agDelDone: ['ایجنت حذف شد', 'Agent deleted'],
+    tuShareW: ['سهم وزنی', 'Weight share'],
+    tuWeightTip: ['وزن پیکربندی‌شدهٔ این تانل در توپولوژی؛ توزیع ترافیک بر اساس نسبت وزن‌ها انجام می‌شود.', 'This tunnel’s configured weight in the topology — traffic is distributed by weight ratio.'],
+    tuShareTip: ['سهم وزنی حل‌شده این تانل از مجموع وزن اعضای متصل توپولوژی.', 'The resolved weight share of this tunnel out of the connected members’ total weight.'],
+    tuNoShareTip: ['تانل قطع یا غیرفعال است — سهمی توزیع نشده.', 'The tunnel is down or disabled — no share was resolved.'],
+    tuShareTrafficTip: ['نسبت ترافیک wire امروز این تانل به کل ترافیک wire توپولوژی — با وزن متفاوت است.', 'This tunnel’s wire traffic today over the whole topology’s — distinct from weight.'],
+    tuOverheadTip: ['نسبت بایت wire به بایت payload امروز — یک نسبت محاسبه‌شده، نه ضریب اعمال‌شده.', 'Wire-to-payload byte ratio today — a computed ratio, never a coefficient applied to bytes.'],
+    tuOverheadNone: ['با payload صفر یا دادهٔ ناموجود، سربار نامشخص است.', 'With zero payload or missing data the overhead is undefined.'],
+    tuWireDef: ['Wire: بایت واقعی منتقل‌شده روی حامل تانل.', 'Wire: the real bytes moved over the tunnel carrier.'],
+    tuPayloadDef: ['Payload: بایت مفید منتقل‌شده توسط کاربران.', 'Payload: the useful bytes moved by the users.'],
+    tuNoPayload: ['دادهٔ payload ثبت نشده است', 'No payload data recorded'],
+    tuMaxLabel: ['اوج', 'Peak'],
+    tuUpdatedAt: ['آخرین به‌روزرسانی', 'Last updated'],
+    tuDownWarn: ['این تانل قطع است — اتصال برقرار نیست.', 'This tunnel is down — the connection is not established.'],
+    tuTechT: ['جزئیات فنی', 'Technical details'],
+    tuConnQ: ['کیفیت اتصال', 'Connection quality'],
+    tuEngineUse: ['مصرف موتور', 'Engine usage'],
+    tuLiveRate: ['سرعت لحظه‌ای', 'Live rate'],
+    tuDownRate: ['دانلود', 'Download rate'],
+    tuUpRate: ['آپلود', 'Upload rate'],
     agDelEnable: ['برای فعال شدن حذف، نام ایجنت را دقیق وارد کنید.', 'Enter the exact agent name to enable Delete'],
     agDelWarn2: ['این عملیات غیرقابل بازگشت است و تمام اطلاعات مربوط به این ایجنت حذف خواهد شد.', 'This action is irreversible and everything belonging to this agent will be removed.'],
     agCopied: ['کپی شد!', 'Copied!'],
@@ -601,6 +620,73 @@
     '.tu-upd-commit { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }',
     '.tu-upd-commit-tx { font-size:12.5px; color:var(--tx2, #cbd5e1); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }',
     '.mtb-upd-info.warn { color:var(--er, #f87171); border:1px solid color-mix(in srgb, var(--er) 30%, transparent); background:color-mix(in srgb, var(--er) 7%, transparent); }',
+    // ---- tunnel detail dashboard (reference redesign) ----
+    '.tu-head-grid { display:grid; grid-template-columns:minmax(0,1.5fr) auto auto; gap:18px; align-items:center; }',
+    '.tu-id { display:flex; flex-direction:column; gap:9px; min-width:0; }',
+    '.tu-id-ico { width:46px; height:46px; border-radius:13px; display:inline-flex; align-items:center; justify-content:center; color:var(--ac); background:color-mix(in srgb, var(--ac) 10%, transparent); border:1px solid color-mix(in srgb, var(--ac) 35%, transparent); }',
+    '.tu-id-ico svg { width:21px; height:21px; fill:none; stroke:currentColor; stroke-width:1.9; }',
+    '.tu-id-tx { display:flex; align-items:center; gap:8px; min-width:0; }',
+    '.tu-key { font-size:14.5px; font-weight:700; max-width:430px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }',
+    '.tu-id-badges { display:flex; gap:6px; flex-wrap:wrap; }',
+    '.tu-ws { display:flex; gap:24px; padding-inline:20px; border-inline-start:1px solid var(--ln); border-inline-end:1px solid var(--ln); align-self:stretch; align-items:center; }',
+    '.tu-wt { display:flex; flex-direction:column; align-items:center; gap:3px; cursor:help; }',
+    '.tu-wt b { font-size:21px; font-weight:800; }',
+    '.tu-wt-lbl { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--mu); white-space:nowrap; } .tu-wt-lbl svg { width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:1.8; }',
+    '.tu-share .tu-wt-lbl { border-bottom:1px dotted var(--ln2, rgba(148,163,184,.4)); }',
+    '.tu-ops { display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end; }',
+    '.tu-ops .mtb-backbtn { min-height:34px; }',
+    '.tu-route { display:grid; grid-template-columns:1fr 150px 1fr; gap:10px; align-items:stretch; margin-top:12px; }',
+    '.tun-side { display:flex; flex-direction:column; gap:5px; padding:12px 16px; border:1px solid var(--ln); border-radius:14px; background:var(--sunk, rgba(148,163,184,.05)); }',
+    '.tun-side.foreign { border-color:color-mix(in srgb, var(--ac) 22%, var(--ln)); }',
+    '.tu-side-role { display:flex; align-items:center; gap:8px; margin:0; font-size:12px; color:var(--mu); text-transform:uppercase; letter-spacing:.06em; } .tu-side-role svg { border-radius:2px; }',
+    '.tu-side-name { font-size:16px; font-weight:700; }',
+    '.tu-side-dc { font-size:12.5px; }',
+    '.tu-side-chips { display:flex; gap:6px; flex-wrap:wrap; margin-top:2px; }',
+    '.tu-chip { display:inline-flex; align-items:center; gap:5px; padding:2px 9px; border:1px solid var(--ln); border-radius:999px; font-size:12px; } .tu-chip svg { border-radius:2px; }',
+    '.tu-side-ag { margin-top:6px; }',
+    '.tun-conn { position:relative; display:flex; align-items:center; justify-content:center; min-height:96px; }',
+    '.tun-conn-svg { position:absolute; inset:0; width:100%; height:100%; }',
+    '.tu-conn-pill { position:relative; z-index:1; display:inline-flex; align-items:center; gap:7px; padding:5px 14px; border-radius:999px; background:var(--s1); border:1px solid; font-size:12.5px; font-weight:700; white-space:nowrap; }',
+    '.tu-conn-pill i { width:9px; height:9px; border-radius:50%; display:inline-block; }',
+    '.tu-updated { display:inline-flex; align-items:center; gap:6px; font-size:12px; } .tu-updated svg { width:13px; height:13px; fill:none; stroke:currentColor; stroke-width:1.8; }',
+    '.tu-vitals3 { display:grid; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); gap:12px; margin-top:12px; }',
+    '.tu-vgroup { border:1px solid var(--ln); border-radius:12px; padding:10px 14px; display:flex; flex-direction:column; gap:9px; }',
+    '.tu-vg-h { display:flex; align-items:center; gap:8px; margin:0; font-size:12.5px; font-weight:700; color:var(--tx2); } .tu-vg-h svg { width:16px; height:16px; fill:none; stroke:var(--ac); stroke-width:1.8; }',
+    '.tu-vital { display:flex; align-items:center; gap:10px; }',
+    '.tu-vital-ico { width:30px; height:30px; border-radius:9px; display:inline-flex; align-items:center; justify-content:center; color:var(--ac); background:color-mix(in srgb, var(--ac) 10%, transparent); flex:none; }',
+    '.tu-vital-ico svg { width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:1.8; }',
+    '.tu-vital-tx { display:flex; flex-direction:column; line-height:1.35; } .tu-vital-tx b { font-size:14px; }',
+    '.tu-unit { font-style:normal; font-size:11.5px; color:var(--mu); font-weight:400; }',
+    '.tu-dl { color:var(--ac); display:inline-flex; align-items:center; gap:5px; } .tu-dl svg { width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:2; }',
+    '.tu-ul { color:#c084fc; display:inline-flex; align-items:center; gap:5px; } .tu-ul svg { width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:2; }',
+    '.tu-chan { display:inline-flex; border:1px solid var(--ln); border-radius:999px; padding:3px; gap:2px; }',
+    '.tu-chan-btn { border:none; background:transparent; color:var(--tx2); padding:5px 18px; border-radius:999px; font-size:12.5px; font-weight:700; cursor:pointer; min-height:30px; }',
+    '.tu-chan-btn.on { background:var(--ac); color:#fff; }',
+    '.tu-chan-btn:disabled { opacity:.45; cursor:not-allowed; }',
+    '.tu-chan-note { font-size:12px; color:var(--mu); margin-top:8px; }',
+    '.tu-tiles { display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:10px; margin-top:12px; }',
+    '.tu-tile { border:1px solid var(--ln); border-radius:12px; padding:10px 14px; display:flex; flex-direction:column; gap:5px; cursor:help; }',
+    '.tu-tile-lbl { font-size:12px; color:var(--mu); }',
+    '.tu-tile-vals { display:flex; flex-direction:column; gap:3px; font-size:13.5px; font-weight:700; }',
+    '.tu-tile-big { font-size:16px; font-weight:800; }',
+    '.tun-chartwrap { position:relative; margin-top:14px; border:1px solid var(--ln); border-radius:12px; padding:10px 12px 6px; }',
+    '.tu-chart-cap { display:flex; align-items:center; gap:14px; font-size:12px; color:var(--mu); } .tu-chart-cap b { color:var(--tx2); }',
+    '.tu-leg { display:inline-flex; align-items:center; gap:5px; } .tu-leg i { width:14px; height:3px; border-radius:2px; display:inline-block; } .tu-leg i.rx { background:var(--ac); } .tu-leg i.tx { background:#c084fc; }',
+    '.tu-chart-svg { width:100%; height:190px; display:block; }',
+    '.tu-grid { stroke:var(--ln); stroke-width:1; stroke-dasharray:3 5; opacity:.6; fill:none; }',
+    '.tu-area-rx { fill:color-mix(in srgb, var(--ac) 16%, transparent); stroke:none; }',
+    '.tu-line-rx { fill:none; stroke:var(--ac); stroke-width:2.2; stroke-linejoin:round; }',
+    '.tu-area-tx { fill:rgba(192,132,252,.14); stroke:none; }',
+    '.tu-line-tx { fill:none; stroke:#c084fc; stroke-width:2.2; stroke-linejoin:round; }',
+    '.tu-dot-rx { fill:var(--ac); stroke:var(--s1); stroke-width:1.5; }',
+    '.tu-dot-tx { fill:#c084fc; stroke:var(--s1); stroke-width:1.5; }',
+    '.tun-tip2 { position:absolute; top:34px; transform:translateX(-50%); z-index:5; background:var(--s1); border:1px solid var(--ln2); border-radius:10px; padding:8px 12px; display:flex; flex-direction:column; gap:3px; font-size:12px; box-shadow:0 10px 30px rgba(0,0,0,.45); pointer-events:none; min-width:210px; }',
+    '.tun-tip2 b { font-size:12.5px; }',
+    '.tu-times { position:relative; height:18px; margin-top:4px; font-size:12px; color:var(--mu); } .tu-times span { position:absolute; transform:translateX(-50%); white-space:nowrap; }',
+    '.tu-downwarn { display:flex; align-items:center; gap:10px; padding:10px 16px; border:1px solid color-mix(in srgb, var(--er) 40%, transparent); background:color-mix(in srgb, var(--er) 9%, transparent); border-radius:12px; color:var(--er); font-weight:700; } .tu-downwarn svg { width:17px; height:17px; flex:none; fill:none; stroke:currentColor; stroke-width:1.9; }',
+    '.tu-tech { margin-top:10px; } .tu-tech summary { cursor:pointer; color:var(--mu); font-size:12.5px; } .tu-tech-err { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:6px 0 0; font-size:12px; }',
+    '@media (max-width: 900px) { .tu-head-grid { grid-template-columns:1fr; } .tu-ws { border:none; padding-inline:0; } .tu-ops { justify-content:flex-start; } }',
+    '@media (max-width: 760px) { .tu-route { grid-template-columns:1fr; } .tun-conn { min-height:56px; } .tun-conn-svg { transform:rotate(90deg); } .tu-ops button { min-height:44px; } .tu-key { max-width:260px; } }',
     '@media (prefers-reduced-motion: reduce) { main.page section[id^="tab-m"] * { animation: none !important; transition: none !important; } }'
   ].join('\n');
 
@@ -1063,9 +1149,12 @@
   function renderTuDetail() {
     var my = (seq.mtun = seq.mtun + 1);
     setBody('mtun', skel(5));
-    apiGet('api/ui/tunnels/' + encodeURIComponent(tuView.key) + '?range=' + tuRange).then(function (d) {
+    Promise.all([
+      apiGet('api/ui/tunnels/' + encodeURIComponent(tuView.key) + '?range=' + tuRange),
+      apiGet('api/mesh/servers').catch(function () { return { servers: [] }; })
+    ]).then(function (rs) {
       if (seq.mtun !== my) return;
-      renderTuDetailBody(d);
+      renderTuDetailBody(rs[0], rs[1]);
     }).catch(function (e) {
       if (seq.mtun !== my) return;
       var card = entError(e, function () { renderTuDetail(); });
@@ -1073,55 +1162,125 @@
     });
   }
 
-  // one end of the tunnel as a card: flag + role, server name, datacenter,
-  // and the agent deep-link when the backend relation gives us an agent
-  function tuSideCard(side, roleLbl) {
-    if (!side || !side.name) {
-      return '<div class="tu-side"><p class="tu-side-role">' + esc(roleLbl) + '</p><span class="mtb-muted">\u2014</span></div>';
+  // the traffic channel: wire (the carrier's real bytes) or payload (what
+  // the users actually moved) — one toggle switches the tiles AND the chart
+  var tunChannel = 'wire';
+
+  function tuStateColor(state) {
+    return state === 'healthy' ? 'var(--ok, #34d399)'
+      : state === 'down' ? 'var(--er, #f87171)'
+      : state === 'degraded' ? 'var(--warn, #f59e0b)'
+      : 'var(--mu, #94a3b8)';
+  }
+
+  // one end of the route as a card: flag, side title, agent name,
+  // datacenter, country chip, IP (when the backend knows it) and the
+  // agent deep-link
+  function tuSideCard(side, s, addr, lbl) {
+    if (!s || !s.name) {
+      return '<div class="tun-side"><p class="tu-side-role">' + topologyFlagSvg(side === 'iran' ? 'ir' : '') + esc(lbl) + '</p><span class="mtb-muted">\u2014</span></div>';
     }
-    var cc = side.role === 'iran' ? 'ir' : String(side.country || '').toLowerCase();
-    var dc = dcDisp(side.datacenter || '', side.datacenter_en);
-    return '<div class="tu-side">' +
-      '<p class="tu-side-role">' + (/^[a-z]{2}$/.test(cc) ? topologyFlagSvg(cc) : '') + esc(roleLbl) + '</p>' +
-      '<b class="mono tu-side-name" dir="ltr">' + esc(side.name) + '</b>' +
+    var cc = side === 'iran' ? 'ir' : String(s.country || '').toLowerCase();
+    var dc = dcDisp(s.datacenter || '', s.datacenter_en);
+    var ccLbl = side === 'iran' ? tr('', 'Iran') : (String(s.country || '').toUpperCase() || '');
+    var ip = addr || '';
+    return '<div class="tun-side' + (side === 'foreign' ? ' foreign' : '') + '">' +
+      '<p class="tu-side-role">' + (/^[a-z]{2}$/.test(cc) ? topologyFlagSvg(cc) : '') + esc(lbl) + '</p>' +
+      '<b class="mono tu-side-name" dir="ltr">' + esc(s.name) + '</b>' +
       (dc ? '<span class="mtb-muted tu-side-dc">' + esc(dc) + '</span>' : '') +
-      (side.agent_id ? '<button type="button" class="quantum-btn quantum-btn-secondary u-btn-xs tu-side-ag" data-tuagt="' + esc(side.agent_id) + '">' + ICO_AGT + esc(L('tuOpenAgent')) + '</button>' : '') +
+      '<div class="tu-side-chips">' +
+      (ccLbl ? '<span class="tu-chip">' + (side === 'iran' ? topologyFlagSvg('ir') : (/^[a-z]{2}$/.test(cc) ? topologyFlagSvg(cc) : '')) + esc(ccLbl) + '</span>' : '') +
+      (ip ? '<span class="tu-chip mono" dir="ltr">' + esc(ip) + '</span>' : '') +
+      '</div>' +
+      (s.agent_id ? '<button type="button" class="quantum-btn quantum-btn-secondary u-btn-xs tu-side-ag" data-tuagt="' + esc(s.agent_id) + '">' + ICO_AGT + esc(L('tuOpenAgent')) + '</button>' : '') +
       '</div>';
   }
 
-  // paired rx/tx bars; one per bucket of the selected range
-  function tuBarChart(points, gran) {
-    if (!points || !points.length) return entEmpty(L('tuNoSeries'));
+  // the connection line between the two route cards: colored by the real
+  // tunnel state, with the state pill riding its center
+  function tuConnector(state) {
+    var col = tuStateColor(state);
+    var stLbl = L('st_' + (state || 'unknown')) !== 'st_' + (state || 'unknown') ? L('st_' + (state || 'unknown')) : (state || '');
+    return '<div class="tun-conn">' +
+      '<svg class="tun-conn-svg" viewBox="0 0 200 12" preserveAspectRatio="none" aria-hidden="true">' +
+      '<line x1="0" y1="6" x2="200" y2="6" stroke="' + col + '" stroke-width="3" stroke-linecap="round" stroke-dasharray="' + (state === 'down' ? '10 8' : 'none') + '" opacity=".9"/>' +
+      '</svg>' +
+      '<span class="tu-conn-pill" style="border-color:' + col + ';color:' + col + '"><i style="background:' + col + '"></i>' + esc(stLbl) + '</span>' +
+      '</div>';
+  }
+
+  // inline SVG line chart: download area + upload line for one channel,
+  // with a hover tooltip (time + exact bytes) and the honest empty state
+  function tuSeriesChart(pts, ch, gran) {
+    var f = ch === 'payload' ? ['payload_rx_bytes', 'payload_tx_bytes'] : ['wire_rx_bytes', 'wire_tx_bytes'];
+    if (!pts || !pts.length) return '<div class="tu-chart-empty">' + entEmpty(L('tuNoSeries')) + '</div>';
     var max = 0;
-    points.forEach(function (p) { max = Math.max(max, (p.wire_rx_bytes || 0) + (p.wire_tx_bytes || 0)); });
+    pts.forEach(function (p) { max = Math.max(max, p[f[0]] || 0, p[f[1]] || 0); });
     if (!max) max = 1;
-    var bars = points.map(function (p) {
-      var rx = Math.round((p.wire_rx_bytes || 0) / max * 100);
-      var tx = Math.round((p.wire_tx_bytes || 0) / max * 100);
+    var W = 1000, H = 240, padL = 10, padR = 10, padT = 14, padB = 10;
+    var iw = W - padL - padR, ih = H - padT - padB;
+    var X = i => padL + (pts.length === 1 ? iw / 2 : i * (iw / (pts.length - 1)));
+    var Y = v => padT + (1 - (v || 0) / max) * ih;
+    function line(k) {
+      var d = '';
+      pts.forEach(function (p, i) { d += (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(p[k] || 0).toFixed(1) + ' '; });
+      return d;
+    }
+    function area(k) {
+      return line(k) + 'L' + X(pts.length - 1).toFixed(1) + ' ' + (padT + ih) + ' L' + X(0).toFixed(1) + ' ' + (padT + ih) + ' Z';
+    }
+    var grid = '';
+    [0.25, 0.5, 0.75].forEach(function (g2) {
+      var y = (padT + ih * (1 - g2)).toFixed(1);
+      grid += '<line x1="' + padL + '" y1="' + y + '" x2="' + (W - padR) + '" y2="' + y + '" class="tu-grid"/>';
+    });
+    var hoverDots = pts.map(function (p, i) {
+      return '<g class="tu-dot" data-tui="' + i + '" style="opacity:0">' +
+        '<circle cx="' + X(i).toFixed(1) + '" cy="' + Y(p[f[0]] || 0).toFixed(1) + '" r="4" class="tu-dot-rx"/>' +
+        '<circle cx="' + X(i).toFixed(1) + '" cy="' + Y(p[f[1]] || 0).toFixed(1) + '" r="4" class="tu-dot-tx"/></g>';
+    }).join('');
+    var svg = '<div class="tun-chartwrap">' +
+      '<div class="tu-chart-cap"><span>' + esc(L('tuMaxLabel')) + ': <bdi dir="ltr">' + esc(bytes(max)) + '</bdi></span>' +
+      '<span class="tu-leg"><i class="rx"></i>' + esc(L('tuDown')) + '</span>' +
+      '<span class="tu-leg"><i class="tx"></i>' + esc(L('tuUp')) + '</span></div>' +
+      '<svg id="tuChartSvg" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" class="tu-chart-svg" role="img">' +
+      grid +
+      '<path d="' + area(f[0]) + '" class="tu-area-rx"/><path d="' + line(f[0]) + '" class="tu-line-rx"/>' +
+      '<path d="' + area(f[1]) + '" class="tu-area-tx"/><path d="' + line(f[1]) + '" class="tu-line-tx"/>' +
+      hoverDots +
+      '</svg>' +
+      '<div class="tun-tip2" hidden></div>' +
+      '</div>';
+    return svg;
+  }
+
+  function tuChartTimes(pts, gran) {
+    var out = [];
+    if (!pts || !pts.length) return out;
+    var idx = [0, Math.floor((pts.length - 1) / 2), pts.length - 1];
+    Array.from(new Set(idx)).forEach(function (i) {
       var when;
       try {
         when = gran === 'hour'
-          ? new Date(p.t * 1000).toLocaleTimeString(isFa() ? 'fa-IR' : 'en-US', { hour: '2-digit', minute: '2-digit' })
-          : new Date(p.t * 1000).toLocaleDateString(isFa() ? 'fa-IR' : 'en-US', { month: 'short', day: 'numeric' });
-      } catch (e) { when = num0(p.t); }
-      return '<div class="tu-bar" title="' + esc(when + ' \u00b7 \u2193 ' + bytes(p.wire_rx_bytes || 0) + ' \u00b7 \u2191 ' + bytes(p.wire_tx_bytes || 0)) + '">' +
-        '<i class="rx" style="height:' + Math.max(rx, 2) + '%"></i>' +
-        '<i class="tx" style="height:' + Math.max(tx, 2) + '%"></i></div>';
-    }).join('');
-    return '<div class="tu-bars">' + bars + '</div>' +
-      '<div class="tu-bars-leg"><span><i class="rx"></i>' + esc(L('tuDown')) + '</span><span><i class="tx"></i>' + esc(L('tuUp')) + '</span></div>';
+          ? new Date(pts[i].t * 1000).toLocaleTimeString(isFa() ? 'fa-IR' : 'en-US', { hour: '2-digit', minute: '2-digit' })
+          : new Date(pts[i].t * 1000).toLocaleDateString(isFa() ? 'fa-IR' : 'en-US', { month: 'short', day: 'numeric' });
+      } catch (e) { when = num0(pts[i].t); }
+      out.push({ i: i, when: when, pct: pts.length === 1 ? 50 : (i / (pts.length - 1)) * 100 });
+    });
+    return out;
   }
 
-  function tuTotalCell(lbl, v) {
-    return '<div class="tu-tot"><span class="mtb-muted">' + esc(lbl) + '</span>' +
-      '<bdi dir="ltr">' + esc(v) + '</bdi></div>';
+  function tuTotalTile(lbl, rx, tx) {
+    return '<div class="tu-tile"><span class="tu-tile-lbl">' + esc(lbl) + '</span>' +
+      '<div class="tu-tile-vals"><span class="tu-dl"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v12"/><path d="M7 12l5 5 5-5"/></svg>' + esc(bytes(rx || 0)) + '</span>' +
+      '<span class="tu-ul"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V7"/><path d="M7 12l5-5 5 5"/></svg>' + esc(bytes(tx || 0)) + '</span></div></div>';
   }
 
-  function tuVital(lbl, v) {
-    return '<div class="tu-vital"><span class="mtb-muted">' + esc(lbl) + '</span><b>' + esc(v) + '</b></div>';
+  function tuVital(lbl, v, icon) {
+    return '<div class="tu-vital"><span class="tu-vital-ico">' + icon + '</span><div class="tu-vital-tx"><span class="mtb-muted">' + esc(lbl) + '</span><b>' + v + '</b></div></div>';
   }
 
-  function renderTuDetailBody(d) {
+  function renderTuDetailBody(d, svList) {
     var t = d.tunnel || {};
     var now = d.now || {};
     var tot = d.totals || {};
@@ -1132,33 +1291,86 @@
     window.mtbTunDetail = key;
     if (window.topTitleSync) window.topTitleSync('mtun');
 
-    var stB = stateBadge(now.state || (t.enabled === false ? 'disabled' : 'unknown'));
+    var addr = {};
+    ((svList && svList.servers) || []).forEach(function (s) { addr[s.id] = s.address || ''; });
+
+    var state = now.state || (t.enabled === false ? 'disabled' : 'unknown');
     var engN = TU_ENG_DISP[t.engine] || t.engine || '\u2014';
-    var engB = '<span class="badge info mtb-eng-badge">' + tuEngLogo(t.engine, engN) + ' ' + esc(engN) + '</span>';
-    var topoB = '<button type="button" class="mtb-topobadge" data-tuview="' + esc(t.topology && t.topology.id) + '" data-tuname="' + esc(t.topology && t.topology.name) + '" title="' + esc(L('tuOpenTopo')) + '">' + MTB_ICO.mesh + esc((t.topology && t.topology.name) || '\u2014') + '</button>';
+    var engMark = t.engine === 'matrix'
+      ? '<span class="badge ok tu-eng-mark">' + esc(L('engineDef')) + '</span>'
+      : '<span class="badge dim tu-eng-mark">' + esc(L('tuExp')) + '</span>';
+    var stateB = stateBadge(state);
 
-    // vitals — only fields the backend actually measured
-    var vitals = '';
-    if (now.latency_ms != null && now.latency_ms > 0) vitals += tuVital(L('agLatency'), (now.latency_ms < 1 ? '<1' : Math.round(now.latency_ms)) + ' ms');
-    if (now.loss_pct != null && now.loss_pct > 0) vitals += tuVital(L('tuLoss'), num(now.loss_pct, 1) + '%');
-    if (now.uptime_s != null && now.uptime_s > 0) vitals += tuVital(L('tuUptime'), dur(now.uptime_s));
-    if (now.cpu_percent != null) vitals += tuVital(L('cpuCol'), pct(now.cpu_percent));
-    if (now.rss_bytes != null) vitals += tuVital(L('memCol'), bytes(now.rss_bytes));
-    if (now.rate && now.rate.wire_rx_bps != null) vitals += tuVital(L('tuRateNow'), bytes(now.rate.wire_rx_bps) + '/s \u2193 \u00b7 ' + bytes(now.rate.wire_tx_bps || 0) + '/s \u2191');
-    if (now.last_error) vitals += '<div class="tu-err" role="alert">' + MTB_ICO.alerc + esc(String(now.last_error).split('\n')[0].slice(0, 180)) + '</div>';
+    // header group 2: the two DIFFERENT concepts, clearly named —
+    // weight (the configured share knob) vs the resolved weight share
+    var shareV = (t.resolved_percent != null) ? num(t.resolved_percent, 1) + '%' : '\u2014';
+    var shareTip = (t.resolved_percent != null) ? esc(L('tuShareTip')) : esc(L('tuNoShareTip'));
 
-    // traffic totals — today / 7d / 30d, real wire bytes
-    var mkT = function (k, lbl) {
-      var v = tot[k] || {};
-      return tuTotalCell(lbl + ' \u2193', bytes(v.wire_rx_bytes || 0)) + tuTotalCell(lbl + ' \u2191', bytes(v.wire_tx_bytes || 0));
+    var ipOf = function (side) {
+      var id = (side === 'iran' ? t.local_server : t.remote_server || {}).id;
+      return addr[id] || '';
     };
+
+    // the channel toggle: payload only when the backend actually recorded
+    // payload bytes for this tunnel
+    var payloadOk = ['today', '7d', '30d'].some(function (k) {
+      var v = tot[k] || {};
+      return (v.payload_rx_bytes || 0) > 0 || (v.payload_tx_bytes || 0) > 0;
+    }) || pts.some(function (p) { return (p.payload_rx_bytes || 0) > 0 || (p.payload_tx_bytes || 0) > 0; });
+    if (tunChannel === 'payload' && !payloadOk) tunChannel = 'wire';
+    var chanF = tunChannel === 'payload' ? ['payload_rx_bytes', 'payload_tx_bytes'] : ['wire_rx_bytes', 'wire_tx_bytes'];
+    var chanTile = function (k, lbl) {
+      var v = tot[k] || {};
+      return tuTotalTile(lbl, v[chanF[0]], v[chanF[1]]);
+    };
+
+    var overheadV = (rat.overhead_ratio != null) ? '\u00d7' + num(rat.overhead_ratio, 2) : '\u2014';
+    var overheadTip = (rat.overhead_ratio != null) ? esc(L('tuOverheadTip')) : esc(L('tuOverheadNone'));
+    var shareTrafficV = (rat.topology_share_pct != null) ? num(rat.topology_share_pct, 1) + '%' : '\u2014';
+
+    // vitals: three groups, real values only (a stored 0 latency is «no
+    // measurement», not a zero RTT)
+    var CLOCK = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
+    var LOSSI = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12h4l3-8 4 16 3-8h6"/></svg>';
+    var UPTI = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8"/></svg>';
+    var CPUI = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></svg>';
+    var RAMI = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="7" width="20" height="10" rx="2"/><path d="M6 17v3M10 17v3M14 17v3M18 17v3"/></svg>';
+    var DLI = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v12"/><path d="M7 11l5 5 5-5"/></svg>';
+    var ULI = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V8"/><path d="M7 13l5-5 5 5"/></svg>';
+    var vq = '';
+    if (now.latency_ms != null && now.latency_ms > 0) vq += tuVital(L('agLatency'), Math.round(now.latency_ms) + ' <i class="tu-unit">ms</i>', CLOCK);
+    if (now.loss_pct != null && now.loss_pct > 0) vq += tuVital(L('tuLoss'), num(now.loss_pct, 1) + ' <i class="tu-unit">%</i>', LOSSI);
+    if (now.uptime_s != null && now.uptime_s > 0) vq += tuVital(L('tuUptime'), dur(now.uptime_s), UPTI);
+    var ve = '';
+    if (now.cpu_percent != null) ve += tuVital(L('cpuCol'), pct(now.cpu_percent), CPUI);
+    if (now.rss_bytes != null) ve += tuVital(L('memCol'), bytes(now.rss_bytes), RAMI);
+    var vr = '';
+    if (now.rate && now.rate.wire_rx_bps != null) {
+      vr += tuVital(L('tuDownRate'), bytes(now.rate.wire_rx_bps) + '/s', DLI);
+      vr += tuVital(L('tuUpRate'), bytes(now.rate.wire_tx_bps || 0) + '/s', ULI);
+    }
+    var sampledAt = now.rate && now.rate.sampled_at ? Number(now.rate.sampled_at) : null;
+    var updLine = sampledAt ? '<span class="mtb-muted tu-updated">' + CLOCK + ' ' + esc(L('tuUpdatedAt')) + ': ' + esc(fmtDate(sampledAt)) + '</span>' : '';
+
+    // the state warning: a DOWN tunnel announces itself above the quality
+    // section; technical detail stays collapsible
+    var downBanner = state === 'down'
+      ? '<div class="tu-downwarn" role="alert">' + MTB_ICO.alerc + '<span>' + esc(L('tuDownWarn')) + '</span></div>' : '';
+    var techDetails = (now.last_error || (d.errors_recent || []).length)
+      ? '<details class="tu-tech"><summary>' + esc(L('tuTechT')) + '</summary>' +
+        (now.last_error ? '<p class="tu-tech-err mono" dir="ltr">' + esc(String(now.last_error)) + '</p>' : '') +
+        ((d.errors_recent || []).map(function (ev) {
+          return '<p class="tu-tech-err"><span class="badge err mono">' + esc(ev.code || 'error') + '</span> <span class="mono" dir="ltr">' + esc(String(ev.text || '').slice(0, 200)) + '</span></p>';
+        }).join('')) +
+        '</details>'
+      : '';
 
     var ranges = ['24h', '7d', '30d'].map(function (r) {
       var lbl = r === '24h' ? L('tuRange24') : (r === '7d' ? L('d7') : L('d30'));
       return '<button type="button" class="mtb-cdd-opt' + (tuRange === r ? ' on' : '') + '" data-turange="' + r + '">' + esc(lbl) + '</button>';
     }).join('');
+    var rangeCur = tuRange === '24h' ? L('tuRange24') : (tuRange === '7d' ? L('d7') : L('d30'));
 
-    // events: state flips and errors the backend recorded (already redacted)
     var evs = (d.events || []).slice(0, 24);
     var evHtml = evs.length ? evs.map(function (ev) {
       var inner;
@@ -1171,66 +1383,109 @@
     }).join('') : entEmpty(L('tuNoEvents'));
 
     var html =
-      '<div class="tunnel-card tu-backrow"><button type="button" class="quantum-btn mtb-backbtn" data-tuback>' + esc(L('tuBackList')) + ' <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg></button></div>' +
-
       '<div class="tunnel-card tu-head">' +
-      '<div class="tu-head-row">' +
-      '<div class="tu-id"><b class="mono tu-key" dir="ltr">' + esc(key) + '</b>' +
-      '<button type="button" class="mtb-keycopy" data-copyval="' + esc(key) + '" title="' + esc(L('copy')) + '" aria-label="' + esc(L('copy')) + '">' + TU_COPY + '</button>' +
-      stB + engB + topoB + '</div>' +
-      '<div class="tu-head-num">' +
-      '<div class="tu-wt"><span class="mtb-muted">' + esc(L('weightCol')) + '</span><b>' + (t.weight != null ? num0(t.weight) : '\u2014') + '</b></div>' +
-      (t.resolved_percent != null ? '<div class="tu-wt"><span class="mtb-muted">' + esc(L('shareCol')) + '</span><b>' + esc(num(t.resolved_percent, 1) + '%') + '</b></div>' : '') +
-      '<div class="tu-head-acts">' +
-      '<button type="button" class="quantum-btn quantum-btn-secondary u-btn-xs" data-tuweight="' + esc(t.topology && t.topology.id) + '|' + esc(key) + '">' + MTB_ICO.pen + esc(L('tuWeightT')) + '</button>' +
-      '<button type="button" class="quantum-btn quantum-btn-secondary u-btn-xs mtb-act-del" data-tudel="' + esc(t.id) + '|' + esc(key) + '">' + MTB_ICO.trash + esc(L('agActDel')) + '</button>' +
-      '</div></div></div>' +
-      (vitals ? '<div class="tu-vitals">' + vitals + '</div>' : '') +
+      '<div class="tu-head-grid">' +
+      // group 1: identity
+      '<div class="tu-id">' +
+      '<span class="tu-id-ico">' + MTB_ICO.chain + '</span>' +
+      '<div class="tu-id-tx"><b class="mono tu-key" dir="ltr">' + esc(key) + '</b>' +
+      '<button type="button" class="mtb-keycopy" data-copyval="' + esc(key) + '" title="' + esc(L('copy')) + '" aria-label="' + esc(L('copy')) + '">' + TU_COPY + '</button></div>' +
+      '<div class="tu-id-badges">' + stateB +
+      '<span class="badge info mtb-eng-badge">' + tuEngLogo(t.engine, engN) + ' ' + esc(engN) + '</span>' + engMark +
+      '<button type="button" class="mtb-topobadge" data-tuview="' + esc(t.topology && t.topology.id) + '" data-tuname="' + esc(t.topology && t.topology.name) + '" title="' + esc(L('tuOpenTopo')) + '">' + MTB_ICO.mesh + esc((t.topology && t.topology.name) || '\u2014') + '</button>' +
+      '</div></div>' +
+      // group 2: weight & share — two different concepts, two tooltips
+      '<div class="tu-ws">' +
+      '<div class="tu-wt" title="' + esc(L('tuWeightTip')) + '"><span class="mtb-muted tu-wt-lbl">' + MTB_ICO.sliders + ' ' + esc(L('weightCol')) + '</span><b>' + (t.weight != null ? num0(t.weight) : '\u2014') + '</b></div>' +
+      '<div class="tu-wt tu-share" title="' + shareTip + '"><span class="mtb-muted tu-wt-lbl">' + MTB_ICO.chart + ' ' + esc(L('tuShareW')) + '</span><b>' + shareV + '</b></div>' +
       '</div>' +
-
-      '<div class="tunnel-card tu-ends">' +
-      '<p class="tc-title dcard-title">' + MTB_ICO.chain + esc(L('tuEndsT')) + '</p>' +
-      '<div class="tu-ends-row">' +
-      tuSideCard(t.local_server, L('tuSideIran')) +
-      '<div class="tu-ends-mid">' + MTB_ICO.tun + '</div>' +
-      tuSideCard(t.remote_server, L('tuSideForeign')) +
+      // group 3: operations — delete stays separated from the regular actions
+      '<div class="tu-ops">' +
+      '<button type="button" class="quantum-btn mtb-backbtn" data-tuback>' + esc(L('tuBackList')) + '</button>' +
+      '<button type="button" class="quantum-btn quantum-btn-secondary u-btn-xs" data-tuweight="' + esc(t.topology && t.topology.id) + '|' + esc(key) + '">' + MTB_ICO.pen + esc(L('tuWeightT')) + '</button>' +
+      '<button type="button" class="quantum-btn quantum-btn-danger u-btn-xs" data-tudel="' + esc(t.id) + '|' + esc(key) + '">' + MTB_ICO.trash + esc(L('agActDel')) + '</button>' +
+      '</div>' +
       '</div></div>' +
 
-      '<div class="tunnel-card tu-traffic">' +
-      '<div class="tc-header dcard-head"><p class="tc-title dcard-title">' + MTB_ICO.dl + esc(L('tuTrafficT')) + '</p>' +
-      '<div class="mtb-cdd mtb-fcdd tu-range"><button type="button" class="mtb-cdd-btn" data-cdd-toggle><span class="mtb-cdd-cur">' + esc(tuRange === '24h' ? L('tuRange24') : (tuRange === '7d' ? L('d7') : L('d30'))) + '</span>' +
-      '<span class="mtb-cdd-arrow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span></button>' +
-      '<div class="mtb-cdd-pop" hidden>' + ranges + '</div></div></div>' +
-      '<div class="tu-tots">' +
-      mkT('today', L('today')) +
-      mkT('7d', L('d7')) +
-      mkT('30d', L('d30')) +
-      (rat.topology_share_pct != null ? tuTotalCell(L('tuShareT'), num(rat.topology_share_pct, 1) + '%') : '') +
-      (rat.overhead_ratio != null ? tuTotalCell(L('overhead'), '×' + num(rat.overhead_ratio, 2)) : '') +
+      downBanner +
+
+      // the route: two side cards joined by the state-colored line
+      '<div class="tunnel-card">' +
+      '<p class="tc-title dcard-title">' + MTB_ICO.tun + esc(L('tuEndsT')) + '</p>' +
+      '<div class="tu-route' + (state === 'down' ? ' down' : '') + '">' +
+      tuSideCard(t.local_server, ipOf('iran'), L('tuSideIran')) +
+      tuConnector(state) +
+      tuSideCard(t.remote_server, ipOf('foreign'), L('tuSideForeign')) +
       '</div>' +
-      tuBarChart(pts, hist.granularity) +
       '</div>' +
 
-      // settings: the PATCH route (enabled / engine / params) finally wired
-      '<div class="tunnel-card tu-settings">' +
-      '<p class="tc-title dcard-title">' + MTB_ICO.gear + esc(L('tuSettingsT')) + '</p>' +
-      '<div class="tu-set-grid">' +
-      '<label class="mtb-check tu-set-toggle"><input type="checkbox" id="tuSetEn"' + (t.enabled !== false ? ' checked' : '') + '> ' + esc(L('enabled')) + '</label>' +
-      '<select id="tuSetEng" class="quantum-input" aria-label="' + esc(L('engineCol')) + '">' +
-      Object.keys(TU_ENG_DISP).map(function (n) { return '<option value="' + esc(n) + '"' + (n === t.engine ? ' selected' : '') + '>' + esc(TU_ENG_DISP[n]) + '</option>'; }).join('') +
-      '</select>' +
+      // quality / engine usage / live rate — three groups, one card
+      '<div class="tunnel-card">' +
+      '<p class="tc-title dcard-title">' + MTB_ICO.chart + esc(L('tuQualityT')) + '</p>' +
+      (vq || ve || vr ? '<div class="tu-vitals3">' +
+        (vq ? '<div class="tu-vgroup"><p class="tu-vg-h">' + CLOCK + esc(L('tuConnQ')) + '</p>' + vq + '</div>' : '') +
+        (ve ? '<div class="tu-vgroup"><p class="tu-vg-h">' + CPUI + esc(L('tuEngineUse')) + '</p>' + ve + '</div>' : '') +
+        (vr ? '<div class="tu-vgroup"><p class="tu-vg-h">' + DLI + esc(L('tuLiveRate')) + '</p>' + vr + updLine + '</div>' : '') +
+        '</div>' : '<p class="qs-hint u-m-0">' + esc(L('tuNoVitals')) + '</p>') +
+      techDetails +
       '</div>' +
-      '<label class="tu-pl mtb-muted">' + esc(L('tuParams')) + '</label>' +
-      '<textarea id="tuSetParams" class="quantum-input tu-params" dir="ltr" rows="4" placeholder="{&quot;port&quot;: 443}" spellcheck="false"></textarea>' +
-      '<p class="qs-hint">' + esc(L('tuParamsHint')) + '</p>' +
-      '<div class="mtb-acts"><button type="button" class="quantum-btn quantum-btn-primary u-btn-xs" id="tuSetSave" data-tuset="' + esc(t.id) + '" data-tueng="' + esc(t.engine || '') + '">' + esc(L('agSave')) + '</button></div>' +
+
+      // traffic: channel toggle, fixed stat tiles, chart with its own range
+      '<div class="tunnel-card">' +
+      '<div class="tc-header dcard-head"><p class="tc-title dcard-title">' + MTB_ICO.dl + esc(L('tuTrafficT')) + '</p>' +
+      '<div class="tu-chan"><button type="button" class="tu-chan-btn' + (tunChannel === 'wire' ? ' on' : '') + '" data-tuchan="wire" ' + '>Wire</button>' +
+      '<button type="button" class="tu-chan-btn' + (tunChannel === 'payload' ? ' on' : '') + '" data-tuchan="payload"' + (payloadOk ? '' : ' disabled title="' + esc(L('tuNoPayload')) + '"') + '>Payload</button></div>' +
+      '<div class="mtb-cdd mtb-fcdd tu-range"><button type="button" class="mtb-cdd-btn" data-cdd-toggle><span class="mtb-cdd-cur">' + esc(rangeCur) + '</span>' +
+      '<span class="mtb-cdd-arrow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span></button>' +
+      '<div class="mtb-cdd-pop" hidden>' + ranges + '</div></div></div>' +
+      '<div class="tu-tiles">' +
+      chanTile('today', L('today')) +
+      chanTile('7d', L('d7')) +
+      chanTile('30d', L('d30')) +
+      '<div class="tu-tile" title="' + esc(L('tuShareTrafficTip')) + '"><span class="tu-tile-lbl">' + esc(L('tuShareT')) + '</span><b class="tu-tile-big">' + shareTrafficV + '</b></div>' +
+      '<div class="tu-tile" title="' + overheadTip + '"><span class="tu-tile-lbl">' + esc(L('overhead')) + '</span><b class="tu-tile-big">' + overheadV + '</b></div>' +
       '</div>' +
+      '<div class="tu-chan-note">' + esc(tunChannel === 'payload' ? L('tuPayloadDef') : L('tuWireDef')) + '</div>' +
+      tuSeriesChart(pts, tunChannel, hist.granularity) +
+      '<div class="tu-times">' + tuChartTimes(pts, hist.granularity).map(function (x) {
+        return '<span style="left:' + x.pct.toFixed(1) + '%">' + esc(x.when) + '</span>';
+      }).join('') + '</div>' +
+      '</div>' +
+
       '<div class="tunnel-card tu-events">' +
       '<p class="tc-title dcard-title">' + MTB_ICO.clock + esc(L('tuEventsT')) + '</p>' +
       evHtml +
       '</div>';
 
     setBody('mtun', html);
+
+    // the chart tooltip: nearest bucket on hover, exact time + byte counts
+    var svgEl = document.getElementById('tuChartSvg');
+    var tip = document.querySelector('.tun-tip2');
+    if (svgEl && tip && pts.length) {
+      svgEl.addEventListener('mousemove', function (ev) {
+        var rect = svgEl.getBoundingClientRect();
+        var rel = Math.min(1, Math.max(0, (ev.clientX - rect.left) / rect.width));
+        var i = Math.round(rel * (pts.length - 1));
+        var p = pts[i];
+        var when;
+        try {
+          when = hist.granularity === 'hour'
+            ? new Date(p.t * 1000).toLocaleString(isFa() ? 'fa-IR' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+            : new Date(p.t * 1000).toLocaleDateString(isFa() ? 'fa-IR' : 'en-US', { month: 'short', day: 'numeric' });
+        } catch (e4) { when = num0(p.t); }
+        tip.innerHTML = '<b>' + esc(when) + '</b>' +
+          '<span class="tu-dl">' + esc(L('tuDown')) + ': ' + esc((p[chanF[0]] || 0).toLocaleString(isFa() ? 'fa-IR' : 'en-US') + ' B') + ' (' + esc(bytes(p[chanF[0]] || 0)) + ')</span>' +
+          '<span class="tu-ul">' + esc(L('tuUp')) + ': ' + esc((p[chanF[1]] || 0).toLocaleString(isFa() ? 'fa-IR' : 'en-US') + ' B') + ' (' + esc(bytes(p[chanF[1]] || 0)) + ')</span>';
+        tip.hidden = false;
+        tip.style.left = Math.min(88, Math.max(2, rel * 100)) + '%';
+        svgEl.querySelectorAll('.tu-dot').forEach(function (d2) { d2.style.opacity = d2.getAttribute('data-tui') === String(i) ? 1 : 0; });
+      });
+      svgEl.addEventListener('mouseleave', function () {
+        tip.hidden = true;
+        svgEl.querySelectorAll('.tu-dot').forEach(function (d2) { d2.style.opacity = 0; });
+      });
+    }
   }
 
   // ---- modal shell (same grammar as the agent wizard) -------------------------
