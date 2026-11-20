@@ -9437,11 +9437,17 @@ function bwRenderRun(st) {
     '<th>' + esc(tr('', 'Score')) + '</th><th>' + esc(tr('', 'Note')) + '</th></tr></thead><tbody>' +
     (rows || '<tr><td colspan="8" class="u-text-center">' + skel(2) + '</td></tr>') + '</tbody></table></div>' +
     '<p class="qs-hint">' + esc(tr('', 'Real temporary tunnels: built through each engine, measured from the agents\u2019 own counter samples, then removed.')) + '</p>' +
-    '<div class="mtb-acts"><button type="button" class="quantum-btn quantum-btn-secondary" id="bwStop">' + esc(tr('', 'Stop')) + '</button>' +
-    '<button type="button" class="quantum-btn quantum-btn-secondary" id="bwAgain">' + esc(tr('', 'Run again')) + '</button></div>';
-  const stopB = $('bwStop'), againB = $('bwAgain');
+    '<div class="mtb-acts"><button type="button" class="quantum-btn quantum-btn-secondary" id="bwStop"' + (st.running ? '' : ' hidden') + '>' + esc(tr('', 'Stop')) + '</button>' +
+    '<button type="button" class="quantum-btn quantum-btn-secondary" id="bwAgain">' + esc(tr('', 'Run again')) + '</button>' +
+    '<button type="button" class="quantum-btn quantum-btn-primary" id="bwNew">' + esc(tr('', 'New benchmark')) + '</button></div>';
+  const stopB = $('bwStop'), againB = $('bwAgain'), newB = $('bwNew');
   if (stopB) stopB.onclick = bwStop;
   if (againB) againB.onclick = () => { bwState.running = false; clearTimeout(bwTimer); loadBenchWizard(); };
+  if (newB) newB.onclick = async () => {
+    await api('/api/benchmark/pair-clear', {}, 'POST').catch(() => {});
+    bwState = { step: 1, topo: null, topoName: '', iran: null, iranAgent: '', foreign: null, foreignAgent: '', engines: [], picked: [], pool: null, running: false, view: null, timer: null };
+    loadBenchWizard();
+  };
 }
 
 // ---------- Bagher (SSH pool carrier): created in Setup, run from the Tunnel tab ----------

@@ -158,6 +158,7 @@ func pairBenchSnapshot() map[string]any {
 	}
 	if !p.finishedAt.IsZero() {
 		out["finished_at"] = p.finishedAt.Unix()
+		out["done"] = true
 	}
 	return out
 }
@@ -441,6 +442,14 @@ func (p *pairBenchState) measure(tunnelID int64) (down, up float64, have bool) {
 
 func handleBenchmarkPairGet(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, pairBenchSnapshot())
+}
+
+func handleBenchmarkPairClear(w http.ResponseWriter, r *http.Request) {
+	pairMu.Lock()
+	pairCur = nil
+	pairMu.Unlock()
+	_ = os.Remove(benchmarkPairFile())
+	writeJSON(w, map[string]any{"status": "cleared"})
 }
 
 func handleBenchmarkPairStop(w http.ResponseWriter, r *http.Request) {
