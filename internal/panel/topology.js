@@ -1408,7 +1408,15 @@ async function topologyDelete(id) {
   if (!await entConfirm(tr('', 'Delete topology?'), tr('', 'This empty topology will be removed.'), tr('', 'Delete topology'))) return;
   try {
     await api('/api/topologies/' + encodeURIComponent(id), {}, 'DELETE');
+    if (topologySelected === id) {
+      // the open topology is the deleted one: close the detail and clean
+      // the &topo= hash, or the page lands on a ghost detail after reload
+      topologySelected = null;
+      _tunnelDetail = null;
+      try { history.replaceState(null, '', '#t=tunnel'); } catch (_) {}
+    }
     await topologyReload();
+    if (typeof topTitleSync === 'function') topTitleSync('tunnel');
     toastOk(tr('', 'Topology deleted'), topo ? topo.name : '');
   }
   catch(e) { toastErr(tr('', 'Topology delete failed'), e.message); }

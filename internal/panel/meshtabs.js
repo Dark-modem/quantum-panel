@@ -1273,6 +1273,11 @@
       apiSend('DELETE', 'api/mesh/tunnels/' + encodeURIComponent(id)).then(function () {
         delete topoTraffic[key];
         mtbToast(L('delDone'));
+        // deleting the open tunnel must leave its detail page, not 404 inside it
+        if (tuView && tuView.key === key) {
+          tuView = null;
+          try { history.replaceState(null, '', '#t=mtun'); } catch (e3) {}
+        }
         loadTun();
       }).catch(tuFail);
     });
@@ -2687,7 +2692,10 @@
       apiSend('DELETE', 'api/ui/agents/' + encodeURIComponent(id)).then(function () {
         ov.remove();
         toastOk(L('agDelT'), L('agDelDone'));
-        agtView = { view: 'table' }; renderAgt();
+        agtView = { view: 'table' };
+        // a deleted agent's detail deep-link is a ghost: clean the hash
+        try { if (location.hash.indexOf('&ag=') > 0) history.replaceState(null, '', '#t=magt'); } catch (e3) {}
+        renderAgt();
       }).catch(function (e2) {
         btn.disabled = false;
         var msg = (e2.body && e2.body.ui && e2.body.ui.title) ? (isFa() ? e2.body.ui.title.fa : e2.body.ui.title.en)
