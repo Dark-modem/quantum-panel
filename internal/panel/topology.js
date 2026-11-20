@@ -1969,9 +1969,11 @@ function topoCreateOpen() {
   }).catch(() => { /* pools stay empty: the steps show the honest empty state */ });
 }
 function topoCreateError(msg) {
+  // errors surface as toasts, not as the inline alert strip
   const el = $('topoCreateErr');
-  el.textContent = msg || '';
-  el.classList.toggle('hidden', !msg);
+  el.textContent = '';
+  el.classList.add('hidden');
+  if (msg) toastErr(tr('', 'Add topology'), msg);
 }
 // Circular step counter: a ring whose arc fills with progress, "1/3" inside.
 function topoCreateRing(step, n) {

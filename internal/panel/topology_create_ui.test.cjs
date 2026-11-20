@@ -104,11 +104,13 @@ test('the name step blocks an empty and a non-slug name', () => {
   const h = harness();
   h.sandbox.topologyCreate();
   h.sandbox.topoCreateNext();
-  assert.ok(h.el('topoCreateErr').textContent.length > 0, 'an inline error explains the block');
+  assert.equal(h.wiz('topoCreate.step'), 1, 'an empty name blocks the step');
+  assert.ok(h.toasts.some(t => t[0] === 'err' && t.includes('Enter a name for the topology.')), 'the block is announced as a toast');
   h.el('topoCreateName').value = 'Main Mesh!';
   h.sandbox.topoCreateNext();
   assert.equal(h.wiz('topoCreate.step'), 1, 'a non-slug name blocks the step');
-  assert.ok(h.el('topoCreateErr').textContent.includes('slug'), 'the error names the real rule');
+  assert.ok(h.toasts.some(t => t[0] === 'err' && t.join(' ').includes('slug')), 'the toast names the real rule');
+  assert.equal(h.el('topoCreateErr').textContent, '', 'the inline alert strip stays empty: errors are toasts');
   h.el('topoCreateName').value = 'main-mesh';
   h.sandbox.topoCreateNext();
   assert.equal(h.wiz('topoCreate.step'), 2, 'a valid slug advances');
@@ -167,7 +169,8 @@ test('a failed create keeps the wizard open with the API error', async () => {
   h.sandbox.topoCreateNext();
   await h.sandbox.topoCreateNext();
   assert.equal(h.el('topoCreateModal').hidden, false, 'the modal stays open');
-  assert.ok(h.el('topoCreateErr').textContent.includes('boom'), 'the inline error shows the API message');
+  assert.ok(h.toasts.some(t => t[0] === 'err' && t.join(' ').includes('boom')), 'the API failure is announced as a toast');
+  assert.equal(h.el('topoCreateErr').textContent, '', 'the inline alert strip stays empty');
 });
 
 test('back preserves the DC and agent picks across steps', async () => {
