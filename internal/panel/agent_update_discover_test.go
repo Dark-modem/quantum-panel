@@ -427,3 +427,116 @@ func TestAgentUpdateOutdatedAlreadyRunning(t *testing.T) {
 		t.Fatalf("bad channel status = %d", w2.Code)
 	}
 }
+
+// TestAgentUpdateOutdatedHostileInput: the POST body and the GET query
+// are hostile-input surfaces (round-4 rules). Malformed / wrong-typed /
+// hostile / oversized bodies answer the structured E-AGENT-08 envelope
+// with 400 and NEVER reach the queue; null and empty-object bodies take
+// the contract's default-channel path; hostile query values are inert.
+func TestAgentUpdateOutdatedHostileInput(t *testing.T) {
+	swapDiscoverSeams(t, fakeDiscoverReleases(), nil)
+	seedAgents(t, sampleAgents())
+	resetGroupState(t)
+
+	dispatched := make(chan string, 8)
+	old := agentUpdateDispatch
+	agentUpdateDispatch = func(id, version, url string) (agentCommandResult, error) {
+		dispatched <- id
+		return agentCommandResult{}, nil
+	}
+	t.Cleanup(func() { agentUpdateDispatch = old })
+
+	post := func(body string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest("POST", "/api/agents/update-outdated", strings.NewReader(body))
+		w := httptest.NewRecorder()
+		handleAgentUpdateOutdatedPost(w, req)
+		return w
+	}
+
+	reject := []struct {
+		name string
+		body string
+	}{
+		{"malformed json", `{"channel":"stable"`},
+		{"empty body", ``},
+		{"array body", `["stable"]`},
+		{"string body", `"stable"`},
+		{"wrong type", `{"channel":123}`},
+		{"hostile channel", `{"channel":"stable; rm -rf /"}`},
+		{"channel with newline", "{\"channel\":\"stable\n\"}"},
+		{"channel with nul", "{\"channel\":\"stab\u0000le\"}"},
+		{"channel lookalike", `{"channel":"stable "}`},
+		{"oversized body", `{"channel":"stable","pad":"` + strings.Repeat("x", 4096) + `"}`},
+	}
+	for _, c := range reject {
+		w := post(c.body)
+		if w.Code != 400 {
+			t.Errorf("%s: status = %d, want 400 (body: %.80s)", c.name, w.Code, w.Body.String())
+		}
+		if !strings.Contains(w.Body.String(), "E-AGENT-08") {
+			t.Errorf("%s: missing E-AGENT-08 envelope: %.120s", c.name, w.Body.String())
+		}
+	}
+	select {
+	case id := <-dispatched:
+		t.Fatalf("hostile input reached the dispatch queue: %q", id)
+	default:
+	}
+
+	// Default-channel path: null (JSON null leaves the string field
+	// untouched = absent) / empty-object bodies are valid requests
+	// (channel defaults to the active channel = stable in the temp dir).
+	for _, c := range []struct{ name, body string }{
+		{"json null", `null`},
+		{"null channel", `{"channel":null}`},
+		{"empty object", `{}`},
+		{"unknown fields only", `{"foo":{"bar":1}}`},
+	} {
+		resetGroupState(t)
+		w := post(c.body)
+		if w.Code != 200 {
+			t.Fatalf("%s: status = %d, want 200: %s", c.name, w.Code, w.Body.String())
+		}
+		var out map[string]any
+		if err := json.Unmarshal(w.Body.Bytes(), &out); err != nil {
+			t.Fatalf("%s: decode: %v", c.name, err)
+		}
+		if out["status"] != "queued" || out["channel"] != channelStable {
+			t.Fatalf("%s: response wrong: %v", c.name, out)
+		}
+		select {
+		case id := <-dispatched:
+			if id != "agt_a" {
+				t.Fatalf("%s: dispatched %q", c.name, id)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatalf("%s: queue did not dispatch", c.name)
+		}
+	}
+}
+
+// TestDiscoveryQueryHostileInput: hostile/inert query values on the
+// discovery GETs are harmless — the endpoints answer 200 with the same
+// shape, and only refresh=1 acts.
+func TestDiscoveryQueryHostileInput(t *testing.T) {
+	swapDiscoverSeams(t, fakeDiscoverReleases(), nil)
+	seedAgents(t, sampleAgents())
+	resetGroupState(t)
+	for _, q := range []string{
+		"?refresh=1",
+		"?refresh=true",
+		"?refresh=0",
+		"?refresh=<script>alert(1)</script>",
+		"?refresh=1&x=" + strings.Repeat("y", 4096),
+		"?channel=dev&refresh=1",
+	} {
+		out := getJSON2(t, handleUpdateAvailable, "/api/update/available"+q)
+		if out["channel"] != channelStable {
+			t.Fatalf("query %q: channel = %v", q, out["channel"])
+		}
+	}
+	out := getJSON2(t, handleAgentUpdates, "/api/agents/updates?refresh=1&callback=fn")
+	if _, ok := out["agents"]; !ok {
+		t.Fatal("agents updates query variant lost the agents field")
+	}
+}
