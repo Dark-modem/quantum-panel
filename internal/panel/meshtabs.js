@@ -84,6 +84,18 @@
     agUpdUrl: ['آدرس فایل آپدیت (https)', 'Artifact URL (https)'],
     agUpdHint: ['فایل باید https، امضاشده با کلید آپدیت و برای معماری همین ایجنت باشد. ایجنت دانلود و تأیید می‌کند و پس از تعویض ری‌استارت می‌شود.', 'The artifact must be https, signed with the pinned update key, and built for this agent architecture. The agent downloads, verifies, swaps and restarts.'],
     agUpdStart: ['شروع آپدیت', 'Start update'], agUpdNeed: ['نسخه و آدرس فایل لازم است', 'Version and artifact URL are required'],
+    agUpdStable: ['آخرین نسخه پایدار', 'Latest stable'],
+    agUpdPre: ['آخرین پیش‌انتشار', 'Latest prerelease'],
+    agUpdUpdateTo: ['آپدیت به {v}', 'Update to {v}'],
+    agUpdUpToDate: ['به‌روز است', 'Up to date'],
+    agUpdNone: ['این کانال ریلیزی ندارد', 'No release on this channel'],
+    agUpdCommitNote: ['فقط اطلاع‌رسانی — تا وقتی پایپ‌لاین برای هر build یک dev-rN منتشر نکند، ارتفاکت ندارد.', 'Informational only — no artifact until the pipeline publishes one dev-rN per build.'],
+    agUpdNoGH: ['دسترسی به گیت‌هاب ممکن نشد — از فرم دستی استفاده کنید.', 'GitHub unreachable — use the manual form.'],
+    agUpdManual: ['فرم دستی', 'Manual form'],
+    agUpdGroup: ['آپدیت همهٔ outdated‌ها', 'Update all outdated'],
+    agUpdGroupStarted: ['صف آپدیت گروهی شروع شد', 'Group update queue started'],
+    agUpdGroupLast: ['آخرین گروه: {ok} موفق، {bad} ناموفق ({tag})', 'Last group: {ok} ok, {bad} failed ({tag})'],
+    agUpdStarted: ['آپدیت شروع شد', 'Update started'],
     agPhRequested: ['درخواست شد', 'requested'], agPhDownloading: ['دانلود', 'downloading'],
     agPhVerifying: ['بررسی امضا', 'verifying'], agPhSwapped: ['جایگزین شد', 'swapped'],
     agPhRestarting: ['ری‌استارت', 'restarting'], agPhCompleted: ['کامل شد', 'completed'],
@@ -575,6 +587,19 @@
     '.tu-set-grid select { min-width:200px; }',
     '.tu-pl { display:block; margin:12px 0 6px; }',
     '.tu-params { font-family:ui-monospace, Menlo, monospace; font-size:12.5px; resize:vertical; }',
+    '.tu-upd-cards { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:4px; }',
+    '@media (max-width: 560px) { .tu-upd-cards { grid-template-columns:1fr; } }',
+    '.tu-upd-card { position:relative; display:flex; flex-direction:column; gap:6px; padding:10px 12px; border:1px solid var(--ln, rgba(148,163,184,.25)); border-radius:12px; }',
+    '.tu-upd-card.na { opacity:.75; }',
+    '.tu-upd-head { display:flex; align-items:center; justify-content:space-between; gap:8px; } .tu-upd-head > b:first-child { font-size:12.5px; color:var(--tx2, #cbd5e1); }',
+    '.tu-upd-tag { font-size:13.5px; font-weight:700; }',
+    '.tu-upd-meta { display:flex; flex-wrap:wrap; gap:4px 10px; font-size:12px; color:var(--mu, #94a3b8); } .tu-upd-meta .mono { font-size:11.5px; overflow-wrap:anywhere; }',
+    '.tu-upd-badge { display:inline-flex; align-items:center; gap:5px; } .tu-upd-badge svg { width:13px; height:13px; fill:none; stroke:currentColor; stroke-width:2; }',
+    '.tu-upd-card .tu-upd-go { align-self:flex-start; }',
+    '.tu-upd-commit-wrap { margin-top:10px; padding-top:10px; border-top:1px solid var(--ln, rgba(148,163,184,.2)); }',
+    '.tu-upd-commit { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }',
+    '.tu-upd-commit-tx { font-size:12.5px; color:var(--tx2, #cbd5e1); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }',
+    '.mtb-upd-info.warn { color:var(--er, #f87171); border:1px solid color-mix(in srgb, var(--er) 30%, transparent); background:color-mix(in srgb, var(--er) 7%, transparent); }',
     '@media (prefers-reduced-motion: reduce) { main.page section[id^="tab-m"] * { animation: none !important; transition: none !important; } }'
   ].join('\n');
 
@@ -2353,10 +2378,115 @@
     }).catch(function () {});
   }
   var agLastUpdUrl = '';
+  // Update-agent modal, GitHub-first (contract §2.20): one GET to
+  // /api/agents/updates brings what GitHub has (stable / dev-rN prerelease
+  // / dev commit) and THIS agent's outdatedness with the arch-resolved
+  // artifact. The Update buttons ride the unchanged M2 path — the panel
+  // still verifies the pinned signature + digest before the agent hears
+  // anything, and the agent re-verifies on its own download. The manual
+  // version+URL form stays as the advanced/fallback path.
   function openAgtUpd(id) {
+    apiGet('api/agents/updates').then(function (disc) {
+      var row = null;
+      (disc.agents || []).forEach(function (r) { if (r.id === id) row = r; });
+      if (!row) { openAgtUpdManual(id, '', ''); return; }
+      var UPGR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17V5"/><path d="M6 11l6-6 6 6"/><path d="M5 21h14"/></svg>';
+      var OKC = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.2l2.5 2.5 4.7-5"/></svg>';
+      var GLOB = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.7 2.7 4 5.8 4 9s-1.3 6.3-4 9c-2.7-2.7-4-5.8-4-9s1.3-6.3 4-9z"/></svg>';
+      var ov = document.createElement('div');
+      ov.className = 'mtb-modal-ov';
+      function chanCard(lbl, rel, art, outdated) {
+        var head = '<div class="tu-upd-head"><b>' + esc(lbl) + '</b>' + (rel && rel.tag ? '<bdi dir="ltr" class="tu-upd-tag">' + esc(rel.tag) + '</bdi>' : '') + '</div>';
+        if (!rel) return '<div class="tu-upd-card na">' + head + '<span class="mtb-muted">' + esc(L('agUpdNone')) + '</span></div>';
+        var date = rel.published_at ? new Date(rel.published_at).toLocaleDateString(isFa() ? 'fa-IR' : 'en-US') : '';
+        var meta = [];
+        if (date) meta.push(date);
+        if (art && art.size) meta.push(bytes(art.size));
+        if (art && art.url) meta.push('<span class="mono" dir="ltr">' + esc(art.asset_name || '') + '</span>');
+        var body = '<div class="tu-upd-meta">' + meta.map(function (m) { return '<span>' + m + '</span>'; }).join('') + '</div>';
+        if (!outdated || !art || !art.url) {
+          return '<div class="tu-upd-card na">' + head + body +
+            '<span class="badge ok tu-upd-badge">' + OKC + esc(L('agUpdUpToDate')) + '</span></div>';
+        }
+        return '<div class="tu-upd-card">' + head + body +
+          '<button type="button" class="quantum-btn quantum-btn-primary u-btn-xs tu-upd-go" data-archan="' + esc(art.channel) + '">' + UPGR + ' ' + esc(Lf('agUpdUpdateTo', { v: art.tag })) + '</button></div>';
+      }
+      function commitRow(c) {
+        if (!c) return '';
+        var when = c.date ? new Date(c.date).toLocaleDateString(isFa() ? 'fa-IR' : 'en-US') : '';
+        return '<div class="tu-upd-commit"><span class="badge dim mono">' + esc(String(c.sha || '').slice(0, 7)) + '</span>' +
+          '<span class="tu-upd-commit-tx">' + esc(String(c.message || '').slice(0, 120)) + '</span>' +
+          '<span class="mtb-muted">' + esc(when) + '</span></div>' +
+          '<p class="qs-hint">' + esc(L('agUpdCommitNote')) + '</p>';
+      }
+      var rep = disc.last_group_update || null;
+      var repLine = '';
+      if (rep && rep.results) {
+        var ok = 0, bad = 0;
+        rep.results.forEach(function (r2) { if (r2.status === 'ok') ok++; else bad++; });
+        repLine = '<p class="qs-hint">' + esc(Lf('agUpdGroupLast', { ok: String(ok), bad: String(bad), tag: rep.tag || '' })) + '</p>';
+      }
+      ov.innerHTML = '<div class="mtb-modal mtb-ed-modal mtb-upd-modal" role="dialog" aria-modal="true">' +
+        '<div class="tc-header"><div class="mtb-wiz-hero"><span class="mtb-modal-badge">' + GLOB + '</span><div class="mtb-wiz-hero-tx"><p class="tc-title">' + esc(L('agUpdT')) + '</p><p class="qs-hint"><b>' + esc(row.name || id) + '</b>' + (row.version ? ' · <bdi dir="ltr">' + esc(row.version) + '</bdi>' : '') + (row.arch ? ' · <span class="mono">' + esc(row.arch) + '</span>' : '') + '</p></div></div>' +
+        '<button type="button" class="mtb-x" data-mtb-close>×</button></div>' +
+        (disc.error ? '<div class="mtb-upd-info warn"><span>' + esc(L('agUpdNoGH')) + '</span></div>' : '') +
+        '<div class="tu-upd-cards">' +
+        chanCard(L('agUpdStable'), disc.stable, row.artifact_stable, row.outdated_stable) +
+        chanCard(L('agUpdPre'), disc.prerelease, row.artifact_prerelease, row.outdated_prerelease) +
+        '</div>' +
+        '<div class="tu-upd-commit-wrap">' + commitRow(disc.commit) + '</div>' +
+        repLine +
+        '<div class="mtb-acts"><button type="button" class="quantum-btn quantum-btn-secondary u-btn-xs" id="mtbUpdGroup">' + esc(L('agUpdGroup')) + '</button>' +
+        '<button type="button" class="quantum-btn quantum-btn-secondary u-btn-xs" id="mtbUpdManual">' + esc(L('agUpdManual')) + '</button>' +
+        '<button type="button" class="quantum-btn quantum-btn-secondary" data-mtb-close>' + esc(L('cancel')) + '</button></div>' +
+        '</div>';
+      document.body.appendChild(ov);
+      ov.querySelectorAll('[data-mtb-close]').forEach(function (b) { b.addEventListener('click', function () { ov.remove(); }); });
+      ov.addEventListener('click', function (e) { if (e.target === ov) ov.remove(); });
+      function updateTo(art) {
+        if (!art || !art.url) return;
+        agLastUpdUrl = art.url;
+        apiSend('POST', 'api/agents/' + encodeURIComponent(id) + '/update', { version: art.version || art.tag, url: art.url }).then(function (res) {
+          if (res && res.status === 'started') {
+            ov.remove();
+            if (agtView.view === 'detail' && agtView.id === id) renderAgtDetail(id);
+            mtbToast(L('agUpdStarted'));
+          } else {
+            toastErr(L('agUpdBtn'), (res && (res.error || res.message)) || 'HTTP');
+          }
+        }).catch(function (e2) {
+          toastErr(L('agUpdBtn'), ((e2.body && (e2.body.error || e2.body.message)) || e2.message || ('HTTP ' + e2.status)) + (e2.body && e2.body.hint ? ' \u2014 ' + e2.body.hint : ''));
+        });
+      }
+      ov.querySelectorAll('.tu-upd-go').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var ch = b.getAttribute('data-archan');
+          updateTo(ch === 'stable' ? row.artifact_stable : row.artifact_prerelease);
+        });
+      });
+      document.getElementById('mtbUpdGroup').addEventListener('click', function () {
+        var btn = this; btn.disabled = true;
+        apiSend('POST', 'api/agents/update-outdated', { channel: disc.channel || 'stable' }).then(function (res) {
+          mtbToast(L('agUpdGroupStarted'));
+          btn.disabled = false;
+        }).catch(function (e2) {
+          btn.disabled = false;
+          toastErr(L('agUpdGroup'), ((e2.body && (e2.body.error || e2.body.message)) || e2.message || 'HTTP'));
+        });
+      });
+      document.getElementById('mtbUpdManual').addEventListener('click', function () {
+        ov.remove();
+        openAgtUpdManual(id, row.version || '', agLastUpdUrl);
+      });
+    }).catch(function () { openAgtUpdManual(id, '', ''); });
+  }
+
+  // the manual fallback: the pre-34 form (version + URL), for when GitHub
+  // is unreachable or the operator wants an exact artifact
+  function openAgtUpdManual(id, ver, lastUrl) {
     apiGet('api/ui/agents/' + encodeURIComponent(id)).then(function (d) {
       var ag = d.agent || {};
-      var curV = ag.version || '';
+      var curV = ag.version || ver || '';
       var preV = /^v[0-9]/.test(curV) ? curV : '';
       var ov = document.createElement('div');
       ov.className = 'mtb-modal-ov';
@@ -2365,15 +2495,14 @@
     var EXT = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg>';
     var INFO = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M12 11.5V16"/></svg>';
     var UPGR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17V5"/><path d="M6 11l6-6 6 6"/><path d="M5 21h14"/></svg>';
-    var SERV = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="7" rx="1.5"/><rect x="3" y="13" width="18" height="7" rx="1.5"/><path d="M7 7.5h.01M7 16.5h.01"/></svg>';
     ov.innerHTML = '<div class="mtb-modal mtb-ed-modal mtb-upd-modal" role="dialog" aria-modal="true">' +
         '<div class="tc-header"><div class="mtb-wiz-hero"><span class="mtb-modal-badge">' + UPGR + '</span><div class="mtb-wiz-hero-tx"><p class="tc-title">' + esc(L('agUpdT')) + '</p><p class="qs-hint"><b>' + esc(ag.name || id) + '</b>' + (curV ? ' · <bdi dir="ltr">' + esc(curV) + '</bdi>' : '') + '</p></div></div>' +
         '<button type="button" class="mtb-x" data-mtb-close>×</button></div>' +
         '<div class="mtb-form">' +
-        '<span class="mtb-upd-k">' + SERV + esc(L('agUpdVer')) + '</span>' +
+        '<span class="mtb-upd-k">' + CUBE + esc(L('agUpdVer')) + '</span>' +
         '<div class="mtb-field"><input id="mtbUpdVer" class="quantum-input" value="' + esc(preV) + '" dir="ltr" placeholder="v1.29.1"><span class="mtb-field-end">' + CUBE + '</span></div>' +
         '<span class="mtb-upd-k">' + LINK + esc(L('agUpdUrl')) + '</span>' +
-        '<div class="mtb-field"><input id="mtbUpdUrl" class="quantum-input" value="' + esc(agLastUpdUrl) + '" dir="ltr" placeholder="https://.../quantum-agent-linux-' + esc(ag.arch || 'amd64') + '.tar.gz"><span class="mtb-field-end">' + EXT + '</span></div>' +
+        '<div class="mtb-field"><input id="mtbUpdUrl" class="quantum-input" value="' + esc(lastUrl || agLastUpdUrl) + '" dir="ltr" placeholder="https://.../quantum-agent-linux-' + esc(ag.arch || 'amd64') + '.tar.gz"><span class="mtb-field-end">' + EXT + '</span></div>' +
         '<div class="mtb-upd-info"><span class="mtb-upd-ico">' + INFO + '</span><span class="mtb-upd-info-tx">' + esc(L('agUpdHint')) + '</span></div>' +
         '<div class="mtb-acts"><button type="button" class="quantum-btn quantum-btn-secondary" data-mtb-close>' + esc(L('cancel')) + '</button>' +
         '<button type="button" class="quantum-btn quantum-btn-primary" id="mtbUpdGo">' + UPGR + ' ' + esc(L('agUpdStart')) + '</button></div>' +
@@ -2382,11 +2511,11 @@
       ov.querySelectorAll('[data-mtb-close]').forEach(function (b) { b.addEventListener('click', function () { ov.remove(); }); });
       ov.addEventListener('click', function (e) { if (e.target === ov) ov.remove(); });
       ov.querySelector('#mtbUpdGo').addEventListener('click', function () {
-        var ver = ov.querySelector('#mtbUpdVer').value.trim();
+        var ver2 = ov.querySelector('#mtbUpdVer').value.trim();
         var url = ov.querySelector('#mtbUpdUrl').value.trim();
-        if (!ver || !url) { toastErr(L('agUpdBtn'), L('agUpdNeed')); return; }
+        if (!ver2 || !url) { toastErr(L('agUpdBtn'), L('agUpdNeed')); return; }
         agLastUpdUrl = url;
-        apiSend('POST', 'api/agents/' + encodeURIComponent(id) + '/update', { version: ver, url: url }).then(function (res) {
+        apiSend('POST', 'api/agents/' + encodeURIComponent(id) + '/update', { version: ver2, url: url }).then(function (res) {
           if (res && res.status === 'started') {
             ov.remove();
             if (agtView.view === 'detail' && agtView.id === id) renderAgtDetail(id);
@@ -2399,6 +2528,7 @@
       });
     }).catch(function () {});
   }
+
   function openAgtEdit(id) {
     apiGet('api/ui/agents/' + encodeURIComponent(id)).then(function (d) {
       var ag = d.agent || {};
