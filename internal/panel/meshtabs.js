@@ -3539,12 +3539,18 @@
       if (tB && aB) aB.insertAdjacentElement('afterend', tB);
       var cB = sb && sb.querySelector('[data-tab="cores"]');
       if (tB && cB) tB.insertAdjacentElement('afterend', cB); // Cores is 4th: right under Topology, above Tunnels
+      var mB = sb.querySelector('[data-tab="mtun"]');
+      var bB = sb.querySelector('[data-tab="benchmark"]');
+      if (mB && bB) mB.insertAdjacentElement('afterend', bB); // Benchmark is 6th: right under Tunnels
       var dr = document.getElementById('drawerNav');
       var dT = dr && dr.querySelector('[data-tab="tunnel"]');
       var dA = dr && dr.querySelector('[data-tab="magt"]');
       if (dT && dA) dA.insertAdjacentElement('afterend', dT);
       var dC = dr && dr.querySelector('[data-tab="cores"]');
       if (dT && dC) dT.insertAdjacentElement('afterend', dC);
+      var dM = dr && dr.querySelector('[data-tab="mtun"]');
+      var dB = dr && dr.querySelector('[data-tab="benchmark"]');
+      if (dM && dB) dM.insertAdjacentElement('afterend', dB);
     } catch (e) { /* non-fatal */ }
     try { injectSections(); } catch (e) { /* non-fatal */ }
     try { bindNav(); } catch (e) { /* non-fatal */ }
