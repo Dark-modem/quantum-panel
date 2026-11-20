@@ -60,7 +60,14 @@ func meshStoreOr503(w http.ResponseWriter, r *http.Request) *store.Store {
 	s, err := MeshStore()
 	if err != nil {
 		noteStoreRetry()
-		writeAPIError(w, r, "E-SYS-01", "mesh store unavailable: "+err.Error())
+		// BACKEND-36 (PHASE35 leftover): the store-open error text carries
+		// filesystem paths and driver internals — L1-gray on the wire.
+		// B-AG2 discipline, the same split as meshErr below: the full raw
+		// detail goes to the durable log (panel.log), while the client and
+		// the client-served error journal keep only the masked string.
+		log.Printf("[mesh] store open failed behind E-SYS-01 on %s %s (masked in the API response): %s",
+			r.Method, r.URL.Path, capReportString(err.Error(), maxReportString))
+		writeAPIError(w, r, "E-SYS-01", "mesh store unavailable (details in the panel error journal)")
 		return nil
 	}
 	return s
