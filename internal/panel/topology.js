@@ -766,50 +766,149 @@ function renderTopoMembers(topo) {
   card.innerHTML = '<div class="tc-header u-flex-wrap-gap8"><p class="tc-title" data-i18n="topo_members_t">' + esc(tr('', 'Agents on this topology')) + '</p></div>' +
     '<div class="topo-mem-grid">' + sideBlock('iran', tr('', 'Iran side')) + sideBlock('foreign', tr('', 'Foreign side')) + '</div>';
 }
+// Add-agent wizard for the open topology: step 1 asks the side, then the
+// wizard walks the TOPOLOGY'S OWN datacenter for that side — the agents on
+// offer are that DC's non-members (a DC can host many agents; the operator
+// picks the subset). When the side has no members yet its DC is unknown,
+// so a DC-pick page slides in between.
+let topoMemWiz = null;
+function topoMemWizClose() {
+  const ov = document.getElementById('topoMemPick');
+  if (ov) ov.hidden = true;
+  topoMemWiz = null;
+}
+function topoMemWizSideDC(side) {
+  const topo = topologyCurrent();
+  if (!topo) return '';
+  const mem = (window.__topoAgents || []).filter(a => a.role === side && (a.topologies || []).includes(topo.name));
+  return mem.length ? (topoIsFa() ? (mem[0].server || {}).datacenter : ((mem[0].server || {}).datacenter_en || (mem[0].server || {}).datacenter)) || '' : '';
+}
+function topoMemWizAgents(side, dc) {
+  const topo = topologyCurrent();
+  return (window.__topoAgents || []).filter(a => a.role === side &&
+    !(a.topologies || []).includes(topo.name) &&
+    (!dc || topoDcName(a) === dc));
+}
 function topoMembersPickOpen(side) {
   const topo = topologyCurrent();
   if (!topo) return;
-  // 'both' lists every agent that is not a member yet, whatever its side —
-  // the enrollment endpoint derives the side from the agent itself
-  const ags = (window.__topoAgents || []).filter(a => !(a.topologies || []).includes(topo.name) && (side === 'both' || a.role === side));
-  const rows = ags.length ? ags.map(a => '<label class="cores-pick-row"><input type="checkbox" value="' + esc(a.id) + '"><b>' + esc(a.name) + '</b>' +
-    '<span class="cores-pick-state">' + esc(a.role === 'iran' ? tr('', 'Iran side') : tr('', 'Foreign side')) + '</span>' +
-    (a.server && a.server.datacenter ? '<span class="cores-pick-state">' + esc(topoIsFa() ? (a.server.datacenter || '') : (a.server.datacenter_en || a.server.datacenter || '')) + '</span>' : '') + '</label>').join('')
-    : '<div class="ent-empty"><b>' + esc(tr('', 'No agents on this side yet')) + '</b></div>';
+  const pre = (side === 'iran' || side === 'foreign') ? side : '';
+  topoMemWiz = { step: pre ? 2 : 1, side: pre, dc: '', picked: [], topoName: topo.name, dcKnown: false };
+  if (pre) topoMemWiz.dc = topoMemWizSideDC(pre), topoMemWiz.dcKnown = !!topoMemWiz.dc;
   let ov = document.getElementById('topoMemPick');
   if (!ov) {
     ov = document.createElement('div');
     ov.id = 'topoMemPick';
-    ov.className = 'ent-modal';
-    ov.innerHTML = '<div class="ent-card cores-pick-card"><div class="cores-pick-head"><b></b><button type="button" class="mtb-toast-x" data-mem-pick-close>\×</button></div>' +
-      '<div class="cores-pick-list"></div><div class="cores-pick-foot"><button type="button" class="quantum-btn quantum-btn-primary" data-mem-pick-go>' + esc(tr('', 'Add')) + '</button>' +
-      '<button type="button" class="quantum-btn quantum-btn-secondary" data-mem-pick-close>' + esc(tr('', 'Cancel')) + '</button></div></div>';
+    ov.className = 'ent-modal-ov';
+    ov.innerHTML = '<div class="ent-card cores-pick-card" role="dialog" aria-modal="true">' +
+      '<div class="cores-pick-head"><span id="topoMemWizRing"></span><b id="topoMemWizTitle"></b>' +
+      '<button type="button" class="mtb-toast-x" data-mem-wiz-close>\u00d7</button></div>' +
+      '<div id="topoMemWizBody"></div>' +
+      '<div class="cores-pick-foot"><button type="button" class="quantum-btn quantum-btn-secondary" data-mem-wiz-back hidden>' + esc(tr('', 'Back')) + '</button>' +
+      '<button type="button" class="quantum-btn quantum-btn-primary" id="topoMemWizNext">' + esc(tr('', 'Next')) + '</button>' +
+      '<button type="button" class="quantum-btn quantum-btn-secondary" data-mem-wiz-close>' + esc(tr('', 'Cancel')) + '</button></div></div>';
     document.body.appendChild(ov);
+    ov.addEventListener('click', e => { if (e.target === ov) topoMemWizClose(); });
+    ov.querySelector('[data-mem-wiz-close]').addEventListener('click', topoMemWizClose);
   }
-  ov.dataset.memSide = side;
-  ov.querySelector('.cores-pick-head b').textContent = (side === 'both' ? tr('', 'Add agent') : (side === 'iran' ? tr('', 'Iran side') : tr('', 'Foreign side')) + ' \\u2014 ' + tr('', 'Add agent'));
-  ov.querySelector('.cores-pick-list').innerHTML = rows;
   ov.hidden = false;
+  topoMemWizRender();
+}
+function topoMemWizSteps() {
+  return topoMemWiz.dcKnown ? ['Side', 'Agents'] : ['Side', 'Datacenter', 'Agents'];
+}
+function topoMemWizRender() {
+  const ov = document.getElementById('topoMemPick');
+  if (!ov || !topoMemWiz) return;
+  const steps = topoMemWizSteps();
+  const n = steps.length, step = topoMemWiz.step;
+  $('topoMemWizRing').innerHTML = topoCreateRing(step, n);
+  $('topoMemWizTitle').textContent = tr('', 'Add agent') + ' \u2014 ' + tr('', topoMemWiz.topoName);
+  const back = ov.querySelector('[data-mem-wiz-back]');
+  back.hidden = step === 1;
+  const next = document.getElementById('topoMemWizNext');
+  next.textContent = step === n ? tr('', 'Add') : tr('', 'Next');
+  next.disabled = false;
+  const body = document.getElementById('topoMemWizBody');
+  if (step === 1) {
+    body.innerHTML = `<p class="qs-hint u-m-0">${esc(tr('', 'Which side do you want to add?'))}</p>` +
+      '<div class="tu-cards">' +
+      '<button type="button" class="mtb-agent-card topo-mem-side' + (topoMemWiz.side === 'iran' ? ' on' : '') + '" data-memwiz-side="iran">' +
+      '<span class="mtb-agc-ico">' + topologyFlagSvg('ir') + '</span><span class="mtb-agc-tx"><b>' + esc(tr('', 'Iran side')) + '</b></span></button>' +
+      '<button type="button" class="mtb-agent-card topo-mem-side' + (topoMemWiz.side === 'foreign' ? ' on' : '') + '" data-memwiz-side="foreign">' +
+      '<span class="mtb-agc-ico">' + topologyFlagSvg('') + '</span><span class="mtb-agc-tx"><b>' + esc(tr('', 'Foreign side')) + '</b></span></button>' +
+      '</div>';
+    body.querySelectorAll('[data-memwiz-side]').forEach(b => {
+      b.onclick = () => {
+        topoMemWiz.side = b.getAttribute('data-memwiz-side');
+        topoMemWiz.dc = topoMemWizSideDC(topoMemWiz.side);
+        topoMemWiz.dcKnown = !!topoMemWiz.dc;
+        topoMemWiz.picked = [];
+        topoMemWiz.step = 2;
+        topoMemWizRender();
+      };
+    });
+    return;
+  }
+  if (steps[step - 1] === 'Datacenter') {
+    const dcs = [];
+    topoMemWizAgents(topoMemWiz.side, '').forEach(a => {
+      const dc = topoDcName(a);
+      if (dc && !dcs.some(x => x.dc === dc)) dcs.push({ dc: dc, n: topoMemWizAgents(topoMemWiz.side, dc).length });
+    });
+    body.innerHTML = `<p class="qs-hint u-m-0">${esc(tr('', 'Choose the datacenter of this side'))}</p>` +
+      (dcs.length ? '<div class="tu-cards">' + dcs.map(d =>
+        '<button type="button" class="mtb-agent-card topo-mem-dc' + (topoMemWiz.dc === d.dc ? ' on' : '') + '" data-memwiz-dc="' + esc(d.dc) + '">' +
+        '<span class="mtb-agc-ico">' + topologyFlagSvg(topoMemWiz.side === 'iran' ? 'ir' : '') + '</span>' +
+        '<span class="mtb-agc-tx"><b>' + esc(d.dc) + '</b><i>' + esc(String(d.n) + ' ' + tr('', d.n === 1 ? 'agent' : 'agents')) + '</i></span></button>').join('') + '</div>'
+        : '<p class="qs-hint u-m-0">' + esc(tr('', 'No agents left in this datacenter')) + '</p>');
+    body.querySelectorAll('[data-memwiz-dc]').forEach(b => {
+      b.onclick = () => {
+        topoMemWiz.dc = b.getAttribute('data-memwiz-dc');
+        topoMemWiz.picked = [];
+        topoMemWizRender();
+      };
+    });
+    return;
+  }
+  const ags = topoMemWizAgents(topoMemWiz.side, topoMemWiz.dc);
+  const dcLbl = topoMemWiz.dc ? topoMemWiz.dc : tr('', 'All datacenters');
+  body.innerHTML = `<p class="qs-hint u-m-0">${esc(tr('', 'Agents of this datacenter'))} — <b>${esc(dcLbl)}</b></p>` +
+    (ags.length ? '<div class="tu-cards">' + ags.map(a => {
+      const on = topoMemWiz.picked.indexOf(a.id) >= 0;
+      const fl = topoMemWiz.side === 'foreign' && a.country ? topologyFlagSvg(a.country) : topologyFlagSvg(topoMemWiz.side === 'iran' ? 'ir' : '');
+      return '<button type="button" class="mtb-agent-card topo-mem-pick' + (on ? ' on' : '') + '" data-memwiz-ag="' + esc(a.id) + '">' +
+        '<span class="mtb-agc-ico">' + fl + '</span>' +
+        '<span class="mtb-agc-tx"><b>' + esc(a.name || a.id) + '</b><i>' + esc(topoDcName(a)) + '</i></span>' +
+        (on ? '<span class="tu-pick-ok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg></span>' : '') +
+        '</button>';
+    }).join('') + '</div>'
+      : '<p class="qs-hint u-m-0">' + esc(tr('', 'No agents left in this datacenter')) + '</p>');
+  body.querySelectorAll('[data-memwiz-ag]').forEach(b => {
+    b.onclick = () => {
+      const id = b.getAttribute('data-memwiz-ag');
+      const k = topoMemWiz.picked.indexOf(id);
+      if (k >= 0) topoMemWiz.picked.splice(k, 1); else topoMemWiz.picked.push(id);
+      topoMemWizRender();
+    };
+  });
 }
 async function topoMembersPickGo() {
-  const ov = document.getElementById('topoMemPick');
-  if (!ov) return;
+  if (!topoMemWiz || !topoMemWiz.picked.length) return;
   const topo = topologyCurrent();
-  const side = ov.dataset.memSide;
-  const ids = Array.from(ov.querySelectorAll('.cores-pick-row input:checked')).map(i => i.value);
-  if (!topo || !ids.length) { ov.hidden = true; return; }
-  const go = ov.querySelector('[data-mem-pick-go]');
-  go.disabled = true;
-  const results = await Promise.allSettled(ids.map(id =>
+  const next = document.getElementById('topoMemWizNext');
+  next.disabled = true;
+  const results = await Promise.allSettled(topoMemWiz.picked.map(id =>
     api('/api/ui/topologies/' + encodeURIComponent(topo.name) + '/members/add', { agent_id: id }, 'POST')));
   const bad = results.filter(r => r.status === 'rejected');
-  if (bad.length) toastErr(tr('', 'Agents'), bad.map(r => (r.reason && r.reason.message) || 'HTTP ' + (r.reason && r.reason.status)).join(' · '));
+  if (bad.length) toastErr(tr('', 'Agents'), bad.map(r => (r.reason && r.reason.message) || 'HTTP ' + (r.reason && r.reason.status)).join(' \u00b7 '));
   else toastOk(tr('', 'Agents'), tr('', 'Agent added to the topology'));
-  go.disabled = false;
-  ov.hidden = true;
+  next.disabled = false;
+  topoMemWizClose();
   topoDcReset();
   await topologyReload();
 }
+
 async function topoMemberRemove(side, agentId) {
   const topo = topologyCurrent();
   if (!topo) return;
@@ -2322,10 +2421,6 @@ $('tab-tunnel').addEventListener('click', e => {
   if (memAdd) { topoMembersPickOpen(memAdd.getAttribute('data-mem-add')); return; }
   const memRm = target.closest ? target.closest('[data-mem-remove]') : null;
   if (memRm) { topoMemberRemove(memRm.getAttribute('data-mem-remove'), memRm.getAttribute('data-mem-agent')); return; }
-  const memGo = target.closest ? target.closest('[data-mem-pick-go]') : null;
-  if (memGo) { topoMembersPickGo(); return; }
-  const memX = target.closest ? target.closest('[data-mem-pick-close]') : null;
-  if (memX) { const ov = document.getElementById('topoMemPick'); if (ov) ov.hidden = true; return; }
   const agJump = target.closest ? target.closest('[data-topo-agent]') : null;
   if (agJump) {
     const id = agJump.getAttribute('data-topo-agent');
