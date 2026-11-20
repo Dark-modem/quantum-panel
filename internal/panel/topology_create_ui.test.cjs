@@ -9,6 +9,19 @@ const faSource = fs.readFileSync(path.join(__dirname, 'i18n-fa.js'), 'utf8');
 const pageSource = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 const cssSource = fs.readFileSync(path.join(__dirname, 'enterprise.css'), 'utf8');
 
+// enrollment fixtures: two iran agents across two datacenters and one
+// foreign agent — the DC lists the wizard shows are this operator data
+const AGENTS = [
+  { id: 'agt_a1', name: 'tehran-1', role: 'iran', linked: true, server: { id: 1, name: 'tehran-1', datacenter: 'Tehran-Azadi', datacenter_en: 'Tehran-Azadi' } },
+  { id: 'agt_a2', name: 'tehran-2', role: 'iran', linked: true, server: { id: 2, name: 'tehran-2', datacenter: 'Tehran-Azadi', datacenter_en: 'Tehran-Azadi' } },
+  { id: 'agt_b1', name: 'shiraz-1', role: 'iran', linked: true, server: { id: 3, name: 'shiraz-1', datacenter: 'Shiraz-Hafez', datacenter_en: 'Shiraz-Hafez' } },
+  { id: 'agt_f1', name: 'frankfurt-1', role: 'foreign', linked: true, country: 'de', server: { id: 6, name: 'frankfurt-1', datacenter: 'Hetzner', datacenter_en: 'Hetzner' } }
+];
+const SERVERS = [
+  { id: 1, address: '10.0.1.12' }, { id: 2, address: '10.0.1.11' },
+  { id: 3, address: '10.0.2.11' }, { id: 6, address: '192.0.2.11' }
+];
+
 function harness({ fa = false, topologies = [], tunnels = [], failOn } = {}) {
   const elements = new Map();
   const calls = [], toasts = [];
@@ -27,8 +40,6 @@ function harness({ fa = false, topologies = [], tunnels = [], failOn } = {}) {
     window: {}, document: { activeElement: null, hidden: false, querySelectorAll() { return []; } },
     $: el, _tunnelDetail: null, setInterval() {}, renderTunnelsList() {},
     skel: n => '<div class="ent-skel"></div>'.repeat(n || 3),
-    // The draft must live in the standard browser store.
-    localStorage: { _d: new Map(), getItem(k) { return this._d.has(k) ? this._d.get(k) : null; }, setItem(k, v) { this._d.set(k, String(v)); }, removeItem(k) { this._d.delete(k); } },
     esc: v => String(v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'),
     toastOk: (...a) => toasts.push(['ok', ...a]), toastErr: (...a) => toasts.push(['err', ...a]), toastWarn: (...a) => toasts.push(['warn', ...a]),
     entConfirm: async () => true,
@@ -40,6 +51,8 @@ function harness({ fa = false, topologies = [], tunnels = [], failOn } = {}) {
         if (created && !topologies.some(t => t.id === created.id)) topologies = [...topologies, created];
         return { topologies, tunnels };
       }
+      if (url === '/api/ui/agents' && !body) return { agents: AGENTS };
+      if (url === '/api/mesh/servers' && !body) return { servers: SERVERS };
       if (url === '/api/topologies' && body) created = { id: 'new1', name: body.name, role: body.role, local_ip: body.local_ip, remote_ip: body.remote_ip, country: body.country, tunnel_ids: [] };
       return created && m === 'POST' ? { topology: created } : {};
     }
@@ -48,227 +61,149 @@ function harness({ fa = false, topologies = [], tunnels = [], failOn } = {}) {
   vm.runInContext(faSource, sandbox, { filename: 'i18n-fa.js' });
   sandbox.tr = (_k, fb) => fa ? (sandbox.window.FA_TEXT[fb] || fb) : fb;
   vm.runInContext(source, sandbox, { filename: 'topology.js' });
-  // `let` bindings are not sandbox properties: read them inside the context
   const wiz = expr => vm.runInContext(expr, sandbox);
   return { sandbox, el, calls, toasts, wiz };
 }
 
-test('add topology opens the wizard and never POSTs an empty topology', () => {
+// open + let the agent/server pools land (a microtask after both GETs)
+async function openWizard(h) {
+  h.sandbox.topologyCreate();
+  await new Promise(r => setTimeout(r, 0));
+}
+
+test('add topology opens the DC wizard and never POSTs an empty topology', async () => {
   const h = harness();
   h.sandbox.topologyCreate();
   assert.equal(h.el('topoCreateModal').hidden, false, 'the wizard modal opens');
   assert.equal(h.calls.length, 0, 'no topology is created until the wizard finishes');
-  assert.equal(h.wiz('topoCreate.step'), 1, 'the wizard starts at the role step');
-  assert.ok(h.el('topoCreateBody').innerHTML.includes('data-create-role="iran"'), 'the role step offers Iran');
-  assert.ok(h.el('topoCreateBody').innerHTML.includes('data-create-role="foreign"'), 'the role step offers Foreign');
+  assert.equal(h.wiz('topoCreate.step'), 1, 'the wizard starts at the name step');
+  await openWizard(h);
+  h.sandbox.topoCreateNext(); // step 2
+  const body = h.el('topoCreateBody').innerHTML;
+  assert.ok(body.includes('data-createdc="Tehran-Azadi"'), 'the Iran DC list comes from the enrollment data');
+  assert.ok(body.includes('data-createdc="Shiraz-Hafez"'), 'every enrolled Iran DC is offered');
+  assert.ok(!body.includes('data-createdc="Hetzner"'), 'foreign DCs stay off the Iran step');
+  assert.equal(h.calls.filter(c => c.url === '/api/topologies' && c.body).length, 0, 'still no creation');
 });
 
-test('the circular counter shows 1/6 and fills as steps advance', () => {
+test('the circular counter shows 1/3 and fills as steps advance', () => {
   const h = harness();
   h.sandbox.topologyCreate();
-  assert.ok(h.el('topoCreateRing').innerHTML.includes('>1/6<'), 'ring reads 1/6 at the start');
+  assert.ok(h.el('topoCreateRing').innerHTML.includes('>1/3<'), 'ring reads 1/3 at the start');
   assert.ok(h.el('topoCreateRing').innerHTML.includes('stroke-dasharray='), 'the arc carries a dash array');
+  h.sandbox.topoCreateNext(); // invalid: empty name blocks
+  assert.ok(h.el('topoCreateRing').innerHTML.includes('>1/3<'), 'an empty name blocks the step');
+  h.el('topoCreateName').value = 'main-mesh';
   h.sandbox.topoCreateNext();
-  assert.ok(h.el('topoCreateRing').innerHTML.includes('>2/6<'), 'ring reads 2/6 on step two');
+  assert.ok(h.el('topoCreateRing').innerHTML.includes('>2/3<'), 'ring reads 2/3 on the Iran DC step');
   assert.ok(h.el('topoCreateDots').innerHTML.includes('topo-create-dot on'), 'the current step dot is highlighted');
   assert.equal(h.el('topoCreateBack').hidden, false, 'Back appears after the first step');
 });
 
-test('steps validate before advancing', () => {
+test('the name step blocks an empty and a non-slug name', () => {
   const h = harness();
   h.sandbox.topologyCreate();
-  h.sandbox.topoCreateNext(); // role always has a default, so step two opens
-  assert.equal(h.wiz('topoCreate.step'), 2);
   h.sandbox.topoCreateNext();
-  assert.equal(h.wiz('topoCreate.step'), 2, 'empty this-server IP blocks the step');
   assert.ok(h.el('topoCreateErr').textContent.length > 0, 'an inline error explains the block');
-  h.el('topoCreateLocal').value = 'not-an-ip';
+  h.el('topoCreateName').value = 'Main Mesh!';
   h.sandbox.topoCreateNext();
-  assert.equal(h.wiz('topoCreate.step'), 2, 'a non-IP string blocks the step');
-  h.el('topoCreateLocal').value = '192.0.2.1';
+  assert.equal(h.wiz('topoCreate.step'), 1, 'a non-slug name blocks the step');
+  assert.ok(h.el('topoCreateErr').textContent.includes('slug'), 'the error names the real rule');
+  h.el('topoCreateName').value = 'main-mesh';
   h.sandbox.topoCreateNext();
-  h.sandbox.topoCreateNext();
-  assert.equal(h.wiz('topoCreate.step'), 3, 'empty other-server IP blocks the step');
-  h.el('topoCreateRemote').value = '192.0.2.1';
-  h.sandbox.topoCreateNext();
-  assert.equal(h.wiz('topoCreate.step'), 3, 'identical IPs are rejected');
-  assert.ok(h.el('topoCreateErr').textContent.includes('different'), 'the error names the real problem');
-  h.el('topoCreateRemote').value = '192.0.2.2';
-  h.sandbox.topoCreateNext();
-  assert.equal(h.wiz('topoCreate.step'), 4, 'valid distinct IPs advance to the country step');
+  assert.equal(h.wiz('topoCreate.step'), 2, 'a valid slug advances');
 });
 
-test('closing the wizard keeps the draft and reopening restores it', () => {
+test('the Iran step needs a DC and at least one of its agents', async () => {
   const h = harness();
-  h.sandbox.topologyCreate();
+  await openWizard(h);
+  h.el('topoCreateName').value = 'main-mesh';
   h.sandbox.topoCreateNext();
-  h.el('topoCreateLocal').value = '198.51.100.7';
-  h.sandbox.topoCreateNext(); // step 3, draft saved on every change
-  h.sandbox.topoCreateCancel();
-  assert.equal(h.el('topoCreateModal').hidden, true, 'cancel closes the modal');
-  assert.ok(h.sandbox.localStorage.getItem('topoCreateDraft'), 'the draft survives the close');
-  h.sandbox.topologyCreate();
-  assert.equal(h.el('topoCreateModal').hidden, false, 'the wizard reopens');
-  assert.equal(h.wiz('topoCreate.step'), 3, 'the draft restores the step');
-  assert.equal(h.wiz('topoCreate.values.local'), '198.51.100.7', 'the draft restores the typed IP');
-  assert.ok(h.el('topoCreateBody').innerHTML.includes('id="topoCreateRemote"'), 'the restored step renders its own field');
+  h.sandbox.topoCreateNext(); // no DC picked yet
+  assert.equal(h.wiz('topoCreate.step'), 2, 'a missing DC blocks the step');
+  h.wiz('topoCreate.values.dcIran = "Tehran-Azadi"; topoCreateRender();');
+  const ags = h.wiz('topoCreateAgentsOf("iran", "Tehran-Azadi").map(a => a.id)');
+  assert.deepEqual(ags, ['agt_a1', 'agt_a2'], 'the DC hosts exactly its own agents');
+  h.sandbox.topoCreateNext();
+  assert.equal(h.wiz('topoCreate.step'), 2, 'zero picked agents blocks the step');
+  h.wiz('topoCreate.values.agentsIran = ["agt_a1"];');
+  h.sandbox.topoCreateNext();
+  assert.equal(h.wiz('topoCreate.step'), 3, 'one picked agent advances to the foreign step');
 });
 
-test('completing the wizard creates the topology once and clears the draft', async () => {
+test('completing the wizard creates the topology and adds the chosen agents', async () => {
   const h = harness();
-  h.sandbox.topologyCreate();
+  await openWizard(h);
+  h.el('topoCreateName').value = 'main-mesh';
   h.sandbox.topoCreateNext();
-  h.el('topoCreateLocal').value = '192.0.2.1';
+  h.wiz('topoCreate.values.dcIran = "Tehran-Azadi"; topoCreate.values.agentsIran = ["agt_a1", "agt_a2"];');
   h.sandbox.topoCreateNext();
-  h.el('topoCreateRemote').value = '192.0.2.2';
+  h.wiz('topoCreate.values.dcForeign = "Hetzner"; topoCreate.values.agentsForeign = ["agt_f1"];');
   h.sandbox.topoCreateNext();
-  h.el('topoCreateCountry').value = 'DE';
-  h.sandbox.topoCreateNext();
-  h.el('topoCreateName').value = 'Pair';
-  h.sandbox.topoCreateNext();
-  assert.equal(h.wiz('topoCreate.step'), 6, 'the review step is reached');
+  assert.equal(h.wiz('topoCreate.step'), 3, 'the review-free flow reaches Create on step 3');
   await h.sandbox.topoCreateNext();
   const post = h.calls.find(c => c.url === '/api/topologies' && c.body);
   assert.ok(post, 'the topology is created exactly at the end');
-  assert.deepEqual(JSON.parse(JSON.stringify(post.body)), { name: 'Pair', role: 'iran', local_ip: '192.0.2.1', remote_ip: '192.0.2.2', country: 'de', tunnel_ids: [] });
-  assert.equal(h.calls.filter(c => c.url === '/api/topologies' && c.body).length, 1, 'no duplicate creations');
+  assert.equal(post.body.name, 'main-mesh');
+  assert.equal(post.body.local_ip, '10.0.1.12', 'the first Iran agent resolves the local address');
+  assert.equal(post.body.remote_ip, '192.0.2.11', 'the first foreign agent resolves the remote address');
+  const adds = h.calls.filter(c => c.url.includes('/members/add') && c.method === 'POST');
+  assert.equal(adds.length, 3, 'every picked agent joins through the member-add route');
+  assert.deepEqual(adds.map(c => c.body.agent_id), ['agt_a1', 'agt_a2', 'agt_f1']);
   assert.equal(h.wiz('topologySelected'), 'new1', 'the created topology opens');
   assert.equal(h.el('topoCreateModal').hidden, true, 'the wizard closes after creating');
-  assert.equal(h.sandbox.localStorage.getItem('topoCreateDraft'), null, 'the draft is cleared after a successful create');
   assert.ok(h.toasts.some(t => t[0] === 'ok' && t[1] === 'Topology created'), 'creation is confirmed with a toast');
   assert.ok(h.wiz('topoCreate') === null, 'the wizard state is reset');
 });
 
 test('a failed create keeps the wizard open with the API error', async () => {
   const h = harness({ failOn: (url, body) => url === '/api/topologies' && !!body });
-  h.sandbox.topologyCreate();
+  await openWizard(h);
+  h.el('topoCreateName').value = 'main-mesh';
   h.sandbox.topoCreateNext();
-  h.el('topoCreateLocal').value = '192.0.2.1';
+  h.wiz('topoCreate.values.dcIran = "Tehran-Azadi"; topoCreate.values.agentsIran = ["agt_a1"];');
   h.sandbox.topoCreateNext();
-  h.el('topoCreateRemote').value = '192.0.2.2';
-  h.sandbox.topoCreateNext();
-  h.el('topoCreateCountry').value = 'DE';
-  h.sandbox.topoCreateNext();
-  h.el('topoCreateName').value = 'Pair';
+  h.wiz('topoCreate.values.dcForeign = "Hetzner"; topoCreate.values.agentsForeign = ["agt_f1"];');
   h.sandbox.topoCreateNext();
   await h.sandbox.topoCreateNext();
   assert.equal(h.el('topoCreateModal').hidden, false, 'the modal stays open');
   assert.ok(h.el('topoCreateErr').textContent.includes('boom'), 'the inline error shows the API message');
-  assert.ok(h.sandbox.localStorage.getItem('topoCreateDraft'), 'the draft survives a failed create');
 });
 
-test('the review step escapes user input', () => {
+test('back preserves the DC and agent picks across steps', async () => {
   const h = harness();
-  h.sandbox.topologyCreate();
+  await openWizard(h);
+  h.el('topoCreateName').value = 'main-mesh';
   h.sandbox.topoCreateNext();
-  h.el('topoCreateLocal').value = '192.0.2.1';
+  h.wiz('topoCreate.values.dcIran = "Tehran-Azadi"; topoCreate.values.agentsIran = ["agt_a1"];');
   h.sandbox.topoCreateNext();
-  h.el('topoCreateRemote').value = '192.0.2.2';
-  h.sandbox.topoCreateNext();
-  h.sandbox.topoCreateNext();
-  h.el('topoCreateName').value = 'Pair <script>alert(1)</script>';
-  h.sandbox.topoCreateNext();
-  const body = h.el('topoCreateBody').innerHTML;
-  assert.ok(!body.includes('<script>'), 'the review never injects HTML');
-  assert.ok(body.includes('&lt;script&gt;'), 'the review renders the escaped name');
-});
-
-test('back preserves typed values across steps', () => {
-  const h = harness();
-  h.sandbox.topologyCreate();
-  h.sandbox.topoCreateNext();
-  h.el('topoCreateLocal').value = '192.0.2.1';
-  h.sandbox.topoCreateNext();
-  h.el('topoCreateRemote').value = '192.0.2.2';
+  h.wiz('topoCreate.values.dcForeign = "Hetzner"; topoCreate.values.agentsForeign = ["agt_f1"];');
   h.sandbox.topoCreateBack();
-  assert.equal(h.wiz('topoCreate.step'), 2, 'back returns to the previous step');
-  assert.equal(h.wiz('topoCreate.values.remote'), '192.0.2.2', 'the typed remote IP is kept');
-  assert.equal(h.wiz('topoCreate.values.local'), '192.0.2.1', 'the typed local IP is kept');
+  assert.equal(h.wiz('topoCreate.step'), 2, 'back returns to the Iran step');
+  assert.equal(h.wiz('topoCreate.values.dcIran'), 'Tehran-Azadi', 'the picked Iran DC is kept');
+  assert.deepEqual(h.wiz('topoCreate.values.agentsIran'), ['agt_a1'], 'the picked agents are kept');
+  assert.deepEqual(h.wiz('topoCreate.values.agentsForeign'), ['agt_f1'], 'the foreign picks are kept too');
 });
 
 test('wizard strings carry unique Persian translations', () => {
   const h = harness({ fa: true });
   const map = h.sandbox.window.FA_TEXT;
-  const keys = ['Choose this server\'s role', 'This server is inside Iran; the other server is abroad.',
-    'This server is abroad; the other server is inside Iran.', "Enter this server's IP address.",
-    "Enter the other server's IP address.", 'Enter a valid IPv4 or IPv6 address.',
-    'The two IP addresses must be different.', 'Enter a name for the topology.', 'Create topology',
-    'Creating…', 'A topology becomes active once at least one tunnel is added to it.',
-    'Add at least one tunnel to activate it.', 'Country', 'Role', 'Review'];
+  const keys = ['Topology name', 'Iran datacenter', 'Foreign datacenter',
+    'A name for this topology — it names the tunnels too.',
+    'Choose the Iran datacenter', 'Choose the foreign datacenter',
+    'Pick the agents joining from this datacenter', 'No agents in this datacenter yet.',
+    'No agents enrolled yet — add one first.', 'Enter a name for the topology.',
+    'Name must be a latin slug: a-z 0-9 -', 'Creating…', 'Topology created',
+    'Pick at least one agent from this datacenter', 'members added'];
   for (const key of keys) {
     assert.equal(faSource.split(JSON.stringify(key) + ':').length - 1, 1, `unique translation: ${key}`);
     assert.ok(map[key], `Persian entry exists: ${key}`);
     assert.match(map[key], /[\u0600-\u06ff]/);
   }
   h.sandbox.topologyCreate();
+  h.el('topoCreateName').value = 'main-mesh';
   h.sandbox.topoCreateNext();
-  assert.ok(h.el('topoCreateBody').innerHTML.includes(map["This server's IP"]), 'the IP step label is translated');
-});
-
-// Advance the wizard to the country step (4) with valid IPs.
-function openToCountryStep(h) {
-  h.sandbox.topologyCreate();
-  h.sandbox.topoCreateNext();
-  h.el('topoCreateLocal').value = '192.0.2.1';
-  h.sandbox.topoCreateNext();
-  h.el('topoCreateRemote').value = '192.0.2.2';
-  h.sandbox.topoCreateNext();
-  assert.equal(h.wiz('topoCreate.step'), 4);
-}
-const keyEv = key => ({ key, preventDefault() {}, stopPropagation() {}, stopImmediatePropagation() {} });
-
-test('the country step renders the custom dropdown inside the modal, not a native select', () => {
-  const h = harness();
-  openToCountryStep(h);
-  const body = h.el('topoCreateBody').innerHTML;
-  assert.ok(!body.includes('<select'), 'no native select renders on the country step');
-  assert.ok(body.includes('<input type="hidden" id="topoCreateCountry"'), 'the chosen code rides the same field the wizard reads');
-  assert.ok(body.includes('<div id="topoCreateCountryDD">'), 'the dropdown mounts next to the hidden field');
-  assert.ok(h.el('topoCreateCountryDD').classList._s.has('topo-dd'), 'the host is the positioning context that keeps the list inside the modal');
-  const dd = h.el('topoCreateCountryDD').innerHTML;
-  assert.ok(dd.includes('id="topoCreateCountryDDBtn"') && dd.includes('aria-haspopup="listbox"') && dd.includes('aria-expanded="false"'), 'the trigger announces the collapsed listbox');
-  assert.ok(dd.includes('id="topoCreateCountryDDList"') && dd.includes('role="listbox"'), 'the listbox renders with its container');
-  const opts = dd.match(/role="option"/g) || [];
-  assert.ok(opts.length >= 20, 'every country renders as an option, got ' + opts.length);
-  assert.ok(dd.includes('data-dd-value="de"') && dd.includes('data-dd-value=""'), 'Germany and the «Other» fallback are offered');
-  assert.ok(dd.split('topo-flag-svg').length > opts.length, 'options carry embedded SVG flags, not emoji');
-  assert.ok(dd.includes('aria-labelledby="topoCreateCountryLbl topoCreateCountryDDTxt"'), 'the trigger announces label plus value');
-});
-
-test('the dropdown is keyboard operable and keeps the value wiring', () => {
-  const h = harness();
-  openToCountryStep(h);
-  const btn = h.el('topoCreateCountryDDBtn');
-  btn.onkeydown(keyEv('Enter'));
-  assert.equal(btn.getAttribute('aria-expanded'), 'true', 'Enter opens the list');
-  const lastIdx = h.wiz('TOPO_COUNTRIES.length - 1');
-  assert.equal(btn.getAttribute('aria-activedescendant'), `topoCreateCountryDDOpt${lastIdx}`, 'the empty selection starts on «Other», the last row');
-  btn.onkeydown(keyEv('Home'));
-  btn.onkeydown(keyEv('ArrowDown'));
-  btn.onkeydown(keyEv('ArrowDown'));
-  assert.equal(btn.getAttribute('aria-activedescendant'), 'topoCreateCountryDDOpt2', 'arrows move the highlight');
-  btn.onkeydown(keyEv('Enter'));
-  assert.equal(h.el('topoCreateCountry').value, 'nl', 'Enter writes the highlighted ISO code to the form field');
-  assert.equal(btn.getAttribute('aria-expanded'), 'false', 'Enter closes the list');
-  assert.ok(btn.innerHTML.includes('Netherlands') && btn.innerHTML.includes('topo-flag-svg'), 'the trigger shows the picked name and flag');
-  assert.equal(JSON.parse(h.sandbox.localStorage.getItem('topoCreateDraft')).values.country, 'nl', 'the pick lands in the localStorage draft');
-  h.sandbox.topoCreateNext(); // -> name step
-  h.el('topoCreateName').value = 'Pair';
-  h.sandbox.topoCreateNext(); // -> review
-  assert.ok(h.el('topoCreateBody').innerHTML.includes('Netherlands'), 'the review keeps showing the country');
-  // Escape closes without changing the picked value.
-  btn.onkeydown(keyEv('Enter'));
-  btn.onkeydown(keyEv('ArrowDown'));
-  btn.onkeydown(keyEv('Escape'));
-  assert.equal(btn.getAttribute('aria-expanded'), 'false', 'Escape closes the list');
-  assert.equal(h.el('topoCreateCountry').value, 'nl', 'Escape does not change the picked value');
-  // Space also opens; clicking an option picks it through the delegated handler.
-  btn.onkeydown(keyEv(' '));
-  assert.equal(btn.getAttribute('aria-expanded'), 'true', 'Space reopens the list');
-  h.el('topoCreateCountryDD').onclick({ target: { closest: s => s === '.topo-dd-opt' ? { dataset: { ddValue: 'fr' } } : null } });
-  assert.equal(h.el('topoCreateCountry').value, 'fr', 'clicking an option picks it');
-  btn.onclick();
-  assert.equal(btn.getAttribute('aria-activedescendant'), 'topoCreateCountryDDOpt3', 'reopening highlights the picked country');
+  assert.ok(h.el('topoCreateBody').innerHTML.includes(map['Choose the Iran datacenter']), 'the DC step hint is translated');
 });
 
 test('the wizard footer has no Cancel; Back and Next render on opposite ends', () => {
@@ -285,6 +220,7 @@ test('the wizard footer has no Cancel; Back and Next render on opposite ends', (
   h.sandbox.topologyCreate();
   h.sandbox.topoCreateRender();
   assert.ok(h.el('topoCreateFoot').classList._s.has('next-only'), 'step 1 has no Back: the footer goes next-only');
+  h.wiz('topoCreate.values.name = "main-mesh";');
   h.sandbox.topoCreateNext();
   assert.ok(!h.el('topoCreateFoot').classList._s.has('next-only'), 'from step 2 on the footer spreads Back and Next');
 });
