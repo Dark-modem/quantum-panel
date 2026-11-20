@@ -2020,7 +2020,7 @@ function topoCreateRender() {
   topoCreateError('');
   if (step === 1) {
     $('topoCreateBody').innerHTML = `<p class="qs-hint u-m-0">${esc(tr('', 'A name for this topology — it names the tunnels too.'))}</p>` +
-      `<div class="fg"><input id="topoCreateName" class="quantum-input" dir="ltr" placeholder="main-mesh" value="${esc(v.name || '')}" maxlength="64"></div>`;
+      `<div class="fg"><input id="topoCreateName" class="quantum-input" dir="ltr" placeholder="main-mesh / DE-NODE" value="${esc(v.name || '')}" maxlength="120"></div>`;
     const el = $('topoCreateName');
     el.oninput = () => { topoCreate.values.name = String(el.value || '').trim(); };
   } else {
@@ -2084,7 +2084,6 @@ function topoCreateNext() {
   const v = topoCreate.values, n = TOPO_CREATE_STEPS.length;
   if (topoCreate.step === 1) {
     if (!v.name) { topoCreateError(tr('', 'Enter a name for the topology.')); return; }
-    if (!/^[a-z0-9-]{1,64}$/.test(v.name)) { topoCreateError(tr('', 'Name must be a latin slug: a-z 0-9 -')); return; }
   } else if (topoCreate.step === 2) {
     if (!v.dcIran) { topoCreateError(tr('', 'Choose the Iran datacenter')); return; }
     if (!v.agentsIran.length) { topoCreateError(tr('', 'Pick at least one agent from this datacenter')); return; }

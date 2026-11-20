@@ -106,14 +106,13 @@ test('the name step blocks an empty and a non-slug name', () => {
   h.sandbox.topoCreateNext();
   assert.equal(h.wiz('topoCreate.step'), 1, 'an empty name blocks the step');
   assert.ok(h.toasts.some(t => t[0] === 'err' && t.includes('Enter a name for the topology.')), 'the block is announced as a toast');
-  h.el('topoCreateName').value = 'Main Mesh!';
+  h.el('topoCreateName').value = 'DE-NODE';
   h.sandbox.topoCreateNext();
-  assert.equal(h.wiz('topoCreate.step'), 1, 'a non-slug name blocks the step');
-  assert.ok(h.toasts.some(t => t[0] === 'err' && t.join(' ').includes('slug')), 'the toast names the real rule');
-  assert.equal(h.el('topoCreateErr').textContent, '', 'the inline alert strip stays empty: errors are toasts');
+  assert.equal(h.wiz('topoCreate.step'), 2, 'uppercase names are accepted — DE-NODE is a valid topology name');
+  h.sandbox.topoCreateBack();
   h.el('topoCreateName').value = 'main-mesh';
   h.sandbox.topoCreateNext();
-  assert.equal(h.wiz('topoCreate.step'), 2, 'a valid slug advances');
+  assert.equal(h.wiz('topoCreate.step'), 2, 'a normal name advances');
 });
 
 test('the Iran step needs a DC and at least one of its agents', async () => {
@@ -196,7 +195,7 @@ test('wizard strings carry unique Persian translations', () => {
     'Choose the Iran datacenter', 'Choose the foreign datacenter',
     'Pick the agents joining from this datacenter', 'No agents in this datacenter yet.',
     'No agents enrolled yet — add one first.', 'Enter a name for the topology.',
-    'Name must be a latin slug: a-z 0-9 -', 'Creating…', 'Topology created',
+    'Creating…', 'Topology created',
     'Pick at least one agent from this datacenter', 'members added'];
   for (const key of keys) {
     assert.equal(faSource.split(JSON.stringify(key) + ':').length - 1, 1, `unique translation: ${key}`);
