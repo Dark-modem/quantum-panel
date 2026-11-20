@@ -372,6 +372,33 @@ ALTER TABLE agents ADD COLUMN country TEXT NOT NULL DEFAULT '';
 	`
 ALTER TABLE agents ADD COLUMN cpu_model TEXT NOT NULL DEFAULT '';
 `,
+	// 11: BACKEND-35 B-AG1 — the traffic hourly rollup + fold watermark
+	// become SCHEMA, not lazy job output. RollupTrafficHourly created both
+	// tables on its first run, so a usage read whose window held a tunnel
+	// with NO raw samples hit the retention fallback before the fold job
+	// ever ticked and answered "no such table: traffic_hourly" — masked
+	// into E-SYS-01 ("store operation failed") on the topology-scoped
+	// /api/mesh/usage read after a panel restart (4/4 in the agent-repo
+	// e2e; per-tunnel reads with samples kept working). Verbatim the DDL
+	// the fold job has always used (CREATE TABLE IF NOT EXISTS keeps this
+	// idempotent for DBs where the fold already ran).
+	`
+CREATE TABLE IF NOT EXISTS traffic_hourly (
+  tunnel_id INTEGER NOT NULL,
+  agent_id TEXT NOT NULL DEFAULT '',
+  hour INTEGER NOT NULL,
+  first_rx INTEGER NOT NULL DEFAULT 0, first_tx INTEGER NOT NULL DEFAULT 0,
+  first_prx INTEGER NOT NULL DEFAULT 0, first_ptx INTEGER NOT NULL DEFAULT 0,
+  last_rx INTEGER NOT NULL DEFAULT 0, last_tx INTEGER NOT NULL DEFAULT 0,
+  last_prx INTEGER NOT NULL DEFAULT 0, last_ptx INTEGER NOT NULL DEFAULT 0,
+  wire_known INTEGER NOT NULL DEFAULT 0,
+  payload_known INTEGER NOT NULL DEFAULT 0,
+  UNIQUE (tunnel_id, agent_id, hour)
+);
+CREATE TABLE IF NOT EXISTS traffic_rollup_state (
+  id INTEGER PRIMARY KEY, done_until INTEGER NOT NULL
+);
+`,
 }
 
 func (s *Store) migrate() error {
