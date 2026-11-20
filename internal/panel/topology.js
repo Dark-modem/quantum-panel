@@ -2026,10 +2026,8 @@ function topologySelectForTunnel(kind) {
 }
 function topologyDisplayMode() { topologyRender(); }
 
-// ---- Add-topology wizard: a 6-step modal (Role -> This server's IP ->
-// Other server's IP -> Country -> Name -> Review) that replaces the old
-// "instantly POST an empty topology" behaviour. The draft lives in
-// typed; only a successful create clears it.
+// ---- Add-topology wizard: three DC-centric steps (name -> Iran DC ->
+// foreign DC), each DC listing the agents the operator enrolled with it.
 const TOPO_CREATE_STEPS = ['Topology name', 'Iran datacenter', 'Foreign datacenter'];
 let topoCreate = null;
 let topoCreateBusy = false;

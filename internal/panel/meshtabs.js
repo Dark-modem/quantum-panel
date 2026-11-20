@@ -1589,7 +1589,7 @@
       '<div class="mtb-form" id="mtbAgentForm">' +
       '<div class="mtb-wpage" data-pg="1">' +
       '<div class="mtb-field"><span class="mtb-field-ico">' + USER + '</span>' +
-      '<input id="mtbAgentLabel" class="quantum-input" placeholder="' + esc(L('agNamePh')) + '" dir="ltr" aria-label="' + esc(L('agentLabel')) + '">' +
+      '<input id="mtbAgentLabel" class="quantum-input" maxlength="120" placeholder="' + esc(L('agNamePh')) + '" dir="ltr" aria-label="' + esc(L('agentLabel')) + '">' +
       '<span class="mtb-field-ok" id="mtbNameOk" hidden>' + CHECK + '</span>' +
       '<button type="button" class="mtb-tip-i mtb-tip-infield" data-tipopen data-tip="' + esc(L('agNameHint')) + '" aria-label="' + esc(L('agNameHint')) + '">!</button></div>' +
       '<div class="mtb-hint-row"><span class="mtb-hint-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M12 11.5V16"/></svg></span><span class="mtb-hint-tx">' + esc(L('agNameHint')) + '</span></div>' +
@@ -1621,12 +1621,12 @@
       '</div></div>' +
       '<input type="hidden" id="mtbCountry" value=""></label>' +
       '<label id="mtbDcRow"><div class="mtb-field"><span class="mtb-field-ico">' + DCG + '</span>' +
-      '<input id="mtbDc" class="quantum-input" list="mtbDcList" dir="ltr" placeholder="' + esc(L('agDcPh')) + '" autocomplete="off" aria-label="' + esc(L('agDc')) + '">' +
+      '<input id="mtbDc" class="quantum-input" maxlength="100" list="mtbDcList" dir="ltr" placeholder="' + esc(L('agDcPh')) + '" autocomplete="off" aria-label="' + esc(L('agDc')) + '">' +
       '<button type="button" class="mtb-tip-i mtb-tip-infield" data-tipopen data-tip="' + esc(L('agDcHint')) + '" aria-label="' + esc(L('agDcHint')) + '">!</button></div>' +
       '<datalist id="mtbDcList"></datalist></label>' +
       '</div>' +
       '<div class="mtb-wpage" data-pg="3" hidden>' +
-      '<label>' + '<button type="button" class="mtb-tip-i" data-tipopen data-tip="' + esc(L('agTtlHint')) + '" aria-label="' + esc(L('agTtlHint')) + '">!</button> ' + esc(L('agentExpiry')) + ' <input id="mtbExpiry" type="number" min="1" max="3650" value="365" class="quantum-input" style="width:120px" dir="ltr"></label>' +
+      '<label>' + '<button type="button" class="mtb-tip-i" data-tipopen data-tip="' + esc(L('agTtlHint')) + '" aria-label="' + esc(L('agTtlHint')) + '">!</button> ' + esc(L('agentExpiry')) + ' <input id="mtbExpiry" type="number" min="1" max="365" value="365" class="quantum-input" style="width:120px" dir="ltr"></label>' +
       '<div class="mtb-chips">' + chips + '</div>' +
       '</div>' +
       '<div class="mtb-acts" id="mtbWizFoot">' +
@@ -1820,7 +1820,7 @@
       var label = document.getElementById('mtbAgentLabel').value.trim() || ('agent-' + Date.now() % 10000);
       var dc = (document.getElementById('mtbDc') || {}).value.trim();
       if (!dc) { mtbToast(L('agDcReq'), 'err'); return; }
-      var days = Math.max(1, Math.min(3650, parseInt(document.getElementById('mtbExpiry').value, 10) || 365));
+      var days = Math.max(1, Math.min(365, parseInt(document.getElementById('mtbExpiry').value, 10) || 365));
       apiSend('POST', 'api/agents/tokens', { role: role, label: label, expires_days: days, country: country, datacenter: dc }).then(function (r) {
         var tok = (r && (r.token || (r.data && r.data.token))) || '';
         if (!tok) { mtbToast('no token in response', 'err'); return; }
