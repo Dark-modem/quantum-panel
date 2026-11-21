@@ -65,7 +65,7 @@
   img, canvas, table { max-width:100%; }
   .tunnel-card, .qs, .det-card { min-width:0; }
   .app-layout { display:flex; min-height:100dvh; width:100%; background:var(--bg); }
-  .sidebar { width:252px; background:var(--sidebar-bg); border-right:1px solid var(--ln);
+  .sidebar { width:248px; background:var(--sidebar-bg); border-right:1px solid var(--ln);
     display:flex; flex-direction:column; position:sticky; top:0; height:100dvh; z-index:50; flex-shrink:0; }
   .sidebar-brand { padding:14px 14px 12px; display:flex; flex-direction:row; align-items:center;
     gap:8px; border-bottom:1px solid var(--ln); flex-shrink:0; }
@@ -1731,7 +1731,7 @@
             <thead role="rowgroup"><tr class="topo-list-head" role="row"><th scope="col" role="columnheader"><span class="topo-th"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.6 2.6a2 2 0 0 0-1.4-.6H5a2 2 0 0 0-2 2v6.2a2 2 0 0 0 .6 1.4l7.6 7.6a2 2 0 0 0 2.8 0l7.2-7.2a2 2 0 0 0 0-2.8L12.6 2.6z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg><span data-i18n="topology_col_name">Name</span></span></th><th scope="col" role="columnheader"><span class="topo-th"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><span data-i18n="topology_list_state">Status</span></span></th><th scope="col" role="columnheader"><span class="topo-th"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16"/><path d="M16.5 8.5L20 12l-3.5 3.5"/><path d="M7.5 8.5L4 12l3.5 3.5"/></svg><span data-i18n="tunnels_title">Tunnels</span></span></th><th scope="col" role="columnheader"><span class="topo-th"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a15.3 15.3 0 0 1 4 9 15.3 15.3 0 0 1-4 9 15.3 15.3 0 0 1-4-9 15.3 15.3 0 0 1 4-9z"/></svg><span data-i18n="topology_col_foreign">Foreign server</span></span></th><th scope="col" role="columnheader"><span class="topo-th"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a15.3 15.3 0 0 1 4 9 15.3 15.3 0 0 1-4 9 15.3 15.3 0 0 1-4-9 15.3 15.3 0 0 1 4-9z"/></svg><span data-i18n="topology_col_iran">Iran servers</span></span></th><th scope="col" role="columnheader"><span class="topo-th"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg></span></th><th scope="col" role="columnheader"><span class="topo-th"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/><path d="M1 14h6M9 8h6M17 16h6"/></svg><span data-i18n="topology_list_actions">Actions</span></span></th></tr></thead>
             <tbody id="topologiesList" role="rowgroup"></tbody>
           </table></div>
-          <div class="topo-list-foot"><span id="topologyFootCount"></span><div class="topo-pager"><button type="button" id="topoPagePrev" class="topo-pager-btn" aria-label="Previous page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button><button type="button" id="topoPageCur" class="topo-pager-btn on" aria-label="Current page">1</button><button type="button" id="topoPageNext" class="topo-pager-btn" aria-label="Next page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></div></div>
+          <div class="topo-list-foot"><div id="topoPager" class="mtb-pager mtb-pager2"></div></div>
         </div>
                 <div class="tunnel-card topo-detail-head-card" id="topologyHeadCard" hidden>
           <div class="topo-head-row">
@@ -1746,7 +1746,7 @@
               </div>
             </div>
             <div class="topo-detail-actions" role="group" aria-label="Topology actions">
-              <button type="button" id="topologyAddTunnelBtn" class="quantum-btn quantum-btn-primary" data-i18n="tunnels_new">New Tunnel</button>
+              <button type="button" id="topologyAddTunnelBtn" class="quantum-btn quantum-btn-primary"><svg class="topo-addtun-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span data-i18n="tunnels_new">New Tunnel</span></button>
 
               <span class="topo-act-sep" aria-hidden="true"></span>
               <button type="button" id="topologyActivateBtn" class="topo-act topo-act-green" hidden><svg class="topo-act-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8"/><path d="M6.3 6.3a8.5 8.5 0 1011.4 0"/></svg><span data-i18n="Activate">Activate</span></button>
@@ -1761,7 +1761,7 @@
         </div>
         <div class="tunnel-card" id="topologyDetailCard" hidden>
           
-          <div class="tc-header topo-map-head"><span class="topo-map-head-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="5" cy="6" r="2.5"/><circle cx="19" cy="6" r="2.5"/><circle cx="12" cy="19" r="2.5"/><path d="M7.5 6h9M6.3 8l4.7 8.8M17.7 8l-4.7 8.8"/></svg></span><p class="tc-title" data-i18n="topology_map_t">Topology map</p></div>
+          <div class="tc-header topo-map-head"><span class="topo-map-head-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="5" cy="6" r="2.5"/><circle cx="19" cy="6" r="2.5"/><circle cx="12" cy="19" r="2.5"/><path d="M7.5 6h9M6.3 8l4.7 8.8M17.7 8l-4.7 8.8"/></svg></span><p class="tc-title" data-i18n="topology_map_t">Topology map</p><button type="button" id="topoMapAddAgentBtn" class="quantum-btn quantum-btn-primary" data-i18n="agents_add" style="margin-inline-start:auto">Add agent</button></div>
           <div id="topologyGraph"></div>
         </div>
         <div class="tunnel-card" id="topologyTunnelsCard" hidden>
@@ -1774,7 +1774,6 @@
           <div id="topologyTunnelList"></div>
           <div class="qs-hint u-mt-8" data-i18n="topology_cables">Each cable represents one tunnel between the two servers.</div>
         </div>
-        <div class="tunnel-card" id="topoMembersCard"></div>
         <div id="topologyBoundList" class="u-mt-8"></div>
         <div class="tunnel-card rsc-banner" id="rscBanner" hidden role="alert">
           <span class="rsc-ic warn" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg></span>
@@ -2089,24 +2088,20 @@
       </section>
       <!-- ==================== CORES TAB ==================== -->
       <section id="tab-cores" role="tabpanel" hidden>
-        <div class="ent-card">
-          <header class="topo-hero">
-            <div class="topo-hero-text">
-              <div class="topo-title-row">
-                <span class="topo-title-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><ellipse cx="12" cy="12" rx="10" ry="4.2" transform="rotate(-30 12 12)"/></svg></span>
-                <p class="tc-title" data-i18n="cores_title">Cores</p>
-              </div>
+        <div class="ent-card eng-headcard">
+          <div class="eng-head">
+            <span class="eng-head-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><ellipse cx="12" cy="12" rx="10" ry="4.2" transform="rotate(-30 12 12)"/></svg></span>
+            <p class="tc-title" data-i18n="eng_title">Cores</p>
+          </div>
+          <div class="eng-tools">
+            <div class="eng-search">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+              <input id="engSearch" type="search" data-i18n-ph="eng_search_ph" placeholder="Search engines by name..." aria-label="Search engines by name">
             </div>
-          </header>
-        </div>
-        <div class="ent-card">
-          <div class="cores-tools">
-            <div class="mtb-eng-filters" id="coresFilters"></div>
-            <span class="cores-count" id="coresCount"></span>
-            <button type="button" class="quantum-btn quantum-btn-secondary" id="coresRefresh" data-cores-refresh><svg class="topo-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg><span data-i18n="cores_refresh">Refresh</span></button>
+            <div class="mtb-eng-filters" id="engFilters"></div>
           </div>
         </div>
-        <div class="ent-card" id="coresList"></div>
+        <div class="ent-card eng-gridcard" id="engList"></div>
       </section>
       <!-- ==================== CLUSTER TAB ==================== -->
       <section id="tab-cluster" role="tabpanel" hidden>
@@ -3080,350 +3075,17 @@
       </section>
       <!-- Tab: Carrier Benchmark & Auto-Pilot -->
       <section id="tab-benchmark" role="tabpanel" hidden>
-        <!-- Path test: which transports cross between the two servers, before any tunnel -->
-        <div class="tunnel-card u-mb-20" id="ptCard">
+        <div class="tunnel-card u-mb-20">
           <div class="tc-header u-bb-ln u-pb-16 u-mb-16">
             <div>
-              <span class="tc-title u-fs-18 u-fw-700" data-i18n="pt_title">Path Test Before Any Tunnel</span>
-              <div class="qs-hint u-mt-4" data-i18n="pt_sub">Finds which transports get through between your Iran and foreign servers, with the real FRP and Backhaul cores. Nothing is set up for good: temporary servers run for a few minutes and are removed. Safe next to a running tunnel: the test uses its own free ports and its own GRE interface and never touches the tunnel.</div>
-            </div>
-            <span class="badge dim" id="ptBadge" data-i18n="pt_idle">Not running</span>
-          </div>
-          <div id="ptForm">
-            <div class="qs-seg u-mb-12" role="group" data-i18n-aria="pt_role_aria" aria-label="Which server is this?">
-              <button type="button" id="ptRoleIran" class="active" aria-pressed="true" data-i18n="pt_role_iran">This is the Iran server</button>
-              <button type="button" id="ptRoleForeign" aria-pressed="false" data-i18n="pt_role_foreign">This is the foreign server</button>
-            </div>
-            <div id="ptIranForm">
-              <label class="qs-label" for="ptForeign" data-i18n="pt_foreign_lbl">Foreign server IP (optional)</label>
-              <input class="quantum-input u-ltr u-mono" id="ptForeign" placeholder="198.51.100.10" inputmode="decimal" autocomplete="off">
-              <div class="qs-hint u-mt-4" data-i18n="pt_foreign_hint">Used for the GRE and SSH (Bagher) checks. Left empty, it is taken from the foreign server when it connects.</div>
-              <details class="u-mt-12">
-                <summary class="u-fs-13 u-c-ac u-fw-600 u-cursor-pointer" data-i18n="pt_opts">Options</summary>
-                <div class="qs-row u-mt-8">
-                  <div>
-                    <label class="qs-label" for="ptBase" data-i18n="pt_base_lbl">First port</label>
-                    <input class="quantum-input u-mono" id="ptBase" type="number" min="1024" max="65504" data-i18n-ph="pt_ip_ph" placeholder="Auto">
-                  </div>
-                  <div>
-                    <label class="qs-label" for="ptMinutes" data-i18n="pt_min_lbl">Minutes</label>
-                    <input class="quantum-input u-mono" id="ptMinutes" type="number" min="1" max="60" value="10">
-                  </div>
-                  <div>
-                    <label class="qs-label" for="ptSsh" data-i18n="pt_ssh_lbl">Foreign SSH port</label>
-                    <input class="quantum-input u-mono" id="ptSsh" type="number" min="1" max="65535" value="22">
-                  </div>
-                  <div>
-                    <label class="qs-label" for="ptIranIp" data-i18n="pt_ip_lbl">This server's IP</label>
-                    <input class="quantum-input u-ltr u-mono" id="ptIranIp" data-i18n-ph="pt_ip_ph" placeholder="Auto" inputmode="decimal" autocomplete="off">
-                  </div>
-                </div>
-                <div class="qs-hint u-mt-4" data-i18n="pt_base_hint">Empty: the first free ports from 41000 are used, never the ports of a running tunnel. The test listens on the first port and the next 10 (TCP and UDP); enter a port to test that one.</div>
-              </details>
-              <div class="qs-actions u-mt-12">
-                <button type="button" class="quantum-btn quantum-btn-primary" id="ptStartBtn" data-i18n="pt_start">Start Test</button>
-              </div>
-            </div>
-            <div id="ptForeignForm" hidden>
-              <label class="qs-label" for="ptCode" data-i18n="pt_code_lbl">Test code from the Iran server</label>
-              <textarea class="quantum-input u-ltr u-mono u-fs-12" id="ptCode" rows="3" placeholder="HPT1-..." autocomplete="off" spellcheck="false"></textarea>
-              <div class="qs-hint u-mt-4" data-i18n="pt_code_hint">Start the test on the Iran server's Benchmark tab first, then paste its code here.</div>
-              <div class="qs-actions u-mt-12">
-                <button type="button" class="quantum-btn quantum-btn-primary" id="ptJoinBtn" data-i18n="pt_start">Start Test</button>
-              </div>
-            </div>
-            <div class="warnbox hidden u-mt-12" id="ptWarn"></div>
-          </div>
-          <div id="ptRun" hidden>
-            <div id="ptCodeWrap" class="u-mb-12" hidden>
-              <label class="qs-label" for="ptCodeOut" data-i18n="pt_code_out">Test code: paste it on the foreign server's Benchmark tab</label>
-              <div class="u-flex u-gap-8">
-                <input class="quantum-input u-ltr u-mono u-fs-12 u-flex-1" id="ptCodeOut" readonly>
-                <button type="button" class="quantum-btn quantum-btn-secondary" id="ptCopyBtn" data-i18n="pt_copy">Copy</button>
-              </div>
-            </div>
-            <div class="qs-hint u-mb-12" id="ptSummary" aria-live="polite"></div>
-            <div class="bench-table-wrap">
-              <table class="quantum-table" id="ptTable">
-                <thead>
-                  <tr>
-                    <th data-i18n="pt_th_engine">Engine</th>
-                    <th data-i18n="pt_th_transport">Transport</th>
-                    <th data-i18n="pt_th_result">Result</th>
-                    <th data-i18n="pt_th_rtt">Latency</th>
-                    <th data-i18n="pt_th_speed">Speed</th>
-                    <th data-i18n="pt_th_port">Port</th>
-                  </tr>
-                </thead>
-                <tbody id="ptBody"></tbody>
-              </table>
-            </div>
-            <ul class="qs-hint u-mt-8" id="ptNotes" dir="ltr" data-no-i18n hidden></ul>
-            <div class="qs-actions u-mt-12">
-              <button type="button" class="quantum-btn quantum-btn-secondary" id="ptStopBtn" data-i18n="pt_stop">Stop Test</button>
+              <span class="tc-title u-fs-18 u-fw-700" data-i18n="bench_wiz_title">Pair Benchmark</span>
+              <div class="qs-hint u-mt-4" data-i18n="bench_wiz_sub">Pick a topology, then its Iran and foreign agents, and run a full benchmark through the engines you choose. Real temporary tunnels are built, measured and removed — no invented numbers.</div>
             </div>
           </div>
-        </div>
-        <!-- Pre-connection Target & Role Configuration Card -->
-        <div class="tunnel-card u-bd-info u-bg-s1 u-lift u-mb-20" style="backdrop-filter:blur(16px);">
-          <div class="tc-header u-bb-ln u-pb-16 u-mb-16">
-            <div>
-              <div class="u-flex-center-gap10">
-                <span class="tc-title u-fs-18 u-fw-700 u-flex u-ai-c u-gap-8" data-i18n="bench_leaderboard_title">
-                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#38bdf8" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                  Smart Multi-Protocol Carrier Benchmark
-                </span>
-                <span class="badge ok" id="benchStatusPill">Ready</span>
-              </div>
-              <div class="qs-hint u-mt-4" id="benchMetaSub">Independent end-to-end benchmark across all 7 Quantum protocols before establishing tunnel</div>
-            </div>
-            <div class="qs-actions">
-              <button class="quantum-btn quantum-btn-primary u-flex u-ai-c u-gap-8" id="benchRunBtn">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                <span id="benchRunBtnTxt" data-i18n="bench_run_btn">Run Smart Benchmark</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- Pre-connection Target Configuration Form -->
-          <div class="u-grid-2 u-gap-16 u-mb-16 u-bg-sunk u-p-16 u-r-10 u-bd-ln">
-            <div>
-              <label class="qs-label u-mb-8 u-fs-13 u-fw-600 u-flex u-ai-c u-gap-8">
-                <span>Current Server Role</span>
-                <span class="badge info">Role</span>
-              </label>
-              <div class="qs-seg u-mb-8" role="group" aria-label="Server Role Selection">
-                <button type="button" id="benchRoleIranBtn" class="active u-fw-600" aria-pressed="true">Iran Server</button>
-                <button type="button" id="benchRoleForeignBtn" aria-pressed="false" class="u-fw-600">Foreign Server</button>
-              </div>
-              <input type="hidden" id="benchTargetRole" value="iran">
-              <div class="qs-hint" id="benchRoleHint">On Iran server, enter foreign server address to probe all 7 protocols outwards.</div>
-            </div>
-
-            <div>
-              <label class="qs-label u-mb-8 u-fs-13 u-fw-600 u-flex u-ai-c u-jc-sb" for="benchTargetHost">
-                <span>Foreign Server Public IP or Domain (Destination)</span>
-                <span class="badge dim u-none" id="benchAutoDetectBadge">Auto Detect</span>
-              </label>
-              <input class="quantum-input u-ltr u-text-start u-mono u-fs-14 u-p-8x12" id="benchTargetHost" placeholder="e.g. 198.51.100.10 or foreign.mydomain.com" inputmode="decimal">
-              <div class="qs-hint u-mt-4" id="benchTargetHint">Enter destination host to benchmark and discover the best protocol for lowest packet loss.</div>
-            </div>
-          </div>
-
-          <!-- Advanced Custom Ports Accordion (Optional) -->
-          <div class="u-mb-16">
-            <div class="u-flex u-ai-c u-jc-sb u-cursor-pointer u-p-8x4" id="benchAdvToggle">
-              <span class="u-fs-13 u-c-ac u-fw-600 u-flex u-ai-c u-gap-8">
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-                <span>Custom Benchmark Ports (Optional)</span>
-              </span>
-              <span class="u-fs-12 u-c-mu" id="benchAdvChevron">▼ Expand</span>
-            </div>
-            <div id="benchAdvWrap" class="hidden u-grid-4 u-gap-12 u-mt-8 u-bg-inset u-p-12 u-r-8 u-bd-ln">
-              <div>
-                <label for="benchFrpPort" class="u-fs-12 u-c-mu u-block u-mb-4">FRP Port (TCP/KCP/QUIC)</label>
-                <input class="quantum-input u-p-8x12 u-fs-12 u-mono" id="benchFrpPort" type="number" value="7000">
-              </div>
-              <div>
-                <label for="benchWssPort" class="u-fs-12 u-c-mu u-block u-mb-4">WSS TLS Port</label>
-                <input class="quantum-input u-p-8x12 u-fs-12 u-mono" id="benchWssPort" type="number" value="8443">
-              </div>
-              <div>
-                <label for="benchBackhaulPort" class="u-fs-12 u-c-mu u-block u-mb-4">Backhaul Port</label>
-                <input class="quantum-input u-p-8x12 u-fs-12 u-mono" id="benchBackhaulPort" type="number" value="3080">
-              </div>
-              <div>
-                <label for="benchBagherPort" class="u-fs-12 u-c-mu u-block u-mb-4">Bagher SSH Port</label>
-                <input class="quantum-input u-p-8x12 u-fs-12 u-mono" id="benchBagherPort" type="number" value="22">
-              </div>
-            </div>
-          </div>
-
-          <!-- Top Winner Recommendation Showcase Banner -->
-          <div id="benchWinnerBanner" class="hidden u-bd-ok u-bg-s1 u-r-12 u-p-20x20 u-mb-20 u-noglow">
-            <div class="u-flex u-ai-c u-jc-sb u-wrap u-gap-16">
-              <div>
-                <div class="u-flex u-ai-c u-gap-8">
-                  <span class="badge ok" id="benchRecBadge">Recommended Protocol</span>
-                  <span class="badge info" id="benchWinnerBadge">Highest Stability</span>
-                </div>
-                <h3 id="benchWinnerTitle" class="u-m-8x0x4x0 u-fs-20 u-fw-700 u-c-tx u-flex u-ai-c u-gap-8">—</h3>
-                <div id="benchWinnerDesc" class="u-fs-13 u-c-mu">Based on live probe metrics, this carrier offers maximum throughput with lowest drop rate.</div>
-              </div>
-              <div class="u-flex u-ai-c u-gap-12">
-                <div class="u-text-end u-bg-inset u-p-8x16 u-r-8 u-bd-ln">
-                  <div class="u-fs-12 u-c-mu">Quality Score</div>
-                  <div id="benchWinnerScore" class="u-fs-18 u-fw-700 u-c-ok u-mono">— / 100</div>
-                </div>
-                <button class="quantum-btn quantum-btn-primary" id="benchApplyWinnerBtn">
-                  Apply This Protocol
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Quick Telemetry Stats Grid -->
-          <div class="bench-stats-grid">
-            <div class="bench-stat-card">
-              <span class="wd-stat-label u-stat-label">
-                Best Protocol
-              </span>
-              <div class="wd-stat-val u-stat-val-ok" id="benchStatWinner">—</div>
-              <span class="wd-stat-sub u-hint-12" id="benchStatWinnerSub">Top Recommendation</span>
-            </div>
-            <div class="bench-stat-card">
-              <span class="wd-stat-label u-stat-label">
-                Active Tunnel Carrier
-              </span>
-              <div class="wd-stat-val u-fs-18 u-fw-700 u-c-info u-m-8x0x4x0" id="benchStatActive">—</div>
-              <span class="wd-stat-sub u-hint-12" id="benchStatActiveSub">Running Carrier</span>
-            </div>
-            <div class="bench-stat-card">
-              <span class="wd-stat-label u-stat-label">
-                Lowest RTT Latency
-              </span>
-              <div class="wd-stat-val u-fs-18 u-fw-700 u-c-tx u-m-8x0x4x0" id="benchStatMinRtt">—</div>
-              <span class="wd-stat-sub u-hint-12" id="benchStatMinRttSub">Round-Trip Time</span>
-            </div>
-            <div class="bench-stat-card">
-              <span class="wd-stat-label u-stat-label">
-                Packet Loss Rate
-              </span>
-              <div class="wd-stat-val u-stat-val-ok" id="benchStatLoss">0%</div>
-              <span class="wd-stat-sub u-hint-12" id="benchStatLossSub">Dropped Packets</span>
-            </div>
-          </div>
-
-          <!-- Leaderboard Table Wrap -->
-          <div class="bench-table-wrap">
-            <table class="quantum-table" id="benchTable">
-              <thead>
-                <tr>
-                  <th class="u-w-44 u-text-center">#</th>
-                  <th data-i18n="bench_tbl_rank">Protocol & Carrier</th>
-                  <th data-i18n="bench_tbl_trans">Transport Core</th>
-                  <th data-i18n="bench_tbl_port">Destination Port</th>
-                  <th data-i18n="bench_tbl_rtt">RTT Latency</th>
-                  <th data-i18n="bench_tbl_loss">Packet Loss</th>
-                  <th data-i18n="bench_tbl_jitter">Jitter</th>
-                  <th data-i18n="bench_tbl_score">Quality Score</th>
-                  <th data-i18n="bench_tbl_status">Status</th>
-                  <th data-i18n="bench_tbl_action">Actions</th>
-                </tr>
-              </thead>
-              <tbody id="benchTableBody">
-                <tr><td colspan="10"><div class="ent-skel u-h-14"></div></td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Secondary Controls Grid: Peer Link & Automatic Failover -->
-        <div class="u-grid-2 u-gap-16 u-mt-16">
-          <!-- Card 1: Peer Link Status -->
-          <div class="tunnel-card u-card-tint">
-            <div class="tc-header">
-              <span class="tc-title u-flex-center-gap8">
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-                <span data-i18n="bench_peer_link_title">Inter-Panel Link</span>
-              </span>
-              <span class="badge dim" id="peerLinkBadge">Probing...</span>
-            </div>
-            <div class="qs-hint" id="peerLinkSub" data-i18n="bench_peer_link_sub">Real-time telemetry and state synchronization with peer panel.</div>
-            <div class="trow u-mt-8">
-              <span class="k" data-i18n="lbl_role">Server Role</span>
-              <span class="v" id="peerRoleVal">—</span>
-            </div>
-            <div class="trow">
-              <span class="k">Peer Panel URL</span>
-              <span class="v" id="peerUrlVal">—</span>
-            </div>
-            <div class="trow">
-              <span class="k">Internal Tunnel IP</span>
-              <span class="v" id="peerInternalVal">—</span>
-            </div>
-            <div class="trow">
-              <span class="k">Peer Latency</span>
-              <span class="v" id="peerLatencyVal">— ms</span>
-            </div>
-            <div class="trow">
-              <span class="k">Last Sync</span>
-              <span class="v" id="peerLastSyncVal">—</span>
-            </div>
-            <div class="qs-actions u-mt-12">
-              <button class="quantum-btn quantum-btn-secondary u-btn-xs" id="peerTestBtn" data-i18n="bench_peer_test_btn">Test Link</button>
-              <button class="quantum-btn quantum-btn-ghost u-btn-xs" id="peerConfigBtn" data-i18n="bench_peer_cfg_btn">Configure Link</button>
-            </div>
-          </div>
-
-          <!-- Card 2: Automatic Failover Settings -->
-          <div class="tunnel-card u-card-tint" id="failoverCard">
-            <div class="tc-header">
-              <span class="tc-title u-flex-center-gap8">
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                <span data-i18n="bench_failover_title">Automatic Failover</span>
-              </span>
-              <span class="badge dim" id="autoPilotBadge">[ OFF ] Manual Mode</span>
-            </div>
-            <div class="qs-hint" data-i18n="bench_failover_sub">Default: <b>OFF</b>. When enabled, watchdog automatically promotes the healthiest backup carrier upon packet loss spike.</div>
-            <div class="fg u-mt-12">
-              <label class="u-flex-center-wrap10">
-                <input type="checkbox" id="autoPilotToggle">
-                <span class="u-fw-600" data-i18n="bench_failover_toggle">Enable Carrier Auto-Failover</span>
-              </label>
-            </div>
-            <div class="fg u-mt-8">
-              <label for="autoPilotThresholdInput" data-i18n="bench_failover_threshold">Packet Loss Trigger Threshold (%)</label>
-              <input class="quantum-input u-maxw-140" id="autoPilotThresholdInput" type="number" min="5" max="90" value="20">
-              <span class="ent-help">If the current carrier packet loss exceeds this threshold, the tunnel seamlessly switches to the best candidate.</span>
-            </div>
-            <div class="trow u-mt-4">
-              <span class="k">Last Auto Failover</span>
-              <span class="v" id="autoPilotLastVal">—</span>
-            </div>
-            <div class="trow">
-              <span class="k">Switch Counter</span>
-              <span class="v" id="autoPilotCountVal">0</span>
-            </div>
-            <div class="qs-actions u-mt-12">
-              <button class="quantum-btn quantum-btn-primary u-btn-xs" id="autoPilotSaveBtn" data-i18n="bench_failover_save">Save Failover Policy</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Modal / Inline Panel for Peer Configuration -->
-        <div class="tunnel-card hidden u-bd-ac" id="peerConfigCard">
-          <div class="tc-header">
-            <p class="tc-title">Configure Inter-Panel Peer Sync</p>
-            <button class="quantum-btn quantum-btn-ghost u-btn-xs" id="peerConfigCloseBtn">Close</button>
-          </div>
-          <div class="u-grid-2 u-gap-16 u-mt-8">
-            <div class="fg">
-              <label for="cfgPeerRole">This Server Role</label>
-              <select class="quantum-input" id="cfgPeerRole">
-                <option value="master">Master - Iran (Primary Controller)</option>
-                <option value="worker">Worker - Foreign (Replica Worker)</option>
-              </select>
-            </div>
-            <div class="fg">
-              <label for="cfgPeerUrl">Peer Web Panel URL</label>
-              <input class="quantum-input" id="cfgPeerUrl" placeholder="http://5.6.7.8:8080">
-            </div>
-            <div class="fg">
-              <label for="cfgPeerInternal">Internal Tunnel IP</label>
-              <input class="quantum-input" id="cfgPeerInternal" placeholder="10.10.10.1">
-            </div>
-            <div class="fg">
-              <label for="cfgPeerSecret">Shared Secret Key</label>
-              <input class="quantum-input" id="cfgPeerSecret" type="password" placeholder="••••••••••••••••••••••••">
-            </div>
-          </div>
-          <div class="qs-actions u-mt-12">
-            <button class="quantum-btn quantum-btn-primary" id="cfgPeerSaveBtn">Save Link Configuration</button>
-          </div>
+          <div id="benchWizard"></div>
         </div>
       </section>
-      <!-- Tab: Spoof Tunnel (IP-spoofing UDP pipe wrapped with WireGuard) -->
+      <!-- Tab: Spoof Tunnel -->
       <section id="tab-spoof" role="tabpanel" hidden>
         <div class="tunnel-card u-mb-20">
           <div class="tc-header u-bb-ln u-pb-16 u-mb-16">

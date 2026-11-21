@@ -75,6 +75,27 @@
     agDelPh: ['اسم ایجنت', 'agent name'],
     agDelNo: ['اسم ایجنت را دقیق بنویس تا دکمه حذف فعال شود', 'Type the exact agent name to enable Delete'],
     agDelQ: ['این عملیات قابل بازگشت نیست. برای ادامه، نام ایجنت را دقیقاً وارد کنید.', 'This action cannot be undone. To continue, enter the agent name exactly.'],
+    agDelDone: ['ایجنت حذف شد', 'Agent deleted'],
+    tuShareW: ['سهم وزنی', 'Weight share'],
+    tuWeightTip: ['وزن پیکربندی‌شدهٔ این تانل در توپولوژی؛ توزیع ترافیک بر اساس نسبت وزن‌ها انجام می‌شود.', 'This tunnel’s configured weight in the topology — traffic is distributed by weight ratio.'],
+    tuShareTip: ['سهم وزنی حل‌شده این تانل از مجموع وزن اعضای متصل توپولوژی.', 'The resolved weight share of this tunnel out of the connected members’ total weight.'],
+    tuNoShareTip: ['تانل قطع یا غیرفعال است — سهمی توزیع نشده.', 'The tunnel is down or disabled — no share was resolved.'],
+    tuShareTrafficTip: ['نسبت ترافیک wire امروز این تانل به کل ترافیک wire توپولوژی — با وزن متفاوت است.', 'This tunnel’s wire traffic today over the whole topology’s — distinct from weight.'],
+    tuOverheadTip: ['نسبت بایت wire به بایت payload امروز — یک نسبت محاسبه‌شده، نه ضریب اعمال‌شده.', 'Wire-to-payload byte ratio today — a computed ratio, never a coefficient applied to bytes.'],
+    tuOverheadNone: ['با payload صفر یا دادهٔ ناموجود، سربار نامشخص است.', 'With zero payload or missing data the overhead is undefined.'],
+    tuWireDef: ['Wire: بایت واقعی منتقل‌شده روی حامل تانل.', 'Wire: the real bytes moved over the tunnel carrier.'],
+    tuPayloadDef: ['Payload: بایت مفید منتقل‌شده توسط کاربران.', 'Payload: the useful bytes moved by the users.'],
+    tuNoPayload: ['دادهٔ payload ثبت نشده است', 'No payload data recorded'],
+    tuMaxLabel: ['اوج', 'Peak'],
+    tuUpdatedAt: ['آخرین به‌روزرسانی', 'Last updated'],
+    tuDownWarn: ['این تانل قطع است — اتصال برقرار نیست.', 'This tunnel is down — the connection is not established.'],
+    tuTechT: ['جزئیات فنی', 'Technical details'],
+    tuConnQ: ['کیفیت اتصال', 'Connection quality'],
+    tuQualityT: ['کیفیت اتصال و مصرف موتور', 'Connection quality & engine usage'],
+    tuEngineUse: ['مصرف موتور', 'Engine usage'],
+    tuLiveRate: ['سرعت لحظه‌ای', 'Live rate'],
+    tuDownRate: ['دانلود', 'Download rate'],
+    tuUpRate: ['آپلود', 'Upload rate'],
     agDelEnable: ['برای فعال شدن حذف، نام ایجنت را دقیق وارد کنید.', 'Enter the exact agent name to enable Delete'],
     agDelWarn2: ['این عملیات غیرقابل بازگشت است و تمام اطلاعات مربوط به این ایجنت حذف خواهد شد.', 'This action is irreversible and everything belonging to this agent will be removed.'],
     agCopied: ['کپی شد!', 'Copied!'],
@@ -84,6 +105,18 @@
     agUpdUrl: ['آدرس فایل آپدیت (https)', 'Artifact URL (https)'],
     agUpdHint: ['فایل باید https، امضاشده با کلید آپدیت و برای معماری همین ایجنت باشد. ایجنت دانلود و تأیید می‌کند و پس از تعویض ری‌استارت می‌شود.', 'The artifact must be https, signed with the pinned update key, and built for this agent architecture. The agent downloads, verifies, swaps and restarts.'],
     agUpdStart: ['شروع آپدیت', 'Start update'], agUpdNeed: ['نسخه و آدرس فایل لازم است', 'Version and artifact URL are required'],
+    agUpdStable: ['آخرین نسخه پایدار', 'Latest stable'],
+    agUpdPre: ['آخرین پیش‌انتشار', 'Latest prerelease'],
+    agUpdUpdateTo: ['آپدیت به {v}', 'Update to {v}'],
+    agUpdUpToDate: ['به‌روز است', 'Up to date'],
+    agUpdNone: ['این کانال ریلیزی ندارد', 'No release on this channel'],
+    agUpdCommitNote: ['فقط اطلاع‌رسانی — تا وقتی پایپ‌لاین برای هر build یک dev-rN منتشر نکند، ارتفاکت ندارد.', 'Informational only — no artifact until the pipeline publishes one dev-rN per build.'],
+    agUpdNoGH: ['دسترسی به گیت‌هاب ممکن نشد — از فرم دستی استفاده کنید.', 'GitHub unreachable — use the manual form.'],
+    agUpdManual: ['فرم دستی', 'Manual form'],
+    agUpdGroup: ['آپدیت همهٔ outdated‌ها', 'Update all outdated'],
+    agUpdGroupStarted: ['صف آپدیت گروهی شروع شد', 'Group update queue started'],
+    agUpdGroupLast: ['آخرین گروه: {ok} موفق، {bad} ناموفق ({tag})', 'Last group: {ok} ok, {bad} failed ({tag})'],
+    agUpdStarted: ['آپدیت شروع شد', 'Update started'],
     agPhRequested: ['درخواست شد', 'requested'], agPhDownloading: ['دانلود', 'downloading'],
     agPhVerifying: ['بررسی امضا', 'verifying'], agPhSwapped: ['جایگزین شد', 'swapped'],
     agPhRestarting: ['ری‌استارت', 'restarting'], agPhCompleted: ['کامل شد', 'completed'],
@@ -168,9 +201,65 @@
     st_offline: ['آفلاین', 'offline'], st_revoked: ['باطل‌شده', 'revoked'],
     up: ['برقرار', 'up'], down: ['قطع', 'down'],
     trafficToday: ['ترافیک امروز', 'Traffic today'], today: ['امروز', 'Today'],
+    tuNew: ['تانل جدید', 'New tunnel'],
+    tuNewHint: ['ترتیب را دنبال کنید: توپولوژی، سرور ایران، سرور خارج، هسته — سپس کلید تانل.', 'Follow the flow: topology, Iran server, foreign server, engine — then the tunnel key.'],
+    tuNeedTopo: ['اول یک توپولوژی بسازید — تانل بدون توپولوژی معنا ندارد.', 'Build a topology first — a tunnel needs one.'],
+    tuPath: ['مسیر', 'Path'],
+    tuD7: ['ترافیک ۷\u00a0روزه', '7d\u00a0traffic'],
+    tuD30: ['ترافیک ۳۰\u00a0روزه', '30d\u00a0traffic'],
+    tuOpen: ['مشاهده تانل', 'View tunnel'],
+    tuBackList: ['بازگشت به تانل‌ها', 'Back to tunnels'],
+    tuEndsT: ['مسیر تانل', 'Tunnel route'],
+    tuSideIran: ['سمت ایران', 'Iran side'],
+    tuSideForeign: ['سمت خارج', 'Foreign side'],
+    tuTrafficT: ['ترافیک', 'Traffic'],
+    tuRateNow: ['نرخ فعلی', 'Current rate'],
+    tuShareT: ['سهم از توپولوژی', 'Topology share'],
+    tuLoss: ['اتلاف بسته', 'Packet loss'],
+    tuUptime: ['آپ‌تایم', 'Uptime'],
+    tuRange24: ['۲۴ ساعت', '24h'],
+    tuDown: ['دانلود', 'download'],
+    tuUp: ['آپلود', 'upload'],
+    tuNoSeries: ['برای این بازه داده‌ای نیست', 'No data for this range'],
+    tuEventsT: ['رویددها', 'Events'],
+    tuNoEvents: ['رویددی ثبت نشده است', 'No events recorded'],
+    tuEvFrom: ['از', 'from'],
+    tuSettingsT: ['تنظیمات', 'Settings'],
+    tuParams: ['پارامترهای هسته (JSON)', 'Engine params (JSON)'],
+    tuParamsHint: ['خالی بگذارید تا مقادیر فعلی — از جمله کلیدها — دست‌نخورده بماند.', 'Leave empty to keep the stored values — secrets included.'],
+    tuSaved: ['تنظیمات ذخیره شد', 'Settings saved'],
+    tuBadJson: ['JSON نامعتبر است', 'Invalid JSON'],
+    tuStIran: ['سرور ایران', 'Iran server'],
+    tuStForeign: ['سرور خارج', 'Foreign server'],
+    tuStKey: ['کلید و بازبینی', 'Key & review'],
+    tuWizHint1: ['یک توپولوژی انتخاب کنید', 'Pick a topology'],
+    tuWizHint2: ['سرور سمت ایران را انتخاب کنید', 'Pick the Iran-side server'],
+    tuWizHint3: ['سرور سمت خارج را انتخاب کنید', 'Pick the foreign-side server'],
+    tuWizHint4: ['هسته تانل را انتخاب کنید', 'Pick the tunnel engine'],
+    tuWizHint5: ['کلید را بنویسید و بازبینی کنید', 'Type the key and review'],
+    tuAutoOn: ['فعال — خودکار', 'Enabled — automatic'],
+    tuPickNeed: ['اول انتخاب این مرحله را انجام دهید', 'Make the choice for this step first'],
+    tuNoneSide: ['سروری در این سمت نیست', 'No server on this side'],
+    tuAllTopos: ['همه توپولوژی‌ها', 'All topologies'],
+    tuAllAgents: ['همه ایجنت‌ها', 'All agents'],
+    tuAllEngines: ['همه هسته‌ها', 'All engines'],
+    tuAllStates: ['همه وضعیت‌ها', 'All states'],
+    tuSearchPh: ['جستوجوی تانل‌ها...', 'Search tunnels...'],
+    tuNoMatch: ['تانلی مطابق جستوجو/فیلتر نیست', 'No tunnels match the search/filters'],
+    tuExp: ['آزمایشی', 'experimental'],
+    tuShare: ['سهم حل‌شده در توپولوژی: {n}%', 'Resolved share of the topology: {n}%'],
+    tuNoShare: ['بدون سهم حل‌شده — تانل قطع یا غیرفعال است', 'No resolved share — tunnel is down or disabled'],
+    tuWeightT: ['ویرایش وزن', 'Edit weight'],
+    tuWRange: ['وزن باید عددی بین ۰ تا ۱۰۰۰ باشد', 'Weight must be a number between 0 and 1000'],
+    tuWSaved: ['وزن ذخیره شد', 'Weight saved'],
+    tuOpenTopo: ['مشاهده توپولوژی', 'View topology'],
+    tuOpenAgent: ['مشاهده ایجنت', 'View agent'],
+    tuDelT: ['حذف تانل', 'Delete tunnel'],
+    tuDelQ: ['تانل «{k}» برای همیشه حذف می‌شود. ادامه می‌دهید؟', 'Tunnel "{k}" will be removed permanently. Continue?'],
+    tuKeyBad: ['کلید تانل باید ۱ تا ۱۲۸ نویسه از a-z 0-9 - _ . باشد', 'Tunnel key must be 1-128 chars of a-z 0-9 - _ .'],
     d7: ['۷ روز', '7d'], d30: ['۳۰ روز', '30d'],
     tunnelKey: ['تونل', 'Tunnel'], topologyCol: ['توپولوژی', 'Topology'],
-    engineCol: ['موتور', 'Engine'], engineDef: ['پیش‌فرض', 'default'],
+    engineCol: ['هسته', 'Engine'], engineDef: ['پیش‌فرض', 'default'],
     weightCol: ['وزن', 'Weight'], shareCol: ['سهم', 'Share'],
     stateCol: ['وضعیت', 'State'], peerCol: ['طرف مقابل', 'Peer'],
     billable: ['دانلود قابل‌قبض', 'Billable download'], upload: ['آپلود', 'Upload'],
@@ -420,6 +509,185 @@
     '.mtb-pending { opacity: .55; }',
     '.mtb-month { max-width: 130px; }',
     '@media (max-width: 640px) { .mtb-key { max-width: 150px; } }',
+    // the head card wears the same blue dress as the Cores head card:
+    // a blue-tinted wash plus the corner bubble
+    '.mtb-tunhead { position:relative; overflow:hidden; border-radius:14px; background: radial-gradient(circle at 16% 20%, color-mix(in srgb, var(--ac) 9%, transparent) 0%, transparent 55%), radial-gradient(circle at 88% 90%, color-mix(in srgb, var(--ac) 6%, transparent) 0%, transparent 50%), var(--s2); }',
+    '.mtb-tunhead::after { content:""; position:absolute; width:96px; height:96px; border-radius:50%; top:-34px; inset-inline-start:-34px; pointer-events:none; background:radial-gradient(circle at 35% 35%, color-mix(in srgb, var(--ac) 26%, transparent) 0%, color-mix(in srgb, var(--ac) 9%, transparent) 72%); }',
+    '.mtb-tunhead > * { position:relative; z-index:1; }',
+    '.mtb-tunhead .mtb-agintro-row { flex-direction:row; }',
+    '.mtb-tunhead-id { display:flex; align-items:center; gap:10px; }',
+    '.mtb-keycopy { display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; margin-inline-start:6px; border:1px solid var(--ln, rgba(148,163,184,.25)); border-radius:6px; background:transparent; color:var(--mu, #94a3b8); cursor:pointer; vertical-align:middle; transition:color .15s, border-color .15s; }',
+    '.mtb-keycopy svg { width:13px; height:13px; flex:none; fill:none; stroke:currentColor; stroke-width:1.7; }',
+    '.mtb-keycopy:hover { color:var(--ac); border-color:var(--ac); }',
+    '.mtb-topobadge { display:inline-flex; align-items:center; gap:6px; padding:3px 10px; border-radius:999px; border:1px solid color-mix(in srgb, var(--ac) 35%, transparent); background:color-mix(in srgb, var(--ac) 8%, transparent); color:var(--ac); font-size:12px; font-weight:600; cursor:pointer; transition:background .15s, border-color .15s; }',
+    '.mtb-topobadge svg { width:13px; height:13px; fill:none; stroke:currentColor; stroke-width:1.8; }',
+    '.mtb-topobadge:hover { background:color-mix(in srgb, var(--ac) 16%, transparent); border-color:var(--ac); }',
+    '.mtb-tupath { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }',
+    '.mtb-tuside { display:inline-flex; align-items:center; gap:7px; padding:2px 8px; border-radius:8px; border:1px solid transparent; }',
+    '.mtb-tuside.clk { cursor:pointer; } .mtb-tuside.clk:hover { border-color:var(--ln, rgba(148,163,184,.3)); background:var(--sunk, rgba(148,163,184,.06)); }',
+    '.mtb-tuside.na { color:var(--mu, #94a3b8); }',
+    '.mtb-tuside-fl { display:inline-flex; } .mtb-tuside-fl svg { border-radius:2px; }',
+    '.mtb-tuside-tx { display:flex; flex-direction:column; line-height:1.25; }',
+    '.mtb-tuside-tx b { font-size:12.5px; font-weight:600; }',
+    '.mtb-tuside-tx .mtb-muted { font-size:11px; }',
+    '.mtb-tuarrow { color:var(--mu, #94a3b8); display:inline-flex; } .mtb-tuarrow svg { width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:1.8; }',
+    '.mtb-engpair { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }',
+    '.mtb-wtx { cursor:help; border-bottom:1px dotted var(--ln, rgba(148,163,184,.4)); padding-bottom:1px; }',
+    '.mtb-agstat-i.warn .mtb-agico { background:color-mix(in srgb, var(--warn, #f59e0b) 14%, transparent); color:var(--warn, #f59e0b); }',
+    '.mtb-tunhead .mtb-agstatbig { flex:1; justify-content:space-around; flex-wrap:wrap; gap:10px 18px; }',
+    // one table, no h-scrollbar: the path stacks its two ends, cells wrap
+    // instead of pushing the row wider, paddings and action buttons tighten
+    '.mtb-tun-tbl tbody td { padding:8px 9px; white-space:normal; }',
+    '.mtb-tun-tbl tbody td .mtb-tuside-tx b, .mtb-tun-tbl tbody td .mtb-topobadge, .mtb-tun-tbl tbody td .badge { white-space:nowrap; }',
+    '.mtb-tun-tbl .mtb-tupath { flex-direction:column; align-items:flex-start; gap:3px; }',
+    '.mtb-tun-tbl .mtb-tuarrow svg { transform:rotate(90deg); }',
+    '.mtb-tun-tbl .mtb-acts-row { gap:4px; }',
+    '.mtb-tun-tbl .mtb-act { width:26px; height:26px; border-radius:7px; }',
+    '.mtb-tun-tbl .mtb-act svg { width:13px; height:13px; }',
+    '.mtb-tun-tbl .mtb-topobadge { font-size:11.5px; padding:2px 8px; }',
+    '.mtb-tun-tbl th.num { white-space:normal; }',
+    '.mtb-tun-tbl [data-tu-d7] bdi, .mtb-tun-tbl [data-tu-d30] bdi { display:inline-block; max-width:96px; white-space:normal; line-height:1.5; }',
+    '.mtb-tun-tbl .mtb-topobadge { font-size:11px; padding:2px 6px; }',
+    '.mtb-tun-tbl .mtb-tuside-fl svg { width:16px; height:11px; }',
+    '.mtb-tun-tbl td:last-child { padding-inline:6px; }',
+    '@media (max-width: 900px) { .mtb-tun-tbl .mtb-tupath { min-width:180px; } }',
+    '.mtb-tun-tbl td.num, .mtb-tun-tbl th.num { text-align:center; }',
+    '[dir="rtl"] .mtb-tun-tbl td.num { text-align:center; }',
+    '@media (max-width: 760px) { .mtb-tun-tbl thead { display:none; } .mtb-tun-tbl tr { display:block; border:1px solid var(--ln, rgba(148,163,184,.22)); border-radius:12px; padding:10px 12px; margin:0 0 10px; } .mtb-tun-tbl td { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:5px 0; border:none; } .mtb-tun-tbl td::before { content:attr(data-l); color:var(--mu, #94a3b8); font-size:12px; flex:none; } .mtb-tun-tbl td[colspan] { justify-content:center; } .mtb-tun-tbl td[colspan]::before { content:none; } }',
+    '.tu-backrow { display:flex; }',
+    '.tu-head-row { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }',
+    '.tu-id { display:flex; align-items:center; gap:8px; flex-wrap:wrap; min-width:0; }',
+    '.tu-key { font-size:14px; font-weight:700; max-width:340px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }',
+    '.tu-head-num { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }',
+    '.tu-wt { display:flex; flex-direction:column; align-items:center; line-height:1.3; } .tu-wt b { font-size:15px; }',
+    '.tu-head-acts { display:flex; gap:6px; }',
+    '.tu-vitals { display:flex; flex-wrap:wrap; gap:8px 22px; margin-top:12px; padding-top:10px; border-top:1px solid var(--ln, rgba(148,163,184,.2)); }',
+    '.tu-vital { display:flex; flex-direction:column; } .tu-vital b { font-size:13px; }',
+    '.tu-err { display:flex; align-items:center; gap:7px; width:100%; color:var(--er, #f87171); font-size:12.5px; margin-top:4px; } .tu-err svg { width:15px; height:15px; flex:none; fill:none; stroke:currentColor; stroke-width:1.8; }',
+    '.tu-ends-row { display:grid; grid-template-columns:1fr auto 1fr; gap:12px; align-items:stretch; margin-top:10px; }',
+    '.tu-side { display:flex; flex-direction:column; gap:4px; padding:12px 14px; border:1px solid var(--ln, rgba(148,163,184,.22)); border-radius:12px; background:var(--sunk, rgba(148,163,184,.05)); align-items:flex-start; }',
+    '.tu-side-role { display:flex; align-items:center; gap:7px; margin:0; font-size:12px; color:var(--mu, #94a3b8); text-transform:uppercase; letter-spacing:.05em; } .tu-side-role svg { border-radius:2px; }',
+    '.tu-side-name { font-size:15px; font-weight:700; }',
+    '.tu-side-ag { margin-top:4px; }',
+    '.tu-ends-mid { display:flex; align-items:center; color:var(--mu, #94a3b8); } .tu-ends-mid svg { width:26px; height:26px; fill:none; stroke:currentColor; stroke-width:1.6; } body.is-rtl .tu-ends-mid svg { transform:scaleX(-1); }',
+    '.tu-tots { display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; margin-top:12px; }',
+    '.tu-tot { display:flex; flex-direction:column; gap:2px; padding:9px 12px; border:1px solid var(--ln, rgba(148,163,184,.22)); border-radius:10px; font-family:ui-monospace, Menlo, monospace; font-size:13px; }',
+    '.tu-bars { display:flex; align-items:flex-end; gap:3px; height:120px; margin-top:16px; padding:10px; border:1px solid var(--ln, rgba(148,163,184,.22)); border-radius:12px; }',
+    '.tu-bar { flex:1; display:flex; align-items:flex-end; justify-content:center; gap:2px; height:100%; min-width:3px; }',
+    '.tu-bar i { display:block; width:42%; border-radius:2px 2px 0 0; }',
+    '.tu-bar i.rx { background:color-mix(in srgb, var(--ac, #38bdf8) 75%, transparent); }',
+    '.tu-bar i.tx { background:color-mix(in srgb, var(--ok, #34d399) 75%, transparent); }',
+    '.tu-bars-leg { display:flex; gap:16px; margin-top:6px; font-size:12px; color:var(--mu, #94a3b8); }',
+    '.tu-bars-leg i { display:inline-block; width:10px; height:10px; border-radius:3px; margin-inline-end:5px; }',
+    '.tu-bars-leg i.rx { background:var(--ac, #38bdf8); } .tu-bars-leg i.tx { background:var(--ok, #34d399); }',
+    '.tu-ev { display:flex; align-items:center; gap:10px; padding:7px 0; border-bottom:1px solid var(--ln, rgba(148,163,184,.15)); flex-wrap:wrap; } .tu-ev:last-child { border-bottom:0; }',
+    '.tu-ev-tx { font-size:12.5px; color:var(--tx2, #cbd5e1); }',
+    '.tu-ev-at { margin-inline-start:auto; font-size:12px; }',
+    '.tu-range { min-width:110px; }',
+    '.mtb-tun-key.tu-open { cursor:pointer; } .mtb-tun-key.tu-open:hover { color:var(--ac); text-decoration:underline; }',
+    '@media (max-width: 760px) { .tu-ends-row { grid-template-columns:1fr; } .tu-ends-mid { justify-content:center; transform:rotate(90deg); } .tu-key { max-width:200px; } }',
+    '.mtb-modal-ov .mtb-modal:has(.tu-cards) { width:min(600px, 94vw); }',
+    '.tu-wiz-ring-row { display:flex; align-items:center; gap:14px; margin:12px 0 16px; }',
+    '.tu-wiz-ring { width:52px; height:52px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; flex:none; background: conic-gradient(var(--ac, #38bdf8) var(--p, 0%), var(--ln, rgba(148,163,184,.3)) 0); position:relative; }',
+    '.tu-wiz-ring::before { content:""; position:absolute; inset:5px; border-radius:50%; background:var(--s1, #12161f); }',
+    '.tu-wiz-ring span { position:relative; font-weight:800; font-size:14px; }',
+    '.tu-wiz-ring-tx { display:flex; flex-direction:column; gap:2px; min-width:0; }',
+    '.tu-wiz-ring-tx b { font-size:15px; }',
+    '.tu-wiz-ring-tx .mtb-muted { font-size:12.5px; }',
+    '.tu-cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:8px; }',
+    '.tu-cards .mtb-agent-card { position:relative; text-align:start; padding:10px 12px; }',
+    '.tu-enggrid { grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); }',
+    '.tu-pick-ok { position:absolute; inset-inline-end:10px; inset-inline-start:auto; top:50%; transform:translateY(-50%); width:20px; height:20px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; color:var(--ac-on, #fff); background:var(--ac, #38bdf8); }',
+    '.tu-pick-ok svg { width:12px; height:12px; fill:none; stroke:currentColor; stroke-width:2.5; stroke-linecap:round; stroke-linejoin:round; }',
+    '.mtb-wstep.done .mtb-wstep-dot { color:var(--ok, #34d399); background:color-mix(in srgb, var(--ok) 14%, transparent); border-color:color-mix(in srgb, var(--ok) 45%, transparent); }',
+    '.mtb-wstep.done .mtb-wstep-lbl { color:var(--tx2); }',
+    '.tu-review { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:8px; margin-bottom:10px; }',
+    '.tu-rev { display:flex; flex-direction:column; gap:2px; padding:8px 12px; border:1px solid var(--ln, rgba(148,163,184,.22)); border-radius:10px; }',
+    '.tu-set-grid { display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-top:10px; }',
+    '.tu-set-toggle { font-size:13.5px; }',
+    '.tu-set-grid select { min-width:200px; }',
+    '.tu-pl { display:block; margin:12px 0 6px; }',
+    '.tu-params { font-family:ui-monospace, Menlo, monospace; font-size:12.5px; resize:vertical; }',
+    '.tu-upd-cards { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:4px; }',
+    '@media (max-width: 560px) { .tu-upd-cards { grid-template-columns:1fr; } }',
+    '.tu-upd-card { position:relative; display:flex; flex-direction:column; gap:6px; padding:10px 12px; border:1px solid var(--ln, rgba(148,163,184,.25)); border-radius:12px; }',
+    '.tu-upd-card.na { opacity:.75; }',
+    '.tu-upd-head { display:flex; align-items:center; justify-content:space-between; gap:8px; } .tu-upd-head > b:first-child { font-size:12.5px; color:var(--tx2, #cbd5e1); }',
+    '.tu-upd-tag { font-size:13.5px; font-weight:700; }',
+    '.tu-upd-meta { display:flex; flex-wrap:wrap; gap:4px 10px; font-size:12px; color:var(--mu, #94a3b8); } .tu-upd-meta .mono { font-size:11.5px; overflow-wrap:anywhere; }',
+    '.tu-upd-badge { display:inline-flex; align-items:center; gap:5px; } .tu-upd-badge svg { width:13px; height:13px; fill:none; stroke:currentColor; stroke-width:2; }',
+    '.tu-upd-card .tu-upd-go { align-self:flex-start; }',
+    '.tu-upd-commit-wrap { margin-top:10px; padding-top:10px; border-top:1px solid var(--ln, rgba(148,163,184,.2)); }',
+    '.tu-upd-commit { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }',
+    '.tu-upd-commit-tx { font-size:12.5px; color:var(--tx2, #cbd5e1); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }',
+    '.mtb-upd-info.warn { color:var(--er, #f87171); border:1px solid color-mix(in srgb, var(--er) 30%, transparent); background:color-mix(in srgb, var(--er) 7%, transparent); }',
+    // ---- tunnel detail dashboard (reference redesign) ----
+    '.tu-head-grid { display:grid; grid-template-columns:minmax(0,1.5fr) auto auto; gap:18px; align-items:center; }',
+    '.tu-id { display:flex; flex-direction:column; gap:9px; min-width:0; }',
+    '.tu-id-ico { width:46px; height:46px; border-radius:13px; display:inline-flex; align-items:center; justify-content:center; color:var(--ac); background:color-mix(in srgb, var(--ac) 10%, transparent); border:1px solid color-mix(in srgb, var(--ac) 35%, transparent); }',
+    '.tu-id-ico svg { width:21px; height:21px; fill:none; stroke:currentColor; stroke-width:1.9; }',
+    '.tu-id-tx { display:flex; align-items:center; gap:8px; min-width:0; }',
+    '.tu-key { font-size:14.5px; font-weight:700; max-width:430px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }',
+    '.tu-id-badges { display:flex; gap:6px; flex-wrap:wrap; }',
+    '.tu-ws { display:flex; gap:24px; padding-inline:20px; border-inline-start:1px solid var(--ln); border-inline-end:1px solid var(--ln); align-self:stretch; align-items:center; }',
+    '.tu-wt { display:flex; flex-direction:column; align-items:center; gap:3px; cursor:help; }',
+    '.tu-wt b { font-size:21px; font-weight:800; }',
+    '.tu-wt-lbl { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--mu); white-space:nowrap; } .tu-wt-lbl svg { width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:1.8; }',
+    '.tu-share .tu-wt-lbl { border-bottom:1px dotted var(--ln2, rgba(148,163,184,.4)); }',
+    '.tu-ops { display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end; }',
+    '.tu-ops .mtb-backbtn { min-height:34px; }',
+    '.tu-route { display:grid; grid-template-columns:1fr 150px 1fr; gap:10px; align-items:stretch; margin-top:12px; }',
+    '.tun-side { display:flex; flex-direction:column; gap:5px; padding:12px 16px; border:1px solid var(--ln); border-radius:14px; background:var(--sunk, rgba(148,163,184,.05)); }',
+    '.tun-side.foreign { border-color:color-mix(in srgb, var(--ac) 22%, var(--ln)); }',
+    '.tu-side-role { display:flex; align-items:center; gap:8px; margin:0; font-size:12px; color:var(--mu); text-transform:uppercase; letter-spacing:.06em; } .tu-side-role svg { border-radius:2px; }',
+    '.tu-side-name { font-size:16px; font-weight:700; }',
+    '.tu-side-dc { font-size:12.5px; }',
+    '.tu-side-chips { display:flex; gap:6px; flex-wrap:wrap; margin-top:2px; }',
+    '.tu-chip { display:inline-flex; align-items:center; gap:5px; padding:2px 9px; border:1px solid var(--ln); border-radius:999px; font-size:12px; } .tu-chip svg { border-radius:2px; }',
+    '.tu-side-ag { margin-top:6px; } .tu-side-ag svg { width:15px; height:15px; flex:none; fill:none; stroke:currentColor; stroke-width:1.8; }',
+    '.tun-conn { position:relative; display:flex; align-items:center; justify-content:center; min-height:96px; }',
+    '.tun-conn-line { position:absolute; left:14px; right:14px; top:50%; height:3px; transform:translateY(-50%); border-radius:3px; opacity:.85; }',
+    '.tu-conn-pill { position:relative; z-index:1; display:inline-flex; align-items:center; gap:7px; padding:5px 14px; border-radius:999px; background:var(--s1); border:1px solid; font-size:12.5px; font-weight:700; white-space:nowrap; }',
+    '.tu-conn-pill i { width:9px; height:9px; border-radius:50%; display:inline-block; }',
+    '.tu-updated { display:inline-flex; align-items:center; gap:6px; font-size:12px; } .tu-updated svg { width:13px; height:13px; fill:none; stroke:currentColor; stroke-width:1.8; }',
+    '.tu-vitals3 { display:grid; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); gap:12px; margin-top:12px; }',
+    '.tu-vgroup { border:1px solid var(--ln); border-radius:12px; padding:10px 14px; display:flex; flex-direction:column; gap:9px; }',
+    '.tu-vg-h { display:flex; align-items:center; gap:8px; margin:0; font-size:12.5px; font-weight:700; color:var(--tx2); } .tu-vg-h svg { width:16px; height:16px; fill:none; stroke:var(--ac); stroke-width:1.8; }',
+    '.tu-vital { display:flex; align-items:center; gap:10px; }',
+    '.tu-vital-ico { width:30px; height:30px; border-radius:9px; display:inline-flex; align-items:center; justify-content:center; color:var(--ac); background:color-mix(in srgb, var(--ac) 10%, transparent); flex:none; }',
+    '.tu-vital-ico svg { width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:1.8; }',
+    '.tu-vital-tx { display:flex; flex-direction:column; line-height:1.35; } .tu-vital-tx b { font-size:14px; }',
+    '.tu-unit { font-style:normal; font-size:11.5px; color:var(--mu); font-weight:400; }',
+    '.tu-dl { color:var(--ac); display:inline-flex; align-items:center; gap:5px; } .tu-dl svg { width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:2; }',
+    '.tu-ul { color:#c084fc; display:inline-flex; align-items:center; gap:5px; } .tu-ul svg { width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:2; }',
+    '.tu-chan { display:inline-flex; border:1px solid var(--ln); border-radius:999px; padding:3px; gap:2px; }',
+    '.tu-chan-btn { border:none; background:transparent; color:var(--tx2); padding:5px 18px; border-radius:999px; font-size:12.5px; font-weight:700; cursor:pointer; min-height:30px; }',
+    '.tu-chan-btn.on { background:var(--ac); color:#fff; }',
+    '.tu-chan-btn:disabled { opacity:.45; cursor:not-allowed; }',
+    '.tu-chan-note { font-size:12px; color:var(--mu); margin-top:8px; }',
+    '.tu-tiles { display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:10px; margin-top:12px; }',
+    '.tu-tile { border:1px solid var(--ln); border-radius:12px; padding:10px 14px; display:flex; flex-direction:column; gap:5px; cursor:help; }',
+    '.tu-tile-lbl { font-size:12px; color:var(--mu); }',
+    '.tu-tile-vals { display:flex; flex-direction:column; gap:3px; font-size:13.5px; font-weight:700; }',
+    '.tu-tile-big { font-size:16px; font-weight:800; }',
+    '.tun-chartwrap { position:relative; margin-top:14px; border:1px solid var(--ln); border-radius:12px; padding:10px 12px 6px; }',
+    '.tu-chart-cap { display:flex; align-items:center; gap:14px; font-size:12px; color:var(--mu); } .tu-chart-cap b { color:var(--tx2); }',
+    '.tu-leg { display:inline-flex; align-items:center; gap:5px; } .tu-leg i { width:14px; height:3px; border-radius:2px; display:inline-block; } .tu-leg i.rx { background:var(--ac); } .tu-leg i.tx { background:#c084fc; }',
+    '.tu-chart-svg { width:100%; height:190px; display:block; }',
+    '.tu-grid { stroke:var(--ln); stroke-width:1; stroke-dasharray:3 5; opacity:.6; fill:none; }',
+    '.tu-area-rx { fill:color-mix(in srgb, var(--ac) 16%, transparent); stroke:none; }',
+    '.tu-line-rx { fill:none; stroke:var(--ac); stroke-width:2.2; stroke-linejoin:round; }',
+    '.tu-area-tx { fill:rgba(192,132,252,.14); stroke:none; }',
+    '.tu-line-tx { fill:none; stroke:#c084fc; stroke-width:2.2; stroke-linejoin:round; }',
+    '.tu-dot-rx { fill:var(--ac); stroke:var(--s1); stroke-width:1.5; }',
+    '.tu-dot-tx { fill:#c084fc; stroke:var(--s1); stroke-width:1.5; }',
+    '.tun-tip2 { position:absolute; top:34px; transform:translateX(-50%); z-index:5; background:var(--s1); border:1px solid var(--ln2); border-radius:10px; padding:8px 12px; display:flex; flex-direction:column; gap:3px; font-size:12px; box-shadow:0 10px 30px rgba(0,0,0,.45); pointer-events:none; min-width:210px; }',
+    '.tun-tip2 b { font-size:12.5px; }',
+    '.tu-times { position:relative; height:18px; margin-top:4px; font-size:12px; color:var(--mu); } .tu-times span { position:absolute; transform:translateX(-50%); white-space:nowrap; }',
+    '.tu-downwarn { display:flex; align-items:center; gap:10px; padding:10px 16px; border:1px solid color-mix(in srgb, var(--er) 40%, transparent); background:color-mix(in srgb, var(--er) 9%, transparent); border-radius:12px; color:var(--er); font-weight:700; } .tu-downwarn svg { width:17px; height:17px; flex:none; fill:none; stroke:currentColor; stroke-width:1.9; }',
+    '.tu-tech { margin-top:10px; } .tu-tech summary { cursor:pointer; color:var(--mu); font-size:12.5px; } .tu-tech-err { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:6px 0 0; font-size:12px; }',
+    '@media (max-width: 900px) { .tu-head-grid { grid-template-columns:1fr; } .tu-ws { border:none; padding-inline:0; } .tu-ops { justify-content:flex-start; } }',
+    '@media (max-width: 760px) { .tu-route { grid-template-columns:1fr; } .tun-conn { min-height:56px; } .tun-conn-line { left:50%; right:auto; top:14px; bottom:14px; width:3px; height:auto; transform:translateX(-50%); background:repeating-linear-gradient(180deg, var(--mu) 0 10px, transparent 10px 17px) !important; } .tu-ops button { min-height:44px; } .tu-key { max-width:260px; } }',
     '@media (prefers-reduced-motion: reduce) { main.page section[id^="tab-m"] * { animation: none !important; transition: none !important; } }'
   ].join('\n');
 
@@ -509,7 +777,10 @@
     markNav(name);
     try {
       var agm = (location.hash || '').match(/[?&]ag=([^&]+)/);
-      history.replaceState(null, '', '#t=' + name + (name === 'magt' && agm ? '&ag=' + agm[1] : ''));
+      var tum = (location.hash || '').match(/[?&]tun=([^&]+)/);
+      history.replaceState(null, '', '#t=' + name +
+        (name === 'magt' && agm ? '&ag=' + agm[1] : '') +
+        (name === 'mtun' && tum ? '&tun=' + tum[1] : ''));
     } catch (e) { /* best effort */ }
     loadTab(name); // lazy-load on first open, refresh on re-open
     if (window.topTitleSync) window.topTitleSync(name);
@@ -551,11 +822,17 @@
   }
 
   // ===========================================================================
-  // 1) Topologies — list + detail (back button returns to the list)
+  // 1) Tunnels — the management page: header, search + 4 combined filters,
+  //    live table (key / topology / path / engine / weight / state / 7d / 30d
+  //    / actions), per-page pager, create + weight + delete flows.
   // ===========================================================================
+  var tuQuery = '', tuFilters = { topo: '', agent: '', engine: '', state: '' };
+  var tuPage = 1, tuPerPage = 10;
+  var tuView = null; // null = the list; { key } = the tunnel's own page
+
   function loadTun() {
     var my = (seq.mtun = seq.mtun + 1);
-    setBody('mtun', skel(4));
+    setBody('mtun', skel(6));
     apiGet('api/mesh/topologies').then(function (j) {
       if (seq.mtun !== my) return;
       var topos = (j && j.topologies) || [];
@@ -576,65 +853,858 @@
       setBody('mtun', card.html); wireRetry('mtun', card.wire);
     });
   }
-  function renderTun(my) {
-    var packs = cache.mtun || [];
-    var rows = [];
+
+  // Flat tunnel rows built ONLY from real backend relations: each pack's
+  // ui.tunnels already carries the numeric id, live state, weight, resolved
+  // share and both server refs (name/role/datacenter/country/agent_id) —
+  // nothing is ever parsed out of display names.
+  function tuAllRows() {
+    var packs = cache.mtun || [], rows = [];
     packs.forEach(function (pk) {
-      if (!pk || !pk.det || !pk.tp) return;
-      var weights = {};
-      (pk.det.weights || []).forEach(function (w) { weights[w.tunnel_id] = w.weight; });
-      var uiByKey = {};
-      ((pk.ui && pk.ui.tunnels) || []).forEach(function (t) { uiByKey[t.tunnel_key] = t; });
-      (pk.det.tunnels || []).forEach(function (t) {
-        var u = uiByKey[t.tunnel_key] || {};
+      if (!pk || !pk.tp || !pk.ui) return;
+      (pk.ui.tunnels || []).forEach(function (u) {
         rows.push({
-          key: t.tunnel_key,
-          topo: pk.tp.name || ('#' + pk.tp.id),
-          engine: t.engine,
-          enabled: t.enabled !== false,
-          weight: weights[t.id] != null ? weights[t.id] : (u.weight != null ? u.weight : null),
-          state: u.state != null ? u.state : null
+          topoId: pk.tp.id, topo: pk.tp.name || ('#' + pk.tp.id),
+          id: u.id, key: u.tunnel_key || '', engine: u.engine || '',
+          enabled: u.enabled !== false,
+          state: u.state != null ? u.state : (u.enabled === false ? 'disabled' : 'unknown'),
+          weight: u.weight, resolved: u.resolved_percent,
+          local: u.local_server || null, remote: u.remote_server || null
         });
       });
     });
     rows.sort(function (a, b) { return (a.topo + a.key).localeCompare(b.topo + b.key); });
-    if (!rows.length) { setBody('mtun', '<div class="tunnel-card">' + entEmpty(L('tunnelsEmpty')) + '</div>'); return; }
-    var trs = rows.map(function (r) {
+    return rows;
+  }
+
+  function tuFiltered(rows) {
+    var q = tuQuery.toLowerCase();
+    return rows.filter(function (r) {
+      if (tuFilters.topo && r.topo !== tuFilters.topo) return false;
+      if (tuFilters.agent) {
+        var ln = (r.local && r.local.name) || '', rn = (r.remote && r.remote.name) || '';
+        if (ln !== tuFilters.agent && rn !== tuFilters.agent) return false;
+      }
+      if (tuFilters.engine && r.engine !== tuFilters.engine) return false;
+      if (tuFilters.state && r.state !== tuFilters.state) return false;
+      if (q) {
+        var hay = (r.key + ' ' + r.topo + ' ' + r.engine + ' ' +
+          ((r.local && r.local.name) || '') + ' ' + ((r.remote && r.remote.name) || '')).toLowerCase();
+        if (hay.indexOf(q) < 0) return false;
+      }
+      return true;
+    });
+  }
+
+  // ---- tunnels-page cell helpers ---------------------------------------------
+    var TU_COPY = '<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+  var TU_WTH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6a3 3 0 0 1 6 0"/><path d="M6.5 6h11l2.5 12h-16l2.5-12z"/></svg>';
+  var TU_STTH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg>';
+  var TU_CHTH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>';
+  var TU_ENG_DISP = { aestun: 'AESTun', rakhsh: 'Rakhsh', matrix: 'Matrix', frp: 'FRP', backhaul: 'Backhaul', gost: 'Gost', xray: 'Xray', wireguard: 'WireGuard', wst: 'wstunnel', wstunnel: 'wstunnel', chisel: 'Chisel', rathole: 'Rathole', tinc: 'Tinc', backpack: 'BackPack', dagger: 'DaggerConnect', easytier: 'EasyTier', hysteria: 'Hysteria', midos: 'Midos', narnia: 'Narnia', paqet: 'Paqet', pengo: 'Pengo', singbox: 'sing-box', spoof: 'Spoof', udp2raw: 'udp2raw', waterwall: 'WaterWall', wattunnel: 'WatTunnel' };
+  var TU_ENG_IMG = { aestun: 'img/engines/aestun.png', rakhsh: 'img/engines/rakhsh.png', gost: 'img/engines/gost.png', xray: 'img/engines/xray.svg', wireguard: 'img/engines/wireguard.png', rathole: 'img/engines/rathole.png', wst: 'img/engines/wstunnel.png', wstunnel: 'img/engines/wstunnel.png', tinc: 'img/engines/tinc.svg', hysteria: 'img/engines/hysteria.png', singbox: 'img/engines/singbox.png', midos: 'img/engines/midos.png', dagger: 'img/engines/dagger.png', pengo: 'img/engines/pengo.png', backhaul: 'img/engines/backhaul.png', backpack: 'img/engines/backpack.png', narnia: 'img/engines/narnia.png', waterwall: 'img/engines/waterwall.png', wattunnel: 'img/engines/wattunnel.png', udp2raw: 'img/engines/udp2raw.png', paqet: 'img/engines/paqet.png', frp: 'img/engines/frp.png', easytier: 'img/engines/easytier.png', chisel: 'img/engines/chisel.png' };
+  var TU_ENG_Q = (typeof engImgTag !== 'undefined' && engImgTag) ? '?v=' + engImgTag : '';
+  function tuEngLogo(eng, disp) {
+    var img = TU_ENG_IMG[eng] ? TU_ENG_IMG[eng] + TU_ENG_Q : '';
+    if (img) return '<img src="' + img + '" alt="' + esc(disp) + '" draggable="false">';
+    if (eng === 'spoof') return MTB_ICO.spoofmark;
+    return MTB_ICO.qmark;
+  }
+  function tuBytesPair(t, done) {
+    if (!t) return done ? '<bdi dir="ltr">\u2014</bdi>' : '<bdi dir="ltr">\u2026</bdi>';
+    // a real 0 renders as "0 B" — never an em dash
+    return '<bdi dir="ltr">' + esc(bytes(t.wire_rx_bytes || 0) + ' / ' + bytes(t.wire_tx_bytes || 0)) + '</bdi>';
+  }
+  // one end of the path: flag + mono server name (+ datacenter subline);
+  // clickable only when the backend gave us the agent id for this server
+  function tuSideChip(side) {
+    if (!side || !side.name) return '<span class="mtb-tuside na">\u2014</span>';
+    var cc = side.role === 'iran' ? 'ir' : String(side.country || '').toLowerCase();
+    var dc = dcDisp(side.datacenter || '', side.datacenter_en);
+    var aid = side.agent_id || '';
+    var clk = aid ? ' data-tuagt="' + esc(aid) + '" title="' + esc(L('tuOpenAgent')) + '"' : '';
+    return '<span class="mtb-tuside' + (aid ? ' clk' : '') + '"' + clk + '>' +
+      '<span class="mtb-tuside-fl">' + (/^[a-z]{2}$/.test(cc) ? topologyFlagSvg(cc) : '') + '</span>' +
+      '<span class="mtb-tuside-tx"><b class="mono" dir="ltr">' + esc(side.name) + '</b>' +
+      (dc ? '<span class="mtb-muted">' + esc(dc) + '</span>' : '') + '</span></span>';
+  }
+  function tuFilterCdd(key, label, allLbl, fico, opts) {
+    var cur = tuFilters[key];
+    var curLbl = allLbl;
+    if (cur) {
+      var hit = opts.filter(function (o) { return o.v === cur; })[0];
+      curLbl = label + ': ' + ((hit && hit.lbl) || cur);
+    }
+    var list = ['<button type="button" class="mtb-cdd-opt' + (!cur ? ' on' : '') + '" data-tuopt="' + key + '" data-tuv="">' + esc(allLbl) + '</button>'];
+    opts.forEach(function (o) {
+      list.push('<button type="button" class="mtb-cdd-opt' + (cur === o.v ? ' on' : '') + '" data-tuopt="' + key + '" data-tuv="' + esc(o.v) + '">' + (o.ico || '') + esc(o.lbl) + '</button>');
+    });
+    return '<div class="mtb-cdd mtb-fcdd">' +
+      '<button type="button" class="mtb-cdd-btn mtb-fbtn' + (cur ? ' on' : '') + '" data-cdd-toggle>' +
+      '<span class="mtb-fico">' + fico + '</span>' +
+      '<span class="mtb-cdd-cur">' + esc(curLbl) + '</span>' +
+      '<span class="mtb-cdd-arrow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span>' +
+      '</button>' +
+      '<div class="mtb-cdd-pop" hidden>' + list.join('') + '</div></div>';
+  }
+  function tuStats(filtered) {
+    var c = { healthy: 0, degraded: 0, down: 0 };
+    filtered.forEach(function (r) {
+      if (r.state === 'healthy') c.healthy++;
+      else if (r.state === 'degraded') c.degraded++;
+      else if (r.state === 'down') c.down++;
+    });
+    function item(kls, ico, n, lbl) {
+      return '<div class="mtb-agstat-i ' + kls + '"><span class="mtb-agico">' + ico + '</span><span class="mtb-agtx"><b>' + num0(n) + '</b><span>' + esc(lbl) + '</span></span></div>';
+    }
+    return '<div class="mtb-agstatbig">' +
+      item('all', MTB_ICO.stack, filtered.length, L('agStatAll')) +
+      item('ok', MTB_ICO.okc, c.healthy, L('st_healthy')) +
+      item('warn', MTB_ICO.alerc, c.degraded, L('st_degraded')) +
+      item('err', MTB_ICO.act, c.down, L('st_down')) +
+      '</div>';
+  }
+
+  function renderTun(my) {
+    if (my == null) my = seq.mtun;
+    // a deep link (#t=mtun&tun=KEY) or an in-session open selects the detail page
+    var tunHash = (location.hash || '').match(/[?&]tun=([^&]+)/);
+    if (tunHash) {
+      var hk = decodeURIComponent(tunHash[1]);
+      if (!tuView || tuView.key !== hk) tuView = { key: hk };
+    }
+    if (!tuView) window.mtbTunDetail = null;
+    if (window.topTitleSync) window.topTitleSync('mtun');
+    if (tuView) {
+      try { if (location.hash !== '#t=mtun&tun=' + encodeURIComponent(tuView.key)) history.replaceState(null, '', '#t=mtun&tun=' + encodeURIComponent(tuView.key)); } catch (e) { /* non-fatal */ }
+      renderTuDetail();
+      return;
+    }
+    try { if (location.hash !== '#t=mtun') history.replaceState(null, '', '#t=mtun'); } catch (e) { /* non-fatal */ }
+    var rows = tuAllRows();
+    var filtered = tuFiltered(rows);
+    var PS = tuPerPage;
+    var maxPg = Math.max(1, Math.ceil(filtered.length / PS));
+    var pg = Math.min(tuPage, maxPg);
+    tuPage = pg;
+    var pageRows = filtered.slice((pg - 1) * PS, pg * PS);
+    var anyF = tuQuery || tuFilters.topo || tuFilters.agent || tuFilters.engine || tuFilters.state;
+
+    // filter option pools — derived from the rows themselves, never guessed
+    var topoOpts = [], agentOpts = [], engOpts = [];
+    rows.forEach(function (r) {
+      if (r.topo && topoOpts.indexOf(r.topo) < 0) topoOpts.push(r.topo);
+      if (r.engine && engOpts.indexOf(r.engine) < 0) engOpts.push(r.engine);
+      [r.local, r.remote].forEach(function (s) {
+        if (s && s.name && agentOpts.indexOf(s.name) < 0) agentOpts.push(s.name);
+      });
+    });
+    topoOpts.sort(); agentOpts.sort(); engOpts.sort();
+
+    // one row: title — stats — button, all on the same level (like the agents head)
+    var head = '<div class="tunnel-card mtb-tunhead"><div class="mtb-agintro-row">' +
+      '<div class="mtb-tunhead-id"><p class="tc-title dcard-title">' + MTB_ICO.tun + esc(L('mtun')) + '</p></div>' +
+      tuStats(filtered) +
+      '<button type="button" class="quantum-btn quantum-btn-primary" id="mtbNewTunnel">+ ' + esc(L('tuNew')).replace('+ ', '') + '</button>' +
+      '</div></div>';
+
+    var tcbar = '<div class="tc-header mtb-tcbar">' +
+      '<div class="mtb-search">' +
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>' +
+      '<input id="mtbTuSearch" class="quantum-input" placeholder="' + esc(L('tuSearchPh')) + '" value="' + esc(tuQuery) + '" aria-label="' + esc(L('tuSearchPh')) + '">' +
+      '</div>' +
+      '<div class="mtb-filters">' +
+      tuFilterCdd('topo', L('topoCol'), L('tuAllTopos'), MTB_ICO.mesh, topoOpts.map(function (t) {
+        return { v: t, lbl: t, ico: '<span class="mtb-optico">' + MTB_ICO.mesh + '</span>' };
+      })) +
+      tuFilterCdd('agent', L('agentCol'), L('tuAllAgents'), ICO_AGT, agentOpts.map(function (n) {
+        return { v: n, lbl: n, ico: '<span class="mtb-optico">' + ICO_AGT + '</span>' };
+      })) +
+      tuFilterCdd('engine', L('engineCol'), L('tuAllEngines'), MTB_ICO.cube, engOpts.map(function (n) {
+        return { v: n, lbl: TU_ENG_DISP[n] || n, ico: '<span class="mtb-eng-logo e-' + esc(n) + '">' + tuEngLogo(n, TU_ENG_DISP[n] || n) + '</span>' };
+      })) +
+      tuFilterCdd('state', L('stateCol'), L('tuAllStates'), MTB_ICO.act, ['healthy', 'degraded', 'down', 'disabled', 'unknown'].map(function (s) {
+        var ico = s === 'healthy' ? '<span class="mtb-optico ok">' + MTB_ICO.okc + '</span>'
+          : (s === 'down' ? '<span class="mtb-optico er">' + MTB_ICO.alerc + '</span>' : '');
+        return { v: s, lbl: L('st_' + s), ico: ico };
+      })) +
+      (anyF ? '<button type="button" class="mtb-fclear" data-tuclear title="' + esc(L('engAll')) + '">\u00d7</button>' : '') +
+      '</div></div>';
+
+    var trs = pageRows.map(function (r) {
       var d7 = (topoTraffic[r.key] || {}).d7, d30 = (topoTraffic[r.key] || {}).d30;
-      return '<tr data-mtb-row="' + esc(r.key) + '">' +
-        tdKey(r.key) +
-        '<td>' + esc(r.topo) + '</td>' +
-        '<td>' + esc(r.engine || '—') + (r.engine === 'matrix' ? ' ' + badge('info', L('engineDef')) : '') + '</td>' +
-        tdNum(r.weight != null ? num0(r.weight) : '—') +
-        '<td>' + stateBadge(r.state != null ? r.state : (r.enabled ? 'unknown' : 'disabled')) + '</td>' +
-        '<td class="num' + (d7 ? '' : ' mtb-pending') + '" data-mtb-d7>' + (d7 ? '<bdi dir="ltr">' + esc(bytes(d7.wire_rx_bytes) + ' / ' + bytes(d7.wire_tx_bytes)) + '</bdi>' : '…') + '</td>' +
-        '<td class="num' + (d30 ? '' : ' mtb-pending') + '" data-mtb-d30>' + (d30 ? '<bdi dir="ltr">' + esc(bytes(d30.wire_rx_bytes) + ' / ' + bytes(d30.wire_tx_bytes)) + '</bdi>' : '…') + '</td>' +
+      var engN = TU_ENG_DISP[r.engine] || r.engine || '\u2014';
+      // the cell is logo + name only — the companion chips (experimental,
+      // then default) both went away on request
+      var engBadge = '<span class="badge info mtb-eng-badge">' + tuEngLogo(r.engine, engN) + ' ' + esc(engN) + '</span>';
+      var wTitle = (r.resolved != null && r.resolved > 0)
+        ? esc(Lf('tuShare', { n: String(Math.round(r.resolved * 10) / 10) }))
+        : esc(L('tuNoShare'));
+      var wt = r.weight != null ? num0(r.weight) : '\u2014';
+      return '<tr data-tu-row="' + esc(r.key) + '">' +
+        // the copy button went away on request — the key still opens the
+        // tunnel's page on click and keeps its hover tooltip
+        '<td data-l="' + esc(L('tunnelKey')) + '"><b class="mono mtb-tun-key tu-open" dir="ltr" data-tuopen="' + esc(r.key) + '" title="' + esc(r.key) + '">' + esc(r.key) + '</b></td>' +
+        '<td data-l="' + esc(L('topologyCol')) + '"><button type="button" class="mtb-topobadge" data-tutopo="' + esc(r.topoId) + '" data-tuname="' + esc(r.topo) + '" title="' + esc(L('tuOpenTopo')) + '">' + MTB_ICO.mesh + esc(r.topo) + '</button></td>' +
+        '<td data-l="' + esc(L('tuPath')) + '"><div class="mtb-tupath">' + tuSideChip(r.local) + '<span class="mtb-tuarrow">' + MTB_ICO.tun + '</span>' + tuSideChip(r.remote) + '</div></td>' +
+        '<td data-l="' + esc(L('engineCol')) + '"><div class="mtb-engpair">' + engBadge + '</div></td>' +
+        '<td class="num" data-l="' + esc(L('weightCol')) + '"><span class="mtb-wtx" data-tu-w="' + esc(r.weight != null ? r.weight : '') + '" title="' + wTitle + '"><bdi dir="ltr">' + wt + '</bdi></span></td>' +
+        '<td data-l="' + esc(L('stateCol')) + '">' + stateBadge(r.state) + '</td>' +
+        '<td class="num' + (d7 ? '' : ' mtb-pending') + '" data-l="' + esc(L('tuD7')) + '" data-tu-d7>' + tuBytesPair(d7) + '</td>' +
+        '<td class="num' + (d30 ? '' : ' mtb-pending') + '" data-l="' + esc(L('tuD30')) + '" data-tu-d30>' + tuBytesPair(d30) + '</td>' +
+        '<td><div class="mtb-acts-row">' +
+        '<div class="mtb-acts-pop">' +
+        '<button type="button" class="mtb-act mtb-act-view" data-tuopen="' + esc(r.key) + '" title="' + esc(L('tuOpen')) + '">' + MTB_ICO.eye + '</button>' +
+        '<button type="button" class="mtb-act mtb-act-edit" data-tuweight="' + esc(r.topoId) + '|' + esc(r.key) + '" title="' + esc(L('tuWeightT')) + '">' + MTB_ICO.pen + '</button>' +
+        '<button type="button" class="mtb-act mtb-act-del" data-tudel="' + esc(r.id) + '|' + esc(r.key) + '" title="' + esc(L('agActDel')) + '">' + MTB_ICO.trash + '</button>' +
+        '</div>' +
+        '<button type="button" class="mtb-act mtb-acts-kebab" data-actskebab title="' + esc(L('agActMore')) + '" aria-label="' + esc(L('agActMore')) + '"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="19" r="1.7"/></svg></button>' +
+        '</div></td>' +
         '</tr>';
     }).join('');
+
+    var pager = (function () {
+      var pages;
+      if (maxPg <= 7) { pages = []; for (var i = 1; i <= maxPg; i++) pages.push(i); }
+      else if (pg <= 4) { pages = [1, 2, 3, 4, 5, '\u2026', maxPg]; }
+      else if (pg >= maxPg - 3) { pages = [1, '\u2026', maxPg - 4, maxPg - 3, maxPg - 2, maxPg - 1, maxPg]; }
+      else { pages = [1, '\u2026', pg - 1, pg, pg + 1, '\u2026', maxPg]; }
+      var btns = pages.map(function (p) {
+        if (p === '\u2026') return '<span class="mtb-pg-dots">\u2026</span>';
+        return '<button type="button" class="mtb-pg-btn' + (p === pg ? ' on' : '') + '" data-tupg="' + p + '">' + num0(p) + '</button>';
+      }).join('');
+      var sizes = [10, 25, 50].map(function (p) {
+        return '<button type="button" class="mtb-cdd-opt' + (p === tuPerPage ? ' on' : '') + '" data-tusize="' + p + '">' + num0(p) + '</button>';
+      }).join('');
+      return '<div class="mtb-pager mtb-pager2">' +
+        '<div class="mtb-pg-size">' +
+        '<div class="mtb-cdd mtb-fcdd"><button type="button" class="mtb-cdd-btn" data-cdd-toggle><span class="mtb-cdd-cur">' + num0(tuPerPage) + '</span>' +
+        '<span class="mtb-cdd-arrow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span></button>' +
+        '<div class="mtb-cdd-pop" hidden>' + sizes + '</div></div>' +
+        '<span class="mtb-pg-szlbl">' + esc(L('agPerPage')) + '</span></div>' +
+        '<div class="mtb-pg-nav">' +
+        '<button type="button" class="mtb-pg-navbtn" data-tupg="prev"' + (pg <= 1 ? ' disabled' : '') + '><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>' + esc(L('agPrev')) + '</button>' +
+        btns +
+        '<button type="button" class="mtb-pg-navbtn" data-tupg="next"' + (pg >= maxPg ? ' disabled' : '') + '>' + esc(L('agNext')) + '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>' +
+        '</div></div>';
+    })();
+
     setBody('mtun',
-      '<div class="tunnel-card"><div class="tc-header"><p class="tc-title">' + esc(L('mtun')) + '</p>' +
-      '<span class="mtb-muted">' + rows.length + '</span></div>' +
-      '<p class="qs-hint">' + esc(L('d7')) + ' / ' + esc(L('d30')) + ' — wire ↓/↑</p>' +
-      '<div class="ent-tbl-wrap"><table class="ent-tbl"><thead><tr>' +
-      '<th>' + esc(L('tunnelKey')) + '</th><th>' + esc(L('topologyCol')) + '</th>' +
-      '<th>' + esc(L('engineCol')) + '</th><th class="num">' + esc(L('weightCol')) + '</th>' +
-      '<th>' + esc(L('stateCol')) + '</th>' +
-      '<th class="num">' + esc(L('d7')) + ' ↓/↑</th><th class="num">' + esc(L('d30')) + ' ↓/↑</th>' +
-      '</tr></thead><tbody>' + trs + '</tbody></table></div></div>');
+      head +
+      '<div class="tunnel-card mtb-agfilter">' + tcbar + '</div>' +
+      '<div class="tunnel-card">' +
+      '<div class="ent-tbl-wrap"><table class="ent-tbl mtb-tun-tbl"><thead><tr>' +
+      '<th><span class="mtb-th">' + MTB_ICO.tun + esc(L('tunnelKey')) + '</span></th>' +
+      '<th><span class="mtb-th">' + MTB_ICO.mesh + esc(L('topologyCol')) + '</span></th>' +
+      '<th><span class="mtb-th">' + MTB_ICO.chain + esc(L('tuPath')) + '</span></th>' +
+      '<th><span class="mtb-th">' + MTB_ICO.cube + esc(L('engineCol')) + '</span></th>' +
+      '<th class="num"><span class="mtb-th">' + TU_WTH + esc(L('weightCol')) + '</span></th>' +
+      '<th><span class="mtb-th">' + TU_STTH + esc(L('stateCol')) + '</span></th>' +
+      '<th class="num"><span class="mtb-th">' + MTB_ICO.dl + esc(L('tuD7')) + ' \u2193/\u2191</span></th>' +
+      '<th class="num"><span class="mtb-th">' + TU_CHTH + esc(L('tuD30')) + ' \u2193/\u2191</span></th>' +
+      '<th><span class="mtb-th">' + MTB_ICO.sliders + esc(L('agActs')) + '</span></th>' +
+      '</tr></thead><tbody>' +
+      (filtered.length ? trs : '<tr><td colspan="9">' + entEmpty(rows.length ? L('tuNoMatch') : L('tunnelsEmpty')) + '</td></tr>') +
+      '</tbody></table></div>' +
+      pager +
+      '</div>');
+
+    // search box keeps focus/-caret across re-renders (same as the agents page)
+    var si = document.getElementById('mtbTuSearch');
+    if (si) {
+      si.addEventListener('input', function () {
+        tuQuery = this.value;
+        tuPage = 1;
+        var pos = this.selectionStart;
+        renderTun();
+        var si2 = document.getElementById('mtbTuSearch');
+        if (si2) { si2.focus(); try { si2.setSelectionRange(pos, pos); } catch (e2) {} }
+      });
+      if (tuQuery) { si.focus(); try { si.setSelectionRange(tuQuery.length, tuQuery.length); } catch (e2) {} }
+    }
     void my;
-    // progressive 7d/30d fill: ONE GET per tunnel returns both windows
-    pool(rows.map(function (r) { return r.key; }), 4, function (key) {
+    // progressive 7d/30d fill: ONE GET per tunnel returns both windows;
+    // a stored 0 stays "0 B", a missing window turns into an em dash
+    pool(filtered.map(function (r) { return r.key; }), 4, function (key) {
       return apiGet('api/ui/tunnels/' + encodeURIComponent(key) + '?range=7d').then(function (j) {
         var tot = (j && j.totals) || {};
         topoTraffic[key] = { d7: tot['7d'] || null, d30: tot['30d'] || null };
         if (seq.mtun !== my) return;
-        var trEl = document.querySelector('tr[data-mtb-row="' + cssEscape(key) + '"]');
+        var trEl = document.querySelector('tr[data-tu-row="' + cssEscape(key) + '"]');
         if (!trEl) return;
         var t7 = topoTraffic[key].d7, t30 = topoTraffic[key].d30;
-        var c7 = trEl.querySelector('[data-mtb-d7]'), c30 = trEl.querySelector('[data-mtb-d30]');
-        if (c7) { c7.classList.remove('mtb-pending'); c7.innerHTML = t7 ? '<bdi dir="ltr">' + esc(bytes(t7.wire_rx_bytes) + ' / ' + bytes(t7.wire_tx_bytes)) + '</bdi>' : '—'; }
-        if (c30) { c30.classList.remove('mtb-pending'); c30.innerHTML = t30 ? '<bdi dir="ltr">' + esc(bytes(t30.wire_rx_bytes) + ' / ' + bytes(t30.wire_tx_bytes)) + '</bdi>' : '—'; }
+        var c7 = trEl.querySelector('[data-tu-d7]'), c30 = trEl.querySelector('[data-tu-d30]');
+        if (c7) { c7.classList.remove('mtb-pending'); c7.innerHTML = tuBytesPair(t7, true); }
+        if (c30) { c30.classList.remove('mtb-pending'); c30.innerHTML = tuBytesPair(t30, true); }
       });
+    });
+  }
+
+  // ===========================================================================
+  // 1b) A tunnel's own page — the dedicated drill-down for one tunnel:
+  //     header strip, endpoints, live vitals, traffic with a bar chart,
+  //     recent events, and the danger zone. Deep link: #t=mtun&tun=KEY
+  // ===========================================================================
+  var tuRange = '24h';
+
+  function renderTuDetail() {
+    var my = (seq.mtun = seq.mtun + 1);
+    setBody('mtun', skel(5));
+    Promise.all([
+      apiGet('api/ui/tunnels/' + encodeURIComponent(tuView.key) + '?range=' + tuRange),
+      apiGet('api/mesh/servers').catch(function () { return { servers: [] }; })
+    ]).then(function (rs) {
+      if (seq.mtun !== my) return;
+      renderTuDetailBody(rs[0], rs[1]);
+    }).catch(function (e) {
+      if (seq.mtun !== my) return;
+      var card = entError(e, function () { renderTuDetail(); });
+      setBody('mtun', card.html); wireRetry('mtun', card.wire);
+    });
+  }
+
+  // the traffic channel: wire (the carrier's real bytes) or payload (what
+  // the users actually moved) — one toggle switches the tiles AND the chart
+  var tunChannel = 'wire';
+
+  function tuStateColor(state) {
+    return state === 'healthy' ? 'var(--ok, #34d399)'
+      : state === 'down' ? 'var(--er, #f87171)'
+      : state === 'degraded' ? 'var(--warn, #f59e0b)'
+      : 'var(--mu, #94a3b8)';
+  }
+
+  // one end of the route as a card: flag, side title, agent name,
+  // datacenter, country chip, IP (when the backend knows it) and the
+  // agent deep-link
+  function tuSideCard(side, s, addr, lbl) {
+    if (!s || !s.name) {
+      return '<div class="tun-side"><p class="tu-side-role">' + topologyFlagSvg(side === 'iran' ? 'ir' : '') + esc(lbl) + '</p><span class="mtb-muted">\u2014</span></div>';
+    }
+    var cc = side === 'iran' ? 'ir' : String(s.country || '').toLowerCase();
+    var dc = dcDisp(s.datacenter || '', s.datacenter_en);
+    var ccLbl = side === 'iran' ? tr('', 'Iran') : (String(s.country || '').toUpperCase() || '');
+    var ip = addr || '';
+    return '<div class="tun-side' + (side === 'foreign' ? ' foreign' : '') + '">' +
+      '<p class="tu-side-role">' + (/^[a-z]{2}$/.test(cc) ? topologyFlagSvg(cc) : '') + esc(lbl) + '</p>' +
+      '<b class="mono tu-side-name" dir="ltr">' + esc(s.name) + '</b>' +
+      (dc ? '<span class="mtb-muted tu-side-dc">' + esc(dc) + '</span>' : '') +
+      '<div class="tu-side-chips">' +
+      (ccLbl ? '<span class="tu-chip">' + (side === 'iran' ? topologyFlagSvg('ir') : (/^[a-z]{2}$/.test(cc) ? topologyFlagSvg(cc) : '')) + esc(ccLbl) + '</span>' : '') +
+      (ip ? '<span class="tu-chip mono" dir="ltr">' + esc(ip) + '</span>' : '') +
+      '</div>' +
+      (s.agent_id ? '<button type="button" class="quantum-btn quantum-btn-secondary u-btn-xs tu-side-ag" data-tuagt="' + esc(s.agent_id) + '">' + ICO_AGT + esc(L('tuOpenAgent')) + '</button>' : '') +
+      '</div>';
+  }
+
+  // the connection line between the two route cards: colored by the real
+  // tunnel state, with the state pill riding its center
+  function tuConnector(state) {
+    var col = tuStateColor(state);
+    var stLbl = L('st_' + (state || 'unknown')) !== 'st_' + (state || 'unknown') ? L('st_' + (state || 'unknown')) : (state || '');
+    // a plain CSS line: the stretched svg distorted its stroke into a fat bar
+    var lineStyle = state === 'down'
+      ? 'background:repeating-linear-gradient(90deg, ' + col + ' 0 10px, transparent 10px 17px)'
+      : 'background:' + col;
+    return '<div class="tun-conn">' +
+      '<div class="tun-conn-line" style="' + lineStyle + '"></div>' +
+      '<span class="tu-conn-pill" style="border-color:' + col + ';color:' + col + '"><i style="background:' + col + '"></i>' + esc(stLbl) + '</span>' +
+      '</div>';
+  }
+
+  // inline SVG line chart: download area + upload line for one channel,
+  // with a hover tooltip (time + exact bytes) and the honest empty state
+  function tuSeriesChart(pts, ch, gran) {
+    var f = ch === 'payload' ? ['payload_rx_bytes', 'payload_tx_bytes'] : ['wire_rx_bytes', 'wire_tx_bytes'];
+    if (!pts || !pts.length) return '<div class="tu-chart-empty">' + entEmpty(L('tuNoSeries')) + '</div>';
+    var max = 0;
+    pts.forEach(function (p) { max = Math.max(max, p[f[0]] || 0, p[f[1]] || 0); });
+    if (!max) max = 1;
+    var W = 1000, H = 240, padL = 10, padR = 10, padT = 14, padB = 10;
+    var iw = W - padL - padR, ih = H - padT - padB;
+    var X = i => padL + (pts.length === 1 ? iw / 2 : i * (iw / (pts.length - 1)));
+    var Y = v => padT + (1 - (v || 0) / max) * ih;
+    function line(k) {
+      var d = '';
+      pts.forEach(function (p, i) { d += (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(p[k] || 0).toFixed(1) + ' '; });
+      return d;
+    }
+    function area(k) {
+      return line(k) + 'L' + X(pts.length - 1).toFixed(1) + ' ' + (padT + ih) + ' L' + X(0).toFixed(1) + ' ' + (padT + ih) + ' Z';
+    }
+    var grid = '';
+    [0.25, 0.5, 0.75].forEach(function (g2) {
+      var y = (padT + ih * (1 - g2)).toFixed(1);
+      grid += '<line x1="' + padL + '" y1="' + y + '" x2="' + (W - padR) + '" y2="' + y + '" class="tu-grid"/>';
+    });
+    var hoverDots = pts.map(function (p, i) {
+      return '<g class="tu-dot" data-tui="' + i + '" style="opacity:0">' +
+        '<circle cx="' + X(i).toFixed(1) + '" cy="' + Y(p[f[0]] || 0).toFixed(1) + '" r="4" class="tu-dot-rx"/>' +
+        '<circle cx="' + X(i).toFixed(1) + '" cy="' + Y(p[f[1]] || 0).toFixed(1) + '" r="4" class="tu-dot-tx"/></g>';
+    }).join('');
+    var svg = '<div class="tun-chartwrap">' +
+      '<div class="tu-chart-cap"><span>' + esc(L('tuMaxLabel')) + ': <bdi dir="ltr">' + esc(bytes(max)) + '</bdi></span>' +
+      '<span class="tu-leg"><i class="rx"></i>' + esc(L('tuDown')) + '</span>' +
+      '<span class="tu-leg"><i class="tx"></i>' + esc(L('tuUp')) + '</span></div>' +
+      '<svg id="tuChartSvg" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" class="tu-chart-svg" role="img">' +
+      grid +
+      '<path d="' + area(f[0]) + '" class="tu-area-rx"/><path d="' + line(f[0]) + '" class="tu-line-rx"/>' +
+      '<path d="' + area(f[1]) + '" class="tu-area-tx"/><path d="' + line(f[1]) + '" class="tu-line-tx"/>' +
+      hoverDots +
+      '</svg>' +
+      '<div class="tun-tip2" hidden></div>' +
+      '</div>';
+    return svg;
+  }
+
+  function tuChartTimes(pts, gran) {
+    var out = [];
+    if (!pts || !pts.length) return out;
+    var idx = [0, Math.floor((pts.length - 1) / 2), pts.length - 1];
+    Array.from(new Set(idx)).forEach(function (i) {
+      var when;
+      try {
+        when = gran === 'hour'
+          ? new Date(pts[i].t * 1000).toLocaleTimeString(isFa() ? 'fa-IR' : 'en-US', { hour: '2-digit', minute: '2-digit' })
+          : new Date(pts[i].t * 1000).toLocaleDateString(isFa() ? 'fa-IR' : 'en-US', { month: 'short', day: 'numeric' });
+      } catch (e) { when = num0(pts[i].t); }
+      out.push({ i: i, when: when, pct: pts.length === 1 ? 50 : (i / (pts.length - 1)) * 100 });
+    });
+    return out;
+  }
+
+  function tuTotalTile(lbl, rx, tx) {
+    return '<div class="tu-tile"><span class="tu-tile-lbl">' + esc(lbl) + '</span>' +
+      '<div class="tu-tile-vals"><span class="tu-dl"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v12"/><path d="M7 12l5 5 5-5"/></svg>' + esc(bytes(rx || 0)) + '</span>' +
+      '<span class="tu-ul"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V7"/><path d="M7 12l5-5 5 5"/></svg>' + esc(bytes(tx || 0)) + '</span></div></div>';
+  }
+
+  function tuVital(lbl, v, icon) {
+    return '<div class="tu-vital"><span class="tu-vital-ico">' + icon + '</span><div class="tu-vital-tx"><span class="mtb-muted">' + esc(lbl) + '</span><b>' + v + '</b></div></div>';
+  }
+
+  function renderTuDetailBody(d, svList) {
+    var t = d.tunnel || {};
+    var now = d.now || {};
+    var tot = d.totals || {};
+    var rat = d.ratios || {};
+    var hist = d.history || {};
+    var pts = hist.points || [];
+    var key = t.tunnel_key || tuView.key;
+    window.mtbTunDetail = key;
+    if (window.topTitleSync) window.topTitleSync('mtun');
+
+    var addr = {};
+    ((svList && svList.servers) || []).forEach(function (s) { addr[s.id] = s.address || ''; });
+
+    var state = now.state || (t.enabled === false ? 'disabled' : 'unknown');
+    var engN = TU_ENG_DISP[t.engine] || t.engine || '\u2014';
+    var engMark = t.engine === 'matrix'
+      ? '<span class="badge ok tu-eng-mark">' + esc(L('engineDef')) + '</span>'
+      : '<span class="badge dim tu-eng-mark">' + esc(L('tuExp')) + '</span>';
+    var stateB = stateBadge(state);
+
+    // header group 2: the two DIFFERENT concepts, clearly named —
+    // weight (the configured share knob) vs the resolved weight share
+    var shareV = (t.resolved_percent != null) ? num(t.resolved_percent, 1) + '%' : '\u2014';
+    var shareTip = (t.resolved_percent != null) ? esc(L('tuShareTip')) : esc(L('tuNoShareTip'));
+
+    var ipOf = function (side) {
+      var id = (side === 'iran' ? t.local_server : t.remote_server || {}).id;
+      return addr[id] || '';
+    };
+
+    // the channel toggle: payload only when the backend actually recorded
+    // payload bytes for this tunnel
+    var payloadOk = ['today', '7d', '30d'].some(function (k) {
+      var v = tot[k] || {};
+      return (v.payload_rx_bytes || 0) > 0 || (v.payload_tx_bytes || 0) > 0;
+    }) || pts.some(function (p) { return (p.payload_rx_bytes || 0) > 0 || (p.payload_tx_bytes || 0) > 0; });
+    if (tunChannel === 'payload' && !payloadOk) tunChannel = 'wire';
+    var chanF = tunChannel === 'payload' ? ['payload_rx_bytes', 'payload_tx_bytes'] : ['wire_rx_bytes', 'wire_tx_bytes'];
+    var chanTile = function (k, lbl) {
+      var v = tot[k] || {};
+      return tuTotalTile(lbl, v[chanF[0]], v[chanF[1]]);
+    };
+
+    var overheadV = (rat.overhead_ratio != null) ? '\u00d7' + num(rat.overhead_ratio, 2) : '\u2014';
+    var overheadTip = (rat.overhead_ratio != null) ? esc(L('tuOverheadTip')) : esc(L('tuOverheadNone'));
+    var shareTrafficV = (rat.topology_share_pct != null) ? num(rat.topology_share_pct, 1) + '%' : '\u2014';
+
+    // vitals: three groups, real values only (a stored 0 latency is «no
+    // measurement», not a zero RTT)
+    var CLOCK = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
+    var LOSSI = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12h4l3-8 4 16 3-8h6"/></svg>';
+    var UPTI = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8"/></svg>';
+    var CPUI = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></svg>';
+    var RAMI = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="7" width="20" height="10" rx="2"/><path d="M6 17v3M10 17v3M14 17v3M18 17v3"/></svg>';
+    var DLI = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v12"/><path d="M7 11l5 5 5-5"/></svg>';
+    var ULI = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V8"/><path d="M7 13l5-5 5 5"/></svg>';
+    var vq = '';
+    if (now.latency_ms != null && now.latency_ms > 0) vq += tuVital(L('agLatency'), Math.round(now.latency_ms) + ' <i class="tu-unit">ms</i>', CLOCK);
+    if (now.loss_pct != null && now.loss_pct > 0) vq += tuVital(L('tuLoss'), num(now.loss_pct, 1) + ' <i class="tu-unit">%</i>', LOSSI);
+    if (now.uptime_s != null && now.uptime_s > 0) vq += tuVital(L('tuUptime'), dur(now.uptime_s), UPTI);
+    var ve = '';
+    if (now.cpu_percent != null) ve += tuVital(L('cpuCol'), pct(now.cpu_percent), CPUI);
+    if (now.rss_bytes != null) ve += tuVital(L('memCol'), bytes(now.rss_bytes), RAMI);
+    var vr = '';
+    if (now.rate && now.rate.wire_rx_bps != null) {
+      vr += tuVital(L('tuDownRate'), bytes(now.rate.wire_rx_bps) + '/s', DLI);
+      vr += tuVital(L('tuUpRate'), bytes(now.rate.wire_tx_bps || 0) + '/s', ULI);
+    }
+    var sampledAt = now.rate && now.rate.sampled_at ? Number(now.rate.sampled_at) : null;
+    var updLine = sampledAt ? '<span class="mtb-muted tu-updated">' + CLOCK + ' ' + esc(L('tuUpdatedAt')) + ': ' + esc(fmtDate(sampledAt)) + '</span>' : '';
+
+    // the state warning: a DOWN tunnel announces itself above the quality
+    // section; technical detail stays collapsible
+    var downBanner = state === 'down'
+      ? '<div class="tu-downwarn" role="alert">' + MTB_ICO.alerc + '<span>' + esc(L('tuDownWarn')) + '</span></div>' : '';
+    var techDetails = (now.last_error || (d.errors_recent || []).length)
+      ? '<details class="tu-tech"><summary>' + esc(L('tuTechT')) + '</summary>' +
+        (now.last_error ? '<p class="tu-tech-err mono" dir="ltr">' + esc(String(now.last_error)) + '</p>' : '') +
+        ((d.errors_recent || []).map(function (ev) {
+          return '<p class="tu-tech-err"><span class="badge err mono">' + esc(ev.code || 'error') + '</span> <span class="mono" dir="ltr">' + esc(String(ev.text || '').slice(0, 200)) + '</span></p>';
+        }).join('')) +
+        '</details>'
+      : '';
+
+    var ranges = ['24h', '7d', '30d'].map(function (r) {
+      var lbl = r === '24h' ? L('tuRange24') : (r === '7d' ? L('d7') : L('d30'));
+      return '<button type="button" class="mtb-cdd-opt' + (tuRange === r ? ' on' : '') + '" data-turange="' + r + '">' + esc(lbl) + '</button>';
+    }).join('');
+    var rangeCur = tuRange === '24h' ? L('tuRange24') : (tuRange === '7d' ? L('d7') : L('d30'));
+
+    var evs = (d.events || []).slice(0, 24);
+    var evHtml = evs.length ? evs.map(function (ev) {
+      var inner;
+      if (ev.kind === 'state') {
+        inner = stateBadge(ev.to) + '<span class="mtb-muted">' + esc(L('tuEvFrom')) + ' ' + esc(L('st_' + ev.from) !== 'st_' + ev.from ? L('st_' + ev.from) : (ev.from || '\u2014')) + '</span>';
+      } else {
+        inner = '<span class="badge err">' + esc(ev.code || 'error') + '</span><span class="tu-ev-tx">' + esc(String(ev.text || '').slice(0, 160)) + '</span>';
+      }
+      return '<div class="tu-ev">' + inner + '<span class="mtb-muted tu-ev-at">' + esc(fmtDate(ev.at)) + '</span></div>';
+    }).join('') : entEmpty(L('tuNoEvents'));
+
+    var html =
+      '<div class="tunnel-card tu-head">' +
+      '<div class="tu-head-grid">' +
+      // group 1: identity
+      '<div class="tu-id">' +
+      '<span class="tu-id-ico">' + MTB_ICO.chain + '</span>' +
+      '<div class="tu-id-tx"><b class="mono tu-key" dir="ltr">' + esc(key) + '</b>' +
+      '<button type="button" class="mtb-keycopy" data-copyval="' + esc(key) + '" title="' + esc(L('copy')) + '" aria-label="' + esc(L('copy')) + '">' + TU_COPY + '</button></div>' +
+      '<div class="tu-id-badges">' + stateB +
+      '<span class="badge info mtb-eng-badge">' + tuEngLogo(t.engine, engN) + ' ' + esc(engN) + '</span>' + engMark +
+      '<button type="button" class="mtb-topobadge" data-tuview="' + esc(t.topology && t.topology.id) + '" data-tuname="' + esc(t.topology && t.topology.name) + '" title="' + esc(L('tuOpenTopo')) + '">' + MTB_ICO.mesh + esc((t.topology && t.topology.name) || '\u2014') + '</button>' +
+      '</div></div>' +
+      // group 2: weight & share — two different concepts, two tooltips
+      '<div class="tu-ws">' +
+      '<div class="tu-wt" title="' + esc(L('tuWeightTip')) + '"><span class="mtb-muted tu-wt-lbl">' + MTB_ICO.sliders + ' ' + esc(L('weightCol')) + '</span><b>' + (t.weight != null ? num0(t.weight) : '\u2014') + '</b></div>' +
+      '<div class="tu-wt tu-share" title="' + shareTip + '"><span class="mtb-muted tu-wt-lbl">' + MTB_ICO.chart + ' ' + esc(L('tuShareW')) + '</span><b>' + shareV + '</b></div>' +
+      '</div>' +
+      // group 3: operations — delete stays separated from the regular actions
+      '<div class="tu-ops">' +
+      '<button type="button" class="quantum-btn quantum-btn-secondary u-btn-xs" data-tuweight="' + esc(t.topology && t.topology.id) + '|' + esc(key) + '">' + MTB_ICO.pen + esc(L('tuWeightT')) + '</button>' +
+      '<button type="button" class="quantum-btn quantum-btn-danger u-btn-xs" data-tudel="' + esc(t.id) + '|' + esc(key) + '">' + MTB_ICO.trash + esc(L('agActDel')) + '</button>' +
+      '<button type="button" class="quantum-btn mtb-backbtn" data-tuback>' + esc(L('tuBackList')) + ' <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg></button>' +
+      '</div>' +
+      '</div></div>' +
+
+      downBanner +
+
+      // the route: two side cards joined by the state-colored line
+      '<div class="tunnel-card">' +
+      '<p class="tc-title dcard-title">' + MTB_ICO.tun + esc(L('tuEndsT')) + '</p>' +
+      '<div class="tu-route">' +
+      tuSideCard('iran', t.local_server, ipOf('iran'), L('tuSideIran')) +
+      tuConnector(state) +
+      tuSideCard('foreign', t.remote_server, ipOf('foreign'), L('tuSideForeign')) +
+      '</div>' +
+      '</div>' +
+
+      // quality / engine usage / live rate — three groups, one card
+      '<div class="tunnel-card">' +
+      '<p class="tc-title dcard-title">' + MTB_ICO.chart + esc(L('tuQualityT')) + '</p>' +
+      (vq || ve || vr ? '<div class="tu-vitals3">' +
+        (vq ? '<div class="tu-vgroup"><p class="tu-vg-h">' + CLOCK + esc(L('tuConnQ')) + '</p>' + vq + '</div>' : '') +
+        (ve ? '<div class="tu-vgroup"><p class="tu-vg-h">' + CPUI + esc(L('tuEngineUse')) + '</p>' + ve + '</div>' : '') +
+        (vr ? '<div class="tu-vgroup"><p class="tu-vg-h">' + DLI + esc(L('tuLiveRate')) + '</p>' + vr + updLine + '</div>' : '') +
+        '</div>' : '<p class="qs-hint u-m-0">' + esc(L('tuNoVitals')) + '</p>') +
+      techDetails +
+      '</div>' +
+
+      // traffic: channel toggle, fixed stat tiles, chart with its own range
+      '<div class="tunnel-card">' +
+      '<div class="tc-header dcard-head"><p class="tc-title dcard-title">' + MTB_ICO.dl + esc(L('tuTrafficT')) + '</p>' +
+      '<div class="tu-chan"><button type="button" class="tu-chan-btn' + (tunChannel === 'wire' ? ' on' : '') + '" data-tuchan="wire" ' + '>Wire</button>' +
+      '<button type="button" class="tu-chan-btn' + (tunChannel === 'payload' ? ' on' : '') + '" data-tuchan="payload"' + (payloadOk ? '' : ' disabled title="' + esc(L('tuNoPayload')) + '"') + '>Payload</button></div>' +
+      '<div class="mtb-cdd mtb-fcdd tu-range"><button type="button" class="mtb-cdd-btn" data-cdd-toggle><span class="mtb-cdd-cur">' + esc(rangeCur) + '</span>' +
+      '<span class="mtb-cdd-arrow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span></button>' +
+      '<div class="mtb-cdd-pop" hidden>' + ranges + '</div></div></div>' +
+      '<div class="tu-tiles">' +
+      chanTile('today', L('today')) +
+      chanTile('7d', L('d7')) +
+      chanTile('30d', L('d30')) +
+      '<div class="tu-tile" title="' + esc(L('tuShareTrafficTip')) + '"><span class="tu-tile-lbl">' + esc(L('tuShareT')) + '</span><b class="tu-tile-big">' + shareTrafficV + '</b></div>' +
+      '<div class="tu-tile" title="' + overheadTip + '"><span class="tu-tile-lbl">' + esc(L('overhead')) + '</span><b class="tu-tile-big">' + overheadV + '</b></div>' +
+      '</div>' +
+      '<div class="tu-chan-note">' + esc(tunChannel === 'payload' ? L('tuPayloadDef') : L('tuWireDef')) + '</div>' +
+      tuSeriesChart(pts, tunChannel, hist.granularity) +
+      '<div class="tu-times">' + tuChartTimes(pts, hist.granularity).map(function (x) {
+        return '<span style="left:' + x.pct.toFixed(1) + '%">' + esc(x.when) + '</span>';
+      }).join('') + '</div>' +
+      '</div>' +
+
+      '<div class="tunnel-card tu-events">' +
+      '<p class="tc-title dcard-title">' + MTB_ICO.clock + esc(L('tuEventsT')) + '</p>' +
+      evHtml +
+      '</div>';
+
+    setBody('mtun', html);
+
+    // the channel toggle re-renders the cached payload — no refetch needed
+    document.querySelectorAll('#tab-mtun [data-tuchan]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (tunChannel === b.getAttribute('data-tuchan')) return;
+        tunChannel = b.getAttribute('data-tuchan');
+        renderTuDetailBody(d, svList);
+      });
+    });
+
+    // the chart tooltip: nearest bucket on hover, exact time + byte counts
+    var svgEl = document.getElementById('tuChartSvg');
+    var tip = document.querySelector('.tun-tip2');
+    if (svgEl && tip && pts.length) {
+      svgEl.addEventListener('mousemove', function (ev) {
+        var rect = svgEl.getBoundingClientRect();
+        var rel = Math.min(1, Math.max(0, (ev.clientX - rect.left) / rect.width));
+        var i = Math.round(rel * (pts.length - 1));
+        var p = pts[i];
+        var when;
+        try {
+          when = hist.granularity === 'hour'
+            ? new Date(p.t * 1000).toLocaleString(isFa() ? 'fa-IR' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+            : new Date(p.t * 1000).toLocaleDateString(isFa() ? 'fa-IR' : 'en-US', { month: 'short', day: 'numeric' });
+        } catch (e4) { when = num0(p.t); }
+        tip.innerHTML = '<b>' + esc(when) + '</b>' +
+          '<span class="tu-dl">' + esc(L('tuDown')) + ': ' + esc((p[chanF[0]] || 0).toLocaleString(isFa() ? 'fa-IR' : 'en-US') + ' B') + ' (' + esc(bytes(p[chanF[0]] || 0)) + ')</span>' +
+          '<span class="tu-ul">' + esc(L('tuUp')) + ': ' + esc((p[chanF[1]] || 0).toLocaleString(isFa() ? 'fa-IR' : 'en-US') + ' B') + ' (' + esc(bytes(p[chanF[1]] || 0)) + ')</span>';
+        tip.hidden = false;
+        tip.style.left = Math.min(88, Math.max(2, rel * 100)) + '%';
+        svgEl.querySelectorAll('.tu-dot').forEach(function (d2) { d2.style.opacity = d2.getAttribute('data-tui') === String(i) ? 1 : 0; });
+      });
+      svgEl.addEventListener('mouseleave', function () {
+        tip.hidden = true;
+        svgEl.querySelectorAll('.tu-dot').forEach(function (d2) { d2.style.opacity = 0; });
+      });
+    }
+  }
+
+  // ---- modal shell (same grammar as the agent wizard) -------------------------
+  function tuModal(html) {
+    var ov = document.createElement('div');
+    ov.className = 'mtb-modal-ov';
+    ov.innerHTML = '<div class="mtb-modal">' + html + '</div>';
+    document.body.appendChild(ov);
+    ov.querySelectorAll('[data-mtb-close]').forEach(function (b) { b.addEventListener('click', function () { ov.remove(); }); });
+    ov.addEventListener('click', function (e) { if (e.target === ov) ov.remove(); });
+    return ov;
+  }
+  function tuFail(e) {
+    mtbToast((e && e.body && (e.body.error || e.body.message || e.body.detail)) || (e && e.message) || (e ? 'HTTP ' + e.status : ''), 'err');
+  }
+
+  function openTuWeight(topoId, key, cur) {
+    var ov = tuModal(
+      '<button type="button" class="mtb-x" data-mtb-close aria-label="' + esc(L('cancel')) + '">\u00d7</button>' +
+      '<p class="tc-title">' + esc(L('tuWeightT')) + '</p>' +
+      '<p class="qs-hint mono" dir="ltr">' + esc(key) + '</p>' +
+      '<div class="mtb-form"><label>' + esc(L('weightCol')) + ' (0\u20131000)</label>' +
+      '<input id="mtbTuW" class="quantum-input" type="number" min="0" max="1000" value="' + esc(cur != null && cur !== '' ? cur : 0) + '"></div>' +
+      '<div class="mtb-acts"><button type="button" class="quantum-btn quantum-btn-secondary" data-mtb-close>' + esc(L('cancel')) + '</button>' +
+      '<button type="button" class="quantum-btn quantum-btn-primary" id="mtbTuWSave">' + esc(L('agSave')) + '</button></div>');
+    ov.querySelector('#mtbTuWSave').addEventListener('click', function () {
+      var v = parseInt(ov.querySelector('#mtbTuW').value, 10);
+      if (isNaN(v) || v < 0 || v > 1000) { mtbToast(L('tuWRange'), 'err'); return; }
+      var btn = this; btn.disabled = true;
+      apiSend('POST', 'api/ui/topologies/' + encodeURIComponent(topoId) + '/tunnels/' + encodeURIComponent(key) + '/weight', { weight: v }).then(function () {
+        ov.remove(); mtbToast(L('tuWSaved'));
+        loadTun();
+      }).catch(function (e) { btn.disabled = false; tuFail(e); });
+    });
+  }
+
+  function tuDel(id, key) {
+    entConfirm(L('tuDelT'), Lf('tuDelQ', { k: key }), L('agActDel')).then(function (ok) {
+      if (!ok) return;
+      apiSend('DELETE', 'api/mesh/tunnels/' + encodeURIComponent(id)).then(function () {
+        delete topoTraffic[key];
+        mtbToast(L('delDone'));
+        // deleting the open tunnel must leave its detail page, not 404 inside it
+        if (tuView && tuView.key === key) {
+          tuView = null;
+          try { history.replaceState(null, '', '#t=mtun'); } catch (e3) {}
+        }
+        loadTun();
+      }).catch(tuFail);
+    });
+  }
+
+  // create flow, redesigned as a wizard: topology → iran → foreign →
+  // engine → key + review, one decision per page with the same step-dot
+  // grammar as the agent wizard. Choices come from the cached packs (real
+  // member lists); the create POST keeps its exact payload.
+  function openTuCreate() {
+    var packs = (cache.mtun || []).filter(function (p) { return p && p.tp; });
+    if (!packs.length) { mtbToast(L('tuNeedTopo'), 'err'); return; }
+
+    var TU_PLUS = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
+    var TU_CHECK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>';
+    var sel = { topo: null, iran: null, foreign: null, engine: 'matrix', key: '' }; // created enabled, always
+    var step = 1, TOTAL = 5;
+    var stepLbl = [L('topoCol'), L('tuStIran'), L('tuStForeign'), L('engineCol'), L('tuStKey')];
+
+    function packOf() {
+      return packs.filter(function (p) { return String(p.tp.id) === String(sel.topo); })[0];
+    }
+    function members(side) {
+      var ui = (packOf() && packOf().ui && packOf().ui.members) || {};
+      return ui[side] || [];
+    }
+    function card(ic, title, sub, attr, val, on) {
+      return '<button type="button" class="mtb-agent-card tu-pick' + (on ? ' on' : '') + '" data-tupick="' + attr + '" data-tuv="' + esc(val) + '">' +
+        '<span class="mtb-agc-ico">' + ic + '</span>' +
+        '<span class="mtb-agc-tx"><b>' + esc(title) + '</b>' + (sub ? '<i>' + esc(sub) + '</i>' : '') + '</span>' +
+        (on ? '<span class="tu-pick-ok">' + TU_CHECK + '</span>' : '') +
+        '</button>';
+    }
+    function sideCards(side, attr) {
+      return members(side).map(function (m) {
+        var name = m.name || ('#' + m.id);
+        var dc = dcDisp(m.datacenter || '', m.datacenter_en);
+        return card(m.role === 'iran' ? topologyFlagSvg('ir') : '<span class="mtb-optglob">' + MTB_ICO.glob2 + '</span>',
+          name, dc, attr, String(m.id), String(sel[attr]) === String(m.id));
+      }).join('') || entEmpty(L('tuNoneSide'));
+    }
+    function topoCards() {
+      return packs.map(function (p) {
+        var n = (p.ui && p.ui.tunnels || []).length;
+        return card(MTB_ICO.mesh, p.tp.name || ('#' + p.tp.id), n + ' ' + L('tunnelsN'), 'topo', String(p.tp.id), String(sel.topo) === String(p.tp.id));
+      }).join('');
+    }
+    function engCards() {
+      return Object.keys(TU_ENG_DISP).map(function (n) {
+        return card('<span class="mtb-eng-logo e-' + esc(n) + '">' + tuEngLogo(n, TU_ENG_DISP[n]) + '</span>',
+          TU_ENG_DISP[n], '', 'engine', n, sel.engine === n);
+      }).join('');
+    }
+    function reviewRow(lbl, v) {
+      return '<div class="tu-rev"><span class="mtb-muted">' + esc(lbl) + '</span><b>' + esc(v) + '</b></div>';
+    }
+    function page(n) {
+      if (n === 1) return '<div class="tu-cards">' + topoCards() + '</div>';
+      if (n === 2) return '<div class="tu-cards">' + sideCards('iran', 'iran') + '</div>';
+      if (n === 3) return '<div class="tu-cards">' + sideCards('foreign', 'foreign') + '</div>';
+      if (n === 4) return '<div class="tu-cards tu-enggrid">' + engCards() + '</div>';
+      var tp = packOf();
+      var iran = members('iran').filter(function (m) { return String(m.id) === String(sel.iran); })[0];
+      var foreign = members('foreign').filter(function (m) { return String(m.id) === String(sel.foreign); })[0];
+      return '<div class="tu-review">' +
+        reviewRow(L('topoCol'), (tp && tp.tp && tp.tp.name) || '\u2014') +
+        reviewRow(L('tuSideIran'), (iran && iran.name) || '\u2014') +
+        reviewRow(L('tuSideForeign'), (foreign && foreign.name) || '\u2014') +
+        reviewRow(L('engineCol'), TU_ENG_DISP[sel.engine] || sel.engine) +
+        reviewRow(L('enabled'), L('tuAutoOn')) +
+        '</div>' +
+        '<div class="mtb-field"><span class="mtb-field-ico">' + MTB_ICO.tun + '</span>' +
+        '<input id="mtbTuKey" class="quantum-input" dir="ltr" placeholder="main" maxlength="128" aria-label="' + esc(L('tunnelKey')) + '">' +
+        '</div>';
+    }
+    function paintPages() {
+      document.getElementById('tuWizPages').innerHTML = '<div class="mtb-wpage" data-pg="1">' + page(1) + '</div>' +
+        '<div class="mtb-wpage" data-pg="2" hidden>' + page(2) + '</div>' +
+        '<div class="mtb-wpage" data-pg="3" hidden>' + page(3) + '</div>' +
+        '<div class="mtb-wpage" data-pg="4" hidden>' + page(4) + '</div>' +
+        '<div class="mtb-wpage" data-pg="5" hidden>' + page(5) + '</div>';
+    }
+    function valid() {
+      if (step === 1) return sel.topo != null;
+      if (step === 2) return sel.iran != null;
+      if (step === 3) return sel.foreign != null;
+      return true;
+    }
+    function sync() {
+      paintPages(); // pages bake their cards from the current selections
+      var ring = document.getElementById('tuWizRing');
+      if (ring) ring.style.setProperty('--p', Math.round(step / TOTAL * 100) + '%');
+      var cnt = document.getElementById('tuWizCount');
+      if (cnt) cnt.textContent = step + '/' + TOTAL;
+      var cur = document.getElementById('tuWizCur');
+      if (cur) cur.textContent = stepLbl[step - 1];
+      var hint = document.getElementById('tuWizHint');
+      if (hint) hint.textContent = L('tuWizHint' + step);
+      ov.querySelectorAll('.mtb-wpage').forEach(function (p2) {
+        p2.hidden = parseInt(p2.getAttribute('data-pg'), 10) !== step;
+      });
+      document.getElementById('tuWizBack').hidden = step === 1;
+      var nx = document.getElementById('tuWizNext');
+      nx.textContent = step === TOTAL ? L('create') : L('agWizNext');
+      nx.disabled = !valid();
+    }
+
+    var ov = tuModal(
+      '<button type="button" class="mtb-x" data-mtb-close aria-label="' + esc(L('cancel')) + '">\u00d7</button>' +
+      '<div class="tc-header"><div class="mtb-wiz-hero"><span class="mtb-wiz-plus">' + TU_PLUS + '</span><div class="mtb-wiz-hero-tx"><p class="tc-title">' + esc(L('tuNew')) + '</p><p class="qs-hint">' + esc(L('tuNewHint')) + '</p></div></div></div>' +
+      '<div class="tu-wiz-ring-row">' +
+      '<div class="tu-wiz-ring" id="tuWizRing"><span id="tuWizCount">1/' + TOTAL + '</span></div>' +
+      '<div class="tu-wiz-ring-tx"><b id="tuWizCur">' + esc(stepLbl[0]) + '</b><span class="mtb-muted" id="tuWizHint">' + esc(L('tuWizHint1')) + '</span></div></div>' +
+      '<div class="mtb-form" id="tuWizPages"></div>' +
+      '<div class="mtb-acts"><button type="button" class="quantum-btn quantum-btn-secondary" data-mtb-close>' + esc(L('cancel')) + '</button>' +
+      '<button type="button" class="quantum-btn quantum-btn-secondary" id="tuWizBack" hidden>' + esc(L('agWizBack')) + '</button>' +
+      '<button type="button" class="quantum-btn quantum-btn-primary" id="tuWizNext">' + esc(L('agWizNext')) + '</button></div>');
+
+    paintPages();
+    sync();
+
+    // card picks — one tap marks the choice and arms Next
+    ov.addEventListener('click', function (e) {
+      var c = e.target && e.target.closest ? e.target.closest('.tu-pick') : null;
+      if (!c) return;
+      var attr = c.getAttribute('data-tupick');
+      sel[attr] = c.getAttribute('data-tuv');
+      ov.querySelectorAll('.tu-pick[data-tupick="' + attr + '"]').forEach(function (x) {
+        x.classList.toggle('on', x === c);
+        var ok = x.querySelector('.tu-pick-ok');
+        if (ok) ok.remove();
+        if (x === c) x.insertAdjacentHTML('beforeend', '<span class="tu-pick-ok">' + TU_CHECK + '</span>');
+      });
+      sync();
+    });
+
+    document.getElementById('tuWizBack').addEventListener('click', function () {
+      if (step > 1) { step--; sync(); }
+    });
+    document.getElementById('tuWizNext').addEventListener('click', function () {
+      if (step < TOTAL) {
+        if (!valid()) { mtbToast(L('tuPickNeed'), 'err'); return; }
+        step++;
+        sync();
+        return;
+      }
+      // final page = review + create
+      var key = (ov.querySelector('#mtbTuKey').value || '').trim();
+      sel.key = key;
+      if (!/^[a-z0-9-_.]{1,128}$/.test(key)) { mtbToast(L('tuKeyBad'), 'err'); return; }
+      if (!sel.topo || !sel.iran || !sel.foreign) { mtbToast(L('pickBoth'), 'err'); return; }
+      var btn = this; btn.disabled = true;
+      // the mesh create route is flat: POST /api/mesh/tunnels with topology_id in the body
+      apiSend('POST', 'api/mesh/tunnels', {
+        topology_id: Number(sel.topo), local_server_id: Number(sel.iran), remote_server_id: Number(sel.foreign),
+        tunnel_key: key, engine: sel.engine, enabled: true
+      }).then(function () {
+        ov.remove(); mtbToast(L('created'));
+        loadTun();
+      }).catch(function (e) { btn.disabled = false; tuFail(e); });
     });
   }
 
@@ -792,7 +1862,7 @@
       '<div class="mtb-form" id="mtbAgentForm">' +
       '<div class="mtb-wpage" data-pg="1">' +
       '<div class="mtb-field"><span class="mtb-field-ico">' + USER + '</span>' +
-      '<input id="mtbAgentLabel" class="quantum-input" placeholder="' + esc(L('agNamePh')) + '" dir="ltr" aria-label="' + esc(L('agentLabel')) + '">' +
+      '<input id="mtbAgentLabel" class="quantum-input" maxlength="120" placeholder="' + esc(L('agNamePh')) + '" dir="ltr" aria-label="' + esc(L('agentLabel')) + '">' +
       '<span class="mtb-field-ok" id="mtbNameOk" hidden>' + CHECK + '</span>' +
       '<button type="button" class="mtb-tip-i mtb-tip-infield" data-tipopen data-tip="' + esc(L('agNameHint')) + '" aria-label="' + esc(L('agNameHint')) + '">!</button></div>' +
       '<div class="mtb-hint-row"><span class="mtb-hint-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M12 11.5V16"/></svg></span><span class="mtb-hint-tx">' + esc(L('agNameHint')) + '</span></div>' +
@@ -824,12 +1894,12 @@
       '</div></div>' +
       '<input type="hidden" id="mtbCountry" value=""></label>' +
       '<label id="mtbDcRow"><div class="mtb-field"><span class="mtb-field-ico">' + DCG + '</span>' +
-      '<input id="mtbDc" class="quantum-input" list="mtbDcList" dir="ltr" placeholder="' + esc(L('agDcPh')) + '" autocomplete="off" aria-label="' + esc(L('agDc')) + '">' +
+      '<input id="mtbDc" class="quantum-input" maxlength="100" list="mtbDcList" dir="ltr" placeholder="' + esc(L('agDcPh')) + '" autocomplete="off" aria-label="' + esc(L('agDc')) + '">' +
       '<button type="button" class="mtb-tip-i mtb-tip-infield" data-tipopen data-tip="' + esc(L('agDcHint')) + '" aria-label="' + esc(L('agDcHint')) + '">!</button></div>' +
       '<datalist id="mtbDcList"></datalist></label>' +
       '</div>' +
       '<div class="mtb-wpage" data-pg="3" hidden>' +
-      '<label>' + '<button type="button" class="mtb-tip-i" data-tipopen data-tip="' + esc(L('agTtlHint')) + '" aria-label="' + esc(L('agTtlHint')) + '">!</button> ' + esc(L('agentExpiry')) + ' <input id="mtbExpiry" type="number" min="1" max="3650" value="365" class="quantum-input" style="width:120px" dir="ltr"></label>' +
+      '<label>' + '<button type="button" class="mtb-tip-i" data-tipopen data-tip="' + esc(L('agTtlHint')) + '" aria-label="' + esc(L('agTtlHint')) + '">!</button> ' + esc(L('agentExpiry')) + ' <input id="mtbExpiry" type="number" min="1" max="365" value="365" class="quantum-input" style="width:120px" dir="ltr"></label>' +
       '<div class="mtb-chips">' + chips + '</div>' +
       '</div>' +
       '<div class="mtb-acts" id="mtbWizFoot">' +
@@ -913,6 +1983,9 @@
     });
     document.getElementById('mtbExpiry').addEventListener('input', function () {
       var v = parseInt(this.value, 10);
+      // live-clamp to the backend's 1-365 window so the field never shows
+      // a value the mint would silently rewrite
+      if (!isNaN(v) && v > 365) { v = 365; this.value = v; }
       ov.querySelectorAll('.mtb-chip').forEach(function (c2) { c2.classList.toggle('on', parseInt(c2.getAttribute('data-days'), 10) === v); });
     });
     if (typeof wizSave === 'function') { /* wired below after wizSave exists */ }
@@ -1023,7 +2096,7 @@
       var label = document.getElementById('mtbAgentLabel').value.trim() || ('agent-' + Date.now() % 10000);
       var dc = (document.getElementById('mtbDc') || {}).value.trim();
       if (!dc) { mtbToast(L('agDcReq'), 'err'); return; }
-      var days = Math.max(1, Math.min(3650, parseInt(document.getElementById('mtbExpiry').value, 10) || 365));
+      var days = Math.max(1, Math.min(365, parseInt(document.getElementById('mtbExpiry').value, 10) || 365));
       apiSend('POST', 'api/agents/tokens', { role: role, label: label, expires_days: days, country: country, datacenter: dc }).then(function (r) {
         var tok = (r && (r.token || (r.data && r.data.token))) || '';
         if (!tok) { mtbToast('no token in response', 'err'); return; }
@@ -1328,6 +2401,7 @@
       '</div></div>';
   }
   window.openAgtDetail = openAgtDetail;
+  window.mtbTunOpen = function (key) { tuView = { key: key }; };
   function openAgtDetail(id) {
     agtView = { view: 'detail', id: id };
     renderAgtDetail(id);
@@ -1580,10 +2654,115 @@
     }).catch(function () {});
   }
   var agLastUpdUrl = '';
+  // Update-agent modal, GitHub-first (contract §2.20): one GET to
+  // /api/agents/updates brings what GitHub has (stable / dev-rN prerelease
+  // / dev commit) and THIS agent's outdatedness with the arch-resolved
+  // artifact. The Update buttons ride the unchanged M2 path — the panel
+  // still verifies the pinned signature + digest before the agent hears
+  // anything, and the agent re-verifies on its own download. The manual
+  // version+URL form stays as the advanced/fallback path.
   function openAgtUpd(id) {
+    apiGet('api/agents/updates').then(function (disc) {
+      var row = null;
+      (disc.agents || []).forEach(function (r) { if (r.id === id) row = r; });
+      if (!row) { openAgtUpdManual(id, '', ''); return; }
+      var UPGR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17V5"/><path d="M6 11l6-6 6 6"/><path d="M5 21h14"/></svg>';
+      var OKC = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.2l2.5 2.5 4.7-5"/></svg>';
+      var GLOB = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.7 2.7 4 5.8 4 9s-1.3 6.3-4 9c-2.7-2.7-4-5.8-4-9s1.3-6.3 4-9z"/></svg>';
+      var ov = document.createElement('div');
+      ov.className = 'mtb-modal-ov';
+      function chanCard(lbl, rel, art, outdated) {
+        var head = '<div class="tu-upd-head"><b>' + esc(lbl) + '</b>' + (rel && rel.tag ? '<bdi dir="ltr" class="tu-upd-tag">' + esc(rel.tag) + '</bdi>' : '') + '</div>';
+        if (!rel) return '<div class="tu-upd-card na">' + head + '<span class="mtb-muted">' + esc(L('agUpdNone')) + '</span></div>';
+        var date = rel.published_at ? new Date(rel.published_at).toLocaleDateString(isFa() ? 'fa-IR' : 'en-US') : '';
+        var meta = [];
+        if (date) meta.push(date);
+        if (art && art.size) meta.push(bytes(art.size));
+        if (art && art.url) meta.push('<span class="mono" dir="ltr">' + esc(art.asset_name || '') + '</span>');
+        var body = '<div class="tu-upd-meta">' + meta.map(function (m) { return '<span>' + m + '</span>'; }).join('') + '</div>';
+        if (!outdated || !art || !art.url) {
+          return '<div class="tu-upd-card na">' + head + body +
+            '<span class="badge ok tu-upd-badge">' + OKC + esc(L('agUpdUpToDate')) + '</span></div>';
+        }
+        return '<div class="tu-upd-card">' + head + body +
+          '<button type="button" class="quantum-btn quantum-btn-primary u-btn-xs tu-upd-go" data-archan="' + esc(art.channel) + '">' + UPGR + ' ' + esc(Lf('agUpdUpdateTo', { v: art.tag })) + '</button></div>';
+      }
+      function commitRow(c) {
+        if (!c) return '';
+        var when = c.date ? new Date(c.date).toLocaleDateString(isFa() ? 'fa-IR' : 'en-US') : '';
+        return '<div class="tu-upd-commit"><span class="badge dim mono">' + esc(String(c.sha || '').slice(0, 7)) + '</span>' +
+          '<span class="tu-upd-commit-tx">' + esc(String(c.message || '').slice(0, 120)) + '</span>' +
+          '<span class="mtb-muted">' + esc(when) + '</span></div>' +
+          '<p class="qs-hint">' + esc(L('agUpdCommitNote')) + '</p>';
+      }
+      var rep = disc.last_group_update || null;
+      var repLine = '';
+      if (rep && rep.results) {
+        var ok = 0, bad = 0;
+        rep.results.forEach(function (r2) { if (r2.status === 'ok') ok++; else bad++; });
+        repLine = '<p class="qs-hint">' + esc(Lf('agUpdGroupLast', { ok: String(ok), bad: String(bad), tag: rep.tag || '' })) + '</p>';
+      }
+      ov.innerHTML = '<div class="mtb-modal mtb-ed-modal mtb-upd-modal" role="dialog" aria-modal="true">' +
+        '<div class="tc-header"><div class="mtb-wiz-hero"><span class="mtb-modal-badge">' + GLOB + '</span><div class="mtb-wiz-hero-tx"><p class="tc-title">' + esc(L('agUpdT')) + '</p><p class="qs-hint"><b>' + esc(row.name || id) + '</b>' + (row.version ? ' · <bdi dir="ltr">' + esc(row.version) + '</bdi>' : '') + (row.arch ? ' · <span class="mono">' + esc(row.arch) + '</span>' : '') + '</p></div></div>' +
+        '<button type="button" class="mtb-x" data-mtb-close>×</button></div>' +
+        (disc.error ? '<div class="mtb-upd-info warn"><span>' + esc(L('agUpdNoGH')) + '</span></div>' : '') +
+        '<div class="tu-upd-cards">' +
+        chanCard(L('agUpdStable'), disc.stable, row.artifact_stable, row.outdated_stable) +
+        chanCard(L('agUpdPre'), disc.prerelease, row.artifact_prerelease, row.outdated_prerelease) +
+        '</div>' +
+        '<div class="tu-upd-commit-wrap">' + commitRow(disc.commit) + '</div>' +
+        repLine +
+        '<div class="mtb-acts"><button type="button" class="quantum-btn quantum-btn-secondary u-btn-xs" id="mtbUpdGroup">' + esc(L('agUpdGroup')) + '</button>' +
+        '<button type="button" class="quantum-btn quantum-btn-secondary u-btn-xs" id="mtbUpdManual">' + esc(L('agUpdManual')) + '</button>' +
+        '<button type="button" class="quantum-btn quantum-btn-secondary" data-mtb-close>' + esc(L('cancel')) + '</button></div>' +
+        '</div>';
+      document.body.appendChild(ov);
+      ov.querySelectorAll('[data-mtb-close]').forEach(function (b) { b.addEventListener('click', function () { ov.remove(); }); });
+      ov.addEventListener('click', function (e) { if (e.target === ov) ov.remove(); });
+      function updateTo(art) {
+        if (!art || !art.url) return;
+        agLastUpdUrl = art.url;
+        apiSend('POST', 'api/agents/' + encodeURIComponent(id) + '/update', { version: art.version || art.tag, url: art.url }).then(function (res) {
+          if (res && res.status === 'started') {
+            ov.remove();
+            if (agtView.view === 'detail' && agtView.id === id) renderAgtDetail(id);
+            mtbToast(L('agUpdStarted'));
+          } else {
+            toastErr(L('agUpdBtn'), (res && (res.error || res.message)) || 'HTTP');
+          }
+        }).catch(function (e2) {
+          toastErr(L('agUpdBtn'), ((e2.body && (e2.body.error || e2.body.message)) || e2.message || ('HTTP ' + e2.status)) + (e2.body && e2.body.hint ? ' \u2014 ' + e2.body.hint : ''));
+        });
+      }
+      ov.querySelectorAll('.tu-upd-go').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var ch = b.getAttribute('data-archan');
+          updateTo(ch === 'stable' ? row.artifact_stable : row.artifact_prerelease);
+        });
+      });
+      document.getElementById('mtbUpdGroup').addEventListener('click', function () {
+        var btn = this; btn.disabled = true;
+        apiSend('POST', 'api/agents/update-outdated', { channel: disc.channel || 'stable' }).then(function (res) {
+          mtbToast(L('agUpdGroupStarted'));
+          btn.disabled = false;
+        }).catch(function (e2) {
+          btn.disabled = false;
+          toastErr(L('agUpdGroup'), ((e2.body && (e2.body.error || e2.body.message)) || e2.message || 'HTTP'));
+        });
+      });
+      document.getElementById('mtbUpdManual').addEventListener('click', function () {
+        ov.remove();
+        openAgtUpdManual(id, row.version || '', agLastUpdUrl);
+      });
+    }).catch(function () { openAgtUpdManual(id, '', ''); });
+  }
+
+  // the manual fallback: the pre-34 form (version + URL), for when GitHub
+  // is unreachable or the operator wants an exact artifact
+  function openAgtUpdManual(id, ver, lastUrl) {
     apiGet('api/ui/agents/' + encodeURIComponent(id)).then(function (d) {
       var ag = d.agent || {};
-      var curV = ag.version || '';
+      var curV = ag.version || ver || '';
       var preV = /^v[0-9]/.test(curV) ? curV : '';
       var ov = document.createElement('div');
       ov.className = 'mtb-modal-ov';
@@ -1592,15 +2771,14 @@
     var EXT = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg>';
     var INFO = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M12 11.5V16"/></svg>';
     var UPGR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17V5"/><path d="M6 11l6-6 6 6"/><path d="M5 21h14"/></svg>';
-    var SERV = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="7" rx="1.5"/><rect x="3" y="13" width="18" height="7" rx="1.5"/><path d="M7 7.5h.01M7 16.5h.01"/></svg>';
     ov.innerHTML = '<div class="mtb-modal mtb-ed-modal mtb-upd-modal" role="dialog" aria-modal="true">' +
         '<div class="tc-header"><div class="mtb-wiz-hero"><span class="mtb-modal-badge">' + UPGR + '</span><div class="mtb-wiz-hero-tx"><p class="tc-title">' + esc(L('agUpdT')) + '</p><p class="qs-hint"><b>' + esc(ag.name || id) + '</b>' + (curV ? ' · <bdi dir="ltr">' + esc(curV) + '</bdi>' : '') + '</p></div></div>' +
         '<button type="button" class="mtb-x" data-mtb-close>×</button></div>' +
         '<div class="mtb-form">' +
-        '<span class="mtb-upd-k">' + SERV + esc(L('agUpdVer')) + '</span>' +
+        '<span class="mtb-upd-k">' + CUBE + esc(L('agUpdVer')) + '</span>' +
         '<div class="mtb-field"><input id="mtbUpdVer" class="quantum-input" value="' + esc(preV) + '" dir="ltr" placeholder="v1.29.1"><span class="mtb-field-end">' + CUBE + '</span></div>' +
         '<span class="mtb-upd-k">' + LINK + esc(L('agUpdUrl')) + '</span>' +
-        '<div class="mtb-field"><input id="mtbUpdUrl" class="quantum-input" value="' + esc(agLastUpdUrl) + '" dir="ltr" placeholder="https://.../quantum-agent-linux-' + esc(ag.arch || 'amd64') + '.tar.gz"><span class="mtb-field-end">' + EXT + '</span></div>' +
+        '<div class="mtb-field"><input id="mtbUpdUrl" class="quantum-input" value="' + esc(lastUrl || agLastUpdUrl) + '" dir="ltr" placeholder="https://.../quantum-agent-linux-' + esc(ag.arch || 'amd64') + '.tar.gz"><span class="mtb-field-end">' + EXT + '</span></div>' +
         '<div class="mtb-upd-info"><span class="mtb-upd-ico">' + INFO + '</span><span class="mtb-upd-info-tx">' + esc(L('agUpdHint')) + '</span></div>' +
         '<div class="mtb-acts"><button type="button" class="quantum-btn quantum-btn-secondary" data-mtb-close>' + esc(L('cancel')) + '</button>' +
         '<button type="button" class="quantum-btn quantum-btn-primary" id="mtbUpdGo">' + UPGR + ' ' + esc(L('agUpdStart')) + '</button></div>' +
@@ -1609,11 +2787,11 @@
       ov.querySelectorAll('[data-mtb-close]').forEach(function (b) { b.addEventListener('click', function () { ov.remove(); }); });
       ov.addEventListener('click', function (e) { if (e.target === ov) ov.remove(); });
       ov.querySelector('#mtbUpdGo').addEventListener('click', function () {
-        var ver = ov.querySelector('#mtbUpdVer').value.trim();
+        var ver2 = ov.querySelector('#mtbUpdVer').value.trim();
         var url = ov.querySelector('#mtbUpdUrl').value.trim();
-        if (!ver || !url) { toastErr(L('agUpdBtn'), L('agUpdNeed')); return; }
+        if (!ver2 || !url) { toastErr(L('agUpdBtn'), L('agUpdNeed')); return; }
         agLastUpdUrl = url;
-        apiSend('POST', 'api/agents/' + encodeURIComponent(id) + '/update', { version: ver, url: url }).then(function (res) {
+        apiSend('POST', 'api/agents/' + encodeURIComponent(id) + '/update', { version: ver2, url: url }).then(function (res) {
           if (res && res.status === 'started') {
             ov.remove();
             if (agtView.view === 'detail' && agtView.id === id) renderAgtDetail(id);
@@ -1626,6 +2804,7 @@
       });
     }).catch(function () {});
   }
+
   function openAgtEdit(id) {
     apiGet('api/ui/agents/' + encodeURIComponent(id)).then(function (d) {
       var ag = d.agent || {};
@@ -1776,9 +2955,20 @@
     });
     ov.querySelector('#mtbAgDelGo').addEventListener('click', function () {
       if (delGo.disabled) return;
+      var btn = this;
       apiSend('DELETE', 'api/ui/agents/' + encodeURIComponent(id)).then(function () {
-        ov.remove(); agtView = { view: 'table' }; renderAgt();
-      }).catch(function () { ov.remove(); });
+        ov.remove();
+        toastOk(L('agDelT'), L('agDelDone'));
+        agtView = { view: 'table' };
+        // a deleted agent's detail deep-link is a ghost: clean the hash
+        try { if (location.hash.indexOf('&ag=') > 0) history.replaceState(null, '', '#t=magt'); } catch (e3) {}
+        renderAgt();
+      }).catch(function (e2) {
+        btn.disabled = false;
+        var msg = (e2.body && e2.body.ui && e2.body.ui.title) ? (isFa() ? e2.body.ui.title.fa : e2.body.ui.title.en)
+          : ((e2.body && (e2.body.error || e2.body.message)) || e2.message || ('HTTP ' + e2.status));
+        toastErr(L('agDelT'), msg);
+      });
     });
   }
 
@@ -2125,7 +3315,11 @@
       return;
     }
     var opt = e.target && e.target.closest ? e.target.closest('[data-agopentun]') : null;
-    if (opt) { goTab('mtun'); return; }
+    if (opt) {
+      if (window.mtbTunOpen && opt.getAttribute('data-agopentun')) window.mtbTunOpen(opt.getAttribute('data-agopentun'));
+      goTab('mtun');
+      return;
+    }
     var fop = e.target && e.target.closest ? e.target.closest('[data-cdd-opt]') : null;
     if (fop) {
       var fk = fop.getAttribute('data-cdd-opt');
@@ -2153,7 +3347,7 @@
     if (ftg) {
       var fcdd = ftg.closest('.mtb-cdd');
       var fpop = fcdd ? fcdd.querySelector('.mtb-cdd-pop') : null;
-      document.querySelectorAll('#tab-magt .mtb-cdd-pop').forEach(function (p2) { if (!p2.hidden && p2 !== fpop) p2.hidden = true; });
+      document.querySelectorAll('#tab-magt .mtb-cdd-pop, #tab-mtun .mtb-cdd-pop').forEach(function (p2) { if (!p2.hidden && p2 !== fpop) p2.hidden = true; });
       if (fpop) {
         fpop.style.top = '';
         fpop.style.bottom = '';
@@ -2169,7 +3363,7 @@
       return;
     }
     if (!e.target.closest('.mtb-cdd')) {
-      document.querySelectorAll('#tab-magt .mtb-cdd-pop').forEach(function (p2) { if (!p2.hidden) p2.hidden = true; });
+      document.querySelectorAll('#tab-magt .mtb-cdd-pop, #tab-mtun .mtb-cdd-pop').forEach(function (p2) { if (!p2.hidden) p2.hidden = true; });
     }
     var pg = e.target && e.target.closest ? e.target.closest('[data-agpg]') : null;
     if (pg && !pg.disabled) {
@@ -2180,6 +3374,112 @@
       renderAgt();
       return;
     }
+    var tupg2 = e.target && e.target.closest ? e.target.closest('[data-tuopen]') : null;
+    if (tupg2) {
+      tuView = { key: tupg2.getAttribute('data-tuopen') };
+      tuRange = '24h';
+      renderTun();
+      return;
+    }
+    var tset = e.target && e.target.closest ? e.target.closest('[data-tuset]') : null;
+    if (tset) {
+      var body = { enabled: document.getElementById('tuSetEn').checked };
+      var engSel = document.getElementById('tuSetEng').value;
+      if (engSel !== (tset.getAttribute('data-tueng') || '')) body.engine = engSel;
+      var ptxt = (document.getElementById('tuSetParams').value || '').trim();
+      if (ptxt) {
+        try { body.engine_params = JSON.parse(ptxt); } catch (e3) { mtbToast(L('tuBadJson'), 'err'); return; }
+      }
+      var sb = tset; sb.disabled = true;
+      apiSend('PATCH', 'api/mesh/tunnels/' + encodeURIComponent(tset.getAttribute('data-tuset')), body).then(function () {
+        mtbToast(L('tuSaved'));
+        renderTuDetail();
+      }).catch(function (e2) { sb.disabled = false; tuFail(e2); });
+      return;
+    }
+    var tubk = e.target && e.target.closest ? e.target.closest('[data-tuback]') : null;
+    if (tubk) {
+      tuView = null;
+      // drop &tun= BEFORE re-rendering, or renderTun's hash re-read reopens it
+      try { history.replaceState(null, '', '#t=mtun'); } catch (e) { /* non-fatal */ }
+      renderTun();
+      return;
+    }
+    var turg = e.target && e.target.closest ? e.target.closest('[data-turange]') : null;
+    if (turg) {
+      tuRange = turg.getAttribute('data-turange') || '24h';
+      renderTuDetail();
+      return;
+    }
+    var tuv = e.target && e.target.closest ? e.target.closest('[data-tuview],[data-tutopo]') : null;
+    if (tuv) {
+      var tid = tuv.getAttribute('data-tuview') || tuv.getAttribute('data-tutopo');
+      var tname = tuv.getAttribute('data-tuname') || '';
+      goTab('tunnel');
+      // The legacy topology page keys its selection by ITS string ids
+      // (topo_…); the mesh packs carry numeric ids — bridge by name once
+      // the legacy list has loaded (bounded wait, then give up quietly).
+      (function openTopo(n) {
+        var pool = (typeof topologyData !== 'undefined' && topologyData.topologies) || null;
+        var hit = null;
+        if (pool && pool.length) {
+          for (var i = 0; i < pool.length; i++) {
+            if (String(pool[i].id) === String(tid) || (tname && pool[i].name === tname)) { hit = pool[i]; break; }
+          }
+        }
+        if (hit) { window.topologyOpen(hit.id); return; }
+        if (n > 0) setTimeout(function () { openTopo(n - 1); }, 150);
+      })(60);
+      return;
+    }
+    var tua = e.target && e.target.closest ? e.target.closest('[data-tuagt]') : null;
+    if (tua) {
+      // detail view first (so activate's loadAgt sees view=detail), then switch
+      window.openAgtDetail(tua.getAttribute('data-tuagt'));
+      goTab('magt');
+      return;
+    }
+    var tuw = e.target && e.target.closest ? e.target.closest('[data-tuweight]') : null;
+    if (tuw) {
+      var wparts = (tuw.getAttribute('data-tuweight') || '').split('|');
+      var wrow = tuw.closest('tr');
+      var wspan = wrow ? wrow.querySelector('[data-tu-w]') : null;
+      var wcur = wspan ? wspan.getAttribute('data-tu-w') : '';
+      openTuWeight(wparts[0], wparts.slice(1).join('|'), wcur);
+      return;
+    }
+    var tud = e.target && e.target.closest ? e.target.closest('[data-tudel]') : null;
+    if (tud) {
+      var dparts = (tud.getAttribute('data-tudel') || '').split('|');
+      tuDel(dparts[0], dparts.slice(1).join('|'));
+      return;
+    }
+    var tup = e.target && e.target.closest ? e.target.closest('[data-tuopt]') : null;
+    if (tup) {
+      tuFilters[tup.getAttribute('data-tuopt')] = tup.getAttribute('data-tuv') || '';
+      tuPage = 1;
+      renderTun();
+      return;
+    }
+    var tusz = e.target && e.target.closest ? e.target.closest('[data-tusize]') : null;
+    if (tusz) { tuPerPage = parseInt(tusz.getAttribute('data-tusize'), 10) || 10; tuPage = 1; renderTun(); return; }
+    var tupg = e.target && e.target.closest ? e.target.closest('[data-tupg]') : null;
+    if (tupg && !tupg.disabled) {
+      var tv = tupg.getAttribute('data-tupg');
+      if (tv === 'prev') tuPage = Math.max(1, tuPage - 1);
+      else if (tv === 'next') tuPage = tuPage + 1;
+      else tuPage = parseInt(tv, 10) || 1;
+      renderTun();
+      return;
+    }
+    var tuc = e.target && e.target.closest ? e.target.closest('[data-tuclear]') : null;
+    if (tuc) {
+      tuQuery = ''; tuFilters = { topo: '', agent: '', engine: '', state: '' }; tuPage = 1;
+      renderTun();
+      return;
+    }
+    var tun = e.target && e.target.closest ? e.target.closest('#mtbNewTunnel') : null;
+    if (tun) { openTuCreate(); return; }
     var dl = e.target && e.target.closest ? e.target.closest('[data-agdel]') : null;
     if (dl) { agtDel(dl.getAttribute('data-agdel'), dl.getAttribute('data-agdelname') || ''); }
   });
@@ -2239,12 +3539,18 @@
       if (tB && aB) aB.insertAdjacentElement('afterend', tB);
       var cB = sb && sb.querySelector('[data-tab="cores"]');
       if (tB && cB) tB.insertAdjacentElement('afterend', cB); // Cores is 4th: right under Topology, above Tunnels
+      var mB = sb.querySelector('[data-tab="mtun"]');
+      var bB = sb.querySelector('[data-tab="benchmark"]');
+      if (mB && bB) mB.insertAdjacentElement('afterend', bB); // Benchmark is 6th: right under Tunnels
       var dr = document.getElementById('drawerNav');
       var dT = dr && dr.querySelector('[data-tab="tunnel"]');
       var dA = dr && dr.querySelector('[data-tab="magt"]');
       if (dT && dA) dA.insertAdjacentElement('afterend', dT);
       var dC = dr && dr.querySelector('[data-tab="cores"]');
       if (dT && dC) dT.insertAdjacentElement('afterend', dC);
+      var dM = dr && dr.querySelector('[data-tab="mtun"]');
+      var dB = dr && dr.querySelector('[data-tab="benchmark"]');
+      if (dM && dB) dM.insertAdjacentElement('afterend', dB);
     } catch (e) { /* non-fatal */ }
     try { injectSections(); } catch (e) { /* non-fatal */ }
     try { bindNav(); } catch (e) { /* non-fatal */ }

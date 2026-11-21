@@ -103,6 +103,34 @@ func handleUITopologyDetail(w http.ResponseWriter, r *http.Request) {
 			foreignRows = append(foreignRows, entry)
 		}
 	}
+	// Tunnels-page path column: each end's flag comes from the agent
+	// enrolled against that server (the servers table carries no country),
+	// and the deep-link needs the agent id. Stamped onto the ref maps so
+	// the frontend reads one shape everywhere.
+	agCountry := map[int64]string{}
+	agBySrv := map[int64]string{}
+	if ags, aerr := h.ListAgents(); aerr == nil {
+		for _, a := range ags {
+			if a.ServerID != 0 {
+				if a.Country != "" {
+					agCountry[a.ServerID] = a.Country
+				}
+				agBySrv[a.ServerID] = a.ID
+			}
+		}
+	}
+	for _, row := range allRows {
+		for _, side := range []string{"local_server", "remote_server"} {
+			if m, ok := row[side].(map[string]any); ok {
+				if id, ok2 := m["id"].(int64); ok2 {
+					m["country"] = agCountry[id]
+					if aid := agBySrv[id]; aid != "" {
+						m["agent_id"] = aid
+					}
+				}
+			}
+		}
+	}
 	writeJSON(w, map[string]any{
 		"topology": map[string]any{"id": topo.ID, "name": topo.Name, "enabled": topo.Enabled},
 		"members": map[string]any{
@@ -244,13 +272,33 @@ func handleUITunnelDetail(w http.ResponseWriter, r *http.Request) {
 		eventRows = append(eventRows, row)
 	}
 
+	// The detail page's endpoint cards need the same real-relation stamps the
+	// topology rows carry: the agent country (flag) and agent id (deep link).
+	// The header strip also reports the tunnel's weight and resolved share.
+	stampRef := func(serverID int64) map[string]any {
+		ref, _ := h.uiServerRef(serverID).(map[string]any)
+		if ref == nil {
+			return nil
+		}
+		if ag, aerr := h.AgentByServer(serverID); aerr == nil {
+			ref["agent_id"] = ag.ID
+			ref["country"] = ag.Country
+		}
+		return ref
+	}
+	tw, _ := h.WeightFor(topo.ID, t.LocalServerID, t.RemoteServerID, t.ID)
+	resolved := any(nil)
+	if p := h.uiResolvedPercents(topo.ID, mustListTunnels(h.Store, topo.ID), verdicts)[t.ID]; p > 0 {
+		resolved = p
+	}
 	writeJSON(w, map[string]any{
 		"tunnel": map[string]any{
 			"id": t.ID, "tunnel_key": t.TunnelKey,
 			"topology":      map[string]any{"id": topo.ID, "name": topo.Name},
-			"local_server":  h.uiServerRef(t.LocalServerID),
-			"remote_server": h.uiServerRef(t.RemoteServerID),
+			"local_server":  stampRef(t.LocalServerID),
+			"remote_server": stampRef(t.RemoteServerID),
 			"engine":        t.Engine, "enabled": t.Enabled, "created_at": t.CreatedAt,
+			"weight": tw, "resolved_percent": resolved,
 		},
 		"now": map[string]any{
 			"state": state, "cpu_percent": cpu, "rss_bytes": rss,
@@ -286,7 +334,7 @@ func mustRange(s *store.Store, ids []int64, from, to int64) (store.Usage, store.
 // uiTunnelRates computes the current per-direction rate from the two
 // newest samples (any reporter; the newest wins, gaps > 10 min → null).
 func (h uiStoreHandle) uiTunnelRates(tunnelID int64) map[string]any {
-	zero := map[string]any{"wire_rx_bps": nil, "wire_tx_bps": nil, "payload_rx_bps": nil, "payload_tx_bps": nil}
+	zero := map[string]any{"wire_rx_bps": nil, "wire_tx_bps": nil, "payload_rx_bps": nil, "payload_tx_bps": nil, "sampled_at": nil}
 	samples, err := h.RecentSamples(tunnelID, 8)
 	if err != nil || len(samples) < 2 {
 		return zero
@@ -312,6 +360,7 @@ func (h uiStoreHandle) uiTunnelRates(tunnelID int64) map[string]any {
 			"wire_tx_bps":    rate(newest.WireTx, older.WireTx, newest.CountersKnown && older.CountersKnown),
 			"payload_rx_bps": rate(newest.PayloadRx, older.PayloadRx, newest.PayloadKnown && older.PayloadKnown),
 			"payload_tx_bps": rate(newest.PayloadTx, older.PayloadTx, newest.PayloadKnown && older.PayloadKnown),
+			"sampled_at":     newest.At,
 		}
 	}
 	return zero

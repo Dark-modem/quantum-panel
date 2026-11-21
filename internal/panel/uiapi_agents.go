@@ -218,6 +218,29 @@ func handleUIAgentDetail(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// The map-card sparkline's data: this agent's last 24 hourly traffic
+	// totals (dl+ul) from the traffic_hourly rollup, dense across the window.
+	traffic24 := []int64{}
+	{
+		nowHour := time.Now().Unix() / 3600
+		lo := nowHour - 24
+		trows, terr := h.Store.DB().Query(`SELECT hour, SUM(MAX(last_rx - first_rx, 0)) + SUM(MAX(last_tx - first_tx, 0))
+			FROM traffic_hourly WHERE agent_id = ? AND hour >= ? AND hour < ? GROUP BY hour`, ag.ID, lo, nowHour)
+		if terr == nil {
+			byHour := map[int64]int64{}
+			for trows.Next() {
+				var hour, v int64
+				if trows.Scan(&hour, &v) == nil {
+					byHour[hour] = v
+				}
+			}
+			trows.Close()
+			for hh := lo; hh < nowHour; hh++ {
+				traffic24 = append(traffic24, byHour[hh])
+			}
+		}
+	}
+
 	writeJSON(w, map[string]any{
 		"agent": map[string]any{
 			"id": ag.ID, "name": ag.Name, "role": ag.Role, "country": ag.Country,
@@ -238,6 +261,7 @@ func handleUIAgentDetail(w http.ResponseWriter, r *http.Request) {
 		"tunnels":       tunRows,
 		"engines":       h.uiEngineList(ag, h.uiCatalogOf(ag.ID)),
 		"recent_errors": recent,
+		"traffic24":     traffic24,
 	})
 }
 

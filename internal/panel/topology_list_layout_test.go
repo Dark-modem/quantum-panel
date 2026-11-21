@@ -293,19 +293,19 @@ func TestTopologyCountryDropdown(t *testing.T) {
 		}
 	}
 	for _, want := range []string{
-		`function topoCountryMount(`,             // the shared component entry point
-		`topoCountryMount('topoCreateCountryDD'`, // add-topology wizard country step
-		`topoCountryMount('topologyCountryDD'`,   // edit-topology form
-		`role="listbox"`,                         // listbox semantics
-		`role="option"`,                          // option semantics
-		`aria-haspopup="listbox"`,                // trigger announces the popup
-		`aria-expanded=`,                         // open state on the trigger
-		`aria-activedescendant`,                  // keyboard highlight without moving focus
-		`aria-selected=`,                         // the picked option is marked
-		`data-dd-value=`,                         // option rows carry the ISO code
-		`topologyFlagSvg(cc)`,                    // trigger uses the embedded SVG flags
-		`topologyFlagSvg(c[0])`,                  // so does every option row
-		`'ArrowDown'`, `'ArrowUp'`,               // arrows navigate
+		`function topoCountryMount(`,           // the shared component entry point
+		`topoCountryMount('topologyCountryDD'`, // add-topology wizard country step
+		`topoCountryMount('topologyCountryDD'`, // edit-topology form
+		`role="listbox"`,                       // listbox semantics
+		`role="option"`,                        // option semantics
+		`aria-haspopup="listbox"`,              // trigger announces the popup
+		`aria-expanded=`,                       // open state on the trigger
+		`aria-activedescendant`,                // keyboard highlight without moving focus
+		`aria-selected=`,                       // the picked option is marked
+		`data-dd-value=`,                       // option rows carry the ISO code
+		`topologyFlagSvg(cc)`,                  // trigger uses the embedded SVG flags
+		`topologyFlagSvg(c[0])`,                // so does every option row
+		`'ArrowDown'`, `'ArrowUp'`,             // arrows navigate
 		`'Escape'`,                      // Escape closes
 		`topoCountrySetOpen(id, false)`, // click-outside / Escape close path
 		`e.stopImmediatePropagation`,    // Escape must not also close the wizard

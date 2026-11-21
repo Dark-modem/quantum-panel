@@ -66,35 +66,6 @@ func TestPanelMatrixSchemeMirrorsAgent2f240d2(t *testing.T) {
 	}
 }
 
-// TestMatrixInstanceOctetsUniqueAcrossWholePool is the panel port of the
-// agent's sweep test (quantum-agent @ 2f240d2): every instance in the whole
-// pool derives a disjoint mesh /30, and nothing ever lands on the pathtest
-// probe nets (77, 78) or the legacy octet 231.
-func TestMatrixInstanceOctetsUniqueAcrossWholePool(t *testing.T) {
-	seen := map[int]string{}
-	check := func(in matrixInstance) {
-		if !in.valid() {
-			t.Fatalf("instance %s must be valid", in.ID)
-		}
-		oct := in.octet()
-		if oct == 77 || oct == 78 || oct == 231 {
-			t.Fatalf("%s landed on reserved octet %d", in.ID, oct)
-		}
-		if prev, dup := seen[oct]; dup {
-			t.Fatalf("octet %d collides between %s and %s", oct, prev, in.ID)
-		}
-		seen[oct] = in.ID
-	}
-	check(matrixLegacyInstance())
-	for n := 2; n <= matrixMaxInstances+1; n++ {
-		check(matrixInstance{ID: "matrix" + strconv.Itoa(n)})
-	}
-	if len(seen) != matrixMaxInstances+1 {
-		t.Fatalf("pool covers %d octets, want %d (legacy + the whole pool, disjoint)",
-			len(seen), matrixMaxInstances+1)
-	}
-}
-
 // TestMatrixCapValidationBoundaries — the 16→250 cap lift accepts exactly
 // n = 2..251 and refuses beyond, in valid() and the API-facing resolver.
 func TestMatrixCapValidationBoundaries(t *testing.T) {

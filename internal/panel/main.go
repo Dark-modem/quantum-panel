@@ -1023,6 +1023,10 @@ func buildPanelMux(base string) *http.ServeMux {
 	mux.HandleFunc("POST "+base+"/api/benchmark/run", requireAuth(requireCSRF(handleBenchmarkRun)))
 	mux.HandleFunc("POST "+base+"/api/benchmark/apply", requireAuth(requireCSRF(handleBenchmarkApply)))
 	mux.HandleFunc("POST "+base+"/api/benchmark/autopilot", requireAuth(requireCSRF(handleBenchmarkAutoPilot)))
+	mux.HandleFunc("POST "+base+"/api/benchmark/pair-run", requireAuth(requireCSRF(handleBenchmarkPairRun)))
+	mux.HandleFunc("GET "+base+"/api/benchmark/pair", requireAuth(handleBenchmarkPairGet))
+	mux.HandleFunc("POST "+base+"/api/benchmark/pair-stop", requireAuth(requireCSRF(handleBenchmarkPairStop)))
+	mux.HandleFunc("POST "+base+"/api/benchmark/pair-clear", requireAuth(requireCSRF(handleBenchmarkPairClear)))
 	// Path test: which transports cross between the two servers, before any tunnel
 	mux.HandleFunc("GET "+base+"/api/pathtest", requireAuth(handlePathTestGet))
 	mux.HandleFunc("POST "+base+"/api/pathtest", requireAuth(requireCSRF(handlePathTestPost)))

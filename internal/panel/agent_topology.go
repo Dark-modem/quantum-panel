@@ -197,7 +197,9 @@ func saveAgentTunnels(s agentTunnelStore) error {
 }
 
 // agentTunnelNextInstance picks the first free matrix instance id for a
-// hub agent, based on the tunnels already assigned to it.
+// hub agent, based on the tunnels already assigned to it. The pool is the
+// full valid range (matrix plus matrix2..matrix<max+1>) — one tunnel engine
+// must never run out of disjoint instances before the server does.
 func agentTunnelNextInstance(tunnels []agentTunnel, hubAgentID string) string {
 	used := map[string]bool{}
 	for _, t := range tunnels {
@@ -205,7 +207,14 @@ func agentTunnelNextInstance(tunnels []agentTunnel, hubAgentID string) string {
 			used[t.Instance] = true
 		}
 	}
-	for _, cand := range []string{"matrix", "matrix2", "matrix3", "matrix4", "matrix5", "matrix6", "matrix7", "matrix8"} {
+	for n := 0; n <= matrixMaxInstances+1; n++ {
+		if n == 1 {
+			continue // matrix1 was never a valid instance id
+		}
+		cand := "matrix"
+		if n > 0 {
+			cand = "matrix" + strconv.Itoa(n)
+		}
 		if !used[cand] {
 			return cand
 		}
