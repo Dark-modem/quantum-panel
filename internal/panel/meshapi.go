@@ -178,6 +178,7 @@ func registerMeshRoutes(mux *http.ServeMux, base string) {
 	mux.HandleFunc("PATCH "+p+"/servers/{id}", requireAuth(requireCSRF(handleMeshServerPatch)))
 	mux.HandleFunc("DELETE "+p+"/servers/{id}", requireAuth(requireCSRF(handleMeshServerDelete)))
 	mux.HandleFunc("POST "+p+"/topologies/generate", requireAuth(requireCSRF(handleMeshTopoGenerate)))
+	mux.HandleFunc("POST "+p+"/topologies/dc", requireAuth(requireCSRF(handleMeshTopoCreateDC)))
 	mux.HandleFunc("PATCH "+p+"/topologies/{id}", requireAuth(requireCSRF(handleMeshTopoPatch)))
 	mux.HandleFunc("DELETE "+p+"/topologies/{id}", requireAuth(requireCSRF(handleMeshTopoDelete)))
 	mux.HandleFunc("POST "+p+"/topologies/{id}/weights", requireAuth(requireCSRF(handleMeshWeightSet)))

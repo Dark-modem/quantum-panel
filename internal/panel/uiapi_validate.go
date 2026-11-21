@@ -94,3 +94,68 @@ func uiValidateAgentTunnels(w http.ResponseWriter, r *http.Request, s *store.Sto
 	}
 	return true
 }
+
+// uiEngineReadinessCheck is the non-writing variant of uiEngineReadiness
+// (BACKEND-41 per-agent push reporting): same policy, but the failure comes
+// back as (catalog code, operator-safe message) instead of a written
+// response — the caller decides where it surfaces.
+func uiEngineReadinessCheck(s *store.Store, serverID int64, engine string) (string, string) {
+	ag, err := s.AgentByServer(serverID)
+	if err != nil {
+		return "", "" // no agent linked yet: the existing link/push flow handles that
+	}
+	enabled, err := s.AgentEngineDesired(ag.ID, engine)
+	if err == nil && !enabled {
+		return "E-ENGINE-NOT-ENABLED",
+			"Engine " + engine + " is not enabled on agent " + ag.ID + ". Open Agents > " + ag.ID + " > Engines and enable it."
+	}
+	if uiArtifactEngines[engine] {
+		arch := ag.Arch
+		if arch == "" {
+			arch = "amd64"
+		}
+		artifacts, _ := s.ListEngineArtifacts()
+		found := false
+		for _, a := range artifacts {
+			if a.Engine == engine && a.Goarch == arch {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return "E-ENGINE-NO-ARTIFACT",
+				"no signed " + engine + " artifact for arch " + arch + " on agent " + ag.ID + " (upload one under Engines > artifacts)"
+		}
+	}
+	return "", ""
+}
+
+// uiAgentTunnelsReady is the non-writing variant of uiValidateAgentTunnels:
+// every enabled tunnel the agent would receive must pass readiness on both
+// ends; answers (code, message) of the first unready (server, engine).
+func uiAgentTunnelsReady(s *store.Store, agentID string) (string, string) {
+	ag, err := s.GetAgent(agentID)
+	if err != nil || ag.ServerID == 0 {
+		return "", "" // nothing to check yet
+	}
+	tunnels, err := s.TunnelsForServer(ag.ServerID)
+	if err != nil {
+		return "", ""
+	}
+	seen := map[string]bool{}
+	for _, t := range tunnels {
+		if !t.Enabled || seen[t.Engine] {
+			continue
+		}
+		seen[t.Engine] = true
+		for _, srv := range []int64{t.LocalServerID, t.RemoteServerID} {
+			if srv == 0 {
+				continue
+			}
+			if code, msg := uiEngineReadinessCheck(s, srv, t.Engine); code != "" {
+				return code, msg
+			}
+		}
+	}
+	return "", ""
+}

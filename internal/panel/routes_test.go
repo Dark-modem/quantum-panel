@@ -79,7 +79,10 @@ import (
 // Pair-benchmark wizard (2026-11-21, panel 82c9969): +1 requireAuth read
 // (GET /api/benchmark/pair) and +3 requireAuth>requireCSRF mutations
 // (pair-run / pair-stop / pair-clear) — manifested here after the freeze.
-const expectedRouteRegistrationSites = 367
+// BACKEND-41 (2026-11-21, panel §2.21.2): +1 requireAuth>requireCSRF
+// mutation — POST /api/mesh/topologies/dc (DC-centric wizard create).
+// Breakdown now 118 requireAuth and 128 requireAuth>requireCSRF.
+const expectedRouteRegistrationSites = 368
 
 // unroutedHandlerExceptions lists handler-shaped package functions that are
 // intentionally NOT mux-registered, each with the reason. Everything else
@@ -399,6 +402,7 @@ var goldenRouteManifest = []routeRow{
 	{"POST {base}/api/mesh/pasarguard/reconcile", "requireAuth>requireCSRF"},
 	{"POST {base}/api/mesh/servers", "requireAuth>requireCSRF"},
 	{"POST {base}/api/mesh/topologies/generate", "requireAuth>requireCSRF"},
+	{"POST {base}/api/mesh/topologies/dc", "requireAuth>requireCSRF"},
 	{"POST {base}/api/mesh/topologies/{id}/weights", "requireAuth>requireCSRF"},
 	{"POST {base}/api/mesh/tunnels", "requireAuth>requireCSRF"},
 	{"POST {base}/api/metrics-token", "requireAuth>requireCSRF"},
