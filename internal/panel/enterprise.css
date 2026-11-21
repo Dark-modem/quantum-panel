@@ -1969,6 +1969,71 @@ html[dir="rtl"] .eng-search input { padding:9px 38px 9px 14px; }
 .cores-pick-count { color:var(--mu); font-size:12.5px; margin-inline-end:auto; }
 .cores-pick-foot { display:flex; align-items:center; justify-content:flex-end; gap:8px; }
 
+/* --- cores artifact store (§2.22): signed binaries, repo or upload ------- */
+.eng-artcard { margin-top:12px; padding:14px; }
+.eng-art-head { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+.eng-art-title { display:flex; align-items:center; gap:11px; min-width:0; }
+.eng-art-ic { width:34px; height:34px; border-radius:9px; background:color-mix(in srgb, var(--ac) 14%, transparent); color:var(--ac); display:inline-flex; align-items:center; justify-content:center; flex:none; }
+.eng-art-ic svg { width:17px; height:17px; fill:none; stroke:currentColor; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
+.eng-art-titletxt { min-width:0; }
+.eng-art-titletxt .tc-title { margin:0; font-size:14.5px; }
+.eng-art-sub { margin:0; }
+.eng-art-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.eng-art-feed { display:inline-flex; align-items:center; gap:6px; color:var(--mu); font-size:12px; white-space:nowrap; }
+.eng-art-feed .dot { width:7px; height:7px; border-radius:50%; background:var(--ok); flex:none; }
+.eng-art-feed.bad .dot { background:var(--wr); }
+.eng-art-feed.bad span { color:var(--wr); cursor:help; }
+.eng-act.danger:hover:not(:disabled) { border-color:var(--er); color:var(--er); }
+.eng-badge-repo { background:color-mix(in srgb, var(--info) 12%, transparent); color:var(--info); border:1px solid color-mix(in srgb, var(--info) 38%, transparent); }
+.eng-badge-upl { background:color-mix(in srgb, var(--mu) 12%, transparent); color:var(--tx2); border:1px solid var(--ln); }
+.eng-badge-repo svg, .eng-badge-upl svg { width:11px; height:11px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+.eng-rel.repo { color:var(--info); }
+.eng-repo-chip { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:99px; font-size:12px; font-weight:700; white-space:nowrap; color:var(--wr); background:color-mix(in srgb, var(--wr) 12%, transparent); border:1px solid color-mix(in srgb, var(--wr) 38%, transparent); }
+.eng-repo-chip bdi { direction:ltr; unicode-bidi:isolate; }
+.art-keywarn { margin-bottom:10px; padding:9px 12px; border:1px solid color-mix(in srgb, var(--wr) 40%, transparent); border-radius:9px; background:color-mix(in srgb, var(--wr) 10%, transparent); color:var(--wr); font-size:12.5px; }
+.art-tblwrap { overflow:auto; border:1px solid var(--ln); border-radius:10px; }
+.art-tbl thead th { position:static; background:var(--s2); }
+.art-tbl .art-acts { text-align:end; white-space:nowrap; }
+.art-tbl .art-acts .eng-act { margin-inline-start:6px; }
+.art-eng-id { display:block; color:var(--mu); font-size:12px; margin-top:2px; }
+.art-eng-id bdi { direction:ltr; unicode-bidi:isolate; }
+.art-dash { color:var(--mu); }
+.art-empty-hint { display:block; margin-top:6px; color:var(--mu); font-size:12.5px; }
+.art-skel { display:flex; flex-direction:column; gap:10px; padding:6px 2px; }
+.art-skel-row { display:grid; grid-template-columns:minmax(0,2fr) minmax(0,3fr) minmax(0,2fr); gap:10px; }
+/* add/replace modal */
+.art-modal-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
+.art-modal-head b { color:var(--tx); font-size:14px; }
+.art-modal-modes { display:flex; gap:8px; margin-bottom:14px; }
+.art-mode-btn { display:inline-flex; align-items:center; gap:7px; padding:7px 13px; border-radius:9px; border:1px solid var(--ln); background:var(--s2); color:var(--tx2); font:inherit; font-size:12.5px; font-weight:700; cursor:pointer; }
+.art-mode-btn svg { width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.art-mode-btn.on { background:color-mix(in srgb, var(--ac) 14%, transparent); border-color:var(--ac); color:var(--ac); }
+.art-modal-body { display:flex; flex-direction:column; gap:12px; max-height:min(58vh, 460px); overflow:auto; padding-inline-end:2px; }
+.art-pane { display:flex; flex-direction:column; gap:12px; }
+.art-field { display:flex; flex-direction:column; gap:5px; min-width:0; flex:1; }
+.art-field label, .art-field .art-lbl { color:var(--tx2); font-size:12px; font-weight:600; }
+.art-field input, .art-field select { min-height:36px; padding:0 10px; border:1px solid var(--ln); border-radius:8px; background:var(--sunk); color:var(--tx); font:inherit; font-size:13px; width:100%; box-sizing:border-box; }
+.art-field input:focus-visible, .art-field select:focus-visible { outline:2px solid var(--ent-focus, var(--ac)); outline-offset:1px; }
+.art-field-row { display:flex; gap:10px; flex-wrap:wrap; }
+.art-chips { display:flex; gap:8px; flex-wrap:wrap; }
+.art-chip { padding:7px 14px; border-radius:9px; border:1px solid var(--ln); background:var(--s2); color:var(--tx2); font:inherit; font-size:12.5px; font-weight:700; cursor:pointer; }
+.art-chip.on { background:var(--ac); border-color:var(--ac); color:#fff; }
+.art-chip-none { color:var(--mu); font-size:12.5px; padding:6px 0; }
+.art-sum { border:1px solid var(--ln); border-radius:10px; background:var(--sunk); padding:4px 12px; }
+.art-sum-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:7px 0; border-bottom:1px solid var(--ln); font-size:12.5px; }
+.art-sum-row:last-child { border-bottom:none; }
+.art-sum-row span { color:var(--mu); }
+.art-sum-row b { color:var(--tx); font-weight:600; text-align:end; overflow-wrap:anywhere; }
+.art-sum-row b.u-mono { font-family:var(--font-mono); font-size:12px; }
+.art-sum-row b.u-mono bdi { direction:ltr; unicode-bidi:isolate; }
+.art-feedbox { display:flex; flex-direction:column; gap:6px; padding:10px 12px; border:1px solid color-mix(in srgb, var(--wr) 40%, transparent); border-radius:10px; background:color-mix(in srgb, var(--wr) 10%, transparent); }
+.art-feedbox b { color:var(--wr); font-size:12.5px; }
+.art-feedbox span { color:var(--tx2); font-size:12px; overflow-wrap:anywhere; }
+.art-feedbox .eng-act { align-self:flex-start; }
+.art-modal-err { padding:9px 12px; border:1px solid color-mix(in srgb, var(--er) 40%, transparent); border-radius:9px; background:color-mix(in srgb, var(--er) 10%, transparent); color:var(--er); font-size:12.5px; white-space:pre-wrap; overflow-wrap:anywhere; }
+.art-modal-foot { display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-top:12px; }
+.art-modal-busy { color:var(--mu); font-size:12px; margin-inline-end:auto; }
+
 /* --- topology detail: the live network map (2026-11-17) ------------------ */
 .topo-map { position:relative; }
 .topo-node-accent:hover > .topo-n-bg { stroke:var(--ac); }

@@ -505,6 +505,9 @@ const I18N = {
     eng_title: "Cores",
     eng_search_ph: "Search engines by name...",
     eng_refresh: "Refresh",
+    eng_art_title: "Artifact store",
+    eng_art_sub: "Signed core binaries the agents install — fetch from the quantum-cores repo or upload manually.",
+    eng_art_add: "Add artifact",
     topo_tunnels_t: "Established tunnels",
     topology_map_t: "Topology map",
     nav_agents: "Agents",
@@ -12193,6 +12196,7 @@ async function loadCores(force) {
   try {
     const d = await api('/api/ui/engines');
     window.__coresAgents = ((d && d.agents) || []);
+    window.__engKeyCfg = !!(d && d.key_configured);
     const arts = ((d && d.artifacts) || []);
     const byEngine = {};
     arts.forEach(a => {
@@ -12266,10 +12270,19 @@ function coresEngineCard(g) {
   const hasArt = (g.builds || []).length > 0;
   const pct = total ? Math.round(installed / total * 100) : 0;
   // release line + context-aware action: never offer installation without a
-  // valid release artifact
+  // valid release artifact. When the local store has nothing but the public
+  // repo carries the core, point at the repo instead of a bare "no release".
+  const repoRow = artRepoRow(g.engine);
+  const repoNewer = hasArt && repoRow && repoRow.latest_version && g.latest &&
+    verCmp(repoRow.latest_version, g.latest) > 0 ? repoRow.latest_version : '';
   const rel = hasArt
     ? '<span class="eng-rel ok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>' + esc(tr('', 'Release available')) + '</span>'
-    : '<span class="eng-rel na"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 15.5h.01"/></svg>' + esc(tr('', 'No release available')) + '</span>';
+    : (repoRow && repoRow.latest_version
+      ? '<span class="eng-rel repo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/></svg>' + esc(tr('', 'In repo')) + ' <bdi dir="ltr">v' + esc(repoRow.latest_version) + '</bdi></span>'
+      : '<span class="eng-rel na"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 15.5h.01"/></svg>' + esc(tr('', 'No release available')) + '</span>');
+  const repoChip = repoNewer
+    ? '<span class="eng-repo-chip" title="' + esc(tr('', 'A newer version is available in the repo — add it from the artifact store')) + '">' + esc(tr('', 'Newer in repo')) + ' <bdi dir="ltr">v' + esc(repoNewer) + '</bdi></span>'
+    : '';
   let act;
   if (!hasArt) act = '<button type="button" class="eng-act" disabled title="' + esc(tr('', 'No release available')) + '">' + esc(tr('', 'Unavailable')) + '</button>';
   else if (stale > 0) act = '<button type="button" class="eng-act pri" data-cores-pick="' + esc(g.engine) + '">' + esc(tr('', 'Update')) + '</button>';
@@ -12283,7 +12296,7 @@ function coresEngineCard(g) {
     '<span class="eng-installed">' + esc(tr('', 'Installed on {n} of {m} agents').replace('{n}', String(installed)).replace('{m}', String(total))) + '</span></div>' +
     (ver ? '<span class="eng-verchip"><bdi dir="ltr">v' + esc(g.latest) + '</bdi></span>' : '') + '</div>' +
     '<div class="eng-progress" role="img" aria-label="' + esc(tr('', 'Installed on {n} of {m} agents').replace('{n}', String(installed)).replace('{m}', String(total))) + '"><div class="eng-progress-fill" style="width:' + pct + '%"></div></div>' +
-    '<div class="eng-card-foot">' + rel + outdatedNote + '<span class="u-flex-1"></span>' + act + '</div>' +
+    '<div class="eng-card-foot">' + rel + repoChip + outdatedNote + '<span class="u-flex-1"></span>' + act + '</div>' +
     '</div>';
 }
 function renderCores() {
@@ -12418,6 +12431,529 @@ async function coresUpdateAll(engine) {
     b.onclick = ev => { if (prev) prev.call(b, ev); loadCores(); };
   });
   if ((location.hash || '').indexOf('#t=cores') === 0) loadCores();
+})();
+
+// ===== Cores artifact store (§2.22) =====================================
+// The signed-binary store the agents install from. Sources: the PUBLIC
+// quantum-cores repo (GET /api/cores/available + POST .../artifacts with
+// source=repo — the panel downloads, re-verifies sha256 + ed25519, stores)
+// and the unchanged manual upload (source=upload). Provenance (source) is
+// operator-facing; agent behavior is untouched.
+let artList = null;
+let artLoading = false;
+let artError = null;
+let coresAvail = null;      // the last /api/cores/available payload
+let coresAvailErr = null;   // feed error (payload.cores=null distinguishes unreachable)
+let coresAvailBusy = false;
+let coresAvailAt = 0;       // the feed's last successful check (unix)
+let artEdit = null;         // row being replaced, null = fresh add
+let artMode = 'repo';       // modal pane: 'repo' | 'upload'
+let artPick = { core: '', version: '', arch: '' };
+let artBusy = false;
+const ART_ICO_REPO = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/></svg>';
+const ART_ICO_UPL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4"/><path d="M6 10l6-6 6 6"/><path d="M4 20h16"/></svg>';
+const ART_ENG_RE = /^[a-z][a-z0-9_-]{0,31}$/;
+const ART_VER_RE = /^[0-9A-Za-z][0-9A-Za-z._+-]{0,63}$/;
+// Same numeric-aware comparison the engine cards use; calver rows
+// (udp2raw-v20230206.0) order correctly without special cases.
+function verCmp(a, b) { return String(a || '').localeCompare(String(b || ''), 'en', { numeric: true }); }
+function artRepoRow(engine) {
+  const key = CORES_ALIAS[engine] || engine;
+  const rows = (coresAvail && coresAvail.cores) || [];
+  return rows.find(r => (CORES_ALIAS[r.core] || r.core) === key && r.latest_version) || null;
+}
+// The repo-ahead indicator: repo latest_version strictly newer than the
+// stored row's version. Equal/older/unknown → '' (renders as —).
+function artRepoNewer(row) {
+  const repo = artRepoRow(row.engine);
+  if (!repo || !repo.latest_version || !row.version) return '';
+  return verCmp(repo.latest_version, row.version) > 0 ? repo.latest_version : '';
+}
+function artSize(n) {
+  if (n == null || isNaN(n) || n <= 0) return '—';
+  const mb = n / 1048576;
+  return mb >= 1024 ? (Math.round(mb / 102.4) / 10) + ' GB' : mb >= 1 ? (Math.round(mb * 10) / 10) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+}
+function artDate(sec) {
+  if (!sec) return '—';
+  try { return new Date(sec * 1000).toLocaleDateString(currentLang === 'fa' ? 'fa-IR' : undefined, { year: 'numeric', month: 'short', day: 'numeric' }); }
+  catch (e) { return '—'; }
+}
+function artDateISO(iso) {
+  if (!iso) return '—';
+  const t = Date.parse(iso);
+  return isNaN(t) ? '—' : artDate(Math.floor(t / 1000));
+}
+function artBadge(src) {
+  const isRepo = src === 'repo';
+  return '<span class="eng-badge ' + (isRepo ? 'eng-badge-repo' : 'eng-badge-upl') + '">' + (isRepo ? ART_ICO_REPO : ART_ICO_UPL) + esc(tr('', isRepo ? 'From repo' : 'Manual upload')) + '</span>';
+}
+function artRepoChip(newer) {
+  if (!newer) return '<span class="art-dash">—</span>';
+  return '<span class="eng-repo-chip" title="' + esc(tr('', 'A newer version is available in the repo — add it from the artifact store')) + '">' +
+    esc(tr('', 'Newer in repo')) + ' <bdi dir="ltr">v' + esc(newer) + '</bdi></span>';
+}
+function artRow(a) {
+  const disp = CORES_ENGINE_NAME[a.engine] || a.engine || '—';
+  return '<tr>' +
+    '<td><b>' + esc(disp || '—') + '</b><span class="art-eng-id"><bdi dir="ltr">' + esc(a.engine || '—') + '</bdi></span></td>' +
+    '<td><bdi dir="ltr">' + esc(a.version || '—') + '</bdi></td>' +
+    '<td><bdi dir="ltr">' + esc((a.goos || '—') + ' · ' + (a.goarch || '—')) + '</bdi></td>' +
+    '<td class="num">' + esc(artSize(a.size)) + '</td>' +
+    '<td>' + artBadge(a.source) + '</td>' +
+    '<td>' + esc(artDate(a.uploaded_at)) + '</td>' +
+    '<td>' + artRepoChip(artRepoNewer(a)) + '</td>' +
+    '<td class="art-acts">' +
+    '<button type="button" class="eng-act" data-art-replace="' + esc(String(a.id)) + '">' + esc(tr('', 'Replace')) + '</button>' +
+    '<button type="button" class="eng-act danger" data-art-del="' + esc(String(a.id)) + '">' + esc(tr('', 'Delete')) + '</button>' +
+    '</td></tr>';
+}
+function artSkeleton() {
+  const one = '<div class="art-skel-row"><div class="eng-skel-line w40"></div><div class="eng-skel-line w60"></div><div class="eng-skel-line w40"></div></div>';
+  return '<div class="art-skel">' + one.repeat(3) + '</div>';
+}
+function renderArtStore() {
+  const list = $('engArtList');
+  if (!list) return;
+  // repo feed line: checked time + honest error when the feed is unreachable
+  const feed = $('engArtFeed');
+  if (feed) {
+    if (coresAvailBusy) {
+      feed.classList.remove('bad');
+      feed.innerHTML = '<i class="dot"></i>' + esc(tr('', 'Checking repo…'));
+    } else if (coresAvailErr) {
+      feed.classList.add('bad');
+      feed.innerHTML = '<i class="dot"></i><span title="' + esc(coresAvailErr) + '">' + esc(tr('', 'Repo feed error')) + '</span>';
+    } else if (coresAvailAt) {
+      feed.classList.remove('bad');
+      feed.innerHTML = '<i class="dot"></i>' + esc(tr('', 'Repo checked {d}').replace('{d}', artDate(coresAvailAt)));
+    } else {
+      feed.classList.remove('bad');
+      feed.innerHTML = '<i class="dot"></i>' + esc(tr('', 'Repo not checked yet'));
+    }
+  }
+  if (artLoading) { list.innerHTML = artSkeleton(); return; }
+  if (artError) {
+    list.innerHTML = '<div class="eng-error"><b>' + esc(tr('', 'Artifact store error')) + '</b><details><summary>' + esc(tr('', 'Details')) + '</summary><pre>' + esc(artError) + '</pre></details>' +
+      '<button type="button" class="eng-act" data-art-retry>' + esc(tr('', 'Retry')) + '</button></div>';
+    return;
+  }
+  const rows = artList || [];
+  if (!rows.length) {
+    list.innerHTML = '<div class="eng-empty"><b>' + esc(tr('', 'No artifacts stored yet.')) + '</b>' +
+      '<span class="art-empty-hint">' + esc(tr('', 'Add one from the repo — the panel downloads, verifies and stores the signed release asset.')) + '</span></div>';
+    return;
+  }
+  const keyBad = window.__engKeyCfg === false;
+  const keyWarn = keyBad
+    ? '<div class="art-keywarn">' + esc(tr('', 'The engine-artifact signing key is not configured — saving artifacts will be refused until it is set (E-ENG-03).')) + '</div>'
+    : '';
+  list.innerHTML = keyWarn +
+    '<div class="art-tblwrap"><table class="ent-tbl art-tbl"><thead><tr>' +
+    '<th>' + esc(tr('', 'Core')) + '</th><th>' + esc(tr('', 'Version')) + '</th><th>' + esc(tr('', 'OS · Arch')) + '</th>' +
+    '<th class="num">' + esc(tr('', 'Size')) + '</th><th>' + esc(tr('', 'Source')) + '</th><th>' + esc(tr('', 'Uploaded')) + '</th>' +
+    '<th>' + esc(tr('', 'Repo')) + '</th><th></th>' +
+    '</tr></thead><tbody>' + rows.map(artRow).join('') + '</tbody></table></div>';
+}
+async function loadArtStore(force) {
+  if (!$('engArtList') || artLoading) return;
+  if (!force && artList) { renderArtStore(); return; }
+  artLoading = true;
+  artError = null;
+  renderArtStore();
+  try {
+    const d = await api('/api/ui/engines/artifacts');
+    artList = (d && d.artifacts) || [];
+  } catch (e) {
+    artError = (e && e.message) || String(e);
+    artList = null;
+  } finally {
+    artLoading = false;
+    renderArtStore();
+  }
+}
+async function loadCoresAvailable(force) {
+  if (!$('engArtList') || coresAvailBusy) return;
+  if (!force && coresAvail) return;
+  coresAvailBusy = true;
+  coresAvailErr = null;
+  renderArtStore();
+  try {
+    // the feed itself never errors with the §1 envelope: unreachable comes
+    // back as 200 + cores:null + error; only auth/network failures throw
+    const d = await api('/api/cores/available' + (force ? '?refresh=1' : ''));
+    coresAvail = d && d.cores ? d : null;
+    coresAvailErr = (d && d.error) || null;
+    coresAvailAt = (d && d.checked_at) || 0;
+  } catch (e) {
+    coresAvail = null;
+    coresAvailErr = (e && e.message) || String(e);
+    coresAvailAt = 0;
+  } finally {
+    coresAvailBusy = false;
+    renderArtStore();
+    renderCores();
+  }
+}
+// Arch auto-pick: prefer the arch the enrolled agents actually report,
+// falling back to amd64, then the first listed asset arch.
+function artAutoArch(archs) {
+  if (!archs || !archs.length) return '';
+  const want = {};
+  (window.__coresAgents || []).forEach(a => { if (a && a.arch) want[a.arch] = (want[a.arch] || 0) + 1; });
+  let best = '', bestN = 0;
+  archs.forEach(x => { const n = want[x] || 0; if (n > bestN) { bestN = n; best = x; } });
+  if (bestN > 0) return best;
+  return archs.includes('amd64') ? 'amd64' : archs[0];
+}
+function artCoreArchs(core) {
+  const repo = artRepoRow(core);
+  const archs = [];
+  ((repo && repo.assets) || []).forEach(a => {
+    if (a && a.os === 'linux' && a.arch && !archs.includes(a.arch)) archs.push(a.arch);
+  });
+  return archs;
+}
+function artModalBuild() {
+  let ov = document.getElementById('artStoreModal');
+  if (ov) return ov;
+  ov = document.createElement('div');
+  ov.id = 'artStoreModal';
+  ov.className = 'ent-modal-ov';
+  ov.innerHTML =
+    '<div class="ent-modal"><div class="ent-card cores-pick-card art-modal">' +
+    '<div class="art-modal-head"><b id="artMTitle"></b><button type="button" class="mtb-toast-x" data-art-close>\u00d7</button></div>' +
+    '<div class="art-modal-modes">' +
+    '<button type="button" class="art-mode-btn" data-art-mode="repo">' + ART_ICO_REPO + esc(tr('', 'From repo')) + '</button>' +
+    '<button type="button" class="art-mode-btn" data-art-mode="upload">' + ART_ICO_UPL + esc(tr('', 'Manual upload')) + '</button>' +
+    '</div>' +
+    '<div class="art-modal-body">' +
+    '<div id="artPaneRepo">' +
+    '<div class="art-field"><label for="artCoreSel">' + esc(tr('', 'Core')) + '</label><select id="artCoreSel"></select></div>' +
+    '<div class="art-field-row">' +
+    '<div class="art-field"><label for="artVerSel">' + esc(tr('', 'Version')) + '</label><select id="artVerSel"></select></div>' +
+    '<div class="art-field" id="artVerCustomWrap" hidden><label for="artVerCustom">' + esc(tr('', 'Exact version')) + '</label><input id="artVerCustom" type="text" placeholder="0.61.0" spellcheck="false" autocomplete="off"></div>' +
+    '</div>' +
+    '<div class="art-field"><span class="art-lbl" id="artArchLbl">' + esc(tr('', 'Architecture')) + '</span><div class="art-chips" id="artArchChips" role="group" aria-labelledby="artArchLbl"></div></div>' +
+    '<div class="art-sum" id="artRepoSum"></div>' +
+    '<div class="art-feedbox" id="artRepoFeedErr" hidden></div>' +
+    '</div>' +
+    '<div id="artPaneUpload" hidden>' +
+    '<div class="art-field-row">' +
+    '<div class="art-field"><label for="artUpEngine">' + esc(tr('', 'Core id')) + '</label><input id="artUpEngine" placeholder="frp" spellcheck="false" autocomplete="off"></div>' +
+    '<div class="art-field"><label for="artUpVersion">' + esc(tr('', 'Version')) + '</label><input id="artUpVersion" placeholder="0.61.2" spellcheck="false" autocomplete="off"></div>' +
+    '</div>' +
+    '<div class="art-field-row">' +
+    '<div class="art-field"><label for="artUpArch">' + esc(tr('', 'Architecture')) + '</label><select id="artUpArch"><option>amd64</option><option>arm64</option><option>arm</option><option>386</option></select></div>' +
+    '<div class="art-field"><label for="artUpName">' + esc(tr('', 'Download name (optional)')) + '</label><input id="artUpName" spellcheck="false" autocomplete="off"></div>' +
+    '</div>' +
+    '<div class="art-field"><label for="artUpSig">' + esc(tr('', 'Signature (base64 ed25519)')) + '</label><input id="artUpSig" spellcheck="false" autocomplete="off"></div>' +
+    '<div class="art-field"><label for="artUpFile">' + esc(tr('', 'File (.tar.gz)')) + '</label><input id="artUpFile" type="file" accept=".tar.gz"></div>' +
+    '</div>' +
+    '<div class="art-modal-err" id="artErr" hidden></div>' +
+    '</div>' +
+    '<div class="art-modal-foot"><span class="art-modal-busy" id="artBusy" hidden></span>' +
+    '<button type="button" class="quantum-btn quantum-btn-secondary" data-art-close>' + esc(tr('', 'Cancel')) + '</button>' +
+    '<button type="button" class="quantum-btn quantum-btn-primary" id="artGo"></button>' +
+    '</div>' +
+    '</div></div>';
+  document.body.appendChild(ov);
+  ov.addEventListener('click', e => {
+    if (e.target === ov) { artModalClose(); return; }
+    const mode = e.target.closest('[data-art-mode]');
+    if (mode) { artModalMode(mode.getAttribute('data-art-mode')); return; }
+    if (e.target.closest('[data-art-close]')) { artModalClose(); return; }
+    const chip = e.target.closest('[data-art-arch]');
+    if (chip) { artPick.arch = chip.getAttribute('data-art-arch') || ''; artModalChips(); artModalSum(); return; }
+    const retry = e.target.closest('[data-art-feed-retry]');
+    if (retry) { loadCoresAvailable(true); return; }
+  });
+  $('artCoreSel').addEventListener('change', function () {
+    artPick.core = this.value || '';
+    artPick.version = '';
+    artPick.arch = artAutoArch(artCoreArchs(artPick.core));
+    artModalVersion();
+    artModalChips();
+    artModalSum();
+  });
+  $('artVerSel').addEventListener('change', function () {
+    artPick.version = this.value === '__custom__' ? '' : (this.value || '');
+    $('artVerCustomWrap').hidden = this.value !== '__custom__';
+    if (this.value === '__custom__') $('artVerCustom').focus();
+    artModalSum();
+  });
+  $('artVerCustom').addEventListener('input', function () { artPick.version = this.value.trim(); artModalSum(); });
+  $('artGo').addEventListener('click', artModalSubmit);
+  return ov;
+}
+function artModalClose() {
+  if (artBusy) return; // never abandon an in-flight verify-then-store request
+  modalHide(document.getElementById('artStoreModal'));
+}
+function artModalErr(msg) {
+  const el = $('artErr');
+  if (!el) return;
+  if (msg) { el.textContent = msg; el.hidden = false; }
+  else { el.textContent = ''; el.hidden = true; }
+}
+function artModalMode(mode) {
+  artMode = mode === 'upload' ? 'upload' : 'repo';
+  const ov = document.getElementById('artStoreModal');
+  if (!ov) return;
+  ov.querySelectorAll('[data-art-mode]').forEach(b => {
+    const on = b.getAttribute('data-art-mode') === artMode;
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+  $('artPaneRepo').hidden = artMode !== 'repo';
+  $('artPaneUpload').hidden = artMode !== 'upload';
+  $('artGo').textContent = tr('', artMode === 'repo' ? 'Fetch from repo' : 'Upload & verify');
+  artModalErr('');
+}
+function artModalVersion() {
+  const sel = $('artVerSel');
+  if (!sel) return;
+  const repo = artRepoRow(artPick.core);
+  if (!repo) {
+    sel.innerHTML = '<option value="">—</option>';
+    sel.disabled = true;
+    $('artVerCustomWrap').hidden = true;
+    return;
+  }
+  sel.disabled = false;
+  sel.innerHTML = '<option value="' + esc(repo.latest_version) + '"><bdi dir="ltr">v' + esc(repo.latest_version) + '</bdi> · ' + esc(tr('', 'Latest in repo')) + '</option>' +
+    '<option value="__custom__">' + esc(tr('', 'Exact version…')) + '</option>';
+  if (artPick.version === repo.latest_version || !artPick.version) sel.value = repo.latest_version;
+  else { sel.value = '__custom__'; $('artVerCustomWrap').hidden = false; $('artVerCustom').value = artPick.version; }
+}
+function artModalChips() {
+  const host = $('artArchChips');
+  if (!host) return;
+  const archs = artPick.core ? artCoreArchs(artPick.core) : [];
+  if (!artPick.core) {
+    host.innerHTML = '<span class="art-chip-none">—</span>';
+    return;
+  }
+  if (!archs.length) {
+    host.innerHTML = '<span class="art-chip-none">' + esc(tr('', 'This release lists no linux asset')) + '</span>';
+    return;
+  }
+  host.innerHTML = archs.map(x =>
+    '<button type="button" class="art-chip' + (x === artPick.arch ? ' on' : '') + '" data-art-arch="' + esc(x) + '" aria-pressed="' + (x === artPick.arch ? 'true' : 'false') + '"><bdi dir="ltr">' + esc(x) + '</bdi></button>'
+  ).join('');
+}
+function artModalSum() {
+  const host = $('artRepoSum');
+  if (!host) return;
+  const repo = artRepoRow(artPick.core);
+  if (!repo) { host.innerHTML = ''; return; }
+  const custom = artPick.version && artPick.version !== repo.latest_version;
+  const tag = custom ? repo.core + '-v' + artPick.version : repo.latest_tag;
+  const asset = repo.core + '-linux-' + (artPick.arch || '—') + '.tar.gz';
+  const listed = custom ? null : (((repo.assets || []).find(a => a && a.name === asset)) || null);
+  const row = (k, v, mono) => '<div class="art-sum-row"><span>' + esc(k) + '</span><b' + (mono ? ' class="u-mono"><bdi dir="ltr">' + esc(v) + '</bdi></b' : '>' + esc(v) + '</b') + '></div>';
+  host.innerHTML =
+    row(tr('', 'Release tag'), tag, true) +
+    row(tr('', 'Asset'), asset, true) +
+    row(tr('', 'Size'), listed ? artSize(listed.size) : '—', false) +
+    row(tr('', 'Published'), custom ? '—' : artDateISO(repo.published_at), false);
+}
+function artModalOpen(editRow) {
+  const ov = artModalBuild();
+  artEdit = editRow || null;
+  artBusy = false;
+  $('artBusy').hidden = true;
+  $('artGo').disabled = false;
+  $('artMTitle').textContent = artEdit
+    ? tr('', 'Replace artifact') + ' — ' + ((CORES_ENGINE_NAME[artEdit.engine] || artEdit.engine || '—')) +
+      (artEdit.version ? ' v' + artEdit.version : '') + (artEdit.goarch ? ' · ' + artEdit.goarch : '')
+    : tr('', 'Add artifact');
+  // preset: a repo-sourced row naturally continues from the repo; a manual
+  // upload row keeps its fields (the file itself always re-uploads — rows
+  // are immutable hash+signature pairs, there is no in-place edit)
+  artModalMode(artEdit && artEdit.source !== 'repo' ? 'upload' : 'repo');
+  artModalErr('');
+  if (artEdit && artEdit.source !== 'repo') {
+    $('artUpEngine').value = artEdit.engine || '';
+    $('artUpVersion').value = artEdit.version || '';
+    $('artUpArch').value = artEdit.goarch || 'amd64';
+    $('artUpName').value = artEdit.artifact || '';
+    $('artUpSig').value = artEdit.signature || '';
+    $('artUpFile').value = '';
+  } else {
+    artPick = { core: (artEdit && artEdit.engine) || '', version: (artEdit && artEdit.version) || '', arch: '' };
+    artModalRepoPane();
+  }
+  modalShow(ov, artModalClose);
+}
+// (Re)fills the repo pane from the current feed data — including the honest
+// empty/error state when the feed is null or unreachable.
+function artModalRepoPane() {
+  const sel = $('artCoreSel');
+  const feedErr = $('artRepoFeedErr');
+  const rows = (coresAvail && coresAvail.cores) || [];
+  if (coresAvailErr && !rows.length) {
+    feedErr.hidden = false;
+    feedErr.innerHTML = '<b>' + esc(tr('', 'The repo feed is unreachable')) + '</b><span>' + esc(coresAvailErr) + '</span>' +
+      '<button type="button" class="eng-act" data-art-feed-retry>' + esc(tr('', 'Retry')) + '</button>';
+    sel.innerHTML = '<option value="">—</option>';
+    sel.disabled = true;
+    artModalVersion();
+    artModalChips();
+    $('artRepoSum').innerHTML = '';
+    return;
+  }
+  feedErr.hidden = true;
+  feedErr.innerHTML = '';
+  if (!rows.length) {
+    sel.innerHTML = '<option value="">' + esc(tr('', 'No cores in the repo yet')) + '</option>';
+    sel.disabled = true;
+    artModalVersion();
+    artModalChips();
+    $('artRepoSum').innerHTML = '';
+    return;
+  }
+  sel.disabled = false;
+  const names = rows.slice().sort((x, y) => (CORES_ENGINE_NAME[x.core] || x.core).localeCompare(CORES_ENGINE_NAME[y.core] || y.core));
+  sel.innerHTML = '<option value="">' + esc(tr('', 'Pick a core…')) + '</option>' +
+    names.map(r => '<option value="' + esc(r.core) + '">' + esc(CORES_ENGINE_NAME[r.core] || r.core) + ' <bdi dir="ltr">v' + esc(r.latest_version || '—') + '</bdi></option>').join('');
+  sel.value = artPick.core && names.some(r => r.core === artPick.core) ? artPick.core : '';
+  artPick.core = sel.value;
+  if (!artPick.version) artPick.version = '';
+  artPick.arch = artPick.arch || artAutoArch(artCoreArchs(artPick.core));
+  artModalVersion();
+  artModalChips();
+  artModalSum();
+}
+async function artModalSubmit() {
+  if (artBusy) return;
+  artModalErr('');
+  const fd = new FormData();
+  let label = '';
+  if (artMode === 'repo') {
+    if (!artPick.core) return artModalErr(tr('', 'Pick a core first'));
+    if (!artPick.arch) return artModalErr(tr('', 'Pick an architecture'));
+    if (artPick.version && !ART_VER_RE.test(artPick.version)) return artModalErr(tr('', 'Invalid version tag'));
+    fd.append('source', 'repo');
+    fd.append('engine', artPick.core);
+    // empty version = the core's latest release tag (the backend resolves it)
+    if (artPick.version) fd.append('version', artPick.version);
+    fd.append('goos', 'linux');
+    fd.append('goarch', artPick.arch);
+    label = tr('', 'Downloading and verifying…');
+  } else {
+    const engine = $('artUpEngine').value.trim();
+    const version = $('artUpVersion').value.trim();
+    const goarch = $('artUpArch').value;
+    const name = $('artUpName').value.trim();
+    const sig = $('artUpSig').value.trim();
+    const file = $('artUpFile').files && $('artUpFile').files[0];
+    if (!ART_ENG_RE.test(engine)) return artModalErr(tr('', 'Invalid core id (lowercase letters, digits, -, _; starts with a letter)'));
+    if (!version || !ART_VER_RE.test(version)) return artModalErr(tr('', 'Invalid version tag'));
+    if (!sig) return artModalErr(tr('', 'The signature is required for manual uploads'));
+    if (!file) return artModalErr(tr('', 'Pick the artifact file'));
+    fd.append('source', 'upload');
+    fd.append('engine', engine);
+    fd.append('version', version);
+    fd.append('goos', 'linux');
+    fd.append('goarch', goarch);
+    if (name) fd.append('name', name);
+    fd.append('signature', sig);
+    fd.append('file', file);
+    label = tr('', 'Uploading and verifying…');
+  }
+  artBusy = true;
+  const go = $('artGo'), busy = $('artBusy');
+  go.disabled = true;
+  busy.hidden = false;
+  busy.textContent = label + ' ' + tr('', 'sha256 + ed25519 are verified before anything is stored');
+  try {
+    const d = await apiForm('/api/ui/engines/artifacts', fd);
+    artBusy = false;
+    busy.hidden = true;
+    go.disabled = false;
+    modalHide(document.getElementById('artStoreModal'));
+    const saved = (d && d.artifact) || String((d && d.id) || '');
+    toastOk(tr('', 'Artifact store'), tr('', 'Artifact saved: {name}').replace('{name}', String(saved || '')) +
+      (d && d.tag ? ' (' + d.tag + ')' : ''));
+    loadArtStore(true);
+    loadCores(true);
+    // replacing: offer to retire the old row now — agents may still be
+    // downloading it, so the removal stays an explicit operator decision
+    if (artEdit) {
+      const old = artEdit;
+      artEdit = null;
+      const okDel = await entConfirm(
+        tr('', 'Remove the replaced artifact?'),
+        (CORES_ENGINE_NAME[old.engine] || old.engine || '') + (old.version ? ' v' + old.version : '') +
+        (old.goarch ? ' · ' + old.goarch : '') + ' — ' + (old.artifact || ''),
+        tr('', 'Remove'));
+      if (okDel) artDeleteRow(old);
+    }
+  } catch (e) {
+    artBusy = false;
+    busy.hidden = true;
+    go.disabled = false;
+    artModalErr((e && e.message) || String(e));
+  }
+}
+async function artDeleteRow(row) {
+  try {
+    await api('/api/mesh/engines/artifacts/' + encodeURIComponent(String(row.id)), null, 'DELETE');
+    toastOk(tr('', 'Artifact store'), tr('', 'Artifact removed: {name}').replace('{name}', String(row.artifact || row.id)));
+  } catch (e) {
+    toastErr(tr('', 'Artifact store'), (e && e.message) || String(e));
+  }
+  loadArtStore(true);
+  loadCores(true);
+}
+async function artDeleteClick(id) {
+  const row = (artList || []).find(x => String(x.id) === String(id));
+  if (!row) return;
+  const ok = await entConfirm(
+    tr('', 'Delete artifact {name}?').replace('{name}', String(row.artifact || row.id)),
+    tr('', 'Agents still downloading this artifact will fail their integrity pin.'),
+    tr('', 'Delete'));
+  if (ok) artDeleteRow(row);
+}
+async function apiForm(path, fd) {
+  // multipart twin of api(): same CSRF + §1 error-envelope handling, no JSON body
+  const headers = { 'X-CSRF-Token': getCSRFToken() };
+  if (Date.now() - userActiveAt < 30000) headers['X-User-Active'] = '1';
+  const r = await fetch(at(path), { method: 'POST', headers, body: fd });
+  if (r.status === 401 && !path.endsWith('/api/login')) { showLogin(); throw new Error('session expired'); }
+  if (!r.ok) {
+    const txt = await r.text();
+    let msg = txt || r.statusText;
+    try {
+      const j = JSON.parse(txt);
+      if (j && j.error_code) msg = '[' + j.error_code + '] ' + (j.error || r.statusText) + (j.hint ? '\n\u21aa ' + j.hint : '');
+    } catch (err) { /* raw text already carried */ }
+    throw new Error(msg);
+  }
+  const data = await r.json();
+  if (data && data.csrf_token) setCSRFToken(data.csrf_token);
+  return data;
+}
+(function artStoreWire() {
+  const add = $('engArtAdd');
+  if (add) add.addEventListener('click', () => { if (!coresAvail && !coresAvailErr && !coresAvailBusy) loadCoresAvailable(); artModalOpen(null); });
+  const ref = $('engArtRefresh');
+  if (ref) ref.addEventListener('click', () => { loadArtStore(true); loadCoresAvailable(true); });
+  const card = $('engArtCard');
+  if (card) card.addEventListener('click', e => {
+    const rep = e.target.closest('[data-art-replace]');
+    if (rep) {
+      const row = (artList || []).find(x => String(x.id) === rep.getAttribute('data-art-replace'));
+      if (row) { if (!coresAvail && !coresAvailErr && !coresAvailBusy) loadCoresAvailable(); artModalOpen(row); }
+      return;
+    }
+    const del = e.target.closest('[data-art-del]');
+    if (del) { artDeleteClick(del.getAttribute('data-art-del')); return; }
+    if (e.target.closest('[data-art-retry]')) loadArtStore(true);
+  });
+  document.querySelectorAll('[data-tab="cores"]').forEach(b => b.addEventListener('click', () => { loadArtStore(); loadCoresAvailable(); }));
+  if ((location.hash || '').indexOf('#t=cores') === 0) { loadArtStore(); loadCoresAvailable(); }
 })();
 
 

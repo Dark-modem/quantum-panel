@@ -2102,6 +2102,23 @@
           </div>
         </div>
         <div class="ent-card eng-gridcard" id="engList"></div>
+        <div class="ent-card eng-artcard" id="engArtCard">
+          <div class="eng-art-head">
+            <div class="eng-art-title">
+              <span class="eng-art-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg></span>
+              <div class="eng-art-titletxt">
+                <p class="tc-title" data-i18n="eng_art_title">Artifact store</p>
+                <p class="ent-help eng-art-sub" data-i18n="eng_art_sub">Signed core binaries the agents install — fetch from the quantum-cores repo or upload manually.</p>
+              </div>
+            </div>
+            <div class="eng-art-actions">
+              <span class="eng-art-feed" id="engArtFeed"></span>
+              <button type="button" class="eng-act" id="engArtRefresh"><span data-i18n="eng_refresh">Refresh</span></button>
+              <button type="button" class="eng-act pri" id="engArtAdd"><span data-i18n="eng_art_add">Add artifact</span></button>
+            </div>
+          </div>
+          <div id="engArtList"></div>
+        </div>
       </section>
       <!-- ==================== CLUSTER TAB ==================== -->
       <section id="tab-cluster" role="tabpanel" hidden>
