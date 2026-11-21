@@ -356,3 +356,51 @@ func TestTopologyInventoryListsMatrixInstances(t *testing.T) {
 		t.Fatal("topology tunnel id regex misjudges matrix instances")
 	}
 }
+
+// Every instance in the whole pool derives a disjoint mesh /30, hub IP and
+// peer IP; the historic block (matrix2..matrix25) keeps its original
+// addresses, and nothing ever lands on the pathtest probe nets (77, 78) or
+// the legacy octet 231. A pool this size is what "no artificial tunnel
+// limit" means for the Matrix engine.
+func TestMatrixInstanceOctetsUniqueAcrossWholePool(t *testing.T) {
+	seen := map[int]string{}
+	check := func(in matrixInstance, wantSubnet string) {
+		if !in.valid() {
+			t.Fatalf("instance %s must be valid", in.ID)
+		}
+		if got := in.subnet(); got != wantSubnet {
+			t.Fatalf("%s subnet = %s, want %s", in.ID, got, wantSubnet)
+		}
+		oct := in.octet()
+		if oct == 77 || oct == 78 || oct == 231 {
+			t.Fatalf("%s landed on reserved octet %d", in.ID, oct)
+		}
+		if prev, dup := seen[oct]; dup {
+			t.Fatalf("octet %d collides between %s and %s", oct, prev, in.ID)
+		}
+		seen[oct] = in.ID
+	}
+	check(matrixLegacyInstance(), matrixSubnet)
+	for n := 2; n <= matrixMaxInstances+1; n++ {
+		in := matrixInstance{ID: "matrix" + strconv.Itoa(n)}
+		want := ""
+		switch {
+		case n <= 25:
+			want = fmt.Sprintf("10.254.%d.0/30", 230+n) // historic block, unchanged
+		case n <= 102:
+			want = fmt.Sprintf("10.254.%d.0/30", n-26)
+		default:
+			want = fmt.Sprintf("10.254.%d.0/30", n-24)
+		}
+		check(in, want)
+	}
+	if len(seen) != matrixMaxInstances+1 {
+		t.Fatalf("pool covers %d octets, want %d", len(seen), matrixMaxInstances+1)
+	}
+	if !(matrixInstance{ID: "matrix" + strconv.Itoa(matrixMaxInstances+1)}).valid() {
+		t.Fatal("top of the pool must be valid")
+	}
+	if (matrixInstance{ID: "matrix" + strconv.Itoa(matrixMaxInstances+2)}).valid() {
+		t.Fatal("instance above the cap accepted")
+	}
+}

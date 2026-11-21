@@ -38,9 +38,11 @@ const (
 	matrixBundlePfx = "hmx1_"
 
 	// matrixMaxInstances caps additional Matrix instances beyond the legacy
-	// first one, keeping the derived 10.254.232.0/30 ... 10.254.247.0/30 mesh
-	// subnets, qmx interfaces and firewall chain prefixes unique.
-	matrixMaxInstances = 16
+	// first one, every one of them a fully disjoint tinc network: its own
+	// qmx interface, systemd unit, firewall chain prefix and a /30 mesh
+	// subnet carved out by octet() — never colliding with the pathtest
+	// probe nets 10.254.77.0/30 and 10.254.78.0/30.
+	matrixMaxInstances = 250
 )
 
 var matrixMu sync.Mutex
@@ -89,24 +91,40 @@ func (in matrixInstance) chainPfx() string { return "QMX" + in.suffix() }
 func (in matrixInstance) pidFile() string  { return "/run/quantum-matrix" + in.suffix() + ".pid" }
 
 // hubIP/firstPeer/subnet: the legacy instance owns 10.254.231.0/30; instance
-// matrixN owns 10.254.(230+N).0/30, disjoint from every other instance.
+// matrixN owns a /30 carved by octet(), disjoint from every other instance.
 func (in matrixInstance) hubIP() string {
 	if in.num() == 0 {
 		return matrixHubIP
 	}
-	return "10.254." + strconv.Itoa(230+in.num()) + ".1"
+	return "10.254." + strconv.Itoa(in.octet()) + ".1"
 }
 func (in matrixInstance) firstPeer() string {
 	if in.num() == 0 {
 		return matrixFirstPeer
 	}
-	return "10.254." + strconv.Itoa(230+in.num()) + ".2"
+	return "10.254." + strconv.Itoa(in.octet()) + ".2"
 }
 func (in matrixInstance) subnet() string {
 	if in.num() == 0 {
 		return matrixSubnet
 	}
-	return "10.254." + strconv.Itoa(230+in.num()) + ".0/30"
+	return "10.254." + strconv.Itoa(in.octet()) + ".0/30"
+}
+
+// octet is the third octet of the instance's mesh /30. The historic block
+// (matrix2..matrix25 on 10.254.232..255) keeps its addresses forever; later
+// instances continue from 10.254.0.0/30 upward, skipping the pathtest probe
+// nets 77 and 78. The three ranges never overlap and never touch 231, which
+// stays reserved for the legacy instance.
+func (in matrixInstance) octet() int {
+	n := in.num()
+	if n <= 25 {
+		return 230 + n // 232..255 — the historic block, unchanged
+	}
+	if n <= 102 {
+		return n - 26 // 0..76
+	}
+	return n - 24 // 79..227
 }
 
 // matrixInstanceOfNetwork maps a tinc network name from a bundle/state onto

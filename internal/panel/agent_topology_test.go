@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -133,6 +134,31 @@ func TestAgentTunnelNextInstance(t *testing.T) {
 	}
 	if got := agentTunnelNextInstance(tunnels, "h2"); got != "matrix" {
 		t.Fatalf("expected matrix for other hub, got %q", got)
+	}
+}
+
+// One hub agent may run the whole pool: the picker walks matrix, matrix2,
+// ... up to the same cap the server enforces, and returns "" only there.
+// Twenty tunnels on one engine must never be the picker's ceiling.
+func TestAgentTunnelNextInstanceWalksWholePool(t *testing.T) {
+	var tunnels []agentTunnel
+	for n := 0; n < matrixMaxInstances; n++ { // matrix..matrix250 taken, matrix251 free
+		id := "matrix"
+		if n > 0 {
+			id = "matrix" + strconv.Itoa(n+1)
+		}
+		tunnels = append(tunnels, agentTunnel{ID: "at_" + strconv.Itoa(n+1), HubAgentID: "h1", Instance: id})
+	}
+	if got := agentTunnelNextInstance(tunnels, "h1"); got != "matrix"+strconv.Itoa(matrixMaxInstances+1) {
+		t.Fatalf("expected matrix%d, got %q", matrixMaxInstances+1, got)
+	}
+	tunnels = append(tunnels, agentTunnel{ID: "at_last", HubAgentID: "h1", Instance: "matrix" + strconv.Itoa(matrixMaxInstances+1)})
+	if got := agentTunnelNextInstance(tunnels, "h1"); got != "" {
+		t.Fatalf("pool exhausted must return empty, got %q", got)
+	}
+	// the same filled pool on another hub agent still starts from matrix
+	if got := agentTunnelNextInstance(tunnels, "h2"); got != "matrix" {
+		t.Fatalf("other hub must reuse the pool from the top, got %q", got)
 	}
 }
 
