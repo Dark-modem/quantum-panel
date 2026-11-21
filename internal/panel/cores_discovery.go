@@ -111,9 +111,10 @@ var (
 // answering 403, every failure is cached for a full minute, which caps
 // the sustained attempt rate at the 60/h ceiling itself — the panel
 // degrades into cached errors instead of hammering. Asset downloads ride
-// github.com release redirects (objects.githubusercontent.com), which are
-// NOT part of the api.github.com budget, and stay bounded by
-// engineArtifactMaxUpload + the downloader timeout.
+// github.com release redirects to the asset CDN (release-assets.githubusercontent.com
+// today, objects.githubusercontent.com legacy — both on the download allowlist,
+// isOfficialGitHubURL), which are NOT part of the api.github.com budget, and stay
+// bounded by engineArtifactMaxUpload + the downloader timeout.
 func fetchCoresReleasesCached() ([]ghRelease, error) {
 	coresRelMu.Lock()
 	defer coresRelMu.Unlock()

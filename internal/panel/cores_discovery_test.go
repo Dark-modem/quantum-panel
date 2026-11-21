@@ -910,3 +910,38 @@ func TestCoresReleasesPaginationNoTruncation(t *testing.T) {
 		t.Fatal("a page-1 failure must surface as an error")
 	}
 }
+
+// TestOfficialGitHubURLAllowlistCoversCoresRedirects pins the download
+// allowlist against what the live cores path actually produces (BACKEND-39
+// redirect-host verification, 00-ADMIN/tools/backend39-evidence/redirect-hosts.txt):
+// discovery emits github.com release-download URLs, which 302 to
+// release-assets.githubusercontent.com (GitHub's CURRENT asset CDN) —
+// objects.githubusercontent.com is the legacy host. Both CDN hosts must stay
+// allowlisted so the list describes reality; the negative control proves the
+// list still rejects non-GitHub hosts. http.Client carries no CheckRedirect,
+// so the allowlist gates the INITIAL URL only (documented, not a behavior
+// change).
+func TestOfficialGitHubURLAllowlistCoversCoresRedirects(t *testing.T) {
+	accept := []string{
+		"https://github.com/Dark-modem/quantum-cores/releases/download/frp-v0.61.1/frp-linux-amd64.tar.gz",
+		"https://release-assets.githubusercontent.com/real-asset",
+		"https://objects.githubusercontent.com/legacy-asset",
+		"https://raw.githubusercontent.com/Dark-modem/quantum-cores/main/NOTICE",
+		"https://api.github.com/repos/Dark-modem/quantum-cores/releases",
+	}
+	for _, u := range accept {
+		if !isOfficialGitHubURL(u) {
+			t.Errorf("isOfficialGitHubURL(%q) = false, want true (cores download path)", u)
+		}
+	}
+	reject := []string{
+		"https://github.com.evil.example/download.tar.gz",
+		"https://evil.example/release-assets.githubusercontent.com",
+		"",
+	}
+	for _, u := range reject {
+		if isOfficialGitHubURL(u) {
+			t.Errorf("isOfficialGitHubURL(%q) = true, want false (host confusion)", u)
+		}
+	}
+}
