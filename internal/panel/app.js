@@ -9294,7 +9294,13 @@ function bwRender() {
         const e = eng.getAttribute('data-bweng');
         const k = bwState.picked.indexOf(e);
         if (k >= 0) bwState.picked.splice(k, 1); else bwState.picked.push(e);
-        eng.classList.toggle('on', bwState.picked.indexOf(e) >= 0);
+        const on = bwState.picked.indexOf(e) >= 0;
+        eng.classList.toggle('on', on);
+        eng.setAttribute('aria-pressed', String(on));
+        // the pick check is part of the markup, not CSS-gated: swap it here
+        const mark = eng.querySelector('.tu-pick-ok');
+        if (on && !mark) eng.insertAdjacentHTML('beforeend', '<span class="tu-pick-ok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg></span>');
+        if (!on && mark) mark.remove();
         const ok = $('bwNext');
         if (ok) ok.disabled = !bwState.picked.length;
       }
@@ -9355,12 +9361,17 @@ async function bwRenderBody() {
       const nx = $('bwNext'); if (nx) nx.disabled = true;
       return;
     }
+    // the pick check renders ONLY on picked cards (like every other step) —
+    // an always-on check made unchecking look like nothing happened
     body.innerHTML = '<p class="qs-hint u-m-0">' + esc(tr('', 'Engines enabled on both agents — pick the ones to benchmark')) + '</p>' +
-      '<div class="tu-cards">' + common.map(e =>
-        '<button type="button" class="mtb-agent-card bw-card on" data-bweng="' + esc(e) + '">' +
-        '<span class="mtb-agc-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2"/></svg></span>' +
-        '<span class="mtb-agc-tx"><b>' + esc(e) + '</b></span>' +
-        '<span class="tu-pick-ok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg></span></button>').join('') + '</div>';
+      '<div class="tu-cards">' + common.map(e => {
+        const on = bwState.picked.indexOf(e) >= 0;
+        return '<button type="button" class="mtb-agent-card bw-card' + (on ? ' on' : '') + '" data-bweng="' + esc(e) + '" aria-pressed="' + on + '">' +
+          '<span class="mtb-agc-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3.2M12 18.3v3.2M2.5 12h3.2M18.3 12h3.2M5.3 5.3l2.2 2.2M16.5 16.5l2.2 2.2M18.7 5.3l-2.2 2.2M7.5 16.5l-2.2 2.2"/></svg></span>' +
+          '<span class="mtb-agc-tx"><b>' + esc(e) + '</b></span>' +
+          (on ? '<span class="tu-pick-ok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg></span>' : '') +
+          '</button>';
+      }).join('') + '</div>';
   } catch (err) {
     body.innerHTML = stateError(err.message, 'bweng', true);
   }
