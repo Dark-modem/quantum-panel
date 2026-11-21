@@ -74,7 +74,9 @@ import (
 // token-authed legacy surface), 1 notfound catch-all (/_hp/), 2 meshHandler
 // (/_hc hello/beat). Contract docs: 00-ADMIN/UI-API-CONTRACT.md (§2.x /api/ui
 // surface) and the registerer file headers for the legacy/mesh/peer families.
-const expectedRouteRegistrationSites = 362
+// BACKEND-38 (2026-11-21, panel §2.22): +1 requireAuth read —
+// GET /api/cores/available (cores discovery). Breakdown now 117 requireAuth.
+const expectedRouteRegistrationSites = 363
 
 // unroutedHandlerExceptions lists handler-shaped package functions that are
 // intentionally NOT mux-registered, each with the reason. Everything else
@@ -137,6 +139,7 @@ var goldenRouteManifest = []routeRow{
 	{"GET {base}/api/carrier/advice", "requireAuth"},
 	{"GET {base}/api/cluster/rules", "requireAuth"},
 	{"GET {base}/api/cluster/status", "requireAuth"},
+	{"GET {base}/api/cores/available", "requireAuth"},
 	{"GET {base}/api/dashboard", "requireAuth"},
 	{"GET {base}/api/dial", "requireAuth"},
 	{"GET {base}/api/doctor", "requireAuth"},

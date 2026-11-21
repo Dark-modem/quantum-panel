@@ -344,6 +344,19 @@ func handleEngineArtifactUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	name := strings.TrimSpace(r.FormValue("name"))
 	sigB64 := strings.TrimSpace(r.FormValue("signature"))
+	// source (BACKEND-38, §2.22): "" / "upload" = the manual multipart
+	// upload below, byte-for-byte unchanged; "repo" = resolve+download
+	// from the quantum-cores release feed through the SAME verify-then-
+	// store tail. Anything else is refused.
+	switch strings.TrimSpace(r.FormValue("source")) {
+	case "", "upload":
+	case "repo":
+		resolveCoreArtifactFromRepo(w, r, engine, version, goos, goarch, name, sigB64)
+		return
+	default:
+		writeAPIError(w, r, "E-IN-06", "invalid source (upload or repo)")
+		return
+	}
 
 	if !engineArtifactEngineRe.MatchString(engine) {
 		writeAPIError(w, r, "E-IN-06", "invalid engine id (lowercase letters, digits, -, _; starts with a letter)")
@@ -410,8 +423,7 @@ func handleEngineArtifactUpload(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, r, "E-SYS-01", "cannot chmod temp file: "+err.Error())
 		return
 	}
-	hasher := sha256.New()
-	size, err := io.Copy(io.MultiWriter(tmp, hasher), io.LimitReader(file, engineArtifactMaxUpload+1))
+	size, err := io.Copy(tmp, io.LimitReader(file, engineArtifactMaxUpload+1))
 	if err != nil {
 		writeAPIError(w, r, "E-IN-01", "artifact copy failed: "+err.Error())
 		return
@@ -424,44 +436,63 @@ func handleEngineArtifactUpload(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, r, "E-SYS-01", "cannot close temp file: "+err.Error())
 		return
 	}
-	shaHex := hex.EncodeToString(hasher.Sum(nil))
+	if finishEngineArtifactStore(w, r, tmpName, engine, version, goos, goarch, name, key, sig, nil) {
+		cleanup = false
+	}
+}
 
+// finishEngineArtifactStore is the ONE verify-then-store tail shared by
+// the manual upload and the repo-resolve path (BACKEND-38, §2.22): the
+// exact artifact bytes sit in tmpName (0600, closed, inside the
+// engine-artifacts dir). It recomputes sha256 over the bytes ON DISK,
+// verifies the detached ed25519 signature over those exact bytes with the
+// configured engine-artifact key (M2, fail-closed — NOTHING is stored or
+// served before this passes), upserts the row, moves the file into place
+// atomically and audits ids only. extra rides additive response fields
+// (nil = the frozen manual-upload shape). Returns true when stored. Both
+// callers load the key BEFORE any copy/download work (fail fast on a
+// misconfigured key) and pass it in.
+func finishEngineArtifactStore(w http.ResponseWriter, r *http.Request, tmpName, engine, version, goos, goarch, name string, key ed25519.PublicKey, sig []byte, extra map[string]any) bool {
 	// Signature over the EXACT bytes: read the temp file back (bounded —
-	// we just wrote it and know its size) and verify.
+	// the caller already capped its size) and recompute the digest.
 	body, err := os.ReadFile(tmpName)
 	if err != nil {
 		writeAPIError(w, r, "E-SYS-01", "cannot re-read artifact: "+err.Error())
-		return
+		return false
 	}
+	sum := sha256.Sum256(body)
+	shaHex := hex.EncodeToString(sum[:])
+
 	if !ed25519.Verify(key, body, sig) {
 		writeAPIError(w, r, "E-IN-06", "artifact signature verification FAILED (wrong key or wrong signature over the bytes)")
-		return
+		return false
 	}
 
 	s, err := MeshStore()
 	if err != nil {
 		writeAPIError(w, r, "E-SYS-01", "mesh store unavailable: "+err.Error())
-		return
+		return false
 	}
 	uploader := cfg.Username
 	row := store.EngineArtifact{
 		Engine: engine, Version: version, Goos: goos, Goarch: goarch,
-		Artifact: name, SHA256: shaHex, Size: size,
+		Artifact: name, SHA256: shaHex, Size: int64(len(body)),
 		Signature: base64.StdEncoding.EncodeToString(sig),
 		Uploader:  uploader, UploadedAt: time.Now().Unix(),
+		Source: sourceOf(extra),
 	}
 	id, err := s.UpsertEngineArtifact(row)
 	if err != nil {
 		if errors.Is(err, store.ErrArtifactHashConflict) {
 			writeAPIError(w, r, "E-ENG-01", "this engine+version+arch slot already holds a DIFFERENT build (different sha256) — pick a new version or remove the old artifact first")
-			return
+			return false
 		}
 		if strings.Contains(err.Error(), "already in use") {
 			writeAPIError(w, r, "E-ENG-02", "artifact download name is taken by another artifact")
-			return
+			return false
 		}
 		writeAPIError(w, r, "E-SYS-01", "cannot store artifact row: "+err.Error())
-		return
+		return false
 	}
 	// Row committed: move the file into place atomically (same dir, same
 	// filesystem; 0600 already set). If the move fails the row goes too.
@@ -469,14 +500,28 @@ func handleEngineArtifactUpload(w http.ResponseWriter, r *http.Request) {
 	if err := os.Rename(tmpName, finalPath); err != nil {
 		_ = s.DeleteEngineArtifact(id)
 		writeAPIError(w, r, "E-SYS-01", "cannot store artifact file: "+err.Error())
-		return
+		return false
 	}
-	cleanup = false
 	// Audit ids only — never artifact contents.
 	LogSecurityAudit("engine_artifact_uploaded", uploader, ClientIP(r),
 		fmt.Sprintf("id=%d engine=%s version=%s goos=%s goarch=%s name=%s sha256=%s size=%d",
-			id, engine, version, goos, goarch, name, shaHex, size))
-	writeJSON(w, map[string]any{"status": "stored", "id": id, "artifact": name, "sha256": shaHex, "size": size})
+			id, engine, version, goos, goarch, name, shaHex, len(body)))
+	resp := map[string]any{"status": "stored", "id": id, "artifact": name, "sha256": shaHex, "size": len(body)}
+	for k, v := range extra {
+		resp[k] = v
+	}
+	writeJSON(w, resp)
+	return true
+}
+
+// sourceOf maps the additive response fields to the row's provenance
+// column: repo-resolved artifacts carry source:"repo", manual uploads
+// default to "upload".
+func sourceOf(extra map[string]any) string {
+	if v, ok := extra["source"].(string); ok && v != "" {
+		return v
+	}
+	return "upload"
 }
 
 // handleEngineArtifactDelete removes a row + its file (operator housekeeping).

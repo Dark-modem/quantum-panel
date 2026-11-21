@@ -155,7 +155,13 @@ func githubToken() string {
 }
 
 func apiURLs(path string) []string {
-	u := releaseAPI + path
+	return apiURLsAt(releaseAPI, path)
+}
+
+// apiURLsAt is apiURLs for an arbitrary GitHub API base (BACKEND-38: the
+// cores feed reuses the exact mirror/token policy).
+func apiURLsAt(base, path string) []string {
+	u := base + path
 	// Never send the access token through a third-party mirror.
 	if githubToken() != "" {
 		return []string{u}
@@ -166,9 +172,14 @@ func apiURLs(path string) []string {
 // getJSON tries the API URL (and its mirrors, without a token) until one
 // decodes into out.
 func getJSON(path string, out any) error {
+	return getJSONAt(releaseAPI, path, out)
+}
+
+// getJSONAt is getJSON against an arbitrary GitHub API base.
+func getJSONAt(base, path string, out any) error {
 	var lastErr error
 	token := githubToken()
-	for _, u := range apiURLs(path) {
+	for _, u := range apiURLsAt(base, path) {
 		req, err := http.NewRequest("GET", u, nil)
 		if err != nil {
 			continue
