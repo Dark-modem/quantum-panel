@@ -39,6 +39,10 @@ type EngineArtifact struct {
 	Signature  string `json:"signature"`
 	Uploader   string `json:"uploader,omitempty"`
 	UploadedAt int64  `json:"uploaded_at"`
+	// Source is provenance only (BACKEND-38 §2.22): "upload" = manual
+	// multipart upload, "repo" = resolved from the quantum-cores release
+	// feed. Never part of the agent-facing integrity pins.
+	Source string `json:"source"`
 }
 
 // UpsertEngineArtifact inserts or updates one artifact row. Slot rule:
@@ -64,18 +68,18 @@ func (s *Store) UpsertEngineArtifact(a EngineArtifact) (int64, error) {
 			}
 		}
 		_, err = s.db.Exec(`UPDATE engine_artifacts
-			SET artifact = ?, size = ?, signature = ?, uploader = ?, uploaded_at = ?
+			SET artifact = ?, size = ?, signature = ?, uploader = ?, uploaded_at = ?, source = ?
 			WHERE id = ?`,
-			a.Artifact, a.Size, a.Signature, a.Uploader, a.UploadedAt, existing.ID)
+			a.Artifact, a.Size, a.Signature, a.Uploader, a.UploadedAt, a.Source, existing.ID)
 		return existing.ID, err
 	case errors.Is(err, sql.ErrNoRows):
 		if err := s.engineArtifactNameTaken(a.Artifact, 0); err != nil {
 			return 0, err
 		}
 		res, err := s.db.Exec(`INSERT INTO engine_artifacts
-			(engine, version, goos, goarch, artifact, sha256, size, signature, uploader, uploaded_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			a.Engine, a.Version, a.Goos, a.Goarch, a.Artifact, a.SHA256, a.Size, a.Signature, a.Uploader, a.UploadedAt)
+			(engine, version, goos, goarch, artifact, sha256, size, signature, uploader, uploaded_at, source)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			a.Engine, a.Version, a.Goos, a.Goarch, a.Artifact, a.SHA256, a.Size, a.Signature, a.Uploader, a.UploadedAt, a.Source)
 		if err != nil {
 			return 0, err
 		}
@@ -103,26 +107,26 @@ func (s *Store) engineArtifactNameTaken(name string, rowID int64) error {
 
 // ListEngineArtifacts returns every uploaded artifact, newest first.
 func (s *Store) ListEngineArtifacts() ([]EngineArtifact, error) {
-	return scanList(s, `SELECT id, engine, version, goos, goarch, artifact, sha256, size, signature, uploader, uploaded_at
+	return scanList(s, `SELECT id, engine, version, goos, goarch, artifact, sha256, size, signature, uploader, uploaded_at, source
 		FROM engine_artifacts ORDER BY uploaded_at DESC, id DESC`, func(a *EngineArtifact) []any {
-		return []any{&a.ID, &a.Engine, &a.Version, &a.Goos, &a.Goarch, &a.Artifact, &a.SHA256, &a.Size, &a.Signature, &a.Uploader, &a.UploadedAt}
+		return []any{&a.ID, &a.Engine, &a.Version, &a.Goos, &a.Goarch, &a.Artifact, &a.SHA256, &a.Size, &a.Signature, &a.Uploader, &a.UploadedAt, &a.Source}
 	})
 }
 
 // GetEngineArtifact returns one artifact row by id.
 func (s *Store) GetEngineArtifact(id int64) (EngineArtifact, error) {
-	return scanOne(s, `SELECT id, engine, version, goos, goarch, artifact, sha256, size, signature, uploader, uploaded_at
+	return scanOne(s, `SELECT id, engine, version, goos, goarch, artifact, sha256, size, signature, uploader, uploaded_at, source
 		FROM engine_artifacts WHERE id = ?`, func(a *EngineArtifact) []any {
-		return []any{&a.ID, &a.Engine, &a.Version, &a.Goos, &a.Goarch, &a.Artifact, &a.SHA256, &a.Size, &a.Signature, &a.Uploader, &a.UploadedAt}
+		return []any{&a.ID, &a.Engine, &a.Version, &a.Goos, &a.Goarch, &a.Artifact, &a.SHA256, &a.Size, &a.Signature, &a.Uploader, &a.UploadedAt, &a.Source}
 	}, id)
 }
 
 // GetEngineArtifactByName resolves the download name → pins (the agent
 // file endpoint uses it for a consistent 404 on unknown names).
 func (s *Store) GetEngineArtifactByName(name string) (EngineArtifact, error) {
-	return scanOne(s, `SELECT id, engine, version, goos, goarch, artifact, sha256, size, signature, uploader, uploaded_at
+	return scanOne(s, `SELECT id, engine, version, goos, goarch, artifact, sha256, size, signature, uploader, uploaded_at, source
 		FROM engine_artifacts WHERE artifact = ?`, func(a *EngineArtifact) []any {
-		return []any{&a.ID, &a.Engine, &a.Version, &a.Goos, &a.Goarch, &a.Artifact, &a.SHA256, &a.Size, &a.Signature, &a.Uploader, &a.UploadedAt}
+		return []any{&a.ID, &a.Engine, &a.Version, &a.Goos, &a.Goarch, &a.Artifact, &a.SHA256, &a.Size, &a.Signature, &a.Uploader, &a.UploadedAt, &a.Source}
 	}, name)
 }
 
