@@ -40,10 +40,15 @@ import (
 const coresReleaseAPI = "https://api.github.com/repos/Dark-modem/quantum-cores/releases"
 
 // coresTagRe is the ONLY release tag shape the cores feed accepts:
-// `<core>-v<semver>`. The core part is lowercase with -, _ allowed (the
-// same charset family as engine ids), so a parsed tag can never carry
-// path separators, "..", "?" or spaces into a download URL.
-var coresTagRe = regexp.MustCompile(`^([a-z][a-z0-9_-]*)-v(\d+\.\d+\.\d+)$`)
+// `<core>-v<semver>` where the version is 2 or 3 numeric segments — the
+// 3-segment semver (frp-v0.61.2) plus the CALVER form the repo actually
+// publishes for udp2raw (udp2raw-v20230206.0; real-feed check 2026-11-21,
+// CORES-1). The core part is lowercase with -, _ allowed (the same
+// charset family as engine ids) and the version only digits+dots, so a
+// parsed tag can never carry path separators, "..", "?" or spaces into a
+// download URL. Non-numeric or suffixed versions (v0.61.0-rc1, vX.Y.Z)
+// stay refused.
+var coresTagRe = regexp.MustCompile(`^([a-z][a-z0-9_-]*)-v(\d+\.\d+(\.\d+)?)$`)
 
 // coresAssetRe matches a usable release asset: `<core>-<os>-<arch>.tar.gz`
 // (the trailing .sig companion files are NOT usable artifacts — they ride
