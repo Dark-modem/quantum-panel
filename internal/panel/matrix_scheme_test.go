@@ -1,13 +1,13 @@
 // matrix_scheme_test.go — BACKEND-40 tests: the panel's Matrix instance
-// pool mirrored from quantum-agent @ 2f240d2 (AGENT-27). Three legs:
+// pool mirrored from quantum-agent @ 2f240d2 (AGENT-27). Two legs:
 // (1) GOLDEN ALIGNMENT — the agent's scheme values pinned as literals with
 // provenance, so any drift between the repos fails HERE first and the
 // panel re-aligns to the agent (the executor), never the other way round;
-// (2) the whole-pool sweep (panel port of the agent's
-// TestMatrixInstanceOctetsUniqueAcrossWholePool); (3) validation
-// boundaries at the lifted cap. Historical invariant: for n <= 25 the
-// derived addresses are byte-identical to the old 230+N scheme, so no
-// address any panel could previously emit has changed.
+// (2) validation boundaries at the lifted cap (the whole-pool sweep lives
+// on matrix_instances_test.go, the ui/live leg that pins every subnet).
+// Historical invariant: for n <= 25 the derived addresses are
+// byte-identical to the old 230+N scheme, so no address any panel could
+// previously emit has changed.
 
 package panel
 
@@ -63,35 +63,6 @@ func TestPanelMatrixSchemeMirrorsAgent2f240d2(t *testing.T) {
 		if got := in.subnet(); got != "10.254."+o+".0/30" {
 			t.Errorf("historic subnet changed: matrix%d subnet = %s, want 10.254.%s.0/30", n, got, o)
 		}
-	}
-}
-
-// TestMatrixInstanceOctetsUniqueAcrossWholePool is the panel port of the
-// agent's sweep test (quantum-agent @ 2f240d2): every instance in the whole
-// pool derives a disjoint mesh /30, and nothing ever lands on the pathtest
-// probe nets (77, 78) or the legacy octet 231.
-func TestMatrixInstanceOctetsUniqueAcrossWholePool(t *testing.T) {
-	seen := map[int]string{}
-	check := func(in matrixInstance) {
-		if !in.valid() {
-			t.Fatalf("instance %s must be valid", in.ID)
-		}
-		oct := in.octet()
-		if oct == 77 || oct == 78 || oct == 231 {
-			t.Fatalf("%s landed on reserved octet %d", in.ID, oct)
-		}
-		if prev, dup := seen[oct]; dup {
-			t.Fatalf("octet %d collides between %s and %s", oct, prev, in.ID)
-		}
-		seen[oct] = in.ID
-	}
-	check(matrixLegacyInstance())
-	for n := 2; n <= matrixMaxInstances+1; n++ {
-		check(matrixInstance{ID: "matrix" + strconv.Itoa(n)})
-	}
-	if len(seen) != matrixMaxInstances+1 {
-		t.Fatalf("pool covers %d octets, want %d (legacy + the whole pool, disjoint)",
-			len(seen), matrixMaxInstances+1)
 	}
 }
 

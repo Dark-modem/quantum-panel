@@ -30,6 +30,7 @@ function harness({ fa = false, topologies = [], tunnels = [], failOn } = {}) {
     if (!elements.has(id)) elements.set(id, {
       hidden: false, disabled: false, value: '', textContent: '', innerHTML: '', dataset: {},
       _attrs: {}, setAttribute(k, v) { this._attrs[k] = String(v); }, getAttribute(k) { return k in this._attrs ? this._attrs[k] : null; },
+      parentElement: { hidden: false, querySelector() { return null; } },
       classList: { _s: new Set(), toggle(c, v) { if (v === undefined) this._s.has(c) ? this._s.delete(c) : this._s.add(c); else v ? this._s.add(c) : this._s.delete(c); }, add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); }, contains(c) { return this._s.has(c); } },
       contains() { return false; },
       addEventListener(type, cb) { this[type] = cb; }
@@ -37,7 +38,7 @@ function harness({ fa = false, topologies = [], tunnels = [], failOn } = {}) {
     return elements.get(id);
   }
   const sandbox = {
-    window: {}, document: { activeElement: null, hidden: false, querySelectorAll() { return []; } },
+    window: {}, document: { activeElement: null, hidden: false, querySelectorAll() { return []; }, querySelector() { return null; }, addEventListener() {}, createElement() { return el('created'); } },
     $: el, _tunnelDetail: null, setInterval() {}, renderTunnelsList() {},
     skel: n => '<div class="ent-skel"></div>'.repeat(n || 3),
     esc: v => String(v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'),
@@ -75,7 +76,10 @@ test('add topology opens the DC wizard and never POSTs an empty topology', async
   const h = harness();
   h.sandbox.topologyCreate();
   assert.equal(h.el('topoCreateModal').hidden, false, 'the wizard modal opens');
-  assert.equal(h.calls.length, 0, 'no topology is created until the wizard finishes');
+  h.el('topoCreateName').value = 'main-mesh'; // step 1 requires a name before it advances
+  // opening the wizard pre-fetches the agent/server pools (two GETs) — what
+  // must never happen is a topology creation before the wizard finishes
+  assert.equal(h.calls.filter(c => c.url === '/api/topologies' && c.method !== 'GET').length, 0, 'no topology is created until the wizard finishes');
   assert.equal(h.wiz('topoCreate.step'), 1, 'the wizard starts at the name step');
   await openWizard(h);
   h.sandbox.topoCreateNext(); // step 2
@@ -140,8 +144,8 @@ test('completing the wizard creates the topology and adds the chosen agents', as
   h.wiz('topoCreate.values.dcIran = "Tehran-Azadi"; topoCreate.values.agentsIran = ["agt_a1", "agt_a2"];');
   h.sandbox.topoCreateNext();
   h.wiz('topoCreate.values.dcForeign = "Hetzner"; topoCreate.values.agentsForeign = ["agt_f1"];');
-  h.sandbox.topoCreateNext();
   assert.equal(h.wiz('topoCreate.step'), 3, 'the review-free flow reaches Create on step 3');
+  // the final next IS the create: finish is async (create + member-adds), await it
   await h.sandbox.topoCreateNext();
   const post = h.calls.find(c => c.url === '/api/topologies' && c.body);
   assert.ok(post, 'the topology is created exactly at the end');
@@ -165,7 +169,8 @@ test('a failed create keeps the wizard open with the API error', async () => {
   h.wiz('topoCreate.values.dcIran = "Tehran-Azadi"; topoCreate.values.agentsIran = ["agt_a1"];');
   h.sandbox.topoCreateNext();
   h.wiz('topoCreate.values.dcForeign = "Hetzner"; topoCreate.values.agentsForeign = ["agt_f1"];');
-  h.sandbox.topoCreateNext();
+  // the final next IS the create: finish is async, await it (a second next
+  // would just no-op against the busy gate)
   await h.sandbox.topoCreateNext();
   assert.equal(h.el('topoCreateModal').hidden, false, 'the modal stays open');
   assert.ok(h.toasts.some(t => t[0] === 'err' && t.join(' ').includes('boom')), 'the API failure is announced as a toast');
@@ -183,8 +188,9 @@ test('back preserves the DC and agent picks across steps', async () => {
   h.sandbox.topoCreateBack();
   assert.equal(h.wiz('topoCreate.step'), 2, 'back returns to the Iran step');
   assert.equal(h.wiz('topoCreate.values.dcIran'), 'Tehran-Azadi', 'the picked Iran DC is kept');
-  assert.deepEqual(h.wiz('topoCreate.values.agentsIran'), ['agt_a1'], 'the picked agents are kept');
-  assert.deepEqual(h.wiz('topoCreate.values.agentsForeign'), ['agt_f1'], 'the foreign picks are kept too');
+  // Array.from bridges the VM realm so deepEqual compares host arrays
+  assert.deepEqual(Array.from(h.wiz('topoCreate.values.agentsIran')), ['agt_a1'], 'the picked agents are kept');
+  assert.deepEqual(Array.from(h.wiz('topoCreate.values.agentsForeign')), ['agt_f1'], 'the foreign picks are kept too');
 });
 
 test('wizard strings carry unique Persian translations', () => {
@@ -222,7 +228,7 @@ test('the wizard footer has no Cancel; Back and Next render on opposite ends', (
   h.sandbox.topologyCreate();
   h.sandbox.topoCreateRender();
   assert.ok(h.el('topoCreateFoot').classList._s.has('next-only'), 'step 1 has no Back: the footer goes next-only');
-  h.wiz('topoCreate.values.name = "main-mesh";');
+  h.el('topoCreateName').value = 'main-mesh'; // topoCreateRead reads the input, not the state
   h.sandbox.topoCreateNext();
   assert.ok(!h.el('topoCreateFoot').classList._s.has('next-only'), 'from step 2 on the footer spreads Back and Next');
 });

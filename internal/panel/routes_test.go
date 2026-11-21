@@ -76,7 +76,10 @@ import (
 // surface) and the registerer file headers for the legacy/mesh/peer families.
 // BACKEND-38 (2026-11-21, panel §2.22): +1 requireAuth read —
 // GET /api/cores/available (cores discovery). Breakdown now 117 requireAuth.
-const expectedRouteRegistrationSites = 363
+// Pair-benchmark wizard (2026-11-21, panel 82c9969): +1 requireAuth read
+// (GET /api/benchmark/pair) and +3 requireAuth>requireCSRF mutations
+// (pair-run / pair-stop / pair-clear) — manifested here after the freeze.
+const expectedRouteRegistrationSites = 367
 
 // unroutedHandlerExceptions lists handler-shaped package functions that are
 // intentionally NOT mux-registered, each with the reason. Everything else
@@ -135,6 +138,7 @@ var goldenRouteManifest = []routeRow{
 	{"GET {base}/api/audit", "requireAuth"},
 	{"GET {base}/api/bagher", "requireAuth"},
 	{"GET {base}/api/benchmark", "requireAuth"},
+	{"GET {base}/api/benchmark/pair", "requireAuth"},
 	{"GET {base}/api/carrier", "requireAuth"},
 	{"GET {base}/api/carrier/advice", "requireAuth"},
 	{"GET {base}/api/cluster/rules", "requireAuth"},
@@ -342,6 +346,9 @@ var goldenRouteManifest = []routeRow{
 	{"POST {base}/api/bagher", "requireAuth>requireCSRF"},
 	{"POST {base}/api/benchmark/apply", "requireAuth>requireCSRF"},
 	{"POST {base}/api/benchmark/autopilot", "requireAuth>requireCSRF"},
+	{"POST {base}/api/benchmark/pair-clear", "requireAuth>requireCSRF"},
+	{"POST {base}/api/benchmark/pair-run", "requireAuth>requireCSRF"},
+	{"POST {base}/api/benchmark/pair-stop", "requireAuth>requireCSRF"},
 	{"POST {base}/api/benchmark/run", "requireAuth>requireCSRF"},
 	{"POST {base}/api/carrier", "requireAuth>requireLegacy>requireCSRF"},
 	{"POST {base}/api/cluster/dns", "requireAuth>requireCSRF"},

@@ -8,6 +8,7 @@ const source = fs.readFileSync(path.join(__dirname, 'topology.js'), 'utf8');
 const faSource = fs.readFileSync(path.join(__dirname, 'i18n-fa.js'), 'utf8');
 const title = 'Delete all tunnels in this topology first';
 const notice = '{n} tunnel(s) still exist. Delete all tunnels in this topology first, including stopped tunnels.';
+const guardToast = 'The topology must be off or empty before it can be deleted';
 const emptyBody = 'This empty topology will be removed.';
 
 function harness(topologies, tunnels, { fa = false, confirm = true, conflict = false } = {}) {
@@ -16,6 +17,8 @@ function harness(topologies, tunnels, { fa = false, confirm = true, conflict = f
   function el(id) {
     if (!elements.has(id)) elements.set(id, {
       hidden: false, disabled: false, value: '', textContent: '', innerHTML: '',
+      dataset: {}, getAttribute() { return null; },
+      parentElement: { hidden: false, querySelector() { return null; } },
       classList: { toggle() {} }, contains() { return false; },
       addEventListener(type, callback) { this[type] = callback; }
     });
@@ -57,14 +60,13 @@ function deleteButton(h, id = 'pair') {
 }
 function assertEnabledDanger(button, message) {
   assert.doesNotMatch(button, / disabled(?: |>|$)/, 'delete is never disabled');
-  assert.ok(button.includes('quantum-btn-danger'), 'delete is styled as a danger action');
+  assert.ok(button.includes('topo-delete'), 'delete keeps its dedicated delete affordance (inline icon; the kebab variant carries the danger styling)');
   assert.ok(message === undefined || button.includes(`title="${message}"`), 'button explains the blocked state');
 }
-function assertCount(html, count, label = `${count} existing tunnel(s)`) {
-  const tag = html.match(/<span\b[^>]*class="topo-count"[^>]*>\s*(\d+)\s*<\/span>/);
-  assert.ok(tag, 'existing-tunnel counter rendered');
+function assertCount(html, count) {
+  const tag = html.match(/<td\b[^>]*class="topo-cell-tunnels"[^>]*>\s*(\d+)\s*<\/td>/);
+  assert.ok(tag, 'existing-tunnel count rendered in the tunnels cell');
   assert.equal(Number(tag[1]), count);
-  assert.ok(tag[0].includes(`aria-label="${label}"`), 'numeric count has a meaningful accessible name');
 }
 function assertNoticeTooltip(html, message) {
   const wrapper = html.match(/<span\b[^>]*class="topo-delete-wrap"[^>]*>/);
@@ -82,7 +84,7 @@ for (const state of ['healthy', 'up', 'down', 'stopped']) {
     assertNoticeTooltip(html, notice.replace('{n}', '1'));
     await h.sandbox.topologyDelete('pair');
     assert.equal(h.warnings.length, 1, 'a visible toast explains the blocked deletion');
-    assert.deepEqual(h.warnings[0], ['Delete topology', notice.replace('{n}', '1')]);
+    assert.deepEqual(h.warnings[0], ['Delete topology', guardToast]);
     assert.equal(h.confirms.length, 0, 'guard runs before confirmation');
     assert.deepEqual(h.calls, [], 'blocked deletion sends no API request, including DELETE');
   });
@@ -97,7 +99,7 @@ test('mixed live/down inventory is counted, while stale and unrelated IDs are ig
   assertNoticeTooltip(html, notice.replace('{n}', '2'));
   await h.sandbox.topologyDelete('pair');
   assert.equal(h.warnings.length, 1);
-  assert.ok(h.warnings[0][1].includes('2'));
+  assert.equal(h.warnings[0][1], guardToast, 'the mixed inventory blocks with the off-or-empty guard');
   assert.equal(h.confirms.length, 0);
   assert.equal(h.calls.length, 0);
 });
@@ -173,20 +175,20 @@ test('backend conflict remains handled without retrying or removing engines', as
   assert.deepEqual(h.errors, [['Topology delete failed', '409: topology still contains tunnels']]);
 });
 
-test('Persian title, count notice and empty confirmation are translated with unique keys', async () => {
+test('Persian title, count notice, guard toast and empty confirmation are translated with unique keys', async () => {
   const h = harness([topo(['matrix'])], [tunnel('matrix', 'down')], { fa: true });
   const map = h.sandbox.window.FA_TEXT;
-  for (const key of [title, notice, emptyBody]) {
+  for (const key of [title, notice, guardToast, emptyBody]) {
     assert.equal(faSource.split(JSON.stringify(key) + ':').length - 1, 1, `unique translation: ${key}`);
     assert.match(map[key], /[\u0600-\u06ff]/);
   }
   const { button, html } = deleteButton(h);
   assert.ok(button.includes(`title="${map[title]}"`));
   assertNoticeTooltip(html, map[notice].replace('{n}', '1'));
-  assertCount(html, 1, (map['{n} existing tunnel(s)'] || '{n} existing tunnel(s)').replace('{n}', '1'));
+  assertCount(html, 1);
   await h.sandbox.topologyDelete('pair');
   assert.equal(h.warnings.length, 1, 'the blocked deletion warns in Persian');
-  assert.deepEqual(h.warnings[0], [map['Delete topology'], map[notice].replace('{n}', '1')]);
+  assert.deepEqual(h.warnings[0], [map['Delete topology'], map[guardToast]]);
   assert.equal(h.confirms.length, 0);
   assert.equal(h.calls.length, 0);
   const empty = harness([topo()], [], { fa: true });

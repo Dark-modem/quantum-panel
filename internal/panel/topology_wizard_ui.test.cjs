@@ -22,6 +22,8 @@ function harness({ fa = false, topologies, tunnels, failOn, failCode, failMessag
   function el(id) {
     if (!elements.has(id)) elements.set(id, {
       hidden: false, disabled: false, value: id === 'jFRPTransport' ? 'tcp' : id === 'jDial' ? 'auto' : '', textContent: '', innerHTML: '', dataset: {},
+      getAttribute() { return null; },
+      parentElement: { hidden: false, querySelector() { return null; } },
       classList: { _s: new Set(), toggle(c, v) { if (v === undefined) this._s.has(c) ? this._s.delete(c) : this._s.add(c); else v ? this._s.add(c) : this._s.delete(c); }, add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); }, contains(c) { return this._s.has(c); } },
       contains() { return false; },
       addEventListener(type, cb) { this[type] = cb; }
