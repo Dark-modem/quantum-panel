@@ -79,7 +79,11 @@ import (
 // BACKEND-41 (2026-11-21, panel §2.21.2): +1 requireAuth>requireCSRF
 // mutation — POST /api/mesh/topologies/dc (DC-centric wizard create).
 // Breakdown now 128 requireAuth>requireCSRF.
-const expectedRouteRegistrationSites = 368
+// BACKEND-42 (2026-11-22, panel §2.23): +2 requireAuth reads —
+// GET /api/benchmark/method-board (method-probe board) and
+// GET /api/optimization/kernel (kernel-tuning read surface).
+// Breakdown now 119 requireAuth.
+const expectedRouteRegistrationSites = 370
 
 // unroutedHandlerExceptions lists handler-shaped package functions that are
 // intentionally NOT mux-registered, each with the reason. Everything else
@@ -180,6 +184,7 @@ var goldenRouteManifest = []routeRow{
 	{"GET {base}/api/mesh/usage", "requireAuth"},
 	{"GET {base}/api/mesh/weights/check", "requireAuth"},
 	{"GET {base}/api/metrics-token", "requireAuth"},
+	{"GET {base}/api/optimization/kernel", "requireAuth"},
 	{"GET {base}/api/pathtest", "requireAuth"},
 	{"GET {base}/api/peer/config", "requireAuth"},
 	{"GET {base}/api/peer/rescue-offer", "requireRescuePeerAuth"},
@@ -344,6 +349,7 @@ var goldenRouteManifest = []routeRow{
 	{"POST {base}/api/alerts", "requireAuth>requireCSRF"},
 	{"POST {base}/api/bagher", "requireAuth>requireCSRF"},
 	{"POST {base}/api/benchmark/apply", "requireAuth>requireCSRF"},
+	{"GET {base}/api/benchmark/method-board", "requireAuth"},
 	{"GET {base}/api/benchmark/pair", "requireAuth"},
 	{"POST {base}/api/benchmark/pair-clear", "requireAuth>requireCSRF"},
 	{"POST {base}/api/benchmark/pair-run", "requireAuth>requireCSRF"},
