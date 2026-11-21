@@ -68,7 +68,7 @@ func fakeCoresReleases() []ghRelease {
 		rel("gost-v3.0.0", asset("gost-linux-amd64.tar.gz", 11000000)),
 		rel("chisel-v1.10.1", asset("chisel-linux-amd64.tar.gz", 8000000)),
 		rel("wstunnel-v10.1.4", asset("wstunnel-linux-amd64.tar.gz", 15000000)),
-		rel("udp2raw-v1.0.0", asset("udp2raw-linux-amd64.tar.gz", 700000)),
+		rel("udp2raw-v20230206.0", asset("udp2raw-linux-amd64.tar.gz", 700000)), // REAL repo shape: calver, 2 numeric segments
 		rel("ctunnel-v0.4.2", asset("ctunnel-linux-amd64.tar.gz", 2500000)),
 		rel("not-a-core-tag"),         // wrong shape → ignored
 		{Tag: "draft-x", Draft: true}, // draft → ignored
@@ -164,6 +164,13 @@ func TestCoresAvailableDiscovery(t *testing.T) {
 	}
 	if !strings.HasPrefix(a0["url"].(string), "https://github.com/Dark-modem/quantum-cores/releases/download/") {
 		t.Fatalf("asset url wrong: %v", a0["url"])
+	}
+	// The REAL udp2raw calver shape surfaces with its version intact.
+	for _, c := range cores {
+		m := c.(map[string]any)
+		if m["core"] == "udp2raw" && m["latest_tag"] != "udp2raw-v20230206.0" {
+			t.Fatalf("udp2raw calver tag lost: %v", m)
+		}
 	}
 	// xray covers all four store arch enums.
 	for _, c := range cores {
@@ -305,6 +312,32 @@ func TestCoresAvailableCache(t *testing.T) {
 	coresAvailable(t, "")
 	if fails != 2 {
 		t.Fatalf("failure cache must expire after a minute (fails=%d)", fails)
+	}
+}
+
+// TestCoresTagShape: the ONLY tags the feed accepts — 3-segment semver
+// AND the calver form the real repo publishes for udp2raw; suffixed,
+// non-numeric and no-"v" tags stay refused.
+func TestCoresTagShape(t *testing.T) {
+	for tag, ok := range map[string]bool{
+		"frp-v0.61.2":         true,
+		"udp2raw-v20230206.0": true, // real calver release (2026-11-21 feed check)
+		"x-v-v1.2.3":          true, // dashed core name, greedy back to the last -v
+		"wstunnel-v10.1.9":    true,
+		"frp-v0.61":           true,  // 2 numeric segments are accepted (calver family)
+		"frp-0.61.2":          false, // no leading v
+		"frp-v0.61.0-beta1":   false, // suffixed
+		"frp-vX.Y.Z":          false, // non-numeric
+		"frp-v..":             false, // empty segments
+		"frp-v1.2.3.4":        false, // 4 segments
+		"../evil-v1.2.3":      false, // path traversal in the core part
+		"frp/../v1.2.3":       false, // path traversal inside
+		"not-a-core-tag":      false,
+		"":                    false,
+	} {
+		if got := coresTagRe.MatchString(tag); got != ok {
+			t.Fatalf("coresTagRe(%q) = %v, want %v", tag, got, ok)
+		}
 	}
 }
 
