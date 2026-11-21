@@ -161,6 +161,9 @@ var uiDetailAllowed = map[string]bool{
 	"arch":         true, "module": true, "op": true, "field": true,
 	"retry_after_s": true, "raw": true, "reason": true, "role": true,
 	"side": true, "datacenters": true,
+	// BACKEND-41 (§2.21.2 addendum): the agent-subset analog of `tunnels`
+	// for the E-TOPOLOGY-DC-CONFLICT envelope — the offending agent ids.
+	"agents": true,
 }
 
 var uiSecretLike = regexp.MustCompile(`(?i)(key|token|secret|password|passwd|psk|auth|cookie|credential|pin\b)`)

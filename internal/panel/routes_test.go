@@ -76,7 +76,10 @@ import (
 // surface) and the registerer file headers for the legacy/mesh/peer families.
 // BACKEND-38 (2026-11-21, panel §2.22): +1 requireAuth read —
 // GET /api/cores/available (cores discovery). Breakdown now 117 requireAuth.
-const expectedRouteRegistrationSites = 363
+// BACKEND-41 (2026-11-21, panel §2.21.2): +1 requireAuth>requireCSRF
+// mutation — POST /api/mesh/topologies/dc (DC-centric wizard create).
+// Breakdown now 128 requireAuth>requireCSRF.
+const expectedRouteRegistrationSites = 364
 
 // unroutedHandlerExceptions lists handler-shaped package functions that are
 // intentionally NOT mux-registered, each with the reason. Everything else
@@ -392,6 +395,7 @@ var goldenRouteManifest = []routeRow{
 	{"POST {base}/api/mesh/pasarguard/reconcile", "requireAuth>requireCSRF"},
 	{"POST {base}/api/mesh/servers", "requireAuth>requireCSRF"},
 	{"POST {base}/api/mesh/topologies/generate", "requireAuth>requireCSRF"},
+	{"POST {base}/api/mesh/topologies/dc", "requireAuth>requireCSRF"},
 	{"POST {base}/api/mesh/topologies/{id}/weights", "requireAuth>requireCSRF"},
 	{"POST {base}/api/mesh/tunnels", "requireAuth>requireCSRF"},
 	{"POST {base}/api/metrics-token", "requireAuth>requireCSRF"},
