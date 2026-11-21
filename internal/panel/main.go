@@ -914,6 +914,9 @@ func buildPanelMux(base string) *http.ServeMux {
 	// ride POST /api/mesh/engines/artifacts with source=repo
 	// (cores_discovery.go) behind the UNCHANGED M2 verify-then-store gate.
 	mux.HandleFunc("GET "+base+"/api/cores/available", requireAuth(handleCoresAvailable))
+	// the cores MANIFEST.json cache feeds §2.22's methods[] passthrough and
+	// the method-probe board's manifest join (BACKEND-43) — wire the seams
+	wireCoresManifestJoin()
 
 	// Mesh management plane (Phase 2B): the SQLite store is the authority
 	// for the new model; legacy JSON features above stay frozen and never
@@ -1027,6 +1030,14 @@ func buildPanelMux(base string) *http.ServeMux {
 	mux.HandleFunc("GET "+base+"/api/benchmark/pair", requireAuth(handleBenchmarkPairGet))
 	mux.HandleFunc("POST "+base+"/api/benchmark/pair-stop", requireAuth(requireCSRF(handleBenchmarkPairStop)))
 	mux.HandleFunc("POST "+base+"/api/benchmark/pair-clear", requireAuth(requireCSRF(handleBenchmarkPairClear)))
+	// Method-probe board (BACKEND-42, §2.23.1): cached board + single-flight
+	// background refresh with run=1 — one GET, reads only, the probe run is
+	// the mutating part (audited)
+	mux.HandleFunc("GET "+base+"/api/benchmark/method-board", requireAuth(handleMethodBoard))
+
+	// Kernel-tuning read surface (BACKEND-42, §2.23.2): read-only per-agent
+	// diagnostics, single-flight probe with run=1
+	mux.HandleFunc("GET "+base+"/api/optimization/kernel", requireAuth(handleOptimizationKernel))
 	// Path test: which transports cross between the two servers, before any tunnel
 	mux.HandleFunc("GET "+base+"/api/pathtest", requireAuth(handlePathTestGet))
 	mux.HandleFunc("POST "+base+"/api/pathtest", requireAuth(requireCSRF(handlePathTestPost)))
