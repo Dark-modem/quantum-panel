@@ -1451,6 +1451,27 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 .topo-create-flag { display: flex; justify-content: center; padding: 4px 0 2px; }
 .topo-create-flag svg { width: 46px; height: 32px; }
 
+/* ---------- DC-centric create wizard (contract §2.21) ---------- */
+/* The name step previews the slug the creation endpoint enforces
+   ([a-z0-9-_], 1-64): the live cleaned form sits next to the rule text. */
+.topo-create-slug { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.topo-create-slug code {
+  font-size: 12px; padding: 2px 8px; border-radius: var(--r-md);
+  border: 1px solid var(--ln2); background: var(--sunk); color: var(--tx2);
+}
+/* The structured §1 failure strip (409 DC conflict, per-agent 400s): title
+   row plus the offending details (side / datacenters / agents). */
+#topoCreateModal .xr-err b { font-weight: 700; }
+.topo-create-err-det { margin-top: 6px; opacity: .92; display: grid; gap: 2px; }
+/* The online/offline chip on the agent checklist cards: online agents stand
+   out (the operator's honest signal), offline cards dim slightly but stay
+   selectable — delivery reaches them at hello. */
+.topo-create-st { margin-inline-start: auto; flex: none; }
+.topo-create-off { opacity: .78; }
+/* The server-defaults line on the foreign step (§2.21.3: engine/tpp/push are
+   the endpoint's defaults, shown as a fact, not a control). */
+.topo-create-dflt { color: var(--tx2); }
+
 /* ---------- Wizard footer: two actions, opposite ends ---------- */
 /* Cancel lives only in the header ×. Back and Next are spread to opposite
    sides of the bar with space-between; flex follows the panel's dir

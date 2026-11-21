@@ -204,6 +204,11 @@ async function api(path, body, method) {
       if (j.error_code) {
         const e = new Error((j.error_code ? '[' + j.error_code + '] ' : '') + (j.error || r.statusText) + (j.hint ? '\n\u21AA ' + j.hint : ''));
         e.code = j.error_code; e.hint = j.hint; e.steps = j.steps;
+        // the §1 structured packet (ui.title/what_to_do/details): surfaces that
+        // render the localized detailed form read it from here — additive,
+        // existing code keeps using code/hint/steps
+        e.ui = j.ui || null;
+        e.status = j.http_status;
         throw e;
       }
     } catch(e) { if (e.code) throw e; }
