@@ -20,12 +20,15 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -764,5 +767,181 @@ func TestEngineArtifactFromRepoHostileInput(t *testing.T) {
 	arts, _ := env.store.ListEngineArtifacts()
 	if len(arts) != 1 || arts[0].Source != "upload" {
 		t.Fatalf("manual upload provenance: %+v", arts)
+	}
+}
+
+// ---- BACKEND-39 live-path hardening: releases pagination ------------------
+
+// coresPagesServer serves a GitHub-API-shaped paged release list over a
+// local server: requests carry ?per_page=100&page=N and the handler
+// answers with exactly per_page contract-shaped releases until the tail
+// page (core000-v1.0.0 …, one <core>-linux-amd64.tar.gz asset each). Every
+// raw query is recorded so the test can assert the paging contract.
+func coresPagesServer(t *testing.T, total int) (*httptest.Server, *[]string) {
+	t.Helper()
+	var mu sync.Mutex
+	var queries []string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		queries = append(queries, r.URL.RawQuery)
+		mu.Unlock()
+		pp, _ := strconv.Atoi(r.URL.Query().Get("per_page"))
+		page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+		if pp != 100 || page < 1 {
+			// The loop MUST ask per_page=100: with the param lost GitHub's
+			// default 30 would silently truncate every feed page.
+			http.Error(w, fmt.Sprintf("bad paging request: %q", r.URL.RawQuery), 400)
+			return
+		}
+		start, end := (page-1)*pp, page*pp
+		if start > total {
+			start = total
+		}
+		if end > total {
+			end = total
+		}
+		rels := make([]ghRelease, 0, end-start)
+		for i := start; i < end; i++ {
+			name := fmt.Sprintf("core%03d", i)
+			rels = append(rels, ghRelease{
+				Tag: name + "-v1.0.0",
+				Assets: []ghAsset{{
+					Name:               name + "-linux-amd64.tar.gz",
+					Size:               1000 + int64(i),
+					BrowserDownloadURL: "https://github.com/Dark-modem/quantum-cores/releases/download/" + name + "-v1.0.0/" + name + "-linux-amd64.tar.gz",
+				}},
+			})
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(rels)
+	}))
+	t.Cleanup(ts.Close)
+	return ts, &queries
+}
+
+// coresAPISeam points coresReleaseAPI at a local server for the duration
+// of one test (the var exists purely as this seam) and pins a token so
+// apiURLsAt never builds third-party mirror fallbacks — the failing-page
+// cases below must stay fully hermetic, no mirror egress.
+func coresAPISeam(t *testing.T, tsURL string) {
+	t.Helper()
+	old := coresReleaseAPI
+	coresReleaseAPI = tsURL
+	t.Cleanup(func() { coresReleaseAPI = old })
+	t.Setenv("GRE_GITHUB_TOKEN", "hermetic-pagination-test-token")
+}
+
+// TestCoresReleasesPaginationNoTruncation drives the REAL paging loop
+// (fetchCoresReleasesUncached → getJSONAt) over a local page-shaped
+// server. >30 releases must not silently truncate: the loop asks
+// per_page=100 (GitHub's default 30 would cut every feed), walks pages
+// until a short page, and a mid-list failure keeps the pages already
+// fetched (documented keep-what-we-have semantics) while a page-1 failure
+// surfaces as an error.
+func TestCoresReleasesPaginationNoTruncation(t *testing.T) {
+	// 45 releases — just past GitHub's per_page default of 30.
+	ts, queries := coresPagesServer(t, 45)
+	coresAPISeam(t, ts.URL)
+	rels, err := fetchCoresReleasesUncached()
+	if err != nil {
+		t.Fatalf("45-release feed: %v", err)
+	}
+	if len(rels) != 45 {
+		t.Fatalf("pagination truncated: got %d releases, want 45", len(rels))
+	}
+	if rows := discoverCores(rels); len(rows) != 45 {
+		t.Fatalf("discovery over the paged feed: %d rows, want 45", len(rows))
+	}
+	if len(*queries) != 1 || !strings.Contains((*queries)[0], "per_page=100") {
+		t.Fatalf("one short page must cost one per_page=100 request, got %q", *queries)
+	}
+
+	// 250 releases across 3 pages (100+100+50) — nothing dropped at page
+	// breaks, and the loop stops after the short page.
+	ts250, queries250 := coresPagesServer(t, 250)
+	coresAPISeam(t, ts250.URL)
+	rels, err = fetchCoresReleasesUncached()
+	if err != nil {
+		t.Fatalf("250-release feed: %v", err)
+	}
+	if len(rels) != 250 {
+		t.Fatalf("multi-page pagination: got %d releases, want 250", len(rels))
+	}
+	if rows := discoverCores(rels); len(rows) != 250 {
+		t.Fatalf("discovery over the multi-page feed: %d rows, want 250", len(rows))
+	}
+	wantQ := []string{"per_page=100&page=1", "per_page=100&page=2", "per_page=100&page=3"}
+	if len(*queries250) != len(wantQ) {
+		t.Fatalf("page requests = %q, want %q", *queries250, wantQ)
+	}
+	for i, q := range wantQ {
+		if (*queries250)[i] != q {
+			t.Fatalf("page request %d = %q, want %q", i, (*queries250)[i], q)
+		}
+	}
+
+	// A failure on page ≥2 keeps what earlier pages returned, without an
+	// error (a partial honest answer beats none); page 1 failing IS an
+	// error.
+	srvPage1 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+		if page > 1 {
+			http.Error(w, "page 2 exploded", 500)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode([]ghRelease{{Tag: "core000-v1.0.0"}})
+	}))
+	t.Cleanup(srvPage1.Close)
+	coresAPISeam(t, srvPage1.URL)
+	rels, err = fetchCoresReleasesUncached()
+	if err != nil {
+		t.Fatalf("mid-list failure must keep page 1: %v", err)
+	}
+	if len(rels) != 1 {
+		t.Fatalf("mid-list failure kept %d releases, want page 1 only", len(rels))
+	}
+	srvDead := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "down", 500)
+	}))
+	t.Cleanup(srvDead.Close)
+	coresReleaseAPI = srvDead.URL
+	if _, err := fetchCoresReleasesUncached(); err == nil {
+		t.Fatal("a page-1 failure must surface as an error")
+	}
+}
+
+// TestOfficialGitHubURLAllowlistCoversCoresRedirects pins the download
+// allowlist against what the live cores path actually produces (BACKEND-39
+// redirect-host verification, 00-ADMIN/tools/backend39-evidence/redirect-hosts.txt):
+// discovery emits github.com release-download URLs, which 302 to
+// release-assets.githubusercontent.com (GitHub's CURRENT asset CDN) —
+// objects.githubusercontent.com is the legacy host. Both CDN hosts must stay
+// allowlisted so the list describes reality; the negative control proves the
+// list still rejects non-GitHub hosts. http.Client carries no CheckRedirect,
+// so the allowlist gates the INITIAL URL only (documented, not a behavior
+// change).
+func TestOfficialGitHubURLAllowlistCoversCoresRedirects(t *testing.T) {
+	accept := []string{
+		"https://github.com/Dark-modem/quantum-cores/releases/download/frp-v0.61.1/frp-linux-amd64.tar.gz",
+		"https://release-assets.githubusercontent.com/real-asset",
+		"https://objects.githubusercontent.com/legacy-asset",
+		"https://raw.githubusercontent.com/Dark-modem/quantum-cores/main/NOTICE",
+		"https://api.github.com/repos/Dark-modem/quantum-cores/releases",
+	}
+	for _, u := range accept {
+		if !isOfficialGitHubURL(u) {
+			t.Errorf("isOfficialGitHubURL(%q) = false, want true (cores download path)", u)
+		}
+	}
+	reject := []string{
+		"https://github.com.evil.example/download.tar.gz",
+		"https://evil.example/release-assets.githubusercontent.com",
+		"",
+	}
+	for _, u := range reject {
+		if isOfficialGitHubURL(u) {
+			t.Errorf("isOfficialGitHubURL(%q) = true, want false (host confusion)", u)
+		}
 	}
 }

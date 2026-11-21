@@ -36,8 +36,10 @@ import (
 )
 
 // coresReleaseAPI is the releases API of the cores repository (public —
-// the mirror/token logic of getJSONAt applies unchanged).
-const coresReleaseAPI = "https://api.github.com/repos/Dark-modem/quantum-cores/releases"
+// the mirror/token logic of getJSONAt applies unchanged). A var purely as
+// a test seam: the BACKEND-39 pagination test points it at a local
+// page-shaped server; production always holds the real URL.
+var coresReleaseAPI = "https://api.github.com/repos/Dark-modem/quantum-cores/releases"
 
 // coresTagRe is the ONLY release tag shape the cores feed accepts:
 // `<core>-v<semver>` where the version is 2 or 3 numeric segments — the
@@ -99,6 +101,20 @@ var (
 // fetchCoresReleasesCached caches the cores release list for 10 minutes
 // (failures for 1 minute) — the same L23 rate-limit protection the
 // panel-update feed rides.
+//
+// GitHub rate-limit math (BACKEND-39 live-path hardening, unauthenticated
+// budget = 60 requests/hour per IP on api.github.com): the discovery
+// handler and the repo-resolve path share THIS ONE cache, so a polling
+// panel costs at most one feed request per 10 minutes = 6/h — a tenth of
+// the budget. The authenticated ?refresh=1 drop is throttled to 30 s
+// (worst case 2/min by a scripting operator); once GitHub starts
+// answering 403, every failure is cached for a full minute, which caps
+// the sustained attempt rate at the 60/h ceiling itself — the panel
+// degrades into cached errors instead of hammering. Asset downloads ride
+// github.com release redirects to the asset CDN (release-assets.githubusercontent.com
+// today, objects.githubusercontent.com legacy — both on the download allowlist,
+// isOfficialGitHubURL), which are NOT part of the api.github.com budget, and stay
+// bounded by engineArtifactMaxUpload + the downloader timeout.
 func fetchCoresReleasesCached() ([]ghRelease, error) {
 	coresRelMu.Lock()
 	defer coresRelMu.Unlock()

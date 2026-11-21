@@ -224,7 +224,12 @@ func panelAsset() (arch, asset string, err error) {
 	return "", "", fmt.Errorf("unsupported arch for update: %s", runtime.GOARCH)
 }
 
-// isOfficialGitHubURL restricts downloads to official GitHub repositories only (CWE-494)
+// isOfficialGitHubURL restricts downloads to official GitHub repositories only (CWE-494).
+// BACKEND-39 live-path verification (00-ADMIN/tools/backend39-evidence/redirect-hosts.txt):
+// github.com release-download URLs 302-redirect to release-assets.githubusercontent.com
+// (GitHub's CURRENT asset CDN — objects.githubusercontent.com is the legacy host, kept
+// listed). http.Client carries no CheckRedirect, so the allowlist gates the INITIAL URL
+// only; the CDN host is listed so the allowlist describes reality.
 func isOfficialGitHubURL(u string) bool {
 	parsed, err := url.Parse(u)
 	if err != nil {
@@ -233,6 +238,7 @@ func isOfficialGitHubURL(u string) bool {
 	host := strings.ToLower(parsed.Host)
 	return host == "github.com" || host == "raw.githubusercontent.com" ||
 		host == "api.github.com" || host == "objects.githubusercontent.com" ||
+		host == "release-assets.githubusercontent.com" ||
 		host == "mirror.ghproxy.com" || host == "ghproxy.net" ||
 		host == "gh.ddlc.top" || host == "fastly.jsdelivr.net"
 }
