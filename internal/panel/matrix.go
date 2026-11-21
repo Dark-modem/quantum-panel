@@ -42,6 +42,13 @@ const (
 	// qmx interface, systemd unit, firewall chain prefix and a /30 mesh
 	// subnet carved out by octet() — never colliding with the pathtest
 	// probe nets 10.254.77.0/30 and 10.254.78.0/30.
+	// BACKEND-40: mirrored from quantum-agent @ 2f240d2 (AGENT-27's matrix
+	// pool fix — the agent is the executor, the panel must derive identical
+	// addresses for the same instance id). The old 16-cap panel scheme was
+	// 230+N raw, which overflows to invalid 10.254.256.x at n >= 26 and
+	// never matched the scheme's own range; the two schemes agree
+	// byte-for-byte for n <= 25 (the historic block), so every address the
+	// old cap could emit is unchanged.
 	matrixMaxInstances = 250
 )
 
@@ -111,7 +118,10 @@ func (in matrixInstance) subnet() string {
 	return "10.254." + strconv.Itoa(in.octet()) + ".0/30"
 }
 
-// octet is the third octet of the instance's mesh /30. The historic block
+// octet is the third octet of the instance's mesh /30 — mirrored
+// byte-for-byte from quantum-agent @ 2f240d2 internal/agent/matrix.go
+// (AGENT-27; the agent is the executor and the panel must derive identical
+// addresses for the same instance id). The historic block
 // (matrix2..matrix25 on 10.254.232..255) keeps its addresses forever; later
 // instances continue from 10.254.0.0/30 upward, skipping the pathtest probe
 // nets 77 and 78. The three ranges never overlap and never touch 231, which

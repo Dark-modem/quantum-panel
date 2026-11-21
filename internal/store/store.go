@@ -399,6 +399,16 @@ CREATE TABLE IF NOT EXISTS traffic_rollup_state (
   id INTEGER PRIMARY KEY, done_until INTEGER NOT NULL
 );
 `,
+	// 12: BACKEND-38 (UI-API-CONTRACT §2.22) — engine artifacts gain a
+	// source-provenance column: "upload" = the manual multipart upload
+	// (every pre-existing row), "repo" = resolved+downloaded from the
+	// Dark-modem/quantum-cores release feed. Purely additive provenance:
+	// the M2 pins (sha256 + ed25519 signature over the exact bytes) and
+	// the verify-before-store flow are unchanged, and the agent-facing
+	// manifest shape is untouched.
+	`
+ALTER TABLE engine_artifacts ADD COLUMN source TEXT NOT NULL DEFAULT 'upload';
+`,
 }
 
 func (s *Store) migrate() error {

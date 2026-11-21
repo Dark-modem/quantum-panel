@@ -908,6 +908,12 @@ func buildPanelMux(base string) *http.ServeMux {
 	mux.HandleFunc("GET "+base+"/api/update/available", requireAuth(handleUpdateAvailable))
 	mux.HandleFunc("GET "+base+"/api/agents/updates", requireAuth(handleAgentUpdates))
 	mux.HandleFunc("POST "+base+"/api/agents/update-outdated", requireAuth(requireCSRF(handleAgentUpdateOutdatedPost)))
+	// BACKEND-38 (contract §2.22): cores discovery from the PUBLIC
+	// Dark-modem/quantum-cores repo releases — the §2.20 feed mechanism
+	// (10-min/1-min cache, 30-s refresh throttle). Repo-sourced artifacts
+	// ride POST /api/mesh/engines/artifacts with source=repo
+	// (cores_discovery.go) behind the UNCHANGED M2 verify-then-store gate.
+	mux.HandleFunc("GET "+base+"/api/cores/available", requireAuth(handleCoresAvailable))
 
 	// Mesh management plane (Phase 2B): the SQLite store is the authority
 	// for the new model; legacy JSON features above stay frozen and never
