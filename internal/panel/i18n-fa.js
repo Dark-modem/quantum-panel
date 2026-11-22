@@ -3602,6 +3602,7 @@ window.FA_TEXT = {
  "Kernel Tuning": "تنظیمات هسته",
  "Live kernel network state per agent: TCP congestion control (BBR), queue discipline, GSO and MTU probing — read from the agents, nothing simulated.": "وضعیت زنده شبکه‌ای هسته برای هر ایجنت: کنترل ازدحام TCP (BBR)، صف بسته‌ها، GSO و کاوش MTU — مستقیم از ایجنت‌ها خوانده می‌شود، بدون هیچ عدد ساختگی.",
  "Method": "روش",
+ "Back to cores": "بازگشت به هسته‌ها",
  "Layer": "لایه",
  "Overhead": "سربار",
  "Port needed": "پورت لازم",

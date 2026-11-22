@@ -16,9 +16,11 @@ function section(start, end) {
   assert.ok(a >= 0 && b > a, 'source anchors: ' + start);
   return source.slice(a, b);
 }
-const consts = section('const CORES_ENGINE_IMG', 'async function loadCores(force)');
+// the grid state + name/alias consts + the grid render (which now also
+// drives the core-detail view sync) the artifact store and the page share
+const consts = section('let coresCache = null;', 'function coresPickerOpen');
 const cmp = section('function verCmp(a, b)', 'function artSize');
-const ctun = section('// ===== Core details modal (§2.22 additive fields)', '(function coresWire()');
+const ctun = section('// ===== Core details drill-down page (§2.22 additive fields)', '(function coresWire()');
 const board = section('// ---------- C-Tunnel method board (tab-cboard, §2.23)', '// ---------- Kernel Tuning (tab-netopt)');
 const kernel = section('// ---------- Kernel Tuning (tab-netopt)', '// ---------- Bagher (SSH pool carrier)');
 const elements = new Map();
@@ -59,6 +61,7 @@ const sandbox = {
   topologyFlagSvg: () => '<svg class="flag"></svg>',
   fmtSpeedRate: v => Math.round(v / 1024) + ' KB/s',
   loadCores() {}, renderCores() {}, loadArtStore() {}, loadCoresAvailable() {},
+  topTitleSync() {}, tabHashWrite() {},
 };
 function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 vm.createContext(sandbox);
@@ -92,23 +95,26 @@ function mkMethods() {
 }
 
 (async () => {
-  // ---- Piece 1: the core details modal --------------------------------------
+  // ---- Piece 1: the core details drill-down page ----------------------------
   vm.runInContext(`
   coresCache = [{ engine: 'ctunnel', latest: '0.3.2', builds: [], installed: {}, detail: { a1: { installed: true, version: '0.3.2' }, a2: { installed: true, version: '0.3.1' } } }];
   coresAvail = { cores: [{ core: 'ctunnel', latest_tag: 'ctunnel-v0.4.0', latest_version: '0.4.0', installed_version: '0.3.2', outdated: true, methods: null }] };
-  ctunModalOpen('ctunnel');
+  ctunPageOpen('ctunnel');
   `, sandbox);
-  let html = el('ctunBody').innerHTML;
-  assert.ok(el('ctunMTitle').textContent.includes('C-Tunnel'), 'the modal titles the core display name');
-  assert.ok(el('ctunMTitle').textContent.includes('Method catalog'), 'the modal names the method catalog');
+  let html = el('ctunPage').innerHTML;
+  assert.equal(vm.runInContext('ctunOpen', sandbox), 'ctunnel', 'opening a core sets the detail state');
+  assert.equal(el('coresList').hidden, true, 'the grid hides while the detail page is open');
+  assert.equal(el('coresDetail').hidden, false, 'the detail page shows');
+  assert.ok(html.includes('C-Tunnel') && html.includes('Method catalog'), 'the page heads with the core name and the method catalog label');
+  assert.ok(html.includes('Back to cores') && html.includes('data-ctun-back'), 'the page carries its back action');
   assert.ok(html.includes('v0.3.2') && html.includes('v0.4.0'), 'the version strip shows installed vs repo latest');
   assert.ok(html.includes('Newer version available'), 'outdated=true carries the newer-version badge');
   vm.runInContext('globalThis.mkMethods = ' + mkMethods.toString(), sandbox);
   vm.runInContext(`
   coresAvail.cores[0].methods = mkMethods();
-  renderCtunModal();
+  renderCtunPage();
   `, sandbox);
-  html = el('ctunBody').innerHTML;
+  html = el('ctunPage').innerHTML;
   assert.ok((html.match(/ctun-lb-/g) || []).length === 49, 'the full 49-method table renders');
   assert.ok(html.includes('All') && html.includes('L2') && html.includes('L3') && html.includes('L4'), 'layer filter chips render');
   assert.ok(html.includes('16') && html.includes('15') && html.includes('18'), 'the chips carry their per-layer counts');
@@ -116,52 +122,52 @@ function mkMethods() {
   assert.ok(html.includes('&lt;script&gt;') && !html.includes('<script>'), 'the method title renders escaped');
   assert.ok(html.includes('49 transport methods'), 'the count line names the 49 methods');
 
-  vm.runInContext(`ctunLayer = 'L3'; renderCtunModal();`, sandbox);
-  html = el('ctunBody').innerHTML;
+  vm.runInContext(`ctunLayer = 'L3'; renderCtunPage();`, sandbox);
+  html = el('ctunPage').innerHTML;
   assert.ok((html.match(/ctun-lb-/g) || []).length === 15, 'the L3 filter keeps only its 15 rows');
 
   // null fields render —
   vm.runInContext(`
   ctunLayer = 'all';
   coresAvail.cores[0].methods = [{ id: 'x1', name: 'x1', title: 'Null row', layer: 'L4', transport: null, ipver: null, overhead: null, needs_port: null, userspace: null, mikrotik: null, family: null }];
-  renderCtunModal();
+  renderCtunPage();
   `, sandbox);
-  html = el('ctunBody').innerHTML;
+  html = el('ctunPage').innerHTML;
   assert.ok((html.match(/art-dash/g) || []).length === 5, 'every null field renders the em dash');
 
   // outdated=false → up to date; absent field + older installed → fallback badge; equal → nothing
   vm.runInContext(`
   coresAvail.cores[0].methods = mkMethods();
   coresAvail.cores[0].outdated = false; coresAvail.cores[0].installed_version = '0.4.0';
-  renderCtunModal();
+  renderCtunPage();
   `, sandbox);
-  html = el('ctunBody').innerHTML;
+  html = el('ctunPage').innerHTML;
   assert.ok(html.includes('Up to date') && !html.includes('Newer version available'), 'outdated=false shows the up-to-date mark');
   vm.runInContext(`
   delete coresAvail.cores[0].outdated; coresAvail.cores[0].installed_version = '0.3.2';
-  renderCtunModal();
+  renderCtunPage();
   `, sandbox);
-  html = el('ctunBody').innerHTML;
+  html = el('ctunPage').innerHTML;
   assert.ok(html.includes('Newer version available'), 'the fallback comparison flags an older installed version');
   vm.runInContext(`
-  coresAvail.cores[0].installed_version = '0.4.0'; renderCtunModal();
+  coresAvail.cores[0].installed_version = '0.4.0'; renderCtunPage();
   `, sandbox);
-  html = el('ctunBody').innerHTML;
+  html = el('ctunPage').innerHTML;
   assert.ok(!html.includes('Newer version available') && html.includes('Up to date'), 'equal versions with no field read up to date via the fallback comparison');
   // installed_version absent → the newest agent-installed version stands in
   vm.runInContext(`
   delete coresAvail.cores[0].installed_version; coresAvail.cores[0].outdated = undefined;
   coresCache[0].detail = { a1: { installed: true, version: '0.3.1' }, a2: { installed: true, version: '0.3.2' } };
-  renderCtunModal();
+  renderCtunPage();
   `, sandbox);
-  html = el('ctunBody').innerHTML;
+  html = el('ctunPage').innerHTML;
   assert.ok(html.includes('v0.3.2'), 'the computed installed version picks the newest agent one');
   // no methods on the feed → the honest empty state
   vm.runInContext(`
   coresCache[0].detail = {};
-  delete coresAvail.cores[0].methods; renderCtunModal();
+  delete coresAvail.cores[0].methods; renderCtunPage();
   `, sandbox);
-  html = el('ctunBody').innerHTML;
+  html = el('ctunPage').innerHTML;
   assert.ok(html.includes('No method catalog yet'), 'a missing catalog renders its honest empty state');
 
   // ---- Piece 2: the live method board ---------------------------------------

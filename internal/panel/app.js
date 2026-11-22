@@ -309,6 +309,18 @@ function topTitleSync(id) {
     h1.querySelector('.mtb-bc-cur').textContent = window.mtbAgtDetail;
     return;
   }
+  if (nid === 'cores') {
+    // a core detail page is open: breadcrumb like the topology's — Cores ‹ core name.
+    // Guarded: topTitleSync's early boot call runs before the ctun state parses.
+    try {
+      if (ctunOpen) {
+        h1.innerHTML = '<span class="mtb-bc"><a href="#t=cores" data-ctun-back class="mtb-bc-link"></a><span class="mtb-bc-sep"> ‹ </span><span class="mtb-bc-cur"></span></span>';
+        h1.querySelector('.mtb-bc-link').textContent = lbl ? lbl.textContent : 'Cores';
+        h1.querySelector('.mtb-bc-cur').textContent = CORES_ENGINE_NAME[ctunOpen] || ctunOpen;
+        return;
+      }
+    } catch (e) { /* ctun state not parsed yet — goTab re-syncs the title later */ }
+  }
   if (!lbl) return;
   // Keep the title text in its own span so the glass chip can ellipsize it
   // instead of clipping mid-glyph on narrow topbars.
@@ -351,6 +363,7 @@ function goTab(name) {
   tabHashWrite(name);
   topTitleSync(name);
   if (name === 'setup' || name === 'tunnel') { loadSSHFwd(); loadMatrix(); }
+  if (name === 'cores') { loadCores(); loadCoresAvailable(); coresViewSync(); if (ctunOpen) renderCtunPage(); }
   if (name === 'cluster') {
     loadClusterStatus();
   }
@@ -381,13 +394,15 @@ function goTab(name) {
 // refresh via the URL hash. Best-effort only; the dashboard stays the fallback.
 function tabHashWrite(name) {
   const topo = name === 'tunnel' && typeof topologySelected !== 'undefined' && topologySelected ? '&topo=' + encodeURIComponent(topologySelected) : '';
-  try { history.replaceState(null, '', '#t=' + name + topo); } catch (e) { /* hash persistence is best-effort */ }
+  const core = name === 'cores' && typeof ctunOpen !== 'undefined' && ctunOpen ? '&core=' + encodeURIComponent(ctunOpen) : '';
+  try { history.replaceState(null, '', '#t=' + name + topo + core); } catch (e) { /* hash persistence is best-effort */ }
 }
 function bootRestoreTab() {
-  const m = (location.hash || '').match(/^#t=([a-z-]+)(?:&topo=([^&]+))?/);
+  const m = (location.hash || '').match(/^#t=([a-z-]+)(?:&topo=([^&]+))?(?:&core=([^&]+))?/);
   if (!m) return;
   const name = m[1];
   if (name === 'tunnel' && m[2] && typeof topologySelected !== 'undefined') topologySelected = decodeURIComponent(m[2]);
+  if (name === 'cores' && m[3] && typeof ctunOpen !== 'undefined') ctunPendingCore = decodeURIComponent(m[3]);
   if (name !== 'dashboard' && $('tab-' + name)) goTab(name);
 }
 document.querySelectorAll('[data-tab]').forEach(b => { b.onclick = () => goTab(b.dataset.tab); });
@@ -12541,7 +12556,7 @@ const CORES_QMARK = '<svg viewBox="0 0 100 100" aria-hidden="true"><path d="M50 
 async function loadCores(force) {
   const list = $('engList');
   if (!list || coresLoading) return;
-  if (!force && coresCache && !coresError) { renderCores(); return; }
+  if (!force && coresCache && !coresError) { renderCores(); ctunPendingConsume(); return; }
   coresLoading = true;
   coresError = null;
   renderCores();
@@ -12593,7 +12608,18 @@ async function loadCores(force) {
     renderCores();
   } finally {
     coresLoading = false;
+    // a deep link (#t=cores&core=…) opens its detail page once the data lands
+    ctunPendingConsume();
   }
+}
+// opens the deep-linked core once the grid data is present (no-op when the
+// hash carried no core, or the data has not landed yet — retried by the
+// next load cycle; a core the panel no longer knows drops silently)
+function ctunPendingConsume() {
+  if (!ctunPendingCore || coresCache === null) return;
+  const c = ctunPendingCore;
+  ctunPendingCore = '';
+  if (ctunGroup(c)) ctunPageOpen(c);
 }
 function a_name(ag) { return ag.name || ''; }
 function coresInstalled(g) {
@@ -12681,6 +12707,10 @@ function renderCores() {
   list.innerHTML = groups.length
     ? '<div class="eng-grid">' + groups.map(coresEngineCard).join('') + '</div>'
     : '<div class="eng-empty"><b>' + esc(tr('', 'No engines match your search.')) + '</b></div>';
+  // the drill-down detail rides the same render: when a core is open the
+  // grid stays fresh behind it and the detail page repaints on every load
+  coresViewSync();
+  if (ctunOpen) renderCtunPage();
 }
 function coresPickerOpen(engine) {
   const g = (coresCache || []).find(x => x.engine === engine);
@@ -12764,14 +12794,16 @@ async function coresUpdateAll(engine) {
   else toastOk(tr('', 'Cores'), tr('', 'Update requested on {n} agent(s)').replace('{n}', String(stale.length)));
   loadCores(true);
 }
-// ===== Core details modal (§2.22 additive fields) ========================
-// Clicking a core card (or its Details button) opens the full method
-// catalog the backend now serves on the /api/cores/available row:
-// methods[] (ctunnel carries the 49-method transport table) plus the
-// installed_version / outdated pair. Everything reads from the already
-// loaded feed — no extra fetch; every absent field renders — honestly.
-let ctunOpen = null;    // engine id the modal shows
-let ctunLayer = 'all';  // method table layer filter
+// ===== Core details drill-down page (§2.22 additive fields) ==============
+// Clicking a core card (or its Details button) opens a dedicated page
+// inside the Cores tab — like a topology opening inside the Tunnel tab:
+// the §2.22 method catalog (ctunnel carries the 49-method transport
+// table) plus the installed_version / outdated pair. Everything reads
+// from the already loaded feed — no extra fetch; every absent field
+// renders — honestly.
+let ctunOpen = null;        // engine id the detail page shows (null = list view)
+let ctunLayer = 'all';      // method table layer filter
+let ctunPendingCore = '';   // core from #t=cores&core=…, opened once data lands
 const CTUN_LAYER_KEY = { L2: 2, L3: 3, L4: 4 };
 function ctunGroup(engine) {
   const key = CORES_ALIAS[engine] || engine;
@@ -12837,58 +12869,53 @@ function ctunMethodRow(m) {
     '<td>' + (m.family ? '<span class="ctun-fam"><bdi dir="ltr">' + esc(String(m.family)) + '</bdi></span>' : '<span class="art-dash">—</span>') + '</td>' +
     '</tr>';
 }
-function ctunModalBuild() {
-  let ov = document.getElementById('ctunModal');
-  if (ov) return ov;
-  ov = document.createElement('div');
-  ov.id = 'ctunModal';
-  ov.className = 'ent-modal-ov';
-  ov.innerHTML =
-    '<div class="ent-modal ctun-modal-wrap"><div class="ent-card cores-pick-card ctun-modal">' +
-    '<div class="art-modal-head"><b id="ctunMTitle"></b><button type="button" class="mtb-toast-x" data-ctun-close>\u00d7</button></div>' +
-    '<div class="art-modal-body" id="ctunBody"></div>' +
-    '<div class="art-modal-foot"><span class="art-modal-busy"></span>' +
-    '<button type="button" class="quantum-btn quantum-btn-secondary" data-ctun-close>' + esc(tr('', 'Close')) + '</button>' +
-    '<button type="button" class="quantum-btn quantum-btn-primary" data-ctun-manage></button>' +
-    '</div>' +
-    '</div></div>';
-  document.body.appendChild(ov);
-  ov.addEventListener('click', e => {
-    if (e.target === ov) { ctunModalClose(); return; }
-    if (e.target.closest('[data-ctun-close]')) { ctunModalClose(); return; }
-    const chip = e.target.closest('[data-ctun-layer]');
-    if (chip) { ctunLayer = chip.getAttribute('data-ctun-layer') || 'all'; renderCtunModal(); return; }
-    const mg = e.target.closest('[data-ctun-manage]');
-    if (mg && ctunOpen) { ctunModalClose(); coresPickerOpen(ctunOpen); }
-  });
-  return ov;
+// list/detail view sync: a core open → the grid + artifact cards hide and
+// the detail page paints; closing restores the list. Safe to call anytime.
+function coresViewSync() {
+  const list = $('coresList'), detail = $('coresDetail');
+  if (!list || !detail) return;
+  const on = !!ctunOpen;
+  list.hidden = on;
+  detail.hidden = !on;
 }
-function ctunModalOpen(engine) {
+function ctunPageOpen(engine) {
   const g = ctunGroup(engine);
   if (!g) return;
   ctunOpen = (CORES_ALIAS[engine] || engine);
   ctunLayer = 'all';
-  const ov = ctunModalBuild();
-  renderCtunModal();
-  modalShow(ov, ctunModalClose);
+  // the repo feed may not have loaded yet — pull it so the version strip
+  // and the method catalog fill in as soon as it answers
+  if (!coresAvail && !coresAvailErr && !coresAvailBusy) loadCoresAvailable();
+  renderCores(); // renders the detail through coresViewSync + renderCtunPage
+  topTitleSync('cores');
+  tabHashWrite('cores');
 }
-function ctunModalClose() {
-  modalHide(document.getElementById('ctunModal'));
+function ctunPageClose() {
+  if (!ctunOpen) return;
+  ctunOpen = null;
+  ctunLayer = 'all';
+  renderCores();
+  topTitleSync('cores');
+  tabHashWrite('cores');
 }
-function renderCtunModal() {
-  const body = $('ctunBody');
-  const title = $('ctunMTitle');
+function renderCtunPage() {
+  const body = $('ctunPage');
   if (!body || !ctunOpen) return;
   const g = ctunGroup(ctunOpen);
   const repo = artRepoRow(ctunOpen);
   const disp = CORES_ENGINE_NAME[ctunOpen] || ctunOpen;
-  const mgBtn = document.querySelector('#ctunModal [data-ctun-manage]');
-  if (mgBtn) mgBtn.textContent = tr('', 'Install / Manage');
-  if (title) title.textContent = disp + ' — ' + tr('', 'Method catalog');
+  if (!g && !repo && (coresLoading || coresCache === null)) {
+    body.innerHTML = '<div class="u-grid u-gap-8">' + skel(3) + '</div>';
+    return;
+  }
   if (!repo && !g) {
     body.innerHTML = stateError(tr('', 'This core is not known to the panel yet'), null, true);
     return;
   }
+  const head = '<div class="ctun-head"><div><h2 class="tc-title u-fs-16 u-fw-700 u-m-0">' + esc(disp) + ' — ' + esc(tr('', 'Method catalog')) + '</h2></div>' +
+    '<span class="u-flex-1"></span>' +
+    '<button type="button" class="eng-act pri" data-ctun-manage>' + esc(tr('', 'Install / Manage')) + '</button>' +
+    '<button type="button" class="quantum-btn quantum-btn-secondary" data-ctun-back>' + esc(tr('', 'Back to cores')) + '</button></div>';
   // version strip: installed on the agents vs the repo latest + the newer badge
   const installed = ctunInstalledVersion(g, repo);
   const outdated = ctunOutdated(repo, installed);
@@ -12904,7 +12931,7 @@ function renderCtunModal() {
   // the method catalog: chips + the full table, or the honest empty state
   const methods = ctunMethods(repo);
   if (!methods || !methods.length) {
-    body.innerHTML = verRows +
+    body.innerHTML = head + verRows +
       '<div class="ent-empty" role="status"><span class="ent-empty-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 9h18M8 13h8"/></svg></span>' +
       '<b>' + esc(tr('', 'No method catalog yet')) + '</b>' +
       '<span>' + esc(tr('', 'The per-method transport catalog for this core has not landed on the feed — the table appears as soon as the backend serves methods[].')) + '</span></div>';
@@ -12918,7 +12945,7 @@ function renderCtunModal() {
   const rows = methods
     .filter(m => ctunLayer === 'all' || String(m.layer || '').toUpperCase() === ctunLayer)
     .map(ctunMethodRow).join('');
-  body.innerHTML = verRows + chips +
+  body.innerHTML = head + verRows + chips +
     '<p class="qs-hint u-m-0 ctun-count">' + esc(tr('', '{n} transport methods — the live board tests them all between a real pair').replace('{n}', String(methods.length))) + '</p>' +
     '<div class="ctun-tblwrap"><table class="ent-tbl ctun-tbl"><thead><tr>' +
     '<th>' + esc(tr('', 'Method')) + '</th><th>' + esc(tr('', 'Layer')) + '</th><th>' + esc(tr('', 'Transport')) + '</th>' +
@@ -12938,9 +12965,14 @@ function renderCtunModal() {
     const u = e.target.closest('[data-cores-update]');
     if (u) { coresUpdateAll(u.getAttribute('data-cores-update')); return; }
     const o = e.target.closest('[data-cores-open]');
-    if (o) { ctunModalOpen(o.getAttribute('data-cores-open')); return; }
+    if (o) { ctunPageOpen(o.getAttribute('data-cores-open')); return; }
     if (e.target.closest('[data-cores-pick-go]')) { coresPickInstall(); return; }
     if (e.target.closest('[data-cores-pick-close]')) { const ov = document.getElementById('coresPickModal'); if (ov) ov.hidden = true; }
+    if (e.target.closest('[data-ctun-back]')) { ctunPageClose(); return; }
+    const chip = e.target.closest('[data-ctun-layer]');
+    if (chip) { ctunLayer = chip.getAttribute('data-ctun-layer') || 'all'; renderCtunPage(); return; }
+    const mg = e.target.closest('[data-ctun-manage]');
+    if (mg && ctunOpen) { coresPickerOpen(ctunOpen); return; }
   });
   const search = $('engSearch');
   if (search) search.addEventListener('input', function () { coresSearch = this.value; renderCores(); });
@@ -12950,6 +12982,14 @@ function renderCtunModal() {
   });
   if ((location.hash || '').indexOf('#t=cores') === 0) loadCores();
 })();
+// the topbar breadcrumb back link lives outside the tab section — a document
+// handler catches it (and the in-page Back button) wherever they render
+document.addEventListener('click', e => {
+  const back = e.target.closest && e.target.closest('[data-ctun-back]');
+  if (!back) return;
+  if (back.tagName === 'A') e.preventDefault();
+  ctunPageClose();
+});
 
 // ===== Cores artifact store (§2.22) =====================================
 // The signed-binary store the agents install from. Sources: the PUBLIC
