@@ -31,6 +31,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -279,9 +280,20 @@ func manifestMethodIDText(raw json.RawMessage) string {
 // release feed knows (the feed cache answers locally; a manifest miss is
 // a cached no-op), then the manifest cache itself as the fallback for a
 // temporarily unreachable feed.
+//
+// BACKEND-46: the scan is SORTED-CORE order, not the feed's order. The
+// release list arrives in GitHub's order, and the real landed manifests
+// publish the SAME method id from several cores ("hysteria2" in hysteria
+// AND sing-box; "vless"/"vmess"/"trojan"/"wireguard" in sing-box AND
+// waterwall AND ctunnel) — a feed-order scan resolves those ids to
+// different engines run to run. The forward join (methodBoardCandidates)
+// dedups in sorted-agreed-engine order, whose live alias map sorts the
+// same way, so sorted-core order here elects the same winner the
+// enumeration kept and the board's identity columns stay deterministic.
 func coresManifestMethodEntry(method string) (methodManifestEntry, bool) {
 	rels, err := fetchCoresReleasesCached()
 	if err == nil {
+		cores := make([]string, 0, len(rels))
 		seen := map[string]bool{}
 		for i := range rels {
 			m := coresTagRe.FindStringSubmatch(rels[i].Tag)
@@ -289,7 +301,11 @@ func coresManifestMethodEntry(method string) (methodManifestEntry, bool) {
 				continue
 			}
 			seen[m[1]] = true
-			for _, e := range coresManifestMethods(m[1]) {
+			cores = append(cores, m[1])
+		}
+		sort.Strings(cores)
+		for _, c := range cores {
+			for _, e := range coresManifestMethods(c) {
 				if e.ID == method {
 					return e, true
 				}
@@ -297,12 +313,13 @@ func coresManifestMethodEntry(method string) (methodManifestEntry, bool) {
 		}
 	}
 	coresManifestMu.Lock()
-	cores := make([]string, 0, len(coresManifestCache))
+	cacheCores := make([]string, 0, len(coresManifestCache))
 	for c := range coresManifestCache {
-		cores = append(cores, c)
+		cacheCores = append(cacheCores, c)
 	}
 	coresManifestMu.Unlock()
-	for _, c := range cores {
+	sort.Strings(cacheCores)
+	for _, c := range cacheCores {
 		for _, e := range coresManifestMethods(c) {
 			if e.ID == method {
 				return e, true
