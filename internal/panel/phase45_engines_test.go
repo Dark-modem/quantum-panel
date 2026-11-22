@@ -77,10 +77,20 @@ func phase45ManifestFixture(t *testing.T) {
 
 func TestPhase45ManifestJoinRealShapes(t *testing.T) {
 	phase45ManifestFixture(t)
-	// drop any cached manifest state from earlier tests, then read fresh
+	// snapshot + restore the package-global manifest cache — this test
+	// fills it with fixture entries that must never leak into later tests
 	coresManifestMu.Lock()
+	oldCache := coresManifestCache
+	oldBusy := coresManifestBusy
 	coresManifestCache = map[string]*coresManifestCacheEntry{}
+	coresManifestBusy = map[string]bool{}
 	coresManifestMu.Unlock()
+	t.Cleanup(func() {
+		coresManifestMu.Lock()
+		coresManifestCache = oldCache
+		coresManifestBusy = oldBusy
+		coresManifestMu.Unlock()
+	})
 	// the manifest read is background-filled (a GET never serializes behind
 	// a possibly dead raw request) — the seam is in-memory, so the fill
 	// lands within the poll window
