@@ -222,7 +222,7 @@ function mkMethods() {
   assert.ok(html.includes('udp-hammer') && html.includes('icmp-slip') && html.includes('tcp-weave'), 'all probed methods render as rows');
   assert.ok(html.includes('Reachable') && html.includes('Blocked'), 'reachability renders its ok/err badges');
   assert.ok(html.includes('41.5 ms'), 'latency renders with its unit');
-  assert.ok(html.includes('KB/s'), 'throughput renders through the speed formatter');
+  assert.ok(html.includes('1.0 Mbps'), 'throughput renders through the wire-bps formatter');
   assert.ok(html.includes('1420'), 'PMTU renders');
   assert.ok(html.includes('Best method'), 'the best card renders');
   assert.ok(/id="ctbDeploy"[^>]*disabled/.test(html), 'deploy stays disabled while the backend offers no deploy field');
@@ -244,6 +244,28 @@ function mkMethods() {
   assert.equal(post.body.kharej, 'ag-fa1', 'deploy posts the kharej side');
   assert.equal(post.body.method, 'udp-hammer', 'deploy posts the best method');
 
+  // the REAL BACKEND-42 shape: rows[].recommended + the bare `best` string +
+  // iran_name/kharej_name + the wire-bps throughput + the honest unprobed word
+  apiHandler = () => ({ running: false, phase: 'done', iran: 'ag-ir1', kharej: 'ag-fa1',
+    iran_name: 'tehran-1', kharej_name: 'frankfurt-1',
+    rows: [
+      { method: 'udp-hammer', layer: 'L4', transport: 'udp', ipver: 'both', reachability: 'ok', latency_ms: 41.5, throughput: 104857600, pmtu: null, score: 87, recommended: true },
+      { method: 'icmp-slip', layer: 'L3', transport: 'icmp', ipver: 'v4', reachability: 'unprobed', latency_ms: null, throughput: null, score: null },
+      { method: 'tcp-weave', layer: 'L4', transport: 'tcp', ipver: 'v4', reachability: 'ok', latency_ms: 60, throughput: null, score: null, error: 'counters did not move' },
+    ],
+    best: 'udp-hammer', error: '' });
+  vm.runInContext(`ctbState = { iran: 'ag-ir1', kharej: 'ag-fa1', running: false, view: null, timer: null, err: null };`, sandbox);
+  await vm.runInContext('ctbRun()', sandbox);
+  await sleep(20);
+  html = el('ctunBoard').innerHTML;
+  assert.ok(html.includes('tehran-1') && html.includes('frankfurt-1'), 'the board header uses the backend pair names');
+  assert.ok(html.includes('Best method') && html.includes('udp-hammer'), 'the bare best string resolves to the best card');
+  assert.ok(html.includes('104.9 Mbps'), 'the wire-bps throughput formats as Mbps');
+  assert.ok(html.includes('unprobed'), 'an unprobed row keeps its honest word in a dim badge');
+  assert.ok(html.includes('Recommended by the board'), 'the recommended row carries its best-mark');
+  assert.ok(html.includes('counters did not move'), 'a reachable-but-unmeasured row names its error');
+  assert.ok(/id="ctbDeploy"[^>]*disabled/.test(html), 'the real shape ships no deploy field — the button stays honest-disabled');
+
   // a failing run renders the honest error with a retry
   vm.runInContext(`ctbState = { iran: 'ag-ir1', kharej: 'ag-fa1', running: false, view: null, timer: null, err: null };`, sandbox);
   apiHandler = () => { throw new Error('[E-UPDATE-01] board feed unreachable'); };
@@ -255,9 +277,9 @@ function mkMethods() {
   vm.runInContext(`
   ktData = ktNorm({
     agents: [
-      { agent_id: 'ag-1', agent_name: 'tehran-1', bbr: true, qdisc: 'fq', gso: false, tcp_mtu_probing: 1 },
-      { agent: { id: 'ag-2', name: 'frankfurt-1' }, congestion_control: 'cubic', fq: true, gso: null, mtu_probing: null },
-      { name: 'shiraz-3', bbr: null, fq: null, gso: null, mtu: null, detail: 'agent offline' },
+      { agent: 'ag-1', name: 'tehran-1', online: true, congestion_control: 'bbr', qdisc: 'fq', gso: 'on', tcp_mtu_probing: 1 },
+      { agent: 'ag-2', name: 'frankfurt-1', online: true, congestion_control: 'cubic', qdisc: 'fq_codel', gso: 'off', tcp_mtu_probing: 0 },
+      { agent: 'ag-3', name: 'shiraz-3', online: false, congestion_control: null, qdisc: null, gso: null, tcp_mtu_probing: null, error: 'agent unreachable' },
     ],
   });
   ktErr = null; ktLoading = false;
@@ -267,11 +289,12 @@ function mkMethods() {
   assert.ok((html.match(/<tr>/g) || []).length === 4, 'three agents render as three rows (+header)');
   assert.ok(html.includes('tehran-1') && html.includes('frankfurt-1') && html.includes('shiraz-3'), 'every agent row carries its name');
   assert.ok(html.includes('BBR') && html.includes('Queue (fq)') && html.includes('GSO') && html.includes('MTU probing'), 'the table carries the four dispatched facts');
-  assert.ok(html.includes('1 of 3 agents report BBR'), 'the summary line counts true/string-bbr rows correctly');
+  assert.ok(html.includes('1 of 3 agents report BBR'), 'the summary line counts the congestion-control bbr rows');
   assert.ok(html.includes('cubic'), 'a string congestion control renders verbatim');
-  assert.ok(html.includes('fq'), 'the qdisc value renders verbatim');
-  assert.ok((html.match(/ctun-no/g) || []).length >= 1, 'a false fact renders the off mark');
-  assert.ok(html.includes('agent offline'), 'the row note renders');
+  assert.ok(html.includes('fq_codel'), 'the qdisc value renders verbatim');
+  assert.ok((html.match(/ctun-yes/g) || []).length >= 5, 'bbr + fq + fq_codel + gso-on + mtu-1 read as on');
+  assert.ok(html.includes('<bdi dir="ltr">off</bdi>') && html.includes('<bdi dir="ltr">0</bdi>'), 'off/0 sysctl strings render verbatim in dim badges');
+  assert.ok(html.includes('agent unreachable'), 'an offline agent keeps its honest note');
 
   vm.runInContext(`ktData = null; ktErr = 'boom'; renderKernelTuning();`, sandbox);
   html = el('ktBody').innerHTML;

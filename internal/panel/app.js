@@ -9583,24 +9583,45 @@ function ctbRender() {
 function ctbNormBoard(d) {
   if (!d || typeof d !== 'object') return null;
   const rows = (Array.isArray(d.results) && d.results) || (Array.isArray(d.rows) && d.rows) || (Array.isArray(d.methods) && d.methods) || [];
-  const bestObj = d.best && typeof d.best === 'object' ? d.best : (d.suggested && typeof d.suggested === 'object' ? d.suggested : null);
-  const best = bestObj || (d.best ? { method: String(d.best) } : (d.suggested ? { method: String(d.suggested) } : null));
+  // the backend (BACKEND-42) flags the winner with rows[].recommended and
+  // repeats it as the bare `best` string — prefer the recommended row so the
+  // best card carries the winner's own stats
+  let bestObj = d.best && typeof d.best === 'object' ? d.best : (d.suggested && typeof d.suggested === 'object' ? d.suggested : null);
+  const bestName = (d.best && typeof d.best === 'string' && d.best) || (d.suggested && typeof d.suggested === 'string' && d.suggested) || '';
+  if (!bestObj) {
+    const rec = rows.find(r => r && r.recommended === true);
+    bestObj = rec || (bestName ? { method: bestName } : null);
+  }
   return {
     running: d.running === true,
     phase: d.phase || d.stage || '',
     cur: d.cur_method || d.current || d.cur || '',
+    iranName: d.iran_name || '',
+    kharejName: d.kharej_name || '',
     rows: rows,
-    best: best,
+    best: bestObj,
     pmtu: d.pmtu != null ? d.pmtu : (bestObj && bestObj.pmtu != null ? bestObj.pmtu : null),
     deploy: d.deploy && typeof d.deploy === 'object' ? d.deploy : null,
     error: d.error || '',
   };
 }
+// the board's reachability vocabulary (BACKEND-42): ok | converge-timeout |
+// stopped | failed | unprobed — ok/bad get the strong badges, the rest render
+// as a dim badge carrying the raw word (nothing invented)
 function ctbReach(v) {
   const s = String(v == null ? '' : v).toLowerCase();
   if (s === 'pass' || s === 'ok' || s === 'reachable' || s === 'up' || s === 'alive') return 'ok';
   if (s === 'blocked' || s === 'fail' || s === 'failed' || s === 'down' || s === 'unreachable' || s === 'filtered') return 'bad';
   return '';
+}
+// wire bits-per-second formatter (the board's throughput unit) — bps/Kbps/Mbps/Gbps
+function ctbRate(v) {
+  const n = Number(v);
+  if (!isFinite(n) || n <= 0) return '';
+  if (n >= 1e9) return (n / 1e9).toFixed(1) + ' Gbps';
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + ' Mbps';
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + ' Kbps';
+  return Math.round(n) + ' bps';
 }
 async function ctbRun() {
   if (ctbState.running || !ctbState.iran || !ctbState.kharej) return;
@@ -9650,13 +9671,16 @@ function ctbRow(r) {
     ? '<span class="badge ok"><span class="dot"></span>' + esc(tr('', 'Reachable')) + '</span>'
     : reach === 'bad'
       ? '<span class="badge err"><span class="dot"></span>' + esc(tr('', 'Blocked')) + '</span>'
-      : '<span class="badge dim">—</span>';
+      : (r.reachability
+        ? '<span class="badge dim" title="' + esc(tr('', 'converge-timeout / stopped / unprobed — the row keeps its honest word')) + '"><bdi dir="ltr">' + esc(String(r.reachability)) + '</bdi></span>'
+        : '<span class="badge dim">—</span>');
   const lat = (r.latency_ms != null && r.latency_ms !== '') ? '<bdi dir="ltr">' + esc(String(Math.round(Number(r.latency_ms) * 100) / 100)) + ' ms</bdi>' : '—';
-  const thr = (r.throughput != null && r.throughput !== '' && Number(r.throughput) > 0) ? '<bdi dir="ltr">' + esc(fmtSpeedRate(Number(r.throughput))) + '</bdi>' : '—';
+  const thr = (r.throughput != null && r.throughput !== '' && Number(r.throughput) > 0) ? '<bdi dir="ltr">' + esc(ctbRate(Number(r.throughput))) + '</bdi>' : '—';
   const pmtu = (r.pmtu != null && r.pmtu !== '') ? esc(String(r.pmtu)) : '—';
   const score = (r.score != null && r.score !== '') ? '<bdi dir="ltr">' + esc(String(r.score)) + '</bdi>' : '—';
+  const bestMark = r.recommended === true ? '<span class="ctun-yes" title="' + esc(tr('', 'Recommended by the board')) + '"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.5-4.8 2.5.9-5.4L4.2 7.7l5.4-.8z"/></svg></span>' : '';
   return '<tr>' +
-    '<td><b>' + esc(r.method || r.name || '—') + '</b></td>' +
+    '<td><b>' + esc(r.method || r.name || '—') + '</b>' + bestMark + '</td>' +
     '<td>' + ctunLayerBadge(r.layer) + '</td>' +
     '<td>' + ctunTextBadge(r.transport) + '</td>' +
     '<td class="u-text-center">' + esc(ctunIpver(r.ipver)) + '</td>' +
@@ -9680,7 +9704,7 @@ function ctbBestCard(view) {
     '<div class="ctb-best-stats">' +
     stat(tr('', 'Score'), b.score != null && b.score !== '' ? String(b.score) : '') +
     stat(tr('', 'Latency'), b.latency_ms != null && b.latency_ms !== '' ? Math.round(Number(b.latency_ms) * 100) / 100 + ' ms' : '') +
-    stat(tr('', 'Throughput'), b.throughput != null && b.throughput !== '' && Number(b.throughput) > 0 ? fmtSpeedRate(Number(b.throughput)) : '') +
+    stat(tr('', 'Throughput'), b.throughput != null && b.throughput !== '' && Number(b.throughput) > 0 ? ctbRate(Number(b.throughput)) : '') +
     stat('PMTU', view.pmtu != null && view.pmtu !== '' ? String(view.pmtu) : '') +
     '</div>' +
     '<button type="button" class="quantum-btn quantum-btn-primary" id="ctbDeploy"' + (deployReady ? '' : ' disabled title="' + esc(tr('', 'The deploy action lands with the backend — the suggested method is recorded here')) + '"') + '>' + esc(tr('', 'Deploy best')) + '</button></div>' +
@@ -9691,7 +9715,8 @@ function ctbRenderRun() {
   if (!host) return;
   const view = ctbState.view;
   if (!view) { ctbRender(); return; }
-  if (view.running) { ctbRenderRunning(view); return; }
+  // running with no rows yet: the progress banner + skeleton
+  if (view.running && !view.rows.length) { ctbRenderRunning(view); return; }
   const rows = view.rows.map(ctbRow).join('');
   const errBox = ctbState.err
     ? '<div class="ctb-pollerr" role="alert">' + esc(tr('', 'Polling error — retrying')) + ': ' + esc(ctbState.err) + '</div>'
@@ -9699,22 +9724,30 @@ function ctbRenderRun() {
   const feedErr = view.error && !view.rows.length
     ? stateError(view.error, 'ctbrun', true)
     : '';
+  // live run: the banner rides the table so rows-so-far stream in as each
+  // method answers; the best card waits for the finished board
+  const runBanner = view.running
+    ? '<div class="ctb-running" role="status"><span class="dot"></span>' +
+      esc(tr('', 'Probing every method through the live pair')) + ' — ' +
+      (view.cur ? '<b>' + esc(String(view.cur)) + '</b> · ' : '') +
+      esc(tr('', 'results stream in as each method answers.')) + '</div>'
+    : '';
   host.innerHTML =
     '<div class="tc-header u-bb-ln u-pb-16 u-mb-16"><div><span class="tc-title u-fs-16 u-fw-700">' + esc(tr('', 'Live board')) + '</span>' +
     '<div class="qs-hint u-mt-4">' + esc(tr('', 'Pair: {iran} \u2194 {kharej}')
-      .replace('{iran}', ctbAgentName(ctbState.iran)).replace('{kharej}', ctbAgentName(ctbState.kharej))) + '</div></div>' +
+      .replace('{iran}', view.iranName || ctbAgentName(ctbState.iran)).replace('{kharej}', view.kharejName || ctbAgentName(ctbState.kharej))) + '</div></div>' +
     '<span class="badge ' + (view.rows.length ? 'ok' : 'dim') + '"><span class="dot"></span>' + esc(tr('', '{n} methods probed').replace('{n}', String(view.rows.length))) + '</span></div>' +
-    errBox + feedErr +
+    errBox + feedErr + runBanner +
     (view.rows.length
       ? '<div class="bench-table-wrap"><table class="quantum-table"><thead><tr>' +
         '<th>' + esc(tr('', 'Method')) + '</th><th>' + esc(tr('', 'Layer')) + '</th><th>' + esc(tr('', 'Transport')) + '</th><th>' + esc(tr('', 'IP')) + '</th>' +
         '<th>' + esc(tr('', 'Reachability')) + '</th><th>' + esc(tr('', 'Latency')) + '</th><th>' + esc(tr('', 'Throughput')) + '</th>' +
         '<th>' + esc(tr('', 'PMTU')) + '</th><th>' + esc(tr('', 'Score')) + '</th><th>' + esc(tr('', 'Error')) + '</th>' +
         '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
-        ctbBestCard(view)
+        (view.running ? '' : ctbBestCard(view))
       : (!feedErr ? '<div class="ent-empty" role="status"><b>' + esc(tr('', 'No method results yet')) + '</b><span>' + esc(tr('', 'Run the live board to probe every ctunnel method through the pair.')) + '</span></div>' : '')) +
-    '<div class="mtb-acts"><button type="button" class="quantum-btn quantum-btn-secondary" id="ctbAgain">' + esc(tr('', 'Run again')) + '</button>' +
-    '<button type="button" class="quantum-btn quantum-btn-secondary" id="ctbNew">' + esc(tr('', 'New pair')) + '</button></div>';
+    (view.running ? '' : '<div class="mtb-acts"><button type="button" class="quantum-btn quantum-btn-secondary" id="ctbAgain">' + esc(tr('', 'Run again')) + '</button>' +
+    '<button type="button" class="quantum-btn quantum-btn-secondary" id="ctbNew">' + esc(tr('', 'New pair')) + '</button></div>');
   const again = $('ctbAgain'), fresh = $('ctbNew');
   if (again) again.onclick = () => { ctbRun(); };
   if (fresh) fresh.onclick = () => { clearTimeout(ctbState.timer); ctbState = { iran: '', kharej: '', running: false, view: null, timer: null, err: null }; ctbRender(); };
@@ -9746,19 +9779,25 @@ async function ctbDeployBest() {
 let ktData = null;
 let ktErr = null;
 let ktLoading = false;
-// ktNorm reads the payload defensively: the rows may ride agents/rows/kernels
-// and each fact may be a boolean or a sysctl string ('bbr', 'fq', '1'…).
+// ktNorm reads the payload defensively: the real shape (BACKEND-42) rides
+// `agents` as {agent, name, online, status, congestion_control, bbr_available,
+// qdisc, tcp_mtu_probing, gso, …error} — but the fallback spellings stay so a
+// future field rename cannot silently blank the card. Each fact may be a
+// boolean or a sysctl string ('bbr', 'fq', '1'…).
 function ktNorm(d) {
   const rows = Array.isArray(d) ? d : (d && (d.agents || d.rows || d.kernels || d.nodes)) || [];
   return rows.map(r => {
     const ag = r.agent && typeof r.agent === 'object' ? r.agent : {};
-    const name = ag.name || r.agent_name || (typeof r.agent === 'string' ? r.agent : '') || r.name || r.agent_id || r.id || '';
-    const id = ag.id || r.agent_id || r.id || '';
+    // the display name wins over the agent-id string (the real shape carries
+    // agent: id + name: display name side by side)
+    const name = ag.name || r.name || r.agent_name || (typeof r.agent === 'string' ? r.agent : '') || r.agent_id || r.id || '';
+    const id = ag.id || r.agent_id || r.agent || r.id || '';
     const bbr = r.bbr != null ? r.bbr : (r.congestion_control != null ? r.congestion_control : null);
     const fq = r.fq != null ? r.fq : (r.qdisc != null ? r.qdisc : null);
     const gso = r.gso != null ? r.gso : (r.gso_enabled != null ? r.gso_enabled : null);
     const mtu = r.mtu_probing != null ? r.mtu_probing : (r.tcp_mtu_probing != null ? r.tcp_mtu_probing : (r.mtu_probe != null ? r.mtu_probe : null));
-    return { id, name, bbr, fq, gso, mtu, detail: r.detail || r.error || '' };
+    const offline = r.online === false;
+    return { id, name, bbr, fq, gso, mtu, offline, detail: r.detail || r.error || (offline ? tr('', 'Agent offline') : '') };
   }).filter(r => r.id || r.name);
 }
 function ktCell(v, goodVal) {
@@ -9766,7 +9805,7 @@ function ktCell(v, goodVal) {
   if (v === true) return '<span class="ctun-yes" aria-label="on">✓</span>';
   if (v === false) return '<span class="ctun-no" aria-label="off">✗</span>';
   const s = String(v);
-  const on = goodVal ? s.toLowerCase().split(/[\s,]+/).includes(goodVal) : /^(1|on|yes|enabled|true)$/i.test(s);
+  const on = ktCellTruth(s, goodVal);
   return '<span class="' + (on ? 'ctun-yes' : 'ctun-tb') + '"><bdi dir="ltr">' + esc(s) + '</bdi></span>';
 }
 function renderKernelTuning() {
@@ -9797,12 +9836,14 @@ function renderKernelTuning() {
     '</tbody></table></div>' +
     '<p class="qs-hint u-m-0">' + esc(tr('', 'Read-only for now: the apply path for kernel tuning lands with the backend.')) + '</p>';
 }
-// boolean/string truthiness for the summary line (mirrors ktCell's on-rule)
+// boolean/string truthiness for the summary line (mirrors ktCell's on-rule);
+// 'fq_codel' counts as a fair queue the same way 'fq' does
 function ktCellTruth(v, goodVal) {
   if (v === true) return true;
   if (v === false || v == null || v === '') return false;
   const s = String(v);
-  return goodVal ? s.toLowerCase().split(/[\s,]+/).includes(goodVal) : /^(1|on|yes|enabled|true)$/i.test(s);
+  if (goodVal) return s.toLowerCase().split(/[\s,]+/).some(t => t === goodVal || t.startsWith(goodVal + '_'));
+  return /^(1|on|yes|enabled|true)$/i.test(s);
 }
 async function loadKernelTuning() {
   const host = $('ktBody');
