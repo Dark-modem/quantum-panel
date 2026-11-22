@@ -12845,7 +12845,19 @@ async function coresUpdateAll(engine) {
 let ctunOpen = null;        // engine id the detail page shows (null = list view)
 let ctunLayer = 'all';      // method table layer filter
 let ctunPendingCore = '';   // core from #t=cores&core=…, opened once data lands
+let ctunSearch = '';        // method catalog search box
+let ctunF = { transport: '', ipver: '', port: '', userspace: '', mikrotik: '' };
+let ctunPageNo = 1;         // 1-based catalog page
+let ctunPerPage = 10;       // 10 / 25 / 50 rows per page
+let ctunDetail = null;      // the method whose details panel is open
+let ctunFeedRetryTimer = null; // the one-shot cold-cache catalog retry
 const CTUN_LAYER_KEY = { L2: 2, L3: 3, L4: 4 };
+const CTUN_ICO_EYE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1.5 12S5.5 5 12 5s10.5 7 10.5 7-4 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+const CTUN_ICO_INFO = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M12 11v5"/></svg>';
+const CTUN_ICO_LINK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>';
+const CTUN_ICO_CUBE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>';
+const CTUN_ICO_AGENT = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="11" rx="2"/><path d="M8 20h8M12 16v4"/></svg>';
+const CTUN_ICO_VER = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>';
 function ctunGroup(engine) {
   const key = CORES_ALIAS[engine] || engine;
   return (coresCache || []).find(x => (CORES_ALIAS[x.engine] || x.engine) === key) || null;
@@ -12873,9 +12885,11 @@ function ctunOutdated(repo, installed) {
 function ctunMethods(repo) {
   return repo && Array.isArray(repo.methods) ? repo.methods : null;
 }
-function ctunBool(v) {
-  if (v === true) return '<span class="ctun-yes" aria-label="yes">✓</span>';
-  if (v === false) return '<span class="ctun-no" aria-label="no">✗</span>';
+// tri-state mapper for the yes/no filters: true→'yes', false→'no', null→''
+function ctunTri(v) { return v === true ? 'yes' : v === false ? 'no' : ''; }
+function ctunPill(v) {
+  if (v === true) return '<span class="ctun-pill ctun-pill-yes">' + esc(tr('', 'Yes')) + '</span>';
+  if (v === false) return '<span class="ctun-pill">' + esc(tr('', 'No')) + '</span>';
   return '<span class="art-dash">—</span>';
 }
 function ctunLayerBadge(layer) {
@@ -12892,23 +12906,45 @@ function ctunIpver(v) {
   if (s === 'v4' || s === '4') return 'IPv4';
   if (s === 'v6' || s === '6') return 'IPv6';
   if (s === 'both') return 'v4+v6';
-  return '—';
+  return v ? String(v) : '—';
 }
-function ctunMethodRow(m) {
-  const name = m.title || m.name || '—';
-  const id = m.id || m.name || '';
-  const oh = (m.overhead != null && m.overhead !== '') ? String(m.overhead) : '—';
-  return '<tr>' +
-    '<td><b>' + esc(name) + '</b>' + (id && id !== name ? '<span class="ctun-mid"><bdi dir="ltr">' + esc(id) + '</bdi></span>' : '') + '</td>' +
-    '<td>' + ctunLayerBadge(m.layer) + '</td>' +
-    '<td>' + ctunTextBadge(m.transport) + '</td>' +
-    '<td class="u-text-center">' + esc(ctunIpver(m.ipver)) + '</td>' +
-    '<td class="num">' + esc(oh) + '</td>' +
-    '<td>' + ctunBool(m.needs_port) + '</td>' +
-    '<td>' + ctunBool(m.userspace) + '</td>' +
-    '<td>' + ctunBool(m.mikrotik) + '</td>' +
-    '<td>' + (m.family ? '<span class="ctun-fam"><bdi dir="ltr">' + esc(String(m.family)) + '</bdi></span>' : '<span class="art-dash">—</span>') + '</td>' +
-    '</tr>';
+// the manifest's title reads "name (technical description)" — the
+// parenthetical becomes the method's gray second line; anything else
+// renders the full title untouched (nothing invented)
+function ctunNameDesc(m) {
+  const name = String(m.name || '');
+  const title = String(m.title || '');
+  let desc = '';
+  if (title && name && title.toLowerCase().startsWith(name.toLowerCase() + ' ')) {
+    const rest = title.slice(name.length + 1).trim();
+    const mm = /^\((.*)\)$/.exec(rest);
+    desc = mm ? mm[1] : rest;
+  } else if (title && title !== name) {
+    desc = title;
+  }
+  return { name: name || title || '—', desc: desc };
+}
+// layer + search + the toolbar filters, composed; every method keeps its
+// original catalog index (the details button and # column ride it)
+function ctunFiltered(repo) {
+  const methods = ctunMethods(repo) || [];
+  const q = ctunSearch.trim().toLowerCase();
+  return methods
+    .map((m, i) => ({ m: m, i: i }))
+    .filter(x => {
+      const m = x.m;
+      if (ctunLayer !== 'all' && String(m.layer || '').toUpperCase() !== ctunLayer) return false;
+      if (ctunF.transport && String(m.transport || '') !== ctunF.transport) return false;
+      if (ctunF.ipver && String(m.ipver || '') !== ctunF.ipver) return false;
+      if (ctunF.port && ctunTri(m.needs_port) !== ctunF.port) return false;
+      if (ctunF.userspace && ctunTri(m.userspace) !== ctunF.userspace) return false;
+      if (ctunF.mikrotik && ctunTri(m.mikrotik) !== ctunF.mikrotik) return false;
+      if (q) {
+        const hay = [m.name, m.title, m.family, m.transport].map(v => String(v || '').toLowerCase()).join(' ');
+        if (hay.indexOf(q) < 0) return false;
+      }
+      return true;
+    });
 }
 // list/detail view sync: a core open → the grid + artifact cards hide and
 // the detail page paints; closing restores the list. Safe to call anytime.
@@ -12924,6 +12960,9 @@ function ctunPageOpen(engine) {
   if (!g) return;
   ctunOpen = (CORES_ALIAS[engine] || engine);
   ctunLayer = 'all';
+  ctunSearch = '';
+  ctunF = { transport: '', ipver: '', port: '', userspace: '', mikrotik: '' };
+  ctunPageNo = 1;
   // the repo feed may not have loaded yet — pull it so the version strip
   // and the method catalog fill in as soon as it answers
   if (!coresAvail && !coresAvailErr && !coresAvailBusy) loadCoresAvailable();
@@ -12935,9 +12974,45 @@ function ctunPageClose() {
   if (!ctunOpen) return;
   ctunOpen = null;
   ctunLayer = 'all';
+  ctunSearch = '';
+  ctunF = { transport: '', ipver: '', port: '', userspace: '', mikrotik: '' };
+  ctunPageNo = 1;
+  ctunDetailClose();
   renderCores();
   topTitleSync('cores');
   tabHashWrite('cores');
+}
+// the three header stat cards — real backend values only; an unknown
+// count never masquerades as zero and an empty install never as a number
+function ctunStatsCards(g, repo, methods) {
+  const agents = window.__coresAgents || [];
+  const det = (g && g.detail) || {};
+  const known = agents.length > 0 && Object.keys(det).length > 0;
+  const installedCount = known ? coresInstalled(g) : 0;
+  const installedVer = ctunInstalledVersion(g, repo);
+  const outdated = ctunOutdated(repo, installedVer);
+  let instVal = '';
+  let instSub = esc(tr('', 'Installed on agents'));
+  if (!known) instVal = '<span class="ctun-stat-na">' + esc(tr('', 'Not available')) + '</span>';
+  else if (installedCount === 0) instVal = '<span class="ctun-stat-na">' + esc(tr('', 'Not installed')) + '</span>';
+  else {
+    instVal = '<bdi dir="ltr">' + esc(String(installedCount)) + '</bdi>';
+    instSub = esc(tr('', 'of {m} agents').replace('{m}', String(agents.length))) +
+      (installedVer ? ' · <bdi dir="ltr">v' + esc(installedVer) + '</bdi>' : '');
+    if (outdated === true && repo && repo.latest_version) {
+      instSub += '<span class="eng-repo-chip ctun-newer" title="' + esc(tr('', 'A newer version is available — update the core from the artifact store')) + '">' +
+        esc(tr('', 'Newer version available')) + ' <bdi dir="ltr">v' + esc(repo.latest_version) + '</bdi></span>';
+    } else if (outdated === false) {
+      instSub += '<span class="ctun-uptodate"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>' + esc(tr('', 'Up to date')) + '</span>';
+    }
+  }
+  const stat = (ico, val, sub) => '<div class="ctun-stat"><span class="ctun-stat-ic" aria-hidden="true">' + ico + '</span>' +
+    '<div class="ctun-stat-tx"><b>' + val + '</b><span>' + sub + '</span></div></div>';
+  return '<div class="ctun-stats">' +
+    stat(CTUN_ICO_CUBE, methods ? '<bdi dir="ltr">' + esc(String(methods.length)) + '</bdi>' : '<span class="ctun-stat-na">—</span>', esc(tr('', 'Total methods'))) +
+    stat(CTUN_ICO_AGENT, instVal, instSub) +
+    stat(CTUN_ICO_VER, repo && repo.latest_version ? '<bdi dir="ltr">v' + esc(repo.latest_version) + '</bdi>' : '<span class="ctun-stat-na">—</span>', esc(tr('', 'Latest repo version'))) +
+    '</div>';
 }
 function renderCtunPage() {
   const body = $('ctunPage');
@@ -12953,29 +13028,35 @@ function renderCtunPage() {
     body.innerHTML = stateError(tr('', 'This core is not known to the panel yet'), null, true);
     return;
   }
-  const head = '<div class="ctun-head"><div><h2 class="tc-title u-fs-16 u-fw-700 u-m-0">' + esc(disp) + ' — ' + esc(tr('', 'Method catalog')) + '</h2></div>' +
-    '<span class="u-flex-1"></span>' +
-    '<button type="button" class="eng-act pri" data-ctun-manage>' + esc(tr('', 'Install / Manage')) + '</button>' +
-    '<button type="button" class="quantum-btn quantum-btn-secondary" data-ctun-back>' + esc(tr('', 'Back to cores')) + '</button></div>';
-  // version strip: installed on the agents vs the repo latest + the newer badge
-  const installed = ctunInstalledVersion(g, repo);
-  const outdated = ctunOutdated(repo, installed);
-  const newer = outdated === true && repo && repo.latest_version ? repo.latest_version : '';
-  const verChip = newer
-    ? '<span class="eng-repo-chip ctun-newer" title="' + esc(tr('', 'A newer version is available — update the core from the artifact store')) + '">' +
-      esc(tr('', 'Newer version available')) + ' <bdi dir="ltr">v' + esc(newer) + '</bdi></span>'
-    : (outdated === false ? '<span class="ctun-uptodate"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>' + esc(tr('', 'Up to date')) + '</span>' : '');
-  const verRows =
-    '<div class="ctun-ver"><div class="ctun-ver-item"><span>' + esc(tr('', 'Installed on agents')) + '</span><b><bdi dir="ltr">' + (installed ? 'v' + esc(installed) : '—') + '</bdi></b></div>' +
-    '<div class="ctun-ver-item"><span>' + esc(tr('', 'Latest in repo')) + '</span><b><bdi dir="ltr">' + (repo && repo.latest_version ? 'v' + esc(repo.latest_version) : '—') + '</bdi></b></div>' +
-    verChip + '</div>';
-  // the method catalog: chips + the full table, or the honest empty state
   const methods = ctunMethods(repo);
+  // the repo feed answers honestly when unreachable — the page says so
+  const feedErr = coresAvailErr && !methods
+    ? '<div class="ctun-feederr" role="alert"><b>' + esc(tr('', 'The repo feed is unreachable')) + '</b><span>' + esc(coresAvailErr) + '</span>' +
+      '<button type="button" class="eng-act" data-ctun-feed-retry>' + esc(tr('', 'Retry')) + '</button></div>'
+    : '';
+  const hero =
+    '<div class="ctun-hero"><span class="ctun-hero-ic" aria-hidden="true">' + CTUN_ICO_LINK + '</span>' +
+    '<div class="ctun-hero-tx"><h2 class="tc-title u-fs-16 u-fw-700 u-m-0">' + esc(disp) + ' — ' + esc(tr('', 'Method catalog')) + '</h2>' +
+    '<span class="ctun-hero-sub">' + esc(tr('', 'Browse and manage supported C-Tunnel methods')) + '</span></div>' +
+    '<span class="u-flex-1"></span>' +
+    '<button type="button" class="quantum-btn quantum-btn-primary" data-ctun-manage>' + esc(tr('', 'Manage installations')) + '</button>' +
+    '<button type="button" class="quantum-btn quantum-btn-secondary" data-ctun-back>' + esc(tr('', 'Back to cores')) + '</button></div>';
+  let middle = '';
   if (!methods || !methods.length) {
-    body.innerHTML = head + verRows +
+    // no catalog yet (or a feed failure) — the honest states, never a fake zero.
+    // a panel restart empties the manifest cache and the first feed read answers
+    // null while the background fetch is in flight: one delayed retry heals it
+    if (!coresAvailBusy && !coresAvailErr) {
+      clearTimeout(ctunFeedRetryTimer);
+      ctunFeedRetryTimer = setTimeout(() => {
+        if (ctunOpen && !ctunMethods(artRepoRow(ctunOpen))) loadCoresAvailable(true);
+      }, 2000);
+    }
+    middle = feedErr +
       '<div class="ent-empty" role="status"><span class="ent-empty-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 9h18M8 13h8"/></svg></span>' +
       '<b>' + esc(tr('', 'No method catalog yet')) + '</b>' +
       '<span>' + esc(tr('', 'The per-method transport catalog for this core has not landed on the feed — the table appears as soon as the backend serves methods[].')) + '</span></div>';
+    body.innerHTML = hero + ctunStatsCards(g, repo, methods) + middle;
     return;
   }
   const layers = ['all', 'L2', 'L3', 'L4'];
@@ -12983,18 +13064,166 @@ function renderCtunPage() {
   const chips = '<div class="ctun-chips" role="group" aria-label="' + esc(tr('', 'Filter by layer')) + '">' +
     layers.map(l => '<button type="button" class="ctun-chip' + (ctunLayer === l ? ' on' : '') + '" data-ctun-layer="' + l + '" aria-pressed="' + (ctunLayer === l ? 'true' : 'false') + '">' +
       esc(l === 'all' ? tr('', 'All') : l) + ' <i>' + count(l) + '</i></button>').join('') + '</div>';
-  const rows = methods
-    .filter(m => ctunLayer === 'all' || String(m.layer || '').toUpperCase() === ctunLayer)
-    .map(ctunMethodRow).join('');
-  body.innerHTML = head + verRows + chips +
-    '<p class="qs-hint u-m-0 ctun-count">' + esc(tr('', '{n} transport methods — the live board tests them all between a real pair').replace('{n}', String(methods.length))) + '</p>' +
-    '<div class="ctun-tblwrap"><table class="ent-tbl ctun-tbl"><thead><tr>' +
-    '<th>' + esc(tr('', 'Method')) + '</th><th>' + esc(tr('', 'Layer')) + '</th><th>' + esc(tr('', 'Transport')) + '</th>' +
-    '<th>' + esc(tr('', 'IP')) + '</th><th class="num">' + esc(tr('', 'Overhead')) + '</th>' +
-    '<th>' + esc(tr('', 'Port needed')) + '</th><th>' + esc(tr('', 'Userspace')) + '</th>' +
-    '<th>' + esc(tr('', 'MikroTik')) + '</th><th>' + esc(tr('', 'Family')) + '</th>' +
-    '</tr></thead><tbody>' + (rows || '<tr><td colspan="9" class="u-text-center">—</td></tr>') + '</tbody></table></div>';
+  const triOpts = () => [['', tr('', 'All')], ['yes', tr('', 'Yes')], ['no', tr('', 'No')]];
+  const sel = (key, lbl, opts) => '<select class="ctun-sel" data-ctun-f="' + key + '" aria-label="' + esc(lbl) + '">' +
+    opts.map(o => '<option value="' + esc(o[0]) + '"' + (ctunF[key] === o[0] ? ' selected' : '') + '>' + esc(o[1]) + '</option>').join('') + '</select>';
+  const transports = Array.from(new Set(methods.map(m => String(m.transport || '')).filter(Boolean))).sort();
+  const ipvers = Array.from(new Set(methods.map(m => String(m.ipver || '')).filter(Boolean))).sort();
+  const toolbar =
+    '<div class="ctun-toolbar">' +
+    '<div class="ctun-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>' +
+    '<input type="search" data-ctun-search value="' + esc(ctunSearch) + '" placeholder="' + esc(tr('', 'Search method or family…')) + '" aria-label="' + esc(tr('', 'Search method or family…')) + '"></div>' +
+    sel('transport', tr('', 'Transport'), [['', tr('', 'Transport: all')]].concat(transports.map(t => [t, t]))) +
+    sel('ipver', tr('', 'IP version'), [['', tr('', 'IP: all')]].concat(ipvers.map(v => [v, ctunIpver(v)]))) +
+    sel('port', tr('', 'Port required'), triOpts()) +
+    sel('userspace', tr('', 'Userspace'), triOpts()) +
+    sel('mikrotik', tr('', 'MikroTik'), triOpts()) +
+    '<button type="button" class="eng-act" data-ctun-clear>' + esc(tr('', 'Clear filters')) + '</button>' +
+    '</div>';
+  body.innerHTML = hero + ctunStatsCards(g, repo, methods) + chips + toolbar +
+    '<div id="ctunTableWrap"></div>';
+  renderCtunTable();
+  ctunWirePage();
 }
+// the catalog table + pagination — re-rendered alone on search/filter/page
+// changes so the search box never loses focus mid-typing
+function renderCtunTable() {
+  const ohTip = tr('', 'Exactly as the quantum-cores manifest publishes it — the upstream defines no unit for this number yet');
+  const wrap = $('ctunTableWrap');
+  if (!wrap) return;
+  const repo = artRepoRow(ctunOpen);
+  const methods = ctunMethods(repo) || [];
+  const filtered = ctunFiltered(repo);
+  const pages = Math.max(1, Math.ceil(filtered.length / ctunPerPage));
+  if (ctunPageNo > pages) ctunPageNo = pages;
+  if (ctunPageNo < 1) ctunPageNo = 1;
+  const a = filtered.length === 0 ? 0 : (ctunPageNo - 1) * ctunPerPage + 1;
+  const b = Math.min(filtered.length, ctunPageNo * ctunPerPage);
+  let rowHtml = '';
+  if (!filtered.length) {
+    rowHtml = '<tr><td colspan="11"><div class="ent-empty ent-empty-sm" role="status"><b>' + esc(tr('', 'No methods match your search.')) + '</b>' +
+      '<button type="button" class="eng-act" data-ctun-clear>' + esc(tr('', 'Clear filters')) + '</button></div></td></tr>';
+  } else {
+    rowHtml = filtered.slice((ctunPageNo - 1) * ctunPerPage, ctunPageNo * ctunPerPage).map(x => {
+      const m = x.m;
+      const nd = ctunNameDesc(m);
+      const oh = (m.overhead != null && m.overhead !== '') ? esc(String(m.overhead)) : '—';
+      const fam = m.family ? '<span class="ctun-fam" data-no-i18n><bdi dir="ltr">' + esc(String(m.family)) + '</bdi></span>' : '<span class="art-dash">—</span>';
+      const num = (m.id != null && m.id !== '') ? esc(String(m.id)) : esc(String(x.i + 1));
+      return '<tr>' +
+        '<td class="num ctun-cell-id" data-lbl="#">' + num + '</td>' +
+        '<td class="ctun-cell-name" data-lbl="' + esc(tr('', 'Method')) + '"><b>' + esc(nd.name) + '</b>' +
+        (nd.desc ? '<span class="ctun-desc">' + esc(nd.desc) + '</span>' : '') + '</td>' +
+        '<td data-lbl="' + esc(tr('', 'Layer')) + '">' + ctunLayerBadge(m.layer) + '</td>' +
+        '<td data-lbl="' + esc(tr('', 'Transport')) + '">' + ctunTextBadge(m.transport) + '</td>' +
+        '<td data-lbl="' + esc(tr('', 'IP version')) + '"><bdi dir="ltr">' + esc(ctunIpver(m.ipver)) + '</bdi></td>' +
+        '<td class="num" data-lbl="' + esc(tr('', 'Overhead')) + '">' + oh + '</td>' +
+        '<td data-lbl="' + esc(tr('', 'Port required')) + '">' + ctunPill(m.needs_port) + '</td>' +
+        '<td data-lbl="' + esc(tr('', 'Userspace')) + '">' + ctunPill(m.userspace) + '</td>' +
+        '<td data-lbl="' + esc(tr('', 'MikroTik')) + '">' + ctunPill(m.mikrotik) + '</td>' +
+        '<td data-lbl="' + esc(tr('', 'Family')) + '">' + fam + '</td>' +
+        '<td class="ctun-cell-act"><button type="button" class="ctun-iconbtn" data-ctun-detail="' + esc(String(x.i)) + '" aria-label="' + esc(tr('', 'Details')) + '" title="' + esc(tr('', 'Details')) + '">' + CTUN_ICO_EYE + '</button></td>' +
+        '</tr>';
+    }).join('');
+  }
+  const pageBtns = [];
+  for (let p = 1; p <= pages; p++) {
+    pageBtns.push('<button type="button" class="ctun-pagebtn' + (p === ctunPageNo ? ' on' : '') + '" data-ctun-goto="' + p + '" aria-label="' + esc(tr('', 'Page {n}').replace('{n}', String(p))) + '">' + p + '</button>');
+  }
+  wrap.innerHTML =
+    '<div class="ctun-tblwrap"><table class="ent-tbl ctun-tbl"><thead><tr>' +
+    '<th class="num">#</th>' +
+    '<th>' + esc(tr('', 'Method')) + '</th>' +
+    '<th>' + esc(tr('', 'Layer')) + '</th>' +
+    '<th>' + esc(tr('', 'Transport')) + '</th>' +
+    '<th>' + esc(tr('', 'IP version')) + '</th>' +
+    '<th class="num ctun-th-oh">' + esc(tr('', 'Overhead')) + '<span class="ctun-info" tabindex="0" role="img" aria-label="' + esc(tr('', 'Overhead')) + '" title="' + esc(ohTip) + '">' + CTUN_ICO_INFO + '</span></th>' +
+    '<th>' + esc(tr('', 'Port required')) + '</th>' +
+    '<th>' + esc(tr('', 'Userspace')) + '</th>' +
+    '<th>' + esc(tr('', 'MikroTik')) + '</th>' +
+    '<th>' + esc(tr('', 'Family')) + '</th>' +
+    '<th>' + esc(tr('', 'Details')) + '</th>' +
+    '</tr></thead><tbody>' + rowHtml + '</tbody></table></div>' +
+    '<div class="ctun-pager">' +
+    '<span class="qs-hint">' + esc(tr('', 'Showing {a}–{b} of {n} methods').replace('{a}', String(a)).replace('{b}', String(b)).replace('{n}', String(filtered.length))) + '</span>' +
+    '<span class="u-flex-1"></span>' +
+    '<label class="ctun-pplbl">' + esc(tr('', 'Per page')) +
+    '<select class="ctun-sel" data-ctun-perpage aria-label="' + esc(tr('', 'Per page')) + '">' +
+    [10, 25, 50].map(n => '<option value="' + n + '"' + (ctunPerPage === n ? ' selected' : '') + '>' + n + '</option>').join('') +
+    '</select></label>' +
+    '<div class="ctun-pagebtns" role="group" aria-label="' + esc(tr('', 'Page')) + '">' + pageBtns.join('') + '</div>' +
+    '</div>';
+}
+// search/filters/pagination are page-local state: the change handlers re-render
+// only the table region, so the search box keeps its focus while typing
+function ctunWirePage() {
+  const page = $('ctunPage');
+  if (!page) return;
+  const si = page.querySelector('[data-ctun-search]');
+  if (si) si.addEventListener('input', function () { ctunSearch = this.value; ctunPageNo = 1; renderCtunTable(); });
+  page.querySelectorAll('select[data-ctun-f]').forEach(s => s.addEventListener('change', function () {
+    ctunF[this.getAttribute('data-ctun-f') || ''] = this.value;
+    ctunPageNo = 1;
+    renderCtunTable();
+  }));
+  const pp = page.querySelector('[data-ctun-perpage]');
+  if (pp) pp.addEventListener('change', function () { ctunPerPage = Number(this.value) || 10; ctunPageNo = 1; renderCtunTable(); });
+}
+// the per-method details panel — every field rides the backend manifest
+function ctunDetailBuild() {
+  let ov = document.getElementById('ctunDetailModal');
+  if (ov) return ov;
+  ov = document.createElement('div');
+  ov.id = 'ctunDetailModal';
+  ov.className = 'ent-modal-ov';
+  ov.innerHTML =
+    '<div class="ent-modal"><div class="ent-card cores-pick-card ctun-detail-card">' +
+    '<div class="art-modal-head"><b id="ctunDTitle"></b><button type="button" class="mtb-toast-x" data-ctun-dclose>×</button></div>' +
+    '<div class="art-modal-body" id="ctunDetailBody"></div>' +
+    '<div class="art-modal-foot"><span class="art-modal-busy"></span>' +
+    '<button type="button" class="quantum-btn quantum-btn-secondary" data-ctun-dclose>' + esc(tr('', 'Close')) + '</button>' +
+    '</div></div></div>';
+  document.body.appendChild(ov);
+  ov.addEventListener('click', e => {
+    if (e.target === ov || e.target.closest('[data-ctun-dclose]')) ctunDetailClose();
+  });
+  return ov;
+}
+function ctunDetailClose() {
+  ctunDetail = null;
+  const ov = document.getElementById('ctunDetailModal');
+  if (ov && ov.hidden !== true) modalHide(ov);
+}
+function ctunDetailOpen(m) {
+  const ov = ctunDetailBuild();
+  const body = $('ctunDetailBody');
+  const title = $('ctunDTitle');
+  ctunDetail = m || null;
+  if (!m) {
+    if (title) title.textContent = tr('', 'Method details');
+    if (body) body.innerHTML = '<div class="ent-empty ent-empty-sm" role="status"><b>' + esc(tr('', 'Method details unavailable')) + '</b>' +
+      '<span>' + esc(tr('', 'This method is not available in the feed yet.')) + '</span></div>';
+    modalShow(ov, ctunDetailClose);
+    return;
+  }
+  const nd = ctunNameDesc(m);
+  if (title) title.textContent = tr('', 'Method details') + ' — ' + nd.name;
+  const row = (k, v) => '<div class="ctun-drow"><span>' + esc(k) + '</span><b>' + v + '</b></div>';
+  if (body) body.innerHTML =
+    (nd.desc ? '<p class="qs-hint u-m-0">' + esc(nd.desc) + '</p>' : '') +
+    row(tr('', 'Method'), esc(nd.name)) +
+    row(tr('', 'Layer'), ctunLayerBadge(m.layer)) +
+    row(tr('', 'Transport'), ctunTextBadge(m.transport)) +
+    row(tr('', 'IP version'), '<bdi dir="ltr">' + esc(ctunIpver(m.ipver)) + '</bdi>') +
+    row(tr('', 'Overhead'), (m.overhead != null && m.overhead !== '') ? '<bdi dir="ltr">' + esc(String(m.overhead)) + '</bdi>' : '—') +
+    '<p class="qs-hint u-m-0 ctun-oh-note">' + esc(tr('', 'The upstream manifest defines no unit for this number yet.')) + '</p>' +
+    row(tr('', 'Port required'), ctunPill(m.needs_port)) +
+    row(tr('', 'Userspace'), ctunPill(m.userspace)) +
+    row(tr('', 'MikroTik'), ctunPill(m.mikrotik)) +
+    row(tr('', 'Family'), m.family ? '<span class="ctun-fam" data-no-i18n><bdi dir="ltr">' + esc(String(m.family)) + '</bdi></span>' : '—');
+  modalShow(ov, ctunDetailClose);
+}
+
 (function coresWire() {
   const tab = $('tab-cores');
   if (!tab) return;
@@ -13011,9 +13240,27 @@ function renderCtunPage() {
     if (e.target.closest('[data-cores-pick-close]')) { const ov = document.getElementById('coresPickModal'); if (ov) ov.hidden = true; }
     if (e.target.closest('[data-ctun-back]')) { ctunPageClose(); return; }
     const chip = e.target.closest('[data-ctun-layer]');
-    if (chip) { ctunLayer = chip.getAttribute('data-ctun-layer') || 'all'; renderCtunPage(); return; }
+    if (chip) { ctunLayer = chip.getAttribute('data-ctun-layer') || 'all'; ctunPageNo = 1; renderCtunPage(); return; }
     const mg = e.target.closest('[data-ctun-manage]');
     if (mg && ctunOpen) { coresPickerOpen(ctunOpen); return; }
+    const det = e.target.closest('[data-ctun-detail]');
+    if (det) {
+      const repo = artRepoRow(ctunOpen);
+      const methods = ctunMethods(repo) || [];
+      const idx = Number(det.getAttribute('data-ctun-detail'));
+      ctunDetailOpen(methods[idx] || null);
+      return;
+    }
+    if (e.target.closest('[data-ctun-clear]')) {
+      ctunSearch = '';
+      ctunF = { transport: '', ipver: '', port: '', userspace: '', mikrotik: '' };
+      ctunPageNo = 1;
+      renderCtunPage();
+      return;
+    }
+    const go = e.target.closest('[data-ctun-goto]');
+    if (go) { ctunPageNo = Number(go.getAttribute('data-ctun-goto')) || 1; renderCtunTable(); return; }
+    if (e.target.closest('[data-ctun-feed-retry]')) { loadCoresAvailable(true); return; }
   });
   const search = $('engSearch');
   if (search) search.addEventListener('input', function () { coresSearch = this.value; renderCores(); });

@@ -19,7 +19,7 @@ function section(start, end) {
 // the grid state + name/alias consts + the grid render (which now also
 // drives the core-detail view sync) the artifact store and the page share
 const consts = section('let coresCache = null;', 'function coresPickerOpen');
-const cmp = section('function verCmp(a, b)', 'function artSize');
+const cmp = section('let artList = null;', 'function artSize');
 const ctun = section('// ===== Core details drill-down page (§2.22 additive fields)', '(function coresWire()');
 const board = section('// ---------- C-Tunnel method board (tab-cboard, §2.23)', '// ---------- Kernel Tuning (tab-netopt)');
 const kernel = section('// ---------- Kernel Tuning (tab-netopt)', '// ---------- Bagher (SSH pool carrier)');
@@ -95,8 +95,10 @@ function mkMethods() {
 }
 
 (async () => {
-  // ---- Piece 1: the core details drill-down page ----------------------------
+  // ---- Piece 1: the redesigned core details drill-down page ------------------
+  // the fleet two agents know so the installed-count stat card is known
   vm.runInContext(`
+  window.__coresAgents = [{ id: 'a1', name: 'tehran-1' }, { id: 'a2', name: 'frank-1' }];
   coresCache = [{ engine: 'ctunnel', latest: '0.3.2', builds: [], installed: {}, detail: { a1: { installed: true, version: '0.3.2' }, a2: { installed: true, version: '0.3.1' } } }];
   coresAvail = { cores: [{ core: 'ctunnel', latest_tag: 'ctunnel-v0.4.0', latest_version: '0.4.0', installed_version: '0.3.2', outdated: true, methods: null }] };
   ctunPageOpen('ctunnel');
@@ -105,34 +107,93 @@ function mkMethods() {
   assert.equal(vm.runInContext('ctunOpen', sandbox), 'ctunnel', 'opening a core sets the detail state');
   assert.equal(el('coresList').hidden, true, 'the grid hides while the detail page is open');
   assert.equal(el('coresDetail').hidden, false, 'the detail page shows');
-  assert.ok(html.includes('C-Tunnel') && html.includes('Method catalog'), 'the page heads with the core name and the method catalog label');
-  assert.ok(html.includes('Back to cores') && html.includes('data-ctun-back'), 'the page carries its back action');
-  assert.ok(html.includes('v0.3.2') && html.includes('v0.4.0'), 'the version strip shows installed vs repo latest');
-  assert.ok(html.includes('Newer version available'), 'outdated=true carries the newer-version badge');
+  assert.ok(html.includes('C-Tunnel') && html.includes('Method catalog'), 'the hero heads with the core name and the catalog label');
+  assert.ok(html.includes('Browse and manage supported C-Tunnel methods'), 'the hero carries its description');
+  assert.ok(html.includes('Manage installations') && html.includes('data-ctun-manage'), 'the primary install action renders');
+  assert.ok(html.includes('Back to cores') && html.includes('data-ctun-back'), 'the secondary back action renders');
+  // the three stat cards
+  assert.ok(html.includes('Total methods') && html.includes('—'), 'the methods card reads honest — while the feed has no catalog');
+  assert.ok(html.includes('Latest repo version') && html.includes('v0.4.0'), 'the repo version card shows the repo latest');
+  // catalog lands → stats fill, table paginates
   vm.runInContext('globalThis.mkMethods = ' + mkMethods.toString(), sandbox);
   vm.runInContext(`
   coresAvail.cores[0].methods = mkMethods();
+  // the first row mirrors the real manifest shape (name + title with the
+  // parenthetical technical description)
+  coresAvail.cores[0].methods[0] = { id: 1, name: '6to4', title: '6to4 (SIT carrier + IPIP6 inside)', layer: 'L3', transport: 'raw-ip', ipver: 'v4', overhead: 60, needs_port: false, userspace: false, mikrotik: true, family: 'kernel-l3' };
   renderCtunPage();
   `, sandbox);
   html = el('ctunPage').innerHTML;
-  assert.ok((html.match(/ctun-lb-/g) || []).length === 49, 'the full 49-method table renders');
+  const tHtml = el('ctunTableWrap').innerHTML;
+  assert.ok(html.includes('Total methods') && html.includes('<bdi dir="ltr">49</bdi>'), 'the methods card counts the real catalog');
+  assert.ok(html.includes('of 2 agents') && html.includes('v0.3.2'), 'the install card counts agents and names the installed version');
+  assert.ok(html.includes('Newer version available') && html.includes('v0.4.0'), 'outdated=true carries the newer-version mark');
   assert.ok(html.includes('All') && html.includes('L2') && html.includes('L3') && html.includes('L4'), 'layer filter chips render');
   assert.ok(html.includes('16') && html.includes('15') && html.includes('18'), 'the chips carry their per-layer counts');
-  assert.ok(html.includes('Overhead') && html.includes('Port needed') && html.includes('Userspace') && html.includes('MikroTik') && html.includes('Family'), 'the table carries every dispatched column');
-  assert.ok(html.includes('&lt;script&gt;') && !html.includes('<script>'), 'the method title renders escaped');
-  assert.ok(html.includes('49 transport methods'), 'the count line names the 49 methods');
+  assert.ok(tHtml.includes('Overhead') && tHtml.includes('Port required') && tHtml.includes('Userspace') && tHtml.includes('MikroTik') && tHtml.includes('Family'), 'the table carries every dispatched column');
+  assert.ok(html.includes('data-ctun-page') === false, 'no leaked test attribute');
+  assert.ok((tHtml.match(/ctun-lb-/g) || []).length === 10, 'page 1 renders 10 rows (10 per page)');
+  assert.ok(tHtml.includes('Showing 1–10 of 49 methods'), 'the pager names the range');
+  assert.ok((tHtml.match(/data-ctun-goto="(\d+)"/g) || []).length === 5, 'five page buttons for 49 methods at 10 per page');
+  assert.ok(tHtml.includes('>6to4</b>') && tHtml.includes('SIT carrier + IPIP6 inside'), 'the method cell splits name and technical description');
+  assert.ok(tHtml.includes('kernel-l3'), 'the family renders');
+  assert.ok(tHtml.includes('Yes') && tHtml.includes('No'), 'the booleans render as yes/no pills');
+  assert.ok(tHtml.includes('&lt;script&gt;') && !tHtml.includes('<script>'), 'the method title renders escaped');
+  assert.ok(tHtml.includes('data-ctun-detail="0"'), 'rows carry their details action');
+  // details panel
+  vm.runInContext(`ctunDetailOpen(coresAvail.cores[0].methods[0])`, sandbox);
+  const dHtml = el('ctunDetailBody').innerHTML;
+  assert.ok(el('ctunDTitle').textContent.includes('Method details') && el('ctunDTitle').textContent.includes('6to4'), 'the details panel titles the method');
+  assert.ok(dHtml.includes('SIT carrier + IPIP6 inside') && dHtml.includes('raw-ip') && dHtml.includes('kernel-l3') && dHtml.includes('>60<'), 'the details panel renders the manifest fields');
+  assert.ok(dHtml.includes('no unit') || dHtml.includes('\u0648\u0627\u062d\u062f'), 'the overhead row carries the honest unit note');
+  vm.runInContext('ctunDetailClose()', sandbox);
 
-  vm.runInContext(`ctunLayer = 'L3'; renderCtunPage();`, sandbox);
-  html = el('ctunPage').innerHTML;
-  assert.ok((html.match(/ctun-lb-/g) || []).length === 15, 'the L3 filter keeps only its 15 rows');
+  // pagination: page 5 → 9 rows; per-page 50 → one page of 49
+  vm.runInContext(`ctunPageNo = 5; renderCtunTable();`, sandbox);
+  html = el('ctunTableWrap').innerHTML;
+  assert.ok((html.match(/ctun-lb-/g) || []).length === 9, 'page 5 keeps the 9 remaining rows');
+  assert.ok(html.includes('Showing 41–49 of 49 methods'), 'the pager names the last range');
+  vm.runInContext(`ctunPerPage = 50; ctunPageNo = 1; renderCtunTable();`, sandbox);
+  html = el('ctunTableWrap').innerHTML;
+  assert.ok((html.match(/ctun-lb-/g) || []).length === 49, 'per-page 50 renders the whole catalog');
+  assert.ok(html.includes('Showing 1–49 of 49 methods'), 'the pager names the full range');
+
+  // search: by name, by family; no results state
+  vm.runInContext(`ctunSearch = '6to4'; ctunPageNo = 1; renderCtunTable();`, sandbox);
+  html = el('ctunTableWrap').innerHTML;
+  assert.ok(html.includes('Showing 1–1 of 1 methods'), 'the search narrows to the name match');
+  vm.runInContext(`ctunSearch = 'kernel-l3'; renderCtunTable();`, sandbox);
+  html = el('ctunTableWrap').innerHTML;
+  const famMatch = Number((html.match(/of (\d+) methods/) || [])[1]);
+  assert.ok(famMatch > 0 && famMatch < 49, 'the family search matches its subset');
+  vm.runInContext(`ctunSearch = 'zzz-nothing'; renderCtunTable();`, sandbox);
+  html = el('ctunTableWrap').innerHTML;
+  assert.ok(html.includes('No methods match your search.') && html.includes('data-ctun-clear'), 'a no-match search renders its honest empty state with a clear action');
+
+  // value filters: transport + mikrotik combine with the layer filter
+  vm.runInContext(`ctunSearch = ''; ctunLayer = 'L3'; renderCtunTable();`, sandbox);
+  html = el('ctunTableWrap').innerHTML;
+  const l3Total = Number((html.match(/of (\d+) methods/) || [])[1]);
+  vm.runInContext(`ctunF.transport = 'raw-ip'; ctunPageNo = 1; renderCtunTable();`, sandbox);
+  html = el('ctunTableWrap').innerHTML;
+  const l3Raw = Number((html.match(/of (\d+) methods/) || [])[1]);
+  assert.ok(l3Raw > 0 && l3Raw <= l3Total, 'the transport filter composes with the layer filter');
+  vm.runInContext(`ctunF.mikrotik = 'yes'; ctunPageNo = 1; renderCtunTable();`, sandbox);
+  html = el('ctunTableWrap').innerHTML;
+  const l3RawMik = Number((html.match(/of (\d+) methods/) || [])[1]);
+  assert.ok(l3RawMik <= l3Raw, 'the mikrotik filter composes on top');
+  vm.runInContext(`
+  ctunSearch = ''; ctunLayer = 'all'; ctunF = { transport: '', ipver: '', port: '', userspace: '', mikrotik: '' }; ctunPageNo = 1; ctunPerPage = 10;
+  `, sandbox);
+  vm.runInContext(`renderCtunPage()`, sandbox);
+  const cHtml = el('ctunTableWrap').innerHTML;
 
   // null fields render —
   vm.runInContext(`
-  ctunLayer = 'all';
   coresAvail.cores[0].methods = [{ id: 'x1', name: 'x1', title: 'Null row', layer: 'L4', transport: null, ipver: null, overhead: null, needs_port: null, userspace: null, mikrotik: null, family: null }];
   renderCtunPage();
   `, sandbox);
-  html = el('ctunPage').innerHTML;
+  html = el('ctunTableWrap').innerHTML;
   assert.ok((html.match(/art-dash/g) || []).length === 5, 'every null field renders the em dash');
 
   // outdated=false → up to date; absent field + older installed → fallback badge; equal → nothing
@@ -162,6 +223,18 @@ function mkMethods() {
   `, sandbox);
   html = el('ctunPage').innerHTML;
   assert.ok(html.includes('v0.3.2'), 'the computed installed version picks the newest agent one');
+  // install states: none installed → نصب نشده; no agent facts → not available
+  vm.runInContext(`
+  coresCache[0].detail = { a1: { installed: false, version: '' }, a2: { installed: false, version: '' } };
+  coresAvail.cores[0].installed_version = ''; renderCtunPage();
+  `, sandbox);
+  html = el('ctunPage').innerHTML;
+  assert.ok(html.includes('Not installed'), 'a zero install count reads نصب نشده, never 0');
+  vm.runInContext(`
+  coresCache[0].detail = {}; renderCtunPage();
+  `, sandbox);
+  html = el('ctunPage').innerHTML;
+  assert.ok(html.includes('Not available'), 'unknown install facts read اطلاعات در دسترس نیست');
   // no methods on the feed → the honest empty state
   vm.runInContext(`
   coresCache[0].detail = {};
