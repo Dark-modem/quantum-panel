@@ -4,12 +4,15 @@ import "testing"
 
 // phase46_real_manifests_test.go — BACKEND-46 fixtures: the REAL landed
 // quantum-cores MANIFEST.json bodies (verbatim bytes, read from the repo at
-// origin/main 741ba974, 2026-11-23). The five cores that publish methods[]
-// are the enumeration ground truth for the §2.23 method-board join and the
-// §2.22 passthrough: ctunnel 49 (AGENT-29), sing-box 16 + hysteria 2
-// (OVERNIGHT-C/AGENT-31), waterwall 18 (OVERNIGHT-C2/A4), easytier 1
-// (OVERNIGHT-D2). Hermetic: served through the coresManifestFetcher seam,
-// no network, no sibling-checkout reads at test time.
+// origin/main 6ebd450, 2026-11-23; all 13 byte-verified against the origin
+// blobs). ALL THIRTEEN cores now publish methods[] — ctunnel 49 (AGENT-29),
+// sing-box 16 + hysteria 2 (OVERNIGHT-C/AGENT-31), waterwall 18
+// (OVERNIGHT-C2/A4), easytier 1 (OVERNIGHT-D2), and CORES-5's concurrent
+// mirror blocks (frp 16 / xray 17 / gost 37 / backhaul 8 / rathole 6 /
+// udp2raw 4 / chisel 1 / wstunnel 2) = 177 published rows, the enumeration
+// ground truth for the §2.23 method-board join and the §2.22 passthrough.
+// Hermetic: served through the coresManifestFetcher seam, no network, no
+// sibling-checkout reads at test time.
 
 const phase46Manifestctunnel = `{
   "core": "ctunnel",
@@ -1235,6 +1238,1307 @@ const phase46Manifesteasytier = `{
 }
 `
 
+const phase46Manifestfrp = `{
+ "core": "frp",
+ "upstream": "https://github.com/fatedier/frp",
+ "license": "Apache-2.0",
+ "latest": "0.61.1",
+ "versions": [
+  {
+   "tag": "frp-v0.61.1",
+   "assets": {
+    "linux-amd64": {
+     "name": "frp-linux-amd64.tar.gz",
+     "sha256": "9fb8bdbb7b96c80d81add5f11565483558c88ec7aa59237559c3d3c28eec21b5"
+    },
+    "linux-arm64": {
+     "name": "frp-linux-arm64.tar.gz",
+     "sha256": "ec6330ee780f3d67697ad7f0387fc816b15330795c558674ecb272b40149058f"
+    }
+   }
+  }
+ ],
+ "methods": [
+  {
+   "id": 1,
+   "name": "proxy-tcp",
+   "title": "plain TCP proxy (our driver's only shape today)",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 2,
+   "name": "proxy-udp",
+   "title": "UDP proxy",
+   "layer": "L4",
+   "transport": "udp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 3,
+   "name": "proxy-http",
+   "title": "HTTP reverse proxy with vhost routing",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 4,
+   "name": "proxy-https",
+   "title": "HTTPS reverse proxy with vhost",
+   "layer": "L4",
+   "transport": "tcp+tls",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 5,
+   "name": "proxy-tcpmux",
+   "title": "TCP mux with httpConnect (multiplexed by hostname)",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 6,
+   "name": "proxy-stcp",
+   "title": "secret TCP - visitors need the secretKey",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 7,
+   "name": "proxy-xtcp",
+   "title": "P2P hole-punching proxy",
+   "layer": "L4",
+   "transport": "udp+p2p",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 8,
+   "name": "proxy-sudp",
+   "title": "secret UDP",
+   "layer": "L4",
+   "transport": "udp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 9,
+   "name": "visitor-stcp",
+   "title": "stcp visitor (binds local port on the visitor end)",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 10,
+   "name": "visitor-xtcp",
+   "title": "xtcp visitor (p2p hole punch client side)",
+   "layer": "L4",
+   "transport": "udp+p2p",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 11,
+   "name": "visitor-sudp",
+   "title": "sudp visitor",
+   "layer": "L4",
+   "transport": "udp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 12,
+   "name": "transport-tcp",
+   "title": "client-server control+data over plain TCP",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 13,
+   "name": "transport-kcp",
+   "title": "KCP transport (lossy-link friendly)",
+   "layer": "L4",
+   "transport": "udp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 14,
+   "name": "transport-quic",
+   "title": "QUIC transport",
+   "layer": "L4",
+   "transport": "udp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 15,
+   "name": "transport-websocket",
+   "title": "websocket transport",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 16,
+   "name": "transport-wss",
+   "title": "websocket over TLS transport",
+   "layer": "L4",
+   "transport": "tcp+tls",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  }
+ ]
+}
+`
+
+const phase46Manifestxray = `{
+ "core": "xray",
+ "upstream": "https://github.com/XTLS/Xray-core",
+ "license": "MPL-2.0",
+ "latest": "26.3.27",
+ "versions": [
+  {
+   "tag": "xray-v26.3.27",
+   "assets": {
+    "linux-amd64": {
+     "name": "xray-linux-amd64.tar.gz",
+     "sha256": "68934f23069ded408b926fb253e079d874d97a88c9849946fa305f825555b533"
+    },
+    "linux-arm64": {
+     "name": "xray-linux-arm64.tar.gz",
+     "sha256": "7366d3e30e96a76a3448f69205624ae72b61b2acec649b44a34b558173ec8d53"
+    }
+   }
+  },
+  {
+   "tag": "xray-v24.12.31",
+   "assets": {
+    "linux-amd64": {
+     "name": "xray-linux-amd64.tar.gz",
+     "sha256": "b18b92c6bf39af7c639ec0667c8bceec76d0bbe478bd1b7d332b239a61e19a0f"
+    },
+    "linux-arm64": {
+     "name": "xray-linux-arm64.tar.gz",
+     "sha256": "6fd6a1979504fe1eba7bc664799caa41cd40308836e62954d09d83b68c1e6dc2"
+    }
+   }
+  }
+ ],
+ "methods": [
+  {
+   "id": 1,
+   "name": "vless+tcp+reality",
+   "title": "our driver's current shape (vision flow disabled for mux)",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 2,
+   "name": "vless+xhttp+reality",
+   "title": "XHTTP stream transport under REALITY (reality supports raw/xhttp/grpc only)",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 3,
+   "name": "vless+grpc+reality",
+   "title": "gRPC carrier under REALITY (upstream-deprecated but functional)",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 4,
+   "name": "vless+tcp+tls",
+   "title": "VLESS over TLS (operator cert needed; reality preferred)",
+   "layer": "L4",
+   "transport": "tcp+tls",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 5,
+   "name": "vless+ws+tls",
+   "title": "websocket transport (upstream-deprecated, still common in Iran)",
+   "layer": "L4",
+   "transport": "tcp+tls",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 6,
+   "name": "vless+httpupgrade",
+   "title": "httpupgrade transport (deprecated)",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 7,
+   "name": "vless+mkcp",
+   "title": "mKCP carrier",
+   "layer": "L4",
+   "transport": "udp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 8,
+   "name": "vless+xhttp+tls",
+   "title": "XHTTP under TLS",
+   "layer": "L4",
+   "transport": "tcp+tls",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 9,
+   "name": "vmess+ws+tls",
+   "title": "VMess over websocket+TLS",
+   "layer": "L4",
+   "transport": "tcp+tls",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 10,
+   "name": "vmess+tcp+reality",
+   "title": "VMess over Reality (mux.cool inner)",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 11,
+   "name": "trojan+tcp+tls",
+   "title": "Trojan server",
+   "layer": "L4",
+   "transport": "tcp+tls",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 12,
+   "name": "shadowsocks",
+   "title": "shadowsocks inbound (tcp; udp relay optional)",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 13,
+   "name": "socks/http-in",
+   "title": "socks/mixed/http local proxies",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 14,
+   "name": "wireguard-inout",
+   "title": "wireguard endpoint inside xray",
+   "layer": "L3",
+   "transport": "udp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 15,
+   "name": "hysteria-inout",
+   "title": "hysteria protocol built in (both directions)",
+   "layer": "L4",
+   "transport": "udp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 16,
+   "name": "masque-inout",
+   "title": "MASQUE built in",
+   "layer": "L4",
+   "transport": "udp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 17,
+   "name": "tun-in",
+   "title": "tun inbound (xray-side TUN)",
+   "layer": "L3",
+   "transport": "any",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  }
+ ]
+}
+`
+
+const phase46Manifestgost = `{
+ "core": "gost",
+ "upstream": "https://github.com/go-gost/gost",
+ "license": "MIT",
+ "latest": "3.3.3",
+ "versions": [
+  {
+   "tag": "gost-v3.3.3",
+   "assets": {
+    "linux-amd64": {
+     "name": "gost-linux-amd64.tar.gz",
+     "sha256": "ca03d2a2fda2bd5003c91ac3e41e365715b8d077b283ff81469c5ab413ce769a"
+    },
+    "linux-arm64": {
+     "name": "gost-linux-arm64.tar.gz",
+     "sha256": "37bafec8eb72fe69ba1cde56083389c2994a36c6e17874e8d5c1ce1a0b6a7ef2"
+    }
+   }
+  }
+ ],
+ "methods": [
+  {
+   "id": 1,
+   "name": "relay+tcp",
+   "title": "reverse tunnel via relay handler over plain TCP carrier",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 2,
+   "name": "relay+tls",
+   "title": "reverse tunnel via relay handler over TLS carrier",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 3,
+   "name": "relay+mtls",
+   "title": "reverse tunnel via relay handler over mutual-TLS carrier",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 4,
+   "name": "relay+ws",
+   "title": "reverse tunnel via relay handler over websocket carrier (our current driver shape relay+ws)",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 5,
+   "name": "relay+mws",
+   "title": "reverse tunnel via relay handler over muxed websocket carrier",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 6,
+   "name": "relay+dtls",
+   "title": "reverse tunnel via relay handler over DTLS (UDP) carrier",
+   "layer": "L4",
+   "transport": "udp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 7,
+   "name": "relay+quic",
+   "title": "reverse tunnel via relay handler over QUIC carrier",
+   "layer": "L4",
+   "transport": "udp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 8,
+   "name": "relay+http3",
+   "title": "reverse tunnel via relay handler over HTTP/3 carrier",
+   "layer": "L4",
+   "transport": "udp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 9,
+   "name": "relay+h3",
+   "title": "reverse tunnel via relay handler over HTTP/3 alias carrier",
+   "layer": "L4",
+   "transport": "udp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 10,
+   "name": "relay+wt",
+   "title": "reverse tunnel via relay handler over WebTransport carrier (http3)",
+   "layer": "L4",
+   "transport": "udp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 11,
+   "name": "relay+grpc",
+   "title": "reverse tunnel via relay handler over gRPC carrier",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 12,
+   "name": "relay+http2",
+   "title": "reverse tunnel via relay handler over HTTP/2 carrier (h2c)",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 13,
+   "name": "relay+h2",
+   "title": "reverse tunnel via relay handler over HTTP/2 over TLS carrier",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 14,
+   "name": "relay+kcp",
+   "title": "reverse tunnel via relay handler over KCP (smux over UDP) carrier",
+   "layer": "L4",
+   "transport": "udp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 15,
+   "name": "relay+icmp",
+   "title": "reverse tunnel via relay handler over raw ICMP echo carrier",
+   "layer": "L4",
+   "transport": "icmp",
+   "ipver": "both",
+   "needs_port": false,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 16,
+   "name": "relay+ftcp",
+   "title": "reverse tunnel via relay handler over fragmented-TCP carrier",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 17,
+   "name": "relay+ssh",
+   "title": "reverse tunnel via relay handler over SSH channel carrier",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 18,
+   "name": "relay+sshd",
+   "title": "reverse tunnel via relay handler over SSH remote-forward carrier",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 19,
+   "name": "relay+obfs-http",
+   "title": "reverse tunnel via relay handler over HTTP-obfuscated carrier",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 20,
+   "name": "relay+obfs-tls",
+   "title": "reverse tunnel via relay handler over TLS-obfuscated carrier",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 21,
+   "name": "relay+pht",
+   "title": "reverse tunnel via relay handler over Plain HTTP Tunnel carrier",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 22,
+   "name": "relay+utls",
+   "title": "reverse tunnel via relay handler over uTLS-fingerprinted TLS carrier",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 23,
+   "name": "rtcp",
+   "title": "reverse TCP port forwarding (public port on the server end)",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 24,
+   "name": "rudp",
+   "title": "reverse UDP port forwarding",
+   "layer": "L4",
+   "transport": "udp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 25,
+   "name": "ss",
+   "title": "shadowsocks listener+handler (ss-udp variant adds UDP relay)",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 26,
+   "name": "socks5",
+   "title": "SOCKS5 proxy service (mixed adds http)",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 27,
+   "name": "socks4",
+   "title": "SOCKS4 proxy service",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 28,
+   "name": "http-proxy",
+   "title": "HTTP proxy service",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 29,
+   "name": "forward-local",
+   "title": "local TCP port forwarding",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 30,
+   "name": "forward-remote",
+   "title": "remote port forwarding",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 31,
+   "name": "tun",
+   "title": "TUN device service (tungo = gvisor userspace variant)",
+   "layer": "L3",
+   "transport": "any",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 32,
+   "name": "tap",
+   "title": "TAP device service (L2 ethernet)",
+   "layer": "L2",
+   "transport": "any",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 33,
+   "name": "redirect-tcp",
+   "title": "transparent TCP proxy (iptables REDIRECT)",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 34,
+   "name": "redirect-udp",
+   "title": "transparent UDP proxy",
+   "layer": "L4",
+   "transport": "udp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 35,
+   "name": "sni",
+   "title": "SNI-dispatch proxy",
+   "layer": "L4",
+   "transport": "tcp+tls",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 36,
+   "name": "dns",
+   "title": "DNS forwarding service",
+   "layer": "L4",
+   "transport": "udp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 37,
+   "name": "masque",
+   "title": "MASQUE (CONNECT-UDP) service",
+   "layer": "L4",
+   "transport": "udp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  }
+ ]
+}
+`
+
+const phase46Manifestbackhaul = `{
+ "core": "backhaul",
+ "upstream": "https://github.com/Musixal/Backhaul",
+ "license": "AGPL-3.0",
+ "latest": "0.7.2",
+ "versions": [
+  {
+   "tag": "backhaul-v0.7.2",
+   "assets": {
+    "linux-amd64": {
+     "name": "backhaul-linux-amd64.tar.gz",
+     "sha256": "7e9ecf9d960ec9a6ab2556c06cf3f04469ecc93ec9200d44532aa0a766e64b98"
+    },
+    "linux-arm64": {
+     "name": "backhaul-linux-arm64.tar.gz",
+     "sha256": "1de1d229c2ae00fd037ae81b19a41aa17b52210811cd8641f1a0463b21d9439e"
+    }
+   }
+  }
+ ],
+ "methods": [
+  {
+   "id": 1,
+   "name": "tcp",
+   "title": "plain TCP reverse tunnel; accept_udp adds UDP-over-TCP",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "v4",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 2,
+   "name": "tcpmux",
+   "title": "SMUX-multiplexed TCP (mux_con/mux_version/framesize/buffers)",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "v4",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 3,
+   "name": "ws",
+   "title": "HTTP-upgrade websocket carrier; edge_ip CDN dial supported",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "v4",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 4,
+   "name": "wss",
+   "title": "websocket over TLS; tls_cert/tls_key mandatory server-side",
+   "layer": "L4",
+   "transport": "tcp+tls",
+   "ipver": "v4",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 5,
+   "name": "wsmux",
+   "title": "SMUX over websocket",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "v4",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 6,
+   "name": "wssmux",
+   "title": "SMUX over websocket+TLS",
+   "layer": "L4",
+   "transport": "tcp+tls",
+   "ipver": "v4",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 7,
+   "name": "udp",
+   "title": "native UDP carrier (server binds UDP; client dials)",
+   "layer": "L4",
+   "transport": "udp",
+   "ipver": "v4",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 8,
+   "name": "udp-over-tcp",
+   "title": "accept_udp=true: UDP sessions encapsulated over the TCP-family carrier",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "v4",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  }
+ ]
+}
+`
+
+const phase46Manifestrathole = `{
+ "core": "rathole",
+ "upstream": "https://github.com/rapiz1/rathole",
+ "license": "Apache-2.0",
+ "latest": "0.5.0",
+ "versions": [
+  {
+   "tag": "rathole-v0.5.0",
+   "assets": {
+    "linux-amd64": {
+     "name": "rathole-linux-amd64.tar.gz",
+     "sha256": "b8081560756a1b65c40f6b87f718186f34f19e8ecba15522281a1de385401b57"
+    },
+    "linux-arm64": {
+     "name": "rathole-linux-arm64.tar.gz",
+     "sha256": "fb40ce69fb91c243a4f1113d5fdfea729ee5e6c36e7028961ad788fd7b28c874"
+    }
+   }
+  }
+ ],
+ "methods": [
+  {
+   "id": 1,
+   "name": "tcp-service",
+   "title": "reverse TCP forwarding (type=tcp default)",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 2,
+   "name": "udp-service",
+   "title": "reverse UDP forwarding (type=udp per service)",
+   "layer": "L4",
+   "transport": "udp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 3,
+   "name": "noise",
+   "title": "Noise_NK_25519_ChaChaPoly_BLAKE2s encrypted carrier over TCP",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 4,
+   "name": "tcp-carrier",
+   "title": "plain TCP carrier (transport type tcp)",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 5,
+   "name": "tls-carrier",
+   "title": "TLS carrier - requires operator cert/key on both ends",
+   "layer": "L4",
+   "transport": "tcp+tls",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 6,
+   "name": "websocket-carrier",
+   "title": "websocket carrier; tls=false = plain ws, tls=true rides the TLS block",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  }
+ ]
+}
+`
+
+const phase46Manifestudp2raw = `{
+ "core": "udp2raw",
+ "upstream": "https://github.com/wangyu-/udp2raw",
+ "license": "MIT",
+ "latest": "20230206.0",
+ "versions": [
+  {
+   "tag": "udp2raw-v20230206.0",
+   "assets": {
+    "linux-amd64": {
+     "name": "udp2raw-linux-amd64.tar.gz",
+     "sha256": "a5a371957f9dccbb9de7d4c280378eba29f257b07412e790aeb3c9a202e9d7f6"
+    }
+   }
+  }
+ ],
+ "methods": [
+  {
+   "id": 1,
+   "name": "faketcp",
+   "title": "UDP disguised as raw TCP SYN/ACK/FIN packets (our companion's mode)",
+   "layer": "L4",
+   "transport": "raw-ip",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 2,
+   "name": "easyfaketcp",
+   "title": "faketcp with tcp dummy socket (use_tcp_dummy_socket=1)",
+   "layer": "L4",
+   "transport": "raw-ip",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 3,
+   "name": "udp-raw",
+   "title": "raw UDP mode (no disguise, lowest overhead)",
+   "layer": "L4",
+   "transport": "raw-ip",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  },
+  {
+   "id": 4,
+   "name": "icmp",
+   "title": "UDP disguised as ICMP echo (the sealed-carrier shape)",
+   "layer": "L4",
+   "transport": "icmp",
+   "ipver": "both",
+   "needs_port": false,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel"
+  }
+ ]
+}
+`
+
+const phase46Manifestchisel = `{
+ "core": "chisel",
+ "upstream": "https://github.com/jpillora/chisel",
+ "license": "MIT",
+ "latest": "1.10.1",
+ "versions": [
+  {
+   "tag": "chisel-v1.10.1",
+   "assets": {
+    "linux-amd64": {
+     "name": "chisel-linux-amd64.tar.gz",
+     "sha256": "10a463a8caf47ea88707f72dd06eb0863df27770dcbd3bb1f7b120d25d531e5f"
+    },
+    "linux-arm64": {
+     "name": "chisel-linux-arm64.tar.gz",
+     "sha256": "9b965a1ebc0829129452ed7e385f46cb83baf33ac8723cf7f1f631e122098931"
+    }
+   }
+  }
+ ],
+ "methods": [
+  {
+   "name": "reverse-tcp",
+   "title": "reverse TCP port-forward over the chisel HTTP/WS carrier (remote_port binds on the foreign end → the iran-local target)",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel",
+   "id": 1
+  }
+ ]
+}
+`
+
+const phase46Manifestwstunnel = `{
+ "core": "wstunnel",
+ "upstream": "https://github.com/erebe/wstunnel",
+ "license": "BSD-3-Clause",
+ "latest": "10.1.9",
+ "versions": [
+  {
+   "tag": "wstunnel-v10.1.9",
+   "assets": {
+    "linux-amd64": {
+     "name": "wstunnel-linux-amd64.tar.gz",
+     "sha256": "1834b8338ccdc667db6e0bbc4bd420ea14e1f81f6081f7e17d1218bf003aced2"
+    },
+    "linux-arm64": {
+     "name": "wstunnel-linux-arm64.tar.gz",
+     "sha256": "73988185b72f03d6fac75c1e048ee65d8394e5847f972016897f97cccc353837"
+    }
+   }
+  }
+ ],
+ "methods": [
+  {
+   "name": "reverse-tcp",
+   "title": "reverse TCP port-forward over the WebSocket carrier (remote_port binds on the foreign end → the iran-local target)",
+   "layer": "L4",
+   "transport": "tcp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel",
+   "id": 1
+  },
+  {
+   "name": "reverse-udp",
+   "title": "reverse UDP port-forward over the WebSocket carrier (remote_udp_port binds on the foreign end → the iran-local target)",
+   "layer": "L4",
+   "transport": "udp",
+   "ipver": "both",
+   "needs_port": true,
+   "userspace": true,
+   "mikrotik": false,
+   "family": "tunnel",
+   "id": 2
+  }
+ ]
+}
+`
+
 // phase46RealManifestFixture swaps the manifest fetcher for the five REAL
 // manifest bodies (every other core 404s) and isolates the package-global
 // manifest cache for the test's duration.
@@ -1254,7 +2558,25 @@ func phase46RealManifestFixture(t *testing.T) {
 			return []byte(phase46Manifestwaterwall), nil
 		case "easytier":
 			return []byte(phase46Manifesteasytier), nil
+		case "frp":
+			return []byte(phase46Manifestfrp), nil
+		case "xray":
+			return []byte(phase46Manifestxray), nil
+		case "gost":
+			return []byte(phase46Manifestgost), nil
+		case "backhaul":
+			return []byte(phase46Manifestbackhaul), nil
+		case "rathole":
+			return []byte(phase46Manifestrathole), nil
+		case "udp2raw":
+			return []byte(phase46Manifestudp2raw), nil
+		case "chisel":
+			return []byte(phase46Manifestchisel), nil
+		case "wstunnel":
+			return []byte(phase46Manifestwstunnel), nil
 		}
+		// matrix and wireguard publish NO core folder — the fetch 404s and
+		// their engines ride their engine rows only (honest)
 		return nil, &coresManifest404{}
 	}
 	coresManifestReset(t)
@@ -1268,4 +2590,16 @@ var phase46MethodCount = map[string]int{
 	"hysteria":  2,
 	"waterwall": 18,
 	"easytier":  1,
+	// CORES-5 (concurrent landing, origin/main 6ebd450): the 8 blocks below
+	// mirror the OVERNIGHT-B inventories + driver catalogs — the FULL
+	// 13-core methods[] surface the §2.22 feed and the §2.23 board join
+	// now serve
+	"frp":      16,
+	"xray":     17,
+	"gost":     37,
+	"backhaul": 8,
+	"rathole":  6,
+	"udp2raw":  4,
+	"chisel":   1,
+	"wstunnel": 2,
 }
