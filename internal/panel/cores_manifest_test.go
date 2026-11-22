@@ -31,10 +31,18 @@ func coresManifestReset(t *testing.T) {
 // coresManifestCTunnel is a fixture MANIFEST.json carrying the
 // architect-fixed methods[] schema (a 2-method stand-in for the real
 // 49-row ctunnel block AGENT-29 publishes).
+// coresManifestCTunnel is a fixture MANIFEST.json carrying the
+// architect-fixed methods[] schema (a 2-method stand-in for the real
+// 49-row ctunnel block AGENT-29 publishes). BACKEND-45: the ids mirror
+// the REAL landed manifests — JSON numbers (ctunnel 49 rows, sing-box 16,
+// hysteria 2, easytier 1, waterwall 18 are all numeric), with the
+// driver-consumable spelling in `name` (the ctunnel driver's ctMethods
+// keys are names like "6to4"; the numeric id is the manifest's row
+// number).
 const coresManifestCTunnel = `{"core":"ctunnel","upstream":"https://github.com/CIAUB/C-Tunnel",
 "license":"AGPL-3.0","latest":"2.0.0","methods":[
-{"id":"ct-kernel-l3-1","name":"kernel-l3-1","title":"Kernel L3 tunnel 1","layer":"L3","transport":"udp","ipver":"v4","overhead":42,"needs_port":true,"userspace":false,"mikrotik":false,"family":"kernel"},
-{"id":"ct-udpcrypt-1","name":"udpcrypt-1","title":"UDP-Crypt 1","layer":"L3","transport":"udp","ipver":"both","overhead":28,"needs_port":true,"userspace":true,"mikrotik":false,"family":"udp-crypt"}]}`
+{"id":1,"name":"kernel-l3-1","title":"Kernel L3 tunnel 1","layer":"L3","transport":"udp","ipver":"v4","overhead":42,"needs_port":true,"userspace":false,"mikrotik":false,"family":"kernel"},
+{"id":2,"name":"udpcrypt-1","title":"UDP-Crypt 1","layer":"L3","transport":"udp","ipver":"both","overhead":28,"needs_port":true,"userspace":true,"mikrotik":false,"family":"udp-crypt"}]}`
 
 func TestCoresManifestPassthroughVerbatim(t *testing.T) {
 	coresManifestReset(t)
@@ -64,7 +72,8 @@ func TestCoresManifestPassthroughVerbatim(t *testing.T) {
 		t.Fatalf("manifest fetch never landed (fetched=%v)", fetched)
 	}
 	// VERBATIM: the row carries the manifest's own bytes (no reshaping)
-	if !strings.Contains(string(entry.Methods), `"id":"ct-kernel-l3-1"`) ||
+	if !strings.Contains(string(entry.Methods), `"id":1`) ||
+		!strings.Contains(string(entry.Methods), `"name":"kernel-l3-1"`) ||
 		!strings.Contains(string(entry.Methods), `"family":"udp-crypt"`) {
 		t.Fatalf("methods passthrough lost fidelity: %s", entry.Methods)
 	}
@@ -320,17 +329,20 @@ func TestWireCoresManifestJoinBoard(t *testing.T) {
 	if got[len(uiKnownEngines)] != "ctunnel" {
 		t.Fatalf("the agreed engine row must precede its manifest methods: %v", got)
 	}
+	// BACKEND-45: the manifest method ids are the NAME column (the
+	// driver-consumable spelling) — the numeric id is the manifest's row
+	// number
 	m1, m2 := got[len(got)-2], got[len(got)-1]
-	if m1 != "ct-kernel-l3-1" || m2 != "ct-udpcrypt-1" {
+	if m1 != "kernel-l3-1" || m2 != "udpcrypt-1" {
 		t.Fatalf("manifest method ids: %q %q", m1, m2)
 	}
 	// the reverse lookup resolves the manifest method's identity columns
-	entry, ok := mboardManifestEntryOf("ct-udpcrypt-1")
+	entry, ok := mboardManifestEntryOf("udpcrypt-1")
 	if !ok || entry.Engine != "ctunnel" || entry.Layer != "L3" || entry.IPVer != "both" {
 		t.Fatalf("reverse lookup: %v %v", entry, ok)
 	}
 	// and the row metadata mapping lowercases layer, keeps the rest verbatim
-	row := unprobedRows([]string{"ct-udpcrypt-1"})
+	row := unprobedRows([]string{"udpcrypt-1"})
 	if len(row) != 1 || row[0].Engine != "ctunnel" || row[0].Layer != "l3" || row[0].Transport != "udp" || row[0].IPVer != "both" {
 		t.Fatalf("manifest row metadata: %+v", row[0])
 	}
