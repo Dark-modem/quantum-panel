@@ -190,9 +190,15 @@ func TestCoresInstalledOutdated(t *testing.T) {
 		Engine: "singbox", Installed: true, Version: "1.12.40", UpdatedAt: time.Now().Unix()}); err != nil {
 		t.Fatal(err)
 	}
+	// 1.12.40 installed vs 1.12.39 repo → installed is newer, outdated false
 	installed, outdated = coreRowInstalledOutdated(s, "sing-box", "1.12.39")
-	if installed != "1.12.40" || outdated == nil || !*outdated {
+	if installed != "1.12.40" || outdated == nil || *outdated {
 		t.Fatalf("singbox alias resolution: %q %v", installed, outdated)
+	}
+	// 1.12.41 repo → the honest newer-version flag rides the alias too
+	_, outdated = coreRowInstalledOutdated(s, "sing-box", "1.12.41")
+	if outdated == nil || !*outdated {
+		t.Fatalf("singbox alias outdated direction: %v", outdated)
 	}
 	if coresCoreOfEngine("singbox") != "sing-box" || coresEngineOfCore("sing-box") != "singbox" {
 		t.Fatalf("singbox alias both ways broken: %q %q", coresCoreOfEngine("singbox"), coresEngineOfCore("sing-box"))

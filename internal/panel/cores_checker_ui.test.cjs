@@ -178,5 +178,106 @@ function sourceMatchCoresListEnd() {
   assert.ok(chkHtml.includes('Checker error'), 'an out-of-shape payload renders the error state');
   assert.ok(!chkHtml.includes('chk-tbl'), 'no table renders from it');
   assert.ok(el('chkFeed').innerHTML.includes('Checker error'), 'the feed line flags the error');
+
+  // ---- Piece 4 (ui-ux-2): the LIVE §2.24 shape — generated + ctunnel_check --
+  apiHandler = () => ({
+    generated: '2026-11-22 09:00',
+    projects: [
+      { name: 'gost', methods_found: 37, methods_added: 37, missing: [], status: 'done' },
+    ],
+    ctunnel_check: {
+      upstream_catalog: { source: 'pkg/catalog/catalog.go', methods: 49 },
+      cores_manifest: { source: 'quantum-cores/ctunnel/MANIFEST.json', methods: 49 },
+      agent_driver: { source: 'internal/agent/ctunnel_driver.go ctMethods', methods: 49 },
+      three_way_match: true,
+      mismatches: [],
+    },
+  });
+  await vm.runInContext('loadChecker(true)', sandbox);
+  chkHtml = el('chkBody').innerHTML;
+  assert.ok(chkHtml.includes('chk-gen') && chkHtml.includes('<bdi dir="ltr">2026-11-22 09:00</bdi>'), 'the generated timestamp renders verbatim');
+  assert.ok(chkHtml.includes('data-chk-tew') && chkHtml.includes('C-Tunnel three-way check'), 'the three-way check strip renders for a live payload');
+  assert.ok(chkHtml.includes('<bdi dir="ltr">49</bdi>'), 'the per-source method counts render');
+  assert.ok(chkHtml.includes('pkg/catalog/catalog.go') && chkHtml.includes('ctunnel_driver.go'), 'the source paths render');
+  assert.ok(chkHtml.includes('chk-tw-match ok') && chkHtml.includes('Three-way match'), 'the match verdict renders as the ok badge');
+  assert.ok(!chkHtml.includes('chk-tw-mm'), 'no mismatches → no mismatches block');
+  // three_way_match false + named mismatches — the bad badge and the list
+  apiHandler = () => ({
+    generated: '2026-11-22 10:00',
+    projects: [{ name: 'frp', methods_found: 16, methods_added: 16, missing: [], status: 'done' }],
+    ctunnel_check: {
+      upstream_catalog: { source: 'pkg/catalog/catalog.go', methods: 49 },
+      cores_manifest: { source: 'quantum-cores/ctunnel/MANIFEST.json', methods: 49 },
+      agent_driver: { source: 'internal/agent/ctunnel_driver.go ctMethods', methods: 48 },
+      three_way_match: false,
+      mismatches: ['driver misses method <m-42>'],
+    },
+  });
+  await vm.runInContext('loadChecker(true)', sandbox);
+  chkHtml = el('chkBody').innerHTML;
+  assert.ok(chkHtml.includes('chk-tw-match bad') && chkHtml.includes('Mismatch'), 'a false verdict renders the mismatch badge');
+  assert.ok(chkHtml.includes('1 mismatches') && chkHtml.includes('&lt;m-42&gt;'), 'the mismatches render count + escaped items');
+  // absent ctunnel_check → no strip, never invented; null generated → nothing
+  apiHandler = () => ({ generated: '', projects: [{ name: 'rathole', methods_found: 6, methods_added: 6, missing: [], status: 'done' }] });
+  await vm.runInContext('loadChecker(true)', sandbox);
+  chkHtml = el('chkBody').innerHTML;
+  assert.ok(!chkHtml.includes('data-chk-tew'), 'no ctunnel_check block → no three-way strip');
+  assert.ok(!chkHtml.includes('chk-gen'), 'an empty generated renders nothing (the no-data marker)');
+  // the three-way numbers stay honest when the payload is partial
+  apiHandler = () => ({
+    generated: 'g',
+    projects: [{ name: 'x', methods_found: 1, methods_added: null, missing: null, status: 'queued' }],
+    ctunnel_check: { three_way_match: null, upstream_catalog: { source: 'a', methods: null }, cores_manifest: { methods: 3 }, agent_driver: {} },
+  });
+  await vm.runInContext('loadChecker(true)', sandbox);
+  chkHtml = el('chkBody').innerHTML;
+  const tewPart = chkHtml.slice(chkHtml.indexOf('data-chk-tew'));
+  assert.ok((tewPart.match(/art-dash/g) || []).length >= 3, 'null counts / verdict / sources render — dashes, never zeros');
+  assert.ok(!tewPart.includes('chk-tw-match ok') && !tewPart.includes('chk-tw-match bad'), 'a null verdict renders no badge');
+  // XSS discipline on the three-way echo too
+  apiHandler = () => ({
+    generated: '<script>x</script>',
+    projects: [{ name: 'y', methods_found: 2, methods_added: 2, missing: [], status: 'done' }],
+    ctunnel_check: { three_way_match: false, mismatches: ['<img src=x onerror=alert(1)>'], upstream_catalog: { source: '<script>z</script>', methods: 1 } },
+  });
+  await vm.runInContext('loadChecker(true)', sandbox);
+  chkHtml = el('chkBody').innerHTML;
+  assert.ok(!chkHtml.includes('<script>x</script>') && !chkHtml.includes('<img src=x'), 'generated/sources/mismatches are escaped');
+  assert.ok(chkHtml.includes('&lt;script&gt;x&lt;/script&gt;'), 'the odd generated still shows as text');
+
+  // ---- Piece 5 (ui-ux-2): EVERY §2.22 core renders — feed-only groups ------
+  vm.runInContext(`
+  coresCache = [
+    { engine: 'frp', latest: '0.61.1', builds: [{ goarch: 'amd64', version: '0.61.1' }], installed: {}, detail: { a1: { installed: true, version: '0.61.1' } } },
+    { engine: 'singbox', latest: '', builds: [], installed: {}, detail: {} },
+  ];
+  coresAvail = { cores: [
+    { core: 'frp', latest_version: '0.61.2', methods: null },
+    { core: 'sing-box', latest_version: '1.12.39', methods: [{ id: 1, name: 'vless', layer: 'l4', transport: 'tcp', ipver: 'both' }] },
+    { core: 'waterwall', latest_version: '1.6.0', methods: [{ id: 1, name: 'quic', layer: 'l4', transport: 'udp', ipver: 'both' }] },
+    { core: 'easytier', latest_version: '2.7.1', methods: [{ id: 1, name: 'easytier-mesh', layer: 'l3', transport: 'tcp|udp', ipver: 'both' }] },
+    { core: 'vortexl2', latest_version: '0.4.0', methods: null },
+    { core: 'naive', latest_version: '', methods: null },
+  ] };
+  coresMergeFeedGroups();
+  renderCores();
+  `, sandbox);
+  const gridHtml = el('engList').innerHTML;
+  assert.ok(vm.runInContext('coresCache.some(g => g.engine === "waterwall" && g.feedOnly)', sandbox), 'waterwall joins as a feed-only group');
+  assert.ok(vm.runInContext('coresCache.some(g => g.engine === "easytier" && g.feedOnly)', sandbox), 'easytier joins too');
+  assert.ok(vm.runInContext('coresCache.filter(g => g.engine === "frp").length === 1', sandbox), 'no duplicate for an agent-known core');
+  assert.equal(vm.runInContext('coresCache.length', sandbox), 6, 'sing-box merges INTO the singbox group via the alias (4 feed-only + 2 agent groups)');
+  assert.ok(gridHtml.includes('WaterWall') && gridHtml.includes('EasyTier') && gridHtml.includes('VortexL2') && gridHtml.includes('Naive'), 'every repo core renders in the grid');
+  assert.ok(gridHtml.includes('In repo'), 'the feed-only cards carry the honest In-repo line');
+  assert.ok(gridHtml.includes('v1.6.0'), 'the feed version badge renders');
+  assert.ok(gridHtml.includes('Unavailable'), 'no install without an artifact — the honest disabled action');
+  // the feed-only core's drill-down opens with its catalog
+  vm.runInContext('ctunPageOpen("waterwall")', sandbox);
+  html = el('ctunPage').innerHTML;
+  const tblHtml = el('ctunTableWrap').innerHTML;
+  assert.ok(html.includes('WaterWall — Method catalog'), 'the feed-only core opens its drill-down');
+  assert.ok(tblHtml.includes('<b>quic</b>'), 'its manifest methods[] render');
+  assert.ok(tblHtml.includes('ctun-cell-id') && tblHtml.includes('>1</td>'), 'the row carries its # from the manifest id');
+  vm.runInContext('ctunPageClose()', sandbox);
   console.log('cores_checker_ui: all assertions passed');
 })().catch(e => { console.error(e); process.exit(1); });

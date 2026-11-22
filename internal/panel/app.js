@@ -13002,6 +13002,7 @@ async function loadCores(force) {
       });
     });
     coresCache = Object.keys(byEngine).sort((x, y) => (CORES_ENGINE_NAME[x] || x).localeCompare(CORES_ENGINE_NAME[y] || y)).map(k => byEngine[k]);
+    coresMergeFeedGroups();
     renderCores();
   } catch (e) {
     coresError = e.message || String(e);
@@ -13020,6 +13021,28 @@ function ctunPendingConsume() {
   const c = ctunPendingCore;
   ctunPendingCore = '';
   if (ctunGroup(c)) ctunPageOpen(c);
+}
+// the §2.22 feed knows cores no agent reports yet (waterwall, easytier,
+// vortexl2, wattunnel, naive — the overnight cores before their drivers
+// land): merge them into the grid as catalog-only groups so EVERY core the
+// repo publishes renders. The card stays honest — the 'In repo v…' release
+// line, no install without an artifact, the drill-down opens with the full
+// manifest catalog (methods[], license/upstream NOTICE, version badge).
+function coresMergeFeedGroups() {
+  const rows = (coresAvail && Array.isArray(coresAvail.cores) && coresAvail.cores) || [];
+  if (!rows.length || !Array.isArray(coresCache)) return;
+  const have = {};
+  coresCache.forEach(g => { have[CORES_ALIAS[g.engine] || g.engine] = true; });
+  let added = false;
+  rows.forEach(r => {
+    if (!r || !r.core) return;
+    const key = CORES_ALIAS[r.core] || r.core;
+    if (have[key]) return;
+    have[key] = true;
+    coresCache.push({ engine: r.core, latest: r.latest_version || '', builds: [], installed: {}, detail: {}, feedOnly: true });
+    added = true;
+  });
+  if (added) coresCache.sort((x, y) => (CORES_ENGINE_NAME[x.engine] || x.engine).localeCompare(CORES_ENGINE_NAME[y.engine] || y.engine));
 }
 function a_name(ag) { return ag.name || ''; }
 function coresInstalled(g) {
@@ -13816,6 +13839,7 @@ async function loadCoresAvailable(force) {
   } finally {
     coresAvailBusy = false;
     renderArtStore();
+    coresMergeFeedGroups();
     renderCores();
   }
 }
