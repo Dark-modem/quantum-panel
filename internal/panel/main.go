@@ -1038,6 +1038,10 @@ func buildPanelMux(base string) *http.ServeMux {
 	// Kernel-tuning read surface (BACKEND-42, §2.23.2): read-only per-agent
 	// diagnostics, single-flight probe with run=1
 	mux.HandleFunc("GET "+base+"/api/optimization/kernel", requireAuth(handleOptimizationKernel))
+	// Overnight checker completeness (BACKEND-44, §2.24): read-only join of
+	// the overnight coordination files (checker.json + status.json) —
+	// request-time reads with a brief cache, honest-empty when absent
+	mux.HandleFunc("GET "+base+"/api/overnight/checker", requireAuth(handleOvernightChecker))
 	// Path test: which transports cross between the two servers, before any tunnel
 	mux.HandleFunc("GET "+base+"/api/pathtest", requireAuth(handlePathTestGet))
 	mux.HandleFunc("POST "+base+"/api/pathtest", requireAuth(requireCSRF(handlePathTestPost)))
