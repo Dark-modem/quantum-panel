@@ -108,7 +108,7 @@ function mkMethods() {
   assert.equal(el('coresList').hidden, true, 'the grid hides while the detail page is open');
   assert.equal(el('coresDetail').hidden, false, 'the detail page shows');
   assert.ok(html.includes('C-Tunnel') && html.includes('Method catalog'), 'the hero heads with the core name and the catalog label');
-  assert.ok(html.includes('Browse and manage supported C-Tunnel methods'), 'the hero carries its description');
+  assert.ok(html.includes('Browse and manage the C-Tunnel methods'), 'the hero carries its description (per-core, ui/ux-1);');
   assert.ok(html.includes('Manage installations') && html.includes('data-ctun-manage'), 'the primary install action renders');
   assert.ok(html.includes('Back to cores') && html.includes('data-ctun-back'), 'the secondary back action renders');
   // the three stat cards

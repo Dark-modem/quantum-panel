@@ -2121,6 +2121,23 @@
           </div>
           <div id="engArtList"></div>
         </div>
+        <!-- Overnight methods checker (ui/ux-1): per source project, methods found vs added -->
+        <div class="ent-card eng-artcard" id="chkCard">
+          <div class="eng-art-head">
+            <div class="eng-art-title">
+              <span class="eng-art-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h7"/><path d="M15 15l3 3 4-5"/></svg></span>
+              <div class="eng-art-titletxt">
+                <p class="tc-title" data-i18n="chk_title">Methods checker</p>
+                <p class="ent-help eng-art-sub" data-i18n="chk_sub">Per source project: tunnel methods found upstream vs added to the cores manifests — the overnight completeness program.</p>
+              </div>
+            </div>
+            <div class="eng-art-actions">
+              <span class="eng-art-feed" id="chkFeed"></span>
+              <button type="button" class="eng-act" id="chkRefresh"><span data-i18n="eng_refresh">Refresh</span></button>
+            </div>
+          </div>
+          <div id="chkBody"></div>
+        </div>
         </div>
         <!-- Core detail drill-down page: a core card (or its Details button) opens it -->
         <div id="coresDetail" hidden><div id="ctunPage"></div></div>

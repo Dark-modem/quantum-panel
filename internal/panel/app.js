@@ -533,6 +533,8 @@ const I18N = {
     eng_art_title: "Artifact store",
     eng_art_sub: "Signed core binaries the agents install — fetch from the quantum-cores repo or upload manually.",
     eng_art_add: "Add artifact",
+    chk_title: "Methods checker",
+    chk_sub: "Per source project: tunnel methods found upstream vs added to the cores manifests — the overnight completeness program.",
     topo_tunnels_t: "Established tunnels",
     topology_map_t: "Topology map",
     nav_agents: "Agents",
@@ -12945,7 +12947,7 @@ let coresLoading = false;
 let coresError = null;
 let coresPick = null; // { engine, disp }
 const CORES_ENGINE_IMG = { aestun: 'img/engines/aestun.png', rakhsh: 'img/engines/rakhsh.png', gost: 'img/engines/gost.png', xray: 'img/engines/xray.svg', wireguard: 'img/engines/wireguard.png', rathole: 'img/engines/rathole.png', wst: 'img/engines/wstunnel.png', wstunnel: 'img/engines/wstunnel.png', tinc: 'img/engines/tinc.svg', hysteria: 'img/engines/hysteria.png', singbox: 'img/engines/singbox.png', midos: 'img/engines/midos.png', dagger: 'img/engines/dagger.png', pengo: 'img/engines/pengo.png', backhaul: 'img/engines/backhaul.png', backpack: 'img/engines/backpack.png', narnia: 'img/engines/narnia.png', waterwall: 'img/engines/waterwall.png', wattunnel: 'img/engines/wattunnel.png', udp2raw: 'img/engines/udp2raw.png', paqet: 'img/engines/paqet.png', frp: 'img/engines/frp.png', easytier: 'img/engines/easytier.png', chisel: 'img/engines/chisel.png' };
-const CORES_ENGINE_NAME = { aestun: 'AESTun', rakhsh: 'Rakhsh', matrix: 'Matrix', frp: 'FRP', backhaul: 'Backhaul', bagher: 'Bagher', gost: 'Gost', xray: 'Xray', wireguard: 'WireGuard', wst: 'wstunnel', wstunnel: 'wstunnel', chisel: 'Chisel', rathole: 'Rathole', tinc: 'Tinc', backpack: 'BackPack', ctunnel: 'C-Tunnel', dagger: 'DaggerConnect', easytier: 'EasyTier', hysteria: 'Hysteria', midos: 'Midos', narnia: 'Narnia', paqet: 'Paqet', pengo: 'Pengo', singbox: 'sing-box', spoof: 'Spoof', udp2raw: 'udp2raw', waterwall: 'WaterWall', wattunnel: 'WatTunnel' };
+const CORES_ENGINE_NAME = { aestun: 'AESTun', rakhsh: 'Rakhsh', matrix: 'Matrix', frp: 'FRP', backhaul: 'Backhaul', bagher: 'Bagher', gost: 'Gost', xray: 'Xray', wireguard: 'WireGuard', wst: 'wstunnel', wstunnel: 'wstunnel', chisel: 'Chisel', rathole: 'Rathole', tinc: 'Tinc', backpack: 'BackPack', ctunnel: 'C-Tunnel', dagger: 'DaggerConnect', easytier: 'EasyTier', hysteria: 'Hysteria', midos: 'Midos', narnia: 'Narnia', paqet: 'Paqet', pengo: 'Pengo', singbox: 'sing-box', 'sing-box': 'sing-box', spoof: 'Spoof', udp2raw: 'udp2raw', waterwall: 'WaterWall', wattunnel: 'WatTunnel', vortexl2: 'VortexL2' };
 const CORES_ALIAS = { wst: 'wstunnel' };
 // Matrix is the default and recommended engine; everything else is experimental.
 const CORES_CATS = { matrix: ['Recommended', 'Default'] };
@@ -13371,6 +13373,25 @@ function ctunStatsCards(g, repo, methods) {
     stat(CTUN_ICO_VER, repo && repo.latest_version ? '<bdi dir="ltr">v' + esc(repo.latest_version) + '</bdi>' : '<span class="ctun-stat-na">—</span>', esc(tr('', 'Latest repo version'))) +
     '</div>';
 }
+// the NOTICE strip: the license and upstream lines the core manifest
+// publishes (§2.22 addendum, ui/ux-1), verbatim — absent fields render
+// nothing (never guessed). The upstream URL only becomes a link over
+// http(s); anything else stays inert text.
+function ctunNoticeLine(repo) {
+  const lic = repo && repo.license ? String(repo.license) : '';
+  const up = repo && repo.upstream ? String(repo.upstream) : '';
+  if (!lic && !up) return '';
+  const bits = [];
+  if (lic) bits.push('<span class="ctun-notice-bit">' + esc(tr('', 'License')) + ': <bdi dir="ltr">' + esc(lic) + '</bdi></span>');
+  if (up) {
+    if (/^https?:\/\//i.test(up)) {
+      bits.push('<span class="ctun-notice-bit">' + esc(tr('', 'Upstream')) + ': <a class="ctun-uplink" href="' + esc(up) + '" target="_blank" rel="noopener noreferrer"><bdi dir="ltr">' + esc(up) + '</bdi>' + CTUN_ICO_LINK + '</a></span>');
+    } else {
+      bits.push('<span class="ctun-notice-bit">' + esc(tr('', 'Upstream')) + ': <bdi dir="ltr">' + esc(up) + '</bdi></span>');
+    }
+  }
+  return '<div class="ctun-notice">' + bits.join('<span class="ctun-notice-sep" aria-hidden="true">·</span>') + '</div>';
+}
 function renderCtunPage() {
   const body = $('ctunPage');
   if (!body || !ctunOpen) return;
@@ -13394,7 +13415,7 @@ function renderCtunPage() {
   const hero =
     '<div class="ctun-hero"><span class="ctun-hero-ic" aria-hidden="true">' + CTUN_ICO_LINK + '</span>' +
     '<div class="ctun-hero-tx"><h2 class="tc-title u-fs-16 u-fw-700 u-m-0">' + esc(disp) + ' — ' + esc(tr('', 'Method catalog')) + '</h2>' +
-    '<span class="ctun-hero-sub">' + esc(tr('', 'Browse and manage supported C-Tunnel methods')) + '</span></div>' +
+    '<span class="ctun-hero-sub">' + esc(tr('', 'Browse and manage the {core} methods').replace('{core}', disp)) + '</span></div>' +
     '<span class="u-flex-1"></span>' +
     '<button type="button" class="quantum-btn quantum-btn-primary" data-ctun-manage>' + esc(tr('', 'Manage installations')) + '</button>' +
     '<button type="button" class="quantum-btn quantum-btn-secondary" data-ctun-back>' + esc(tr('', 'Back to cores')) + '</button></div>';
@@ -13413,7 +13434,7 @@ function renderCtunPage() {
       '<div class="ent-empty" role="status"><span class="ent-empty-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 9h18M8 13h8"/></svg></span>' +
       '<b>' + esc(tr('', 'No method catalog yet')) + '</b>' +
       '<span>' + esc(tr('', 'The per-method transport catalog for this core has not landed on the feed — the table appears as soon as the backend serves methods[].')) + '</span></div>';
-    body.innerHTML = hero + ctunStatsCards(g, repo, methods) + middle;
+    body.innerHTML = hero + ctunNoticeLine(repo) + ctunStatsCards(g, repo, methods) + middle;
     return;
   }
   const layers = ['all', 'L2', 'L3', 'L4'];
@@ -13437,7 +13458,7 @@ function renderCtunPage() {
     sel('mikrotik', tr('', 'MikroTik'), triOpts()) +
     '<button type="button" class="eng-act" data-ctun-clear>' + esc(tr('', 'Clear filters')) + '</button>' +
     '</div>';
-  body.innerHTML = hero + ctunStatsCards(g, repo, methods) + chips + toolbar +
+  body.innerHTML = hero + ctunNoticeLine(repo) + ctunStatsCards(g, repo, methods) + chips + toolbar +
     '<div id="ctunTableWrap"></div>';
   renderCtunTable();
   ctunWirePage();
@@ -14157,6 +14178,141 @@ async function apiForm(path, fd) {
   });
   document.querySelectorAll('[data-tab="cores"]').forEach(b => b.addEventListener('click', () => { loadArtStore(); loadCoresAvailable(); }));
   if ((location.hash || '').indexOf('#t=cores') === 0) { loadArtStore(); loadCoresAvailable(); }
+})();
+
+// ===== Overnight methods checker (ui/ux-1, §2.23-family) =================
+// The completeness program's read surface: per SOURCE project, the tunnel
+// methods the overnight runs found upstream vs the ones added to the cores
+// manifests, with the missing list. Data source: GET /api/overnight/checker
+// (documented shape — the backend lands it in parallel):
+//   {projects:[{name, methods_found, methods_added, missing:[...], status}]}
+// null counts render "—" (unknown is not zero); until the endpoint goes
+// live the panel shows the honest "checker not live yet" state.
+let chkData = null;           // the last checker payload {projects:[…]}
+let chkBusy = false;
+let chkErr = null;            // { notlive: bool, msg: string } | null
+function chkNotLiveErr(e) {
+  // the endpoint is not deployed yet: the mux's plain-text 404 for
+  // unclaimed paths, or a §1-envelope 404/501 once it routes
+  if (e && (e.status === 404 || e.status === 501)) return true;
+  return /\b(not found|404|501)\b/i.test((e && e.message) || '');
+}
+async function loadChecker(force) {
+  const body = $('chkBody');
+  if (!body || chkBusy) return;
+  if (!force && (chkData || chkErr)) { renderChecker(); return; }
+  chkBusy = true;
+  chkErr = null;
+  renderChecker();
+  try {
+    const d = await api('/api/overnight/checker');
+    if (d && Array.isArray(d.projects)) chkData = d;
+    else chkErr = { notlive: false, msg: tr('', 'The checker answered no project list') };
+  } catch (e) {
+    chkData = null;
+    chkErr = { notlive: chkNotLiveErr(e), msg: (e && e.message) || String(e) };
+  } finally {
+    chkBusy = false;
+    renderChecker();
+  }
+}
+function chkSum(projects) {
+  // honest totals: sums run over numeric values only; an all-null column
+  // never masquerades as a zero
+  let found = 0, added = 0, anyF = false, anyA = false;
+  projects.forEach(p => {
+    if (typeof p.methods_found === 'number') { found += p.methods_found; anyF = true; }
+    if (typeof p.methods_added === 'number') { added += p.methods_added; anyA = true; }
+  });
+  return {
+    found: anyF ? String(found) : null,
+    added: anyA ? String(added) : null,
+  };
+}
+function chkMissingCell(missing) {
+  if (!Array.isArray(missing)) return '<span class="art-dash">—</span>';
+  if (!missing.length) return '<span class="chk-none">0</span>';
+  const items = missing.map(m => '<li><bdi dir="ltr">' + esc(String(m == null ? '' : m)) + '</bdi></li>').join('');
+  return '<details class="chk-missing"><summary>' + esc(tr('', '{n} missing').replace('{n}', String(missing.length))) + '</summary><ul>' + items + '</ul></details>';
+}
+function chkStatusBadge(status) {
+  const s = status == null ? '' : String(status);
+  if (!s) return '<span class="art-dash">—</span>';
+  return '<span class="ctun-tb chk-status"><bdi dir="ltr">' + esc(s) + '</bdi></span>';
+}
+function chkNumCell(v) {
+  if (typeof v !== 'number') return '<span class="art-dash">—</span>';
+  return '<bdi dir="ltr">' + esc(String(v)) + '</bdi>';
+}
+function renderChecker() {
+  const body = $('chkBody'), feed = $('chkFeed');
+  if (!body) return;
+  if (feed) {
+    if (chkBusy) feed.innerHTML = '<i class="dot"></i>' + esc(tr('', 'Checking…'));
+    else if (chkErr && chkErr.notlive) feed.innerHTML = '<i class="dot"></i>' + esc(tr('', 'Not live yet'));
+    else if (chkErr) { feed.classList.add('bad'); feed.innerHTML = '<i class="dot"></i>' + esc(tr('', 'Checker error')); }
+    else if (chkData) { feed.classList.remove('bad'); feed.innerHTML = '<i class="dot"></i>' + esc(tr('', '{n} source projects').replace('{n}', String(chkData.projects.length))); }
+    else feed.innerHTML = '';
+  }
+  if (chkBusy) {
+    body.innerHTML = '<div class="art-skel">' + ('<div class="art-skel-row"><div class="eng-skel-line w40"></div><div class="eng-skel-line w20"></div><div class="eng-skel-line w30"></div></div>').repeat(3) + '</div>';
+    return;
+  }
+  if (chkErr && chkErr.notlive) {
+    body.innerHTML = '<div class="ent-empty" role="status">' +
+      '<span class="ent-empty-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 15.5h.01"/></svg></span>' +
+      '<b>' + esc(tr('', 'Checker not live yet')) + '</b>' +
+      '<span>' + esc(tr('', 'The backend has not published GET /api/overnight/checker yet — this view fills in as soon as the endpoint lands.')) + '</span>' +
+      '<button type="button" class="eng-act" data-chk-retry>' + esc(tr('', 'Retry')) + '</button></div>';
+    return;
+  }
+  if (chkErr) {
+    body.innerHTML = '<div class="eng-error"><b>' + esc(tr('', 'Checker error')) + '</b><details><summary>' + esc(tr('', 'Details')) + '</summary><pre>' + esc(chkErr.msg) + '</pre></details>' +
+      '<button type="button" class="eng-act" data-chk-retry>' + esc(tr('', 'Retry')) + '</button></div>';
+    return;
+  }
+  if (!chkData) return;
+  const projects = chkData.projects;
+  if (!projects.length) {
+    body.innerHTML = '<div class="eng-empty"><b>' + esc(tr('', 'The checker lists no projects yet.')) + '</b></div>';
+    return;
+  }
+  const sum = chkSum(projects);
+  const sumLine =
+    '<div class="chk-sum">' +
+    '<span class="chk-sum-bit"><b>' + esc(String(projects.length)) + '</b> ' + esc(tr('', 'source projects')) + '</span>' +
+    '<span class="chk-sum-bit">' + esc(tr('', 'Methods found')) + ': <b>' + (sum.found == null ? '—' : '<bdi dir="ltr">' + esc(sum.found) + '</bdi>') + '</b></span>' +
+    '<span class="chk-sum-bit">' + esc(tr('', 'Methods added')) + ': <b>' + (sum.added == null ? '—' : '<bdi dir="ltr">' + esc(sum.added) + '</bdi>') + '</b></span>' +
+    '</div>';
+  const rows = projects.map(p => {
+    const name = p && p.name != null ? String(p.name) : '—';
+    return '<tr>' +
+      '<td class="chk-cell-name" data-lbl="' + esc(tr('', 'Project')) + '"><b><bdi dir="ltr">' + esc(name) + '</bdi></b></td>' +
+      '<td class="num" data-lbl="' + esc(tr('', 'Methods found')) + '">' + chkNumCell(p && p.methods_found) + '</td>' +
+      '<td class="num" data-lbl="' + esc(tr('', 'Methods added')) + '">' + chkNumCell(p && p.methods_added) + '</td>' +
+      '<td data-lbl="' + esc(tr('', 'Status')) + '">' + chkStatusBadge(p && p.status) + '</td>' +
+      '<td data-lbl="' + esc(tr('', 'Missing methods')) + '">' + chkMissingCell(p && p.missing) + '</td>' +
+      '</tr>';
+  }).join('');
+  body.innerHTML = sumLine +
+    '<div class="ctun-tblwrap chk-tblwrap"><table class="ent-tbl ctun-tbl chk-tbl"><thead><tr>' +
+    '<th>' + esc(tr('', 'Project')) + '</th>' +
+    '<th class="num">' + esc(tr('', 'Methods found')) + '</th>' +
+    '<th class="num">' + esc(tr('', 'Methods added')) + '</th>' +
+    '<th>' + esc(tr('', 'Status')) + '</th>' +
+    '<th>' + esc(tr('', 'Missing methods')) + '</th>' +
+    '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+}
+(function chkWire() {
+  const ref = $('chkRefresh');
+  if (ref) ref.addEventListener('click', () => loadChecker(true));
+  const card = $('chkCard');
+  if (card) card.addEventListener('click', e => {
+    if (e.target.closest('[data-chk-retry]')) { loadChecker(true); return; }
+    // native <details> toggles the missing list — nothing to wire
+  });
+  document.querySelectorAll('[data-tab="cores"]').forEach(b => b.addEventListener('click', () => loadChecker()));
+  if ((location.hash || '').indexOf('#t=cores') === 0) loadChecker();
 })();
 
 

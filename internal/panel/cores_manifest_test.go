@@ -264,7 +264,13 @@ func TestCoresAvailableHandlerAdditiveFields(t *testing.T) {
 	if ct.InstalledVersion != "1.1.1" || ct.Outdated == nil || !*ct.Outdated {
 		t.Fatalf("ctunnel installed/outdated: %q %v (latest %s)", ct.InstalledVersion, ct.Outdated, ct.LatestVersion)
 	}
-	// frp: manifest 404 → methods null; nothing installed → ""/null
+	// the manifest's informational lines pass through verbatim (ui/ux-1
+	// addendum) — landed together with methods[] on the same read
+	if ct.License != "AGPL-3.0" || ct.Upstream != "https://github.com/CIAUB/C-Tunnel" {
+		t.Fatalf("license/upstream passthrough: %q %q", ct.License, ct.Upstream)
+	}
+	// frp: manifest 404 → methods null; nothing installed → ""/null;
+	// license/upstream "" as well (an unreachable manifest answers nothing)
 	var frp *coreRow
 	for i := range resp.Cores {
 		if resp.Cores[i].Core == "frp" {
@@ -276,6 +282,33 @@ func TestCoresAvailableHandlerAdditiveFields(t *testing.T) {
 	frpMethodsAbsent := frp != nil && (frp.Methods == nil || string(frp.Methods) == "null")
 	if frp == nil || !frpMethodsAbsent || frp.InstalledVersion != "" || frp.Outdated != nil {
 		t.Fatalf("frp row: %+v", frp)
+	}
+	if frp.License != "" || frp.Upstream != "" {
+		t.Fatalf("frp license/upstream must be empty on a failed manifest: %q %q", frp.License, frp.Upstream)
+	}
+}
+
+// A manifest that publishes license/upstream without methods[] renders the
+// informational lines and the honest null — the fields are independent.
+func TestCoresManifestInfoWithoutMethods(t *testing.T) {
+	coresManifestReset(t)
+	coresManifestFetcher = func(core string) ([]byte, error) {
+		return []byte(`{"core":"gost","upstream":"https://github.com/go-gost/gost","license":"MIT","latest":"3.0.0"}`), nil
+	}
+	entry := fetchCoresManifestCached("gost")
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if entry.Err != nil || entry.Upstream != "" {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+		entry = fetchCoresManifestCached("gost")
+	}
+	if entry.Err != nil {
+		t.Fatalf("manifest without methods is not a failure: %v", entry.Err)
+	}
+	if entry.Upstream != "https://github.com/go-gost/gost" || entry.License != "MIT" || len(entry.Methods) != 0 {
+		t.Fatalf("info passthrough: %+v", entry)
 	}
 }
 

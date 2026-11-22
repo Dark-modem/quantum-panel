@@ -2519,6 +2519,41 @@ html[dir="rtl"] .eng-search input { padding:9px 38px 9px 14px; }
   .ctun-tbl tbody td .ctun-desc { max-width:none; }
   .ctun-pager { justify-content:center; }
 }
+/* NOTICE strip: license + upstream, verbatim from the core manifest */
+.ctun-notice { display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:10px 14px; border:1px solid var(--ln); border-radius:var(--r-md); background:var(--s2); font-size:12.5px; color:var(--tx2); }
+.ctun-notice-bit { display:inline-flex; align-items:center; gap:6px; min-width:0; }
+.ctun-notice-bit bdi { color:var(--tx); font-weight:600; }
+.ctun-uplink { display:inline-flex; align-items:center; gap:5px; color:var(--ac); text-decoration:none; min-width:0; }
+.ctun-uplink bdi { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:320px; font-weight:600; }
+.ctun-uplink svg { width:12px; height:12px; flex:none; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; }
+.ctun-uplink:hover bdi { text-decoration:underline; }
+.ctun-notice-sep { color:var(--mu); }
+/* Methods checker (ui/ux-1): per source project, found vs added */
+.chk-sum { display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:12px; font-size:12.5px; color:var(--mu); }
+.chk-sum-bit { display:inline-flex; align-items:center; gap:6px; }
+.chk-sum-bit b { color:var(--tx); font-size:14px; }
+.chk-tbl { min-width:640px; }
+.chk-tbl tbody td { padding:11px 12px; }
+.chk-tbl .chk-cell-name b { font-size:13px; color:var(--tx); }
+.chk-status.ctun-tb { font-weight:700; }
+.chk-none { color:var(--ok); font-weight:700; }
+.chk-missing summary { cursor:pointer; color:var(--wr); font-weight:600; font-size:12.5px; min-height:24px; display:inline-flex; align-items:center; }
+.chk-missing summary::-webkit-details-marker { display:none; }
+.chk-missing summary::before { content:'▸'; margin-inline-end:6px; font-size:12px; color:var(--mu); }
+.chk-missing[open] summary::before { content:'▾'; }
+.chk-missing ul { margin:8px 0 0; padding-inline-start:18px; font-size:12.5px; color:var(--tx2); display:flex; flex-direction:column; gap:4px; }
+/* checker mobile: each project renders as a compact card (44px-safe targets) */
+@media (max-width: 700px) {
+  .chk-tbl { min-width:0; }
+  .chk-tbl thead { display:none; }
+  .chk-tbl, .chk-tbl tbody, .chk-tbl tr, .chk-tbl td { display:block; width:100%; }
+  .chk-tbl tbody { display:flex; flex-direction:column; gap:10px; padding:10px; }
+  .chk-tbl tbody tr { display:grid; grid-template-columns:1fr 1fr; gap:8px 14px; border:1px solid var(--ln); border-radius:12px; background:var(--sunk); padding:12px; }
+  .chk-tbl tbody td { border:0; padding:0; font-size:12.5px; }
+  .chk-tbl tbody td[data-lbl]::before { content:attr(data-lbl); display:block; font-size:12px; color:var(--mu); margin-bottom:3px; }
+  .chk-tbl tbody td.chk-cell-name { grid-column:1 / -1; }
+  .chk-missing summary { min-height:44px; }
+}
 /* Method Board: pair pickers + live table + best card */
 .ctb-pickgrid { display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:16px; }
 .ctb-side { display:flex; flex-direction:column; gap:10px; min-width:0; }
