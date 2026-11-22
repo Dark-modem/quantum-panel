@@ -82,8 +82,8 @@ import (
 // BACKEND-42 (2026-11-22, panel §2.23): +2 requireAuth reads —
 // GET /api/benchmark/method-board (method-probe board) and
 // GET /api/optimization/kernel (kernel-tuning read surface).
-// Breakdown now 119 requireAuth.
-const expectedRouteRegistrationSites = 370
+// Breakdown now 120 requireAuth.
+const expectedRouteRegistrationSites = 371
 
 // unroutedHandlerExceptions lists handler-shaped package functions that are
 // intentionally NOT mux-registered, each with the reason. Everything else
@@ -185,6 +185,7 @@ var goldenRouteManifest = []routeRow{
 	{"GET {base}/api/mesh/weights/check", "requireAuth"},
 	{"GET {base}/api/metrics-token", "requireAuth"},
 	{"GET {base}/api/optimization/kernel", "requireAuth"},
+	{"GET {base}/api/overnight/checker", "requireAuth"}, // BACKEND-44: overnight completeness join (contract §2.24)
 	{"GET {base}/api/pathtest", "requireAuth"},
 	{"GET {base}/api/peer/config", "requireAuth"},
 	{"GET {base}/api/peer/rescue-offer", "requireRescuePeerAuth"},
