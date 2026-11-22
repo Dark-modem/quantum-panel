@@ -1942,6 +1942,11 @@ html[dir="rtl"] .eng-search input { padding:9px 38px 9px 14px; }
 .eng-badge svg { width:10px; height:10px; fill:none; stroke:currentColor; stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; }
 .eng-badge-cat { background:color-mix(in srgb, var(--ac) 14%, transparent); color:var(--ac); border:1px solid color-mix(in srgb, var(--ac) 40%, transparent); }
 .eng-badge-exp { background:color-mix(in srgb, var(--wr) 12%, transparent); color:var(--wr); border:1px solid color-mix(in srgb, var(--wr) 38%, transparent); }
+/* the per-core METHOD COUNT badge (ui-ux-3): the real §2.22 manifest count,
+   and its honest pending mark while a core's catalog has not landed */
+.eng-badge-mc { background:color-mix(in srgb, var(--info) 12%, transparent); color:var(--info); border:1px solid color-mix(in srgb, var(--info) 38%, transparent); }
+.eng-badge-mc svg, .eng-badge-mc-pend svg { width:11px; height:11px; }
+.eng-badge-mc-pend { background:color-mix(in srgb, var(--mu) 9%, transparent); color:var(--mu); border:1px dashed var(--ln); font-weight:600; }
 .eng-installed { color:var(--tx2); font-size:12.5px; }
 .eng-verchip { flex:none; padding:2px 8px; border-radius:7px; border:1px solid var(--ln); color:var(--tx2); font-size:12px; font-weight:600; margin-inline-start:auto; }
 .eng-verchip bdi { direction:ltr; unicode-bidi:isolate; }
@@ -2475,6 +2480,7 @@ html[dir="rtl"] .eng-search input { padding:9px 38px 9px 14px; }
 .ctun-lb-L2 { background:color-mix(in srgb, var(--info) 14%, transparent); color:var(--info); }
 .ctun-lb-L3 { background:var(--ok-soft); color:var(--ok); }
 .ctun-lb-L4 { background:color-mix(in srgb, var(--sc-fill) 16%, transparent); color:color-mix(in srgb, var(--sc-fill) 70%, var(--tx)); }
+.ctun-lb-x { background:var(--sunk); color:var(--tx2); border:1px solid var(--ln); }
 .ctun-tb { display:inline-flex; padding:2px 9px; border-radius:99px; font-size:12px; font-weight:600; background:var(--sunk); color:var(--tx2); border:1px solid var(--ln); }
 .ctun-pill { display:inline-flex; align-items:center; padding:2px 10px; border-radius:99px; font-size:12px; font-weight:700; background:var(--sunk); color:var(--mu); border:1px solid var(--ln); }
 .ctun-pill-yes { background:var(--ok-soft); color:var(--ok); border-color:var(--ok-badge-b); }
@@ -2548,7 +2554,7 @@ html[dir="rtl"] .eng-search input { padding:9px 38px 9px 14px; }
 .chk-tew-t { font-size:12.5px; font-weight:700; color:var(--tx2); }
 .chk-tw-bit { display:inline-flex; align-items:center; gap:5px; font-size:12px; color:var(--mu); min-width:0; }
 .chk-tw-bit b { color:var(--tx); font-size:13px; }
-.chk-tw-src { max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11px; color:var(--mu); direction:ltr; }
+.chk-tw-src { max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; color:var(--mu); direction:ltr; }
 .chk-tw-match { display:inline-flex; align-items:center; gap:5px; padding:4px 10px; border-radius:999px; font-size:12px; font-weight:700; }
 .chk-tw-match.ok { color:var(--ok); background:color-mix(in srgb, var(--ok) 12%, transparent); border:1px solid color-mix(in srgb, var(--ok) 35%, transparent); }
 .chk-tw-match.ok svg { width:12px; height:12px; fill:none; stroke:currentColor; stroke-width:2.5; stroke-linecap:round; stroke-linejoin:round; }

@@ -12953,6 +12953,20 @@ const CORES_ALIAS = { wst: 'wstunnel', singbox: 'sing-box' };
 const CORES_CATS = { matrix: ['Recommended', 'Default'] };
 const CORES_SEARCH_ICO = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>';
 const CORES_QMARK = '<svg viewBox="0 0 100 100" aria-hidden="true"><path d="M50 48 C42 38 26 32 12 42 C4 48 1 56 3 62 C6 60 12 54 20 55 C32 56 42 60 50 52 C58 60 68 56 80 55 C88 54 94 60 97 62 C99 56 96 48 88 42 C74 32 58 38 50 48 Z" fill="#38bdf8"/></svg>';
+const CORES_ICO_MC = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M7.5 13h4M7.5 16.5h7"/></svg>';
+// the §2.22 method count for one grid card: {n, known} — known=true only
+// when the cores feed serves a non-empty methods[] for the core (the count
+// is REAL manifest data); known=false with a repo row = the honest
+// catalog-pending state; null = no resolvable §2.22 row (panel-internal
+// engines, feed not loaded / unreachable) — the badge renders nothing
+// rather than inventing a number or a premature pending
+function coresMethodCount(g) {
+  const repo = artRepoRow(g.engine);
+  if (!repo) return null;
+  return Array.isArray(repo.methods) && repo.methods.length
+    ? { n: repo.methods.length, known: true }
+    : { n: 0, known: false };
+}
 async function loadCores(force) {
   const list = $('engList');
   if (!list || coresLoading) return;
@@ -13062,6 +13076,21 @@ function coresBadges(g) {
   if (cats) return cats.map(c => `<span class="eng-badge eng-badge-cat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.5-4.8 2.5.9-5.4L4.2 7.7l5.4-.8z"/></svg>${esc(tr('', c))}</span>`).join('');
   return `<span class="eng-badge eng-badge-exp">${esc(tr('', 'Experimental'))}</span>`;
 }
+// the per-core METHOD COUNT badge (overnight order): the REAL count of the
+// §2.22 manifest methods[] when the feed serves it, the honest 'pending'
+// mark when the core exists on the feed without its catalog yet — never an
+// invented number; a core the §2.22 row doesn't resolve for (panel-internal
+// engines) renders no badge at all
+function coresMethodBadge(g) {
+  const mc = coresMethodCount(g);
+  if (!mc) return '';
+  if (mc.known) {
+    return '<span class="eng-badge eng-badge-mc" title="' + esc(tr('', 'Methods published in the core manifest')) + '">' + CORES_ICO_MC +
+      tr('', '{n} methods').replace('{n}', '<bdi dir="ltr">' + esc(String(mc.n)) + '</bdi>') + '</span>';
+  }
+  return '<span class="eng-badge eng-badge-mc-pend" title="' + esc(tr('', 'The method catalog for this core has not landed on the feed yet')) + '">' + CORES_ICO_MC +
+    esc(tr('', 'Methods pending')) + '</span>';
+}
 function coresEngineCard(g) {
   const disp = CORES_ENGINE_NAME[g.engine] || g.engine || '';
   const img = CORES_ENGINE_IMG[g.engine] ? '<img src="' + CORES_ENGINE_IMG[g.engine] + '" alt="' + esc(disp) + '" draggable="false">' : CORES_QMARK;
@@ -13094,7 +13123,7 @@ function coresEngineCard(g) {
   const openBtn = '<button type="button" class="eng-act" data-cores-open="' + esc(g.engine) + '">' + esc(tr('', 'Details')) + '</button>';
   return '<div class="eng-card" data-cores-open="' + esc(g.engine) + '">' +
     '<div class="eng-card-top"><span class="eng-logo">' + img + '</span>' +
-    '<div class="eng-card-id"><div class="eng-card-namerow"><b>' + esc(disp) + '</b>' + coresBadges(g) + '</div>' +
+    '<div class="eng-card-id"><div class="eng-card-namerow"><b>' + esc(disp) + '</b>' + coresBadges(g) + coresMethodBadge(g) + '</div>' +
     '<span class="eng-installed">' + esc(tr('', 'Installed on {n} of {m} agents').replace('{n}', String(installed)).replace('{m}', String(total))) + '</span></div>' +
     (ver ? '<span class="eng-verchip"><bdi dir="ltr">v' + esc(g.latest) + '</bdi></span>' : '') + '</div>' +
     '<div class="eng-progress" role="img" aria-label="' + esc(tr('', 'Installed on {n} of {m} agents').replace('{n}', String(installed)).replace('{m}', String(total))) + '"><div class="eng-progress-fill" style="width:' + pct + '%"></div></div>' +
@@ -13276,8 +13305,23 @@ function ctunPill(v) {
 }
 function ctunLayerBadge(layer) {
   const l = String(layer || '').toUpperCase();
-  if (!CTUN_LAYER_KEY[l]) return '<span class="art-dash">—</span>';
+  if (!l) return '<span class="art-dash">—</span>';
+  // the canonical layers keep their colored badges; any other value the
+  // manifest publishes (compound forms like L3/L4) renders a neutral badge
+  // verbatim — the new cores' catalogs are passed through untouched
+  if (!CTUN_LAYER_KEY[l]) return '<span class="ctun-lb ctun-lb-x"><bdi dir="ltr">' + esc(l) + '</bdi></span>';
   return '<span class="ctun-lb ctun-lb-' + l + '">' + esc(l) + '</span>';
+}
+// the distinct layer values one catalog actually publishes, chip order:
+// 'all', the canonical L2/L3/L4 (each only when present), then the rest
+// sorted — data-derived so every core's own vocabulary renders
+function ctunLayersOf(methods) {
+  const seen = [];
+  (methods || []).forEach(m => {
+    const l = String((m && m.layer) || '').toUpperCase();
+    if (l && !seen.includes(l)) seen.push(l);
+  });
+  return ['all'].concat(['L2', 'L3', 'L4'].filter(l => seen.includes(l)), seen.filter(l => !CTUN_LAYER_KEY[l]).sort());
 }
 function ctunTextBadge(v) {
   if (v == null || v === '') return '<span class="art-dash">—</span>';
@@ -13460,10 +13504,15 @@ function renderCtunPage() {
     body.innerHTML = hero + ctunNoticeLine(repo) + ctunStatsCards(g, repo, methods) + middle;
     return;
   }
-  const layers = ['all', 'L2', 'L3', 'L4'];
+  // the layer chips derive from the LIVE catalog, not a fixed list: the
+  // canonical L2/L3/L4 first (when the core publishes them), then any other
+  // layer value the manifest uses (compound forms like L3/L4 ride the new
+  // cores' catalogs verbatim) — a layer with no rows never renders, so no
+  // dead-end filter chip
+  const layers = ctunLayersOf(methods);
   const count = l => l === 'all' ? methods.length : methods.filter(m => String(m.layer || '').toUpperCase() === l).length;
   const chips = '<div class="ctun-chips" role="group" aria-label="' + esc(tr('', 'Filter by layer')) + '">' +
-    layers.map(l => '<button type="button" class="ctun-chip' + (ctunLayer === l ? ' on' : '') + '" data-ctun-layer="' + l + '" aria-pressed="' + (ctunLayer === l ? 'true' : 'false') + '">' +
+    layers.map(l => '<button type="button" class="ctun-chip' + (ctunLayer === l ? ' on' : '') + '" data-ctun-layer="' + esc(l) + '" aria-pressed="' + (ctunLayer === l ? 'true' : 'false') + '">' +
       esc(l === 'all' ? tr('', 'All') : l) + ' <i>' + count(l) + '</i></button>').join('') + '</div>';
   const triOpts = () => [['', tr('', 'All')], ['yes', tr('', 'Yes')], ['no', tr('', 'No')]];
   const sel = (key, lbl, opts) => '<select class="ctun-sel" data-ctun-f="' + key + '" aria-label="' + esc(lbl) + '">' +

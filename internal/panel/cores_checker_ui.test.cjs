@@ -4,6 +4,9 @@
 // text, NOTICE license/upstream strip, honest catalog-pending state) and
 // the methods-checker view (GET /api/overnight/checker, documented shape —
 // the backend lands it in parallel; until then the honest not-live state).
+// ui-ux-2 extended the LIVE §2.24 payload + the feed-only grid groups;
+// ui-ux-3 adds the per-core METHOD COUNT badge (real count / honest
+// pending / no badge) and the data-derived layer chips.
 // No server or browser required.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -278,6 +281,88 @@ function sourceMatchCoresListEnd() {
   assert.ok(html.includes('WaterWall — Method catalog'), 'the feed-only core opens its drill-down');
   assert.ok(tblHtml.includes('<b>quic</b>'), 'its manifest methods[] render');
   assert.ok(tblHtml.includes('ctun-cell-id') && tblHtml.includes('>1</td>'), 'the row carries its # from the manifest id');
+  vm.runInContext('ctunPageClose()', sandbox);
+
+  // ---- Piece 6 (ui-ux-3): the per-core METHOD COUNT badge + the generalized
+  // layer chips — the badge states (real count / honest pending / no badge),
+  // the alias join, the panel-internal silence, and the drill-down chips
+  // deriving from the LIVE catalog (compound layers ride verbatim)
+  vm.runInContext(`
+  coresCache = [
+    { engine: 'matrix', latest: '', builds: [], installed: {}, detail: {} },
+    { engine: 'frp', latest: '0.61.1', builds: [], installed: {}, detail: {} },
+    { engine: 'singbox', latest: '', builds: [], installed: {}, detail: {} },
+    { engine: 'waterwall', latest: '', builds: [], installed: {}, detail: {}, feedOnly: true },
+  ];
+  coresAvail = { cores: [
+    { core: 'frp', latest_version: '0.61.2', methods: null },
+    { core: 'sing-box', latest_version: '1.12.39', methods: [{ id: 1, name: 'vless', layer: 'l4', transport: 'tcp' }, { id: 2, name: 'vmess', layer: 'l4', transport: 'tcp' }] },
+    { core: 'waterwall', latest_version: '1.6.0', methods: [{ id: 1, name: 'quic', layer: 'l4', transport: 'udp' }, { id: 2, name: 'tcp', layer: 'l4', transport: 'tcp' }, { id: 3, name: 'http2', layer: 'l4', transport: 'tcp+tls' }] },
+  ] };
+  renderCores();
+  `, sandbox);
+  const grid6 = el('engList').innerHTML;
+  const cardOf = eng => {
+    const seg = grid6.split('<div class="eng-card" data-cores-open="' + eng + '"');
+    return seg.length > 1 ? seg[1].split('<div class="eng-card"')[0] : '';
+  };
+  const frpCard = cardOf('frp'), sbCard = cardOf('singbox'), wwCard = cardOf('waterwall'), mxCard = cardOf('matrix');
+  assert.ok(frpCard.includes('eng-badge-mc-pend') && frpCard.includes('Methods pending'), 'a core without methods[] renders the honest pending badge');
+  assert.ok(!frpCard.includes('eng-badge-mc"'), 'the pending card carries NO count badge');
+  assert.ok(!frpCard.includes('<bdi dir="ltr">0</bdi>'), 'pending never masquerades as a zero count');
+  assert.ok(sbCard.includes('eng-badge-mc"') && sbCard.includes('<bdi dir="ltr">2</bdi> methods'), 'the sing-box count resolves THROUGH the alias (2 methods)');
+  assert.ok(wwCard.includes('eng-badge-mc"') && wwCard.includes('<bdi dir="ltr">3</bdi> methods'), 'the real manifest count renders on the feed-only card');
+  assert.ok(mxCard.includes('eng-badge-mc-pend') === false && mxCard.includes('eng-badge-mc"') === false, 'a panel-internal core with no §2.22 row renders NO badge (nothing invented)');
+  // the feed not having answered yet → no badge at all (not even pending)
+  vm.runInContext(`
+  coresAvail = null; coresAvailErr = null;
+  renderCores();
+  `, sandbox);
+  assert.ok(!el('engList').innerHTML.includes('eng-badge-mc'), 'before the feed answers the cards carry no badge — no premature pending');
+  // the honest pending badge also explains itself (title tooltip)
+  vm.runInContext(`
+  coresAvail = { cores: [{ core: 'frp', latest_version: '0.61.2', methods: null }] };
+  renderCores();
+  `, sandbox);
+  assert.ok(el('engList').innerHTML.includes('title="The method catalog for this core has not landed on the feed yet"'), 'the pending badge carries its honest tooltip');
+  // XSS discipline: an odd manifest layer/name echoes as text
+  vm.runInContext(`
+  coresAvail = { cores: [{ core: 'frp', latest_version: '0.61.2', methods: [
+    { id: 1, name: '<script>alert(1)</script>', layer: 'L3/L4', transport: '"><b>x</b>', ipver: 'v4', family: '<b>fam</b>' },
+    { id: 2, name: 'plain', layer: 'L4', transport: 'tcp', ipver: 'v4' },
+    { id: 3, name: 'sneaky', layer: 'L4"><svg onload=alert(2)>', transport: 'udp', ipver: 'v4' },
+  ] }] };
+  ctunPageOpen('frp');
+  `, sandbox);
+  html = el('ctunPage').innerHTML;
+  const tbl6 = el('ctunTableWrap').innerHTML;
+  assert.ok(!html.includes('<script>alert(1)</script>') && !tbl6.includes('<script>alert(1)</script>'), 'no raw hostile name anywhere on the page');
+  assert.ok(tbl6.includes('&lt;script&gt;alert(1)&lt;/script&gt;'), 'a hostile method name renders as text');
+  assert.ok(!html.includes('<svg onload=alert(2)>') && html.includes('L4&quot;&gt;&lt;SVG'), 'a hostile layer value never breaks the chip attribute');
+  assert.ok(tbl6.includes('ctun-lb-x') && tbl6.includes('<bdi dir="ltr">L3/L4</bdi>'), 'a compound layer renders the neutral badge verbatim');
+  assert.ok(!tbl6.includes('"><b>x</b></span>'), 'a hostile transport never injects markup');
+  // the layer chips derive from the LIVE catalog: the compound layer gets its
+  // own chip, and a catalog without L2 rows never renders a dead-end L2 chip
+  const chips6 = html.slice(html.indexOf('ctun-chips'), html.indexOf('ctun-toolbar'));
+  assert.ok(chips6.includes('data-ctun-layer="L3/L4"') && chips6.includes('data-ctun-layer="L4"'), 'the chips carry the catalog\u2019s own layer values');
+  assert.ok(!chips6.includes('data-ctun-layer="L2"') && !chips6.includes('data-ctun-layer="L3"'), 'layers the catalog does not publish never render as dead-end chips');
+  assert.ok(chips6.includes('data-ctun-layer="all"'), 'the All chip always leads');
+  // filtering by the compound layer keeps exactly its rows
+  vm.runInContext("ctunLayer = 'L3/L4'; renderCtunPage();", sandbox);
+  const filtered6 = el('ctunTableWrap').innerHTML;
+  assert.ok(filtered6.includes('&lt;script&gt;') && !filtered6.includes('<b>plain</b>'), 'the compound-layer filter selects exactly its rows');
+  // the canonical three-layer catalog still renders all four chips (ui-ux-1 shape)
+  vm.runInContext(`
+  ctunLayer = 'all';
+  coresAvail = { cores: [{ core: 'frp', latest_version: '0.61.2', methods: [
+    { id: 1, name: 'a', layer: 'L2', transport: 'udp' },
+    { id: 2, name: 'b', layer: 'L3', transport: 'raw-ip' },
+    { id: 3, name: 'c', layer: 'L4', transport: 'tcp' },
+  ] }] };
+  renderCtunPage();
+  `, sandbox);
+  const chips7 = el('ctunPage').innerHTML;
+  assert.ok(chips7.includes('data-ctun-layer="L2"') && chips7.includes('data-ctun-layer="L3"') && chips7.includes('data-ctun-layer="L4"'), 'the canonical chips render when the catalog publishes them');
   vm.runInContext('ctunPageClose()', sandbox);
   console.log('cores_checker_ui: all assertions passed');
 })().catch(e => { console.error(e); process.exit(1); });
