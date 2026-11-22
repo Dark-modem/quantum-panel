@@ -3729,5 +3729,13 @@ window.FA_TEXT = {
  "Pending": "در انتظار",
  "The method probes keep running to completion — they have no stop switch.": "پراب‌های روش تا تکمیل ادامه می‌دهند — کلید توقف ندارند.",
  "Engine benchmark": "بنچمارک هسته",
- "Start benchmark": "شروع بنچمارک"
+ "Start benchmark": "شروع بنچمارک",
+ "Generated": "زمان تولید",
+ "C-Tunnel three-way check": "بررسی سه‌طرفهٔ C-Tunnel",
+ "Upstream catalog": "کاتالوگ مخزن اصلی",
+ "Cores manifest": "مانیفست هسته‌ها",
+ "Agent driver": "درایور ایجنت",
+ "Three-way match": "تطابق سه‌طرفه",
+ "Mismatch": "عدم تطابق",
+ "{n} mismatches": "{n} مورد عدم تطابق"
 };

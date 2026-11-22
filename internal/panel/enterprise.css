@@ -2542,6 +2542,18 @@ html[dir="rtl"] .eng-search input { padding:9px 38px 9px 14px; }
 .chk-missing summary::before { content:'▸'; margin-inline-end:6px; font-size:12px; color:var(--mu); }
 .chk-missing[open] summary::before { content:'▾'; }
 .chk-missing ul { margin:8px 0 0; padding-inline-start:18px; font-size:12.5px; color:var(--tx2); display:flex; flex-direction:column; gap:4px; }
+/* §2.24 three-way check strip (ui/ux-2): upstream vs manifest vs driver */
+.chk-gen b { color:var(--tx2); font-size:12.5px; }
+.chk-tew-way { display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:12px; padding:10px 14px; border:1px solid var(--ln); border-radius:var(--r-md); background:var(--sunk); }
+.chk-tew-t { font-size:12.5px; font-weight:700; color:var(--tx2); }
+.chk-tw-bit { display:inline-flex; align-items:center; gap:5px; font-size:12px; color:var(--mu); min-width:0; }
+.chk-tw-bit b { color:var(--tx); font-size:13px; }
+.chk-tw-src { max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11px; color:var(--mu); direction:ltr; }
+.chk-tw-match { display:inline-flex; align-items:center; gap:5px; padding:4px 10px; border-radius:999px; font-size:12px; font-weight:700; }
+.chk-tw-match.ok { color:var(--ok); background:color-mix(in srgb, var(--ok) 12%, transparent); border:1px solid color-mix(in srgb, var(--ok) 35%, transparent); }
+.chk-tw-match.ok svg { width:12px; height:12px; fill:none; stroke:currentColor; stroke-width:2.5; stroke-linecap:round; stroke-linejoin:round; }
+.chk-tw-match.bad { color:var(--er); background:color-mix(in srgb, var(--er) 12%, transparent); border:1px solid color-mix(in srgb, var(--er) 35%, transparent); }
+.chk-tw-mm { flex-basis:100%; }
 /* checker mobile: each project renders as a compact card (44px-safe targets) */
 @media (max-width: 700px) {
   .chk-tbl { min-width:0; }

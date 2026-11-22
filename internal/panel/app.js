@@ -12946,9 +12946,9 @@ let coresSearch = '';
 let coresLoading = false;
 let coresError = null;
 let coresPick = null; // { engine, disp }
-const CORES_ENGINE_IMG = { aestun: 'img/engines/aestun.png', rakhsh: 'img/engines/rakhsh.png', gost: 'img/engines/gost.png', xray: 'img/engines/xray.svg', wireguard: 'img/engines/wireguard.png', rathole: 'img/engines/rathole.png', wst: 'img/engines/wstunnel.png', wstunnel: 'img/engines/wstunnel.png', tinc: 'img/engines/tinc.svg', hysteria: 'img/engines/hysteria.png', singbox: 'img/engines/singbox.png', midos: 'img/engines/midos.png', dagger: 'img/engines/dagger.png', pengo: 'img/engines/pengo.png', backhaul: 'img/engines/backhaul.png', backpack: 'img/engines/backpack.png', narnia: 'img/engines/narnia.png', waterwall: 'img/engines/waterwall.png', wattunnel: 'img/engines/wattunnel.png', udp2raw: 'img/engines/udp2raw.png', paqet: 'img/engines/paqet.png', frp: 'img/engines/frp.png', easytier: 'img/engines/easytier.png', chisel: 'img/engines/chisel.png' };
-const CORES_ENGINE_NAME = { aestun: 'AESTun', rakhsh: 'Rakhsh', matrix: 'Matrix', frp: 'FRP', backhaul: 'Backhaul', bagher: 'Bagher', gost: 'Gost', xray: 'Xray', wireguard: 'WireGuard', wst: 'wstunnel', wstunnel: 'wstunnel', chisel: 'Chisel', rathole: 'Rathole', tinc: 'Tinc', backpack: 'BackPack', ctunnel: 'C-Tunnel', dagger: 'DaggerConnect', easytier: 'EasyTier', hysteria: 'Hysteria', midos: 'Midos', narnia: 'Narnia', paqet: 'Paqet', pengo: 'Pengo', singbox: 'sing-box', 'sing-box': 'sing-box', spoof: 'Spoof', udp2raw: 'udp2raw', waterwall: 'WaterWall', wattunnel: 'WatTunnel', vortexl2: 'VortexL2' };
-const CORES_ALIAS = { wst: 'wstunnel' };
+const CORES_ENGINE_IMG = { aestun: 'img/engines/aestun.png', rakhsh: 'img/engines/rakhsh.png', gost: 'img/engines/gost.png', xray: 'img/engines/xray.svg', wireguard: 'img/engines/wireguard.png', rathole: 'img/engines/rathole.png', wst: 'img/engines/wstunnel.png', wstunnel: 'img/engines/wstunnel.png', tinc: 'img/engines/tinc.svg', hysteria: 'img/engines/hysteria.png', singbox: 'img/engines/singbox.png', 'sing-box': 'img/engines/singbox.png', midos: 'img/engines/midos.png', dagger: 'img/engines/dagger.png', pengo: 'img/engines/pengo.png', backhaul: 'img/engines/backhaul.png', backpack: 'img/engines/backpack.png', narnia: 'img/engines/narnia.png', waterwall: 'img/engines/waterwall.png', wattunnel: 'img/engines/wattunnel.png', udp2raw: 'img/engines/udp2raw.png', paqet: 'img/engines/paqet.png', frp: 'img/engines/frp.png', easytier: 'img/engines/easytier.png', chisel: 'img/engines/chisel.png' };
+const CORES_ENGINE_NAME = { aestun: 'AESTun', rakhsh: 'Rakhsh', matrix: 'Matrix', frp: 'FRP', backhaul: 'Backhaul', bagher: 'Bagher', gost: 'Gost', xray: 'Xray', wireguard: 'WireGuard', wst: 'wstunnel', wstunnel: 'wstunnel', chisel: 'Chisel', rathole: 'Rathole', tinc: 'Tinc', backpack: 'BackPack', ctunnel: 'C-Tunnel', dagger: 'DaggerConnect', easytier: 'EasyTier', hysteria: 'Hysteria', midos: 'Midos', narnia: 'Narnia', naive: 'Naive', 'naive-http2': 'Naive (HTTP/2)', paqet: 'Paqet', pengo: 'Pengo', singbox: 'sing-box', 'sing-box': 'sing-box', spoof: 'Spoof', udp2raw: 'udp2raw', waterwall: 'WaterWall', wattunnel: 'WatTunnel', vortexl2: 'VortexL2' };
+const CORES_ALIAS = { wst: 'wstunnel', singbox: 'sing-box' };
 // Matrix is the default and recommended engine; everything else is experimental.
 const CORES_CATS = { matrix: ['Recommended', 'Default'] };
 const CORES_SEARCH_ICO = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>';
@@ -14235,6 +14235,38 @@ function chkMissingCell(missing) {
   const items = missing.map(m => '<li><bdi dir="ltr">' + esc(String(m == null ? '' : m)) + '</bdi></li>').join('');
   return '<details class="chk-missing"><summary>' + esc(tr('', '{n} missing').replace('{n}', String(missing.length))) + '</summary><ul>' + items + '</ul></details>';
 }
+// The §2.24 ctunnel three-way machine-check block, verbatim passthrough
+// from the endpoint: upstream catalog vs cores manifest vs agent driver —
+// three source counts + the match verdict + the named mismatches. Fields
+// stay honest (null/absent = —, never invented).
+function chkThreeWay(tc) {
+  if (!tc || typeof tc !== 'object') return '';
+  const src = (lbl, s) => {
+    const o = (s && typeof s === 'object') ? s : null;
+    const m = o && typeof o.methods === 'number' ? String(o.methods) : null;
+    const sv = o && o.source ? String(o.source) : '';
+    return '<span class="chk-tw-bit" data-chk-tw="' + esc(lbl) + '"><i>' + esc(lbl) + '</i>' +
+      (m ? ' <b><bdi dir="ltr">' + esc(m) + '</bdi></b>' : ' <b class="art-dash">—</b>') +
+      (sv ? ' <span class="chk-tw-src" title="' + esc(sv) + '"><bdi dir="ltr">' + esc(sv) + '</bdi></span>' : '') +
+      '</span>';
+  };
+  const match = tc.three_way_match;
+  const mBad = match === true
+    ? '<span class="chk-tw-match ok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>' + esc(tr('', 'Three-way match')) + '</span>'
+    : match === false
+      ? '<span class="chk-tw-match bad">' + esc(tr('', 'Mismatch')) + '</span>'
+      : '<span class="art-dash">—</span>';
+  const mm = Array.isArray(tc.mismatches) && tc.mismatches.length
+    ? '<details class="chk-missing chk-tw-mm"><summary>' + esc(tr('', '{n} mismatches').replace('{n}', String(tc.mismatches.length))) + '</summary><ul>' +
+      tc.mismatches.map(x => '<li><bdi dir="ltr">' + esc(String(x == null ? '' : x)) + '</bdi></li>').join('') + '</ul></details>'
+    : '';
+  return '<div class="chk-tew-way" data-chk-tew>' +
+    '<span class="chk-tew-t">' + esc(tr('', 'C-Tunnel three-way check')) + '</span>' +
+    src(tr('', 'Upstream catalog'), tc.upstream_catalog) +
+    src(tr('', 'Cores manifest'), tc.cores_manifest) +
+    src(tr('', 'Agent driver'), tc.agent_driver) +
+    mBad + mm + '</div>';
+}
 function chkStatusBadge(status) {
   const s = status == null ? '' : String(status);
   if (!s) return '<span class="art-dash">—</span>';
@@ -14278,12 +14310,18 @@ function renderChecker() {
     return;
   }
   const sum = chkSum(projects);
+  // §2.24: generated == "" is the endpoint's own "no checker data yet"
+  // marker — an empty string renders nothing, never a fake date
+  const gen = chkData && typeof chkData.generated === 'string' && chkData.generated
+    ? '<span class="chk-sum-bit chk-gen">' + esc(tr('', 'Generated')) + ': <b><bdi dir="ltr">' + esc(chkData.generated) + '</bdi></b></span>'
+    : '';
+  const tew = chkThreeWay(chkData && chkData.ctunnel_check);
   const sumLine =
     '<div class="chk-sum">' +
     '<span class="chk-sum-bit"><b>' + esc(String(projects.length)) + '</b> ' + esc(tr('', 'source projects')) + '</span>' +
     '<span class="chk-sum-bit">' + esc(tr('', 'Methods found')) + ': <b>' + (sum.found == null ? '—' : '<bdi dir="ltr">' + esc(sum.found) + '</bdi>') + '</b></span>' +
     '<span class="chk-sum-bit">' + esc(tr('', 'Methods added')) + ': <b>' + (sum.added == null ? '—' : '<bdi dir="ltr">' + esc(sum.added) + '</bdi>') + '</b></span>' +
-    '</div>';
+    gen + '</div>' + tew;
   const rows = projects.map(p => {
     const name = p && p.name != null ? String(p.name) : '—';
     return '<tr>' +

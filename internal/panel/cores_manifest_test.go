@@ -183,6 +183,20 @@ func TestCoresInstalledOutdated(t *testing.T) {
 	if installed != "9.9.9" || outdated == nil || *outdated {
 		t.Fatalf("alias resolution: %q %v", installed, outdated)
 	}
+	// the sing-box alias: the agent's driver id is `singbox`, the cores
+	// row is `sing-box` (quantum-cores folder) — without it the row never
+	// joins its methods[]/installed_version
+	if err := s.UpsertAgentEngine(store.AgentEngine{AgentID: "agt_0b0b0b0b0b0b",
+		Engine: "singbox", Installed: true, Version: "1.12.40", UpdatedAt: time.Now().Unix()}); err != nil {
+		t.Fatal(err)
+	}
+	installed, outdated = coreRowInstalledOutdated(s, "sing-box", "1.12.39")
+	if installed != "1.12.40" || outdated == nil || !*outdated {
+		t.Fatalf("singbox alias resolution: %q %v", installed, outdated)
+	}
+	if coresCoreOfEngine("singbox") != "sing-box" || coresEngineOfCore("sing-box") != "singbox" {
+		t.Fatalf("singbox alias both ways broken: %q %q", coresCoreOfEngine("singbox"), coresEngineOfCore("sing-box"))
+	}
 }
 
 func TestCoresAvailableHandlerAdditiveFields(t *testing.T) {

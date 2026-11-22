@@ -189,8 +189,11 @@ func parseCoresManifest(core string, body []byte) (methods json.RawMessage, lice
 
 // coresEngineAlias maps an engine id to the cores-repo core folder name
 // where they differ (verified against the repo layout 2026-11-22: the
-// wstunnel core drives the panel's wst engine).
-var coresEngineAlias = map[string]string{"wst": "wstunnel"}
+// wstunnel core drives the panel's wst engine, and the sing-box core
+// folder is `sing-box/` while the agent's driver id is `singbox` —
+// quantum-agent singbox_driver.go singboxID; without the second alias
+// the sing-box row never joins its manifest methods[]/installed_version).
+var coresEngineAlias = map[string]string{"wst": "wstunnel", "singbox": "sing-box"}
 
 // coresCoreOfEngine resolves the repo core folder for an engine id.
 func coresCoreOfEngine(engine string) string {
