@@ -46,6 +46,14 @@ func phase46FeedFixture(t *testing.T, order string) {
 		{Tag: "xray-v24.12.31", PublishedAt: "2026-11-22T00:00:00Z"},
 		{Tag: "xray-v26.3.27", PublishedAt: "2026-11-23T00:00:00Z"},
 		{Tag: "udp2raw-v20230206.0", PublishedAt: "2026-11-22T00:00:00Z"},
+		// the CORES-5-era full feed (14 tags over 13 cores — xray keeps its
+		// legacy tag for the agents pinned to v24.12.31)
+		{Tag: "frp-v0.61.1", PublishedAt: "2026-11-08T00:00:00Z"},
+		{Tag: "gost-v3.3.3", PublishedAt: "2026-11-08T00:00:00Z"},
+		{Tag: "backhaul-v0.7.2", PublishedAt: "2026-11-08T00:00:00Z"},
+		{Tag: "rathole-v0.5.0", PublishedAt: "2026-11-08T00:00:00Z"},
+		{Tag: "chisel-v1.10.1", PublishedAt: "2026-11-08T00:00:00Z"},
+		{Tag: "wstunnel-v10.1.9", PublishedAt: "2026-11-08T00:00:00Z"},
 	}
 	if order == "feed" {
 		// GitHub's order is its own — deliberate NON-sorted fixture (the
@@ -60,6 +68,12 @@ func phase46FeedFixture(t *testing.T, order string) {
 			{Tag: "hysteria-v2.14.0", PublishedAt: "2026-11-22T00:00:00Z"},
 			{Tag: "xray-v24.12.31", PublishedAt: "2026-11-22T00:00:00Z"},
 			{Tag: "easytier-v2.7.1", PublishedAt: "2026-11-22T00:00:00Z"},
+			{Tag: "gost-v3.3.3", PublishedAt: "2026-11-08T00:00:00Z"},
+			{Tag: "wstunnel-v10.1.9", PublishedAt: "2026-11-08T00:00:00Z"},
+			{Tag: "backhaul-v0.7.2", PublishedAt: "2026-11-08T00:00:00Z"},
+			{Tag: "frp-v0.61.1", PublishedAt: "2026-11-08T00:00:00Z"},
+			{Tag: "rathole-v0.5.0", PublishedAt: "2026-11-08T00:00:00Z"},
+			{Tag: "chisel-v1.10.1", PublishedAt: "2026-11-08T00:00:00Z"},
 		}
 	}
 	oldFeed := coresReleasesFetcher
@@ -112,27 +126,37 @@ func TestPhase46BoardEnumeratesAllLandedManifestMethods(t *testing.T) {
 	phase46FeedFixture(t, "feed") // deliberately unsorted
 	phase46WireJoin(t)
 
-	// the catalog-agreed set: the four engines whose drivers landed (AGENT-29
-	// ctunnel, AGENT-31 hysteria+singbox, OVERNIGHT-A5 waterwall in flight)
-	// plus gost (a landed engine whose core publishes NO methods[])
-	catalog := []string{"matrix", "ctunnel", "hysteria", "singbox", "waterwall", "gost"}
+	// the catalog-agreed set: the FULL landed driver catalog (the 12 builtin
+	// registrations + ctunnel) plus waterwall (OVERNIGHT-A5's driver, in
+	// flight) — the real agents report all of these
+	catalog := []string{"matrix", "frp", "backhaul", "xray", "wireguard", "wst",
+		"chisel", "gost", "rathole", "ctunnel", "hysteria", "singbox", "waterwall",
+		"udp2raw"}
 
 	// the manifest reads are background-filled — wait for the real fills to
 	// land before enumerating (a GET must never serialize behind them, so
 	// the join answers empty until the cache warms; the phase45 poll pattern)
-	deadline := time.Now().Add(3 * time.Second)
+	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
 		if rows := coresManifestMethods("ctunnel"); len(rows) == 49 &&
 			len(coresManifestMethods("sing-box")) == 16 &&
 			len(coresManifestMethods("waterwall")) == 18 &&
 			len(coresManifestMethods("hysteria")) == 2 &&
-			len(coresManifestMethods("easytier")) == 1 {
+			len(coresManifestMethods("easytier")) == 1 &&
+			len(coresManifestMethods("gost")) == 37 &&
+			len(coresManifestMethods("frp")) == 16 &&
+			len(coresManifestMethods("xray")) == 17 &&
+			len(coresManifestMethods("backhaul")) == 8 &&
+			len(coresManifestMethods("rathole")) == 6 &&
+			len(coresManifestMethods("udp2raw")) == 4 &&
+			len(coresManifestMethods("chisel")) == 1 &&
+			len(coresManifestMethods("wstunnel")) == 2 {
 			break
 		}
 		time.Sleep(2 * time.Millisecond)
 	}
-	if rows := coresManifestMethods("ctunnel"); len(rows) != 49 {
-		t.Fatalf("ctunnel manifest never filled: %d rows", len(rows))
+	if rows := coresManifestMethods("gost"); len(rows) != 37 {
+		t.Fatalf("gost manifest never filled: %d rows", len(rows))
 	}
 
 	got := methodBoardCandidates(catalog, catalog)
@@ -149,15 +173,22 @@ func TestPhase46BoardEnumeratesAllLandedManifestMethods(t *testing.T) {
 	manifestRows := got[len(uiKnownEngines):]
 	// ctunnel is NOT a uiKnownEngines id (the C-Tunnel engine rides the cores
 	// catalog) — it lands as the catalog-agreed extra engine row FIRST, then
-	// the manifest methods: ctunnel 49−1 (its own "wireguard" row is shadowed
-	// by the kernel-WG ENGINE row — the designed precedence) + hysteria 2 +
-	// sing-box 16−3 (hysteria2/hysteria/wireguard seen) + waterwall 18−4
-	// (trojan/vless/vmess/wireguard seen)
+	// the 155 unique manifest methods: the 13 cores publish 177 rows, of
+	// which 20 dedup away — wireguard engine-shadowed (ctunnel/sing-box/
+	// waterwall all publish the name) + hysteria engine-shadowed (sing-box)
+	// + 18 cross-core dups resolving to the sorted-first core (backhaul's
+	// tcp/tcpmux/ws/wsmux/wss/wssmux/udp over ctunnel's; chisel's reverse-tcp
+	// over wstunnel's; gost's tun+socks5 over sing-box's/waterwall's;
+	// hysteria's hysteria2 over sing-box's; sing-box's vless/vmess/trojan/
+	// shadowsocks over waterwall's/xray's; ctunnel's faketcp+icmp over
+	// udp2raw's) — per-core winners: backhaul 8 / chisel 1 / ctunnel 41 /
+	// frp 16 / gost 37 / hysteria 2 / rathole 6 / sing-box 12 / waterwall 13
+	// / wstunnel 1 / xray 16 / udp2raw 2
 	if len(manifestRows) == 0 || manifestRows[0] != "ctunnel" {
 		t.Fatalf("ctunnel extra engine row missing/first: %v", manifestRows)
 	}
-	if want := 1 + 48 + 2 + 13 + 14; len(manifestRows) != want {
-		t.Fatalf("manifest rows %d, want %d: %v", len(manifestRows), want, manifestRows)
+	if want := 1 + 155; len(manifestRows) != want {
+		t.Fatalf("manifest rows %d, want %d", len(manifestRows), want)
 	}
 	// every landed ctunnel method enumerates (all 49 — the BACKEND-45 test
 	// only drove a 3-row slice)
@@ -177,12 +208,64 @@ func TestPhase46BoardEnumeratesAllLandedManifestMethods(t *testing.T) {
 			t.Fatalf("landed ctunnel method %q missing from the board", e.ID)
 		}
 	}
+	// every CORES-5 family enumerates (the REAL spellings — frp proxy-* /
+	// transport-* / visitor-*, xray's carrier+security combos incl. the
+	// A5-proven hysteria/masque inouts, gost relay+*, rathole services and
+	// carriers, udp2raw modes, the reverse pairs)
 	for _, want := range []string{"salamander", "vless", "vmess", "trojan", "shadowsocks",
 		"tuic", "anytls", "shadowtls", "snell", "socks-http", "openvpn", "tun", "tailscale",
 		"quic", "kcp", "enet", "reality", "rtmp", "gns", "bgp4", "http", "socks5",
-		"fake-tcp", "obfuscator", "connection-fisher", "connection-stripe", "mux"} {
+		"fake-tcp", "obfuscator", "connection-fisher", "connection-stripe", "mux",
+		"proxy-tcp", "proxy-udp", "proxy-http", "proxy-https", "proxy-tcpmux",
+		"proxy-stcp", "proxy-xtcp", "proxy-sudp", "visitor-stcp", "visitor-xtcp",
+		"visitor-sudp", "transport-tcp", "transport-kcp", "transport-quic",
+		"transport-websocket", "transport-wss",
+		"vless+tcp+reality", "vless+xhttp+reality", "vless+grpc+reality",
+		"vless+tcp+tls", "vless+ws+tls", "vless+httpupgrade", "vless+mkcp",
+		"vless+xhttp+tls", "vmess+ws+tls", "vmess+tcp+reality", "trojan+tcp+tls",
+		"socks/http-in", "wireguard-inout", "hysteria-inout", "masque-inout", "tun-in",
+		"relay+tcp", "relay+tls", "relay+mtls", "relay+ws", "relay+mws", "relay+dtls",
+		"relay+quic", "relay+http3", "relay+h3", "relay+wt", "relay+grpc",
+		"relay+http2", "relay+h2", "relay+kcp", "relay+icmp", "relay+ftcp",
+		"relay+ssh", "relay+sshd", "relay+obfs-http", "relay+obfs-tls", "relay+pht",
+		"relay+utls", "rtcp", "rudp", "ss", "socks4", "http-proxy", "forward-local",
+		"forward-remote", "tap", "redirect-tcp", "redirect-udp", "sni", "dns", "masque",
+		"udp-over-tcp", "tcp-service", "udp-service", "noise", "tcp-carrier",
+		"tls-carrier", "websocket-carrier", "easyfaketcp", "udp-raw", "reverse-udp"} {
 		if !seen[want] {
 			t.Fatalf("landed manifest method %q missing from the board", want)
+		}
+	}
+	// the 16 cross-core dups resolve to the sorted-first core — the same
+	// winner the reverse lookup must answer (tcp family → backhaul over
+	// ctunnel; faketcp/icmp → ctunnel over udp2raw; vless/vmess/trojan/
+	// shadowsocks → sing-box over waterwall/xray; tun/socks5 → gost over
+	// sing-box/waterwall; reverse-tcp → chisel over wstunnel)
+	for method, engine := range map[string]string{
+		"tcp": "backhaul", "udp": "backhaul", "wssmux": "backhaul",
+		"faketcp": "ctunnel", "icmp": "ctunnel",
+		"vless": "singbox", "shadowsocks": "singbox",
+		"tun": "gost", "socks5": "gost",
+		"reverse-tcp": "chisel",
+	} {
+		if e := phase46WaitEntry(t, method); e.Engine != engine {
+			t.Fatalf("dup %q resolved to %q, want %q (sorted-first core)", method, e.Engine, engine)
+		}
+	}
+	// per-core winner counts (the 177 published rows minus 18 dedup losses:
+	// 2 engine-id shadowed + 16 cross-core dups)
+	perCore := map[string]int{}
+	for _, e := range got[len(uiKnownEngines)+1:] {
+		if entry, ok := mboardManifestEntryOf(e); ok {
+			perCore[entry.Engine]++
+		}
+	}
+	wantPerCore := map[string]int{"backhaul": 8, "chisel": 1, "ctunnel": 41, "frp": 16,
+		"gost": 37, "hysteria": 2, "rathole": 6, "singbox": 12, "waterwall": 13,
+		"wst": 1, "xray": 16, "udp2raw": 2}
+	for c, n := range wantPerCore {
+		if perCore[c] != n {
+			t.Fatalf("per-core winners %v: %s has %d, want %d", perCore, c, perCore[c], n)
 		}
 	}
 	// engine ids appear EXACTLY once even though manifests publish methods
@@ -393,6 +476,12 @@ func TestPhase46NewCoresFeedEndToEnd(t *testing.T) {
 		{AgentID: "agt_1a1a1a1a1a1a", Engine: "hysteria", Installed: true, Version: "2.13.0"},
 		{AgentID: "agt_2b2b2b2b2b2b", Engine: "waterwall", Installed: true, Version: "1.6.0"},
 		{AgentID: "agt_2b2b2b2b2b2b", Engine: "ctunnel", Installed: true, Version: "2.0.0"},
+		// the CORES-5 rows (the fleet's real shape): the deployed xray rides
+		// the v24.12.31 artifacts — genuinely outdated vs the A5-upgraded
+		// v26.3.27 core
+		{AgentID: "agt_1a1a1a1a1a1a", Engine: "frp", Installed: true, Version: "0.61.1"},
+		{AgentID: "agt_2b2b2b2b2b2b", Engine: "gost", Installed: true, Version: "3.3.3"},
+		{AgentID: "agt_2b2b2b2b2b2b", Engine: "xray", Installed: true, Version: "24.12.31"},
 	}
 	for _, e := range seed {
 		e.UpdatedAt = time.Now().Unix()
@@ -484,9 +573,10 @@ func TestPhase46NewCoresFeedEndToEnd(t *testing.T) {
 			t.Fatalf("%s passthrough altered", core)
 		}
 	}
-	// latest_version from the REAL tags (xray: the newest of its two tags)
-	if x := row("xray"); x.LatestVersion != "26.3.27" || x.Methods != nil && string(x.Methods) != "null" {
-		t.Fatalf("xray row: latest %q methods %s", x.LatestVersion, x.Methods)
+	// latest_version from the REAL tags (xray: the newest of its two tags);
+	// post-CORES-5 the xray row carries its 17 methods too
+	if x := row("xray"); x.LatestVersion != "26.3.27" {
+		t.Fatalf("xray latest %q", x.LatestVersion)
 	}
 	if u := row("udp2raw"); u.LatestVersion != "20230206.0" {
 		t.Fatalf("udp2raw calver latest %q", u.LatestVersion)
@@ -507,5 +597,45 @@ func TestPhase46NewCoresFeedEndToEnd(t *testing.T) {
 	}
 	if et := row("easytier"); et.InstalledVersion != "" || et.Outdated != nil {
 		t.Fatalf("easytier must stay honest-empty: %q %v", et.InstalledVersion, et.Outdated)
+	}
+	// the CORES-5 rows through the same generic passthrough: methods[] land
+	// on frp/xray/gost/backhaul, and the deployed-fleet shape proves
+	// outdated-true (xray 24.12.31 installed vs the 26.3.27 core)
+	count2 := func(core string) int {
+		c := row(core)
+		if c.Methods == nil || string(c.Methods) == "null" {
+			return -1
+		}
+		var rows []json.RawMessage
+		if json.Unmarshal(c.Methods, &rows) != nil {
+			return -1
+		}
+		return len(rows)
+	}
+	deadline2 := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline2) {
+		if count2("frp") == 16 && count2("gost") == 37 && count2("xray") == 17 &&
+			count2("backhaul") == 8 && count2("rathole") == 6 && count2("udp2raw") == 4 &&
+			count2("chisel") == 1 && count2("wstunnel") == 2 {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+		decode()
+	}
+	if count2("frp") != 16 || count2("gost") != 37 || count2("xray") != 17 ||
+		count2("backhaul") != 8 || count2("rathole") != 6 || count2("udp2raw") != 4 ||
+		count2("chisel") != 1 || count2("wstunnel") != 2 {
+		t.Fatalf("CORES-5 methods[] counts: frp=%d gost=%d xray=%d backhaul=%d rathole=%d udp2raw=%d chisel=%d wstunnel=%d",
+			count2("frp"), count2("gost"), count2("xray"), count2("backhaul"),
+			count2("rathole"), count2("udp2raw"), count2("chisel"), count2("wstunnel"))
+	}
+	if fr := row("frp"); fr.InstalledVersion != "0.61.1" || fr.Outdated == nil || *fr.Outdated {
+		t.Fatalf("frp installed/outdated: %q %v", fr.InstalledVersion, fr.Outdated)
+	}
+	if go2 := row("gost"); go2.InstalledVersion != "3.3.3" || go2.Outdated == nil || *go2.Outdated {
+		t.Fatalf("gost installed/outdated: %q %v", go2.InstalledVersion, go2.Outdated)
+	}
+	if x := row("xray"); x.InstalledVersion != "24.12.31" || x.Outdated == nil || !*x.Outdated {
+		t.Fatalf("xray must be outdated-true (24.12.31 vs 26.3.27): %q %v", x.InstalledVersion, x.Outdated)
 	}
 }
