@@ -178,8 +178,11 @@ func parseCoresManifestMethods(core string, body []byte) (json.RawMessage, error
 
 // coresEngineAlias maps an engine id to the cores-repo core folder name
 // where they differ (verified against the repo layout 2026-11-22: the
-// wstunnel core drives the panel's wst engine).
-var coresEngineAlias = map[string]string{"wst": "wstunnel"}
+// wstunnel core drives the panel's wst engine; BACKEND-45 adds sing-box —
+// the core folder/repo name carries the dash, the agents' engine id does
+// not, so the sing-box manifest join and the sing-box rows'
+// installed_version resolution both need the alias).
+var coresEngineAlias = map[string]string{"wst": "wstunnel", "singbox": "sing-box"}
 
 // coresCoreOfEngine resolves the repo core folder for an engine id.
 func coresCoreOfEngine(engine string) string {
@@ -204,29 +207,71 @@ func coresEngineOfCore(core string) string {
 // implementation: the verbatim manifest methods[] of one core, decoded
 // ONLY into the board's identity columns (the §2.22 passthrough itself
 // stays raw).
+//
+// BACKEND-45 fixes (found by the acceptance pass against the REAL landed
+// manifests): every live manifest publishes `id` as a JSON NUMBER (ctunnel
+// 49 rows, sing-box 16, hysteria 2, easytier 1, waterwall 18 — all ints),
+// which the old `ID string` decode rejected wholesale — the join silently
+// yielded zero rows for every core. The decode is now id-shape-agnostic,
+// and the board's method id is the manifest's `name` — the DRIVER-
+// consumable spelling (the ctunnel driver's ctMethods keys are the names:
+// "6to4", "6to4-gre", …; the numeric id is the manifest's own row number
+// and no driver accepts it). A manifest without `name` falls back to the
+// verbatim id text. The row's Engine is the ENGINE id the agents report
+// (coresEngineOfCore: the sing-box core drives engine "singbox"), never
+// the repo folder name — a probe tunnel for an unreported engine id can
+// never converge.
 func coresManifestMethods(core string) []methodManifestEntry {
 	entry := fetchCoresManifestCached(core)
 	if entry == nil || entry.Err != nil || len(entry.Methods) == 0 {
 		return nil
 	}
 	var methods []struct {
-		ID        string `json:"id"`
-		Layer     string `json:"layer"`
-		Transport string `json:"transport"`
-		IPVer     string `json:"ipver"`
+		ID        json.RawMessage `json:"id"`
+		Name      string          `json:"name"`
+		Layer     string          `json:"layer"`
+		Transport string          `json:"transport"`
+		IPVer     string          `json:"ipver"`
 	}
 	if err := json.Unmarshal(entry.Methods, &methods); err != nil {
 		return nil
 	}
+	engine := coresEngineOfCore(core)
 	out := make([]methodManifestEntry, 0, len(methods))
 	for _, m := range methods {
-		if m.ID == "" {
+		id := manifestMethodIDText(m.ID)
+		if m.Name != "" {
+			id = m.Name
+		}
+		if id == "" {
 			continue
 		}
-		out = append(out, methodManifestEntry{ID: m.ID, Engine: core,
+		out = append(out, methodManifestEntry{ID: id, Engine: engine,
 			Layer: m.Layer, Transport: m.Transport, IPVer: m.IPVer})
 	}
 	return out
+}
+
+// manifestMethodIDText renders a manifest method id's raw JSON as plain
+// text: a JSON string unquotes, a number keeps its literal digits,
+// anything else (objects/arrays) yields "" — no invented ids.
+func manifestMethodIDText(raw json.RawMessage) string {
+	trimmed := strings.TrimSpace(string(raw))
+	if trimmed == "" || trimmed == "null" {
+		return ""
+	}
+	if len(trimmed) > 1 && trimmed[0] == '"' && trimmed[len(trimmed)-1] == '"' {
+		var s string
+		if err := json.Unmarshal(raw, &s); err != nil {
+			return ""
+		}
+		return s
+	}
+	var n json.Number
+	if err := json.Unmarshal(raw, &n); err == nil {
+		return n.String()
+	}
+	return ""
 }
 
 // coresManifestMethodEntry is the method-board join's reverse lookup

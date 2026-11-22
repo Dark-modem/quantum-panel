@@ -96,7 +96,11 @@ func uiAgentOnline(ag store.Agent) bool {
 
 // uiEngineList is the union the detail endpoints show: catalog + desired
 // rows + matrix default, each with the agent-reported state merged in.
-func (h uiStoreHandle) uiEngineList(ag store.Agent, v2Catalog []string) []map[string]any {
+// schemas carries the agents' hello-catalog params_schema per engine id
+// (BACKEND-45: the engines-catalog passthrough — the UI builds the wizard
+// fields against the agent's OWN schema; nil for engines the agent did
+// not publish a schema for).
+func (h uiStoreHandle) uiEngineList(ag store.Agent, v2Catalog []string, schemas map[string]json.RawMessage) []map[string]any {
 	rows, _ := h.AgentEngines(ag.ID)
 	byEngine := map[string]store.AgentEngine{}
 	for _, row := range rows {
@@ -137,6 +141,10 @@ func (h uiStoreHandle) uiEngineList(ag store.Agent, v2Catalog []string) []map[st
 		if row.LastError != "" {
 			lastErr = redactErrorText(row.LastError)
 		}
+		var schema any
+		if s, ok := schemas[engine]; ok && len(s) > 0 {
+			schema = json.RawMessage(s)
+		}
 		out = append(out, map[string]any{
 			"engine":          engine,
 			"installed":       row.Installed,
@@ -148,6 +156,7 @@ func (h uiStoreHandle) uiEngineList(ag store.Agent, v2Catalog []string) []map[st
 			"health":          health,
 			"last_error":      lastErr,
 			"kernel":          uiKernelEngines[engine],
+			"params_schema":   schema,
 		})
 	}
 	add("matrix") // desired-by-default first
@@ -166,20 +175,61 @@ func (h uiStoreHandle) uiEngineList(ag store.Agent, v2Catalog []string) []map[st
 
 // uiCatalogOf returns the agent's reported engine catalog ids.
 func (h uiStoreHandle) uiCatalogOf(agentID string) []string {
+	entries := h.uiCatalogEntries(agentID)
+	out := make([]string, 0, len(entries))
+	for _, c := range entries {
+		out = append(out, c.ID)
+	}
+	return out
+}
+
+// uiCatalogEntry is one hello-catalog entry (recordEngineCatalog's stored
+// shape: {id, version?, params_schema?}).
+type uiCatalogEntry struct {
+	ID           string
+	Version      string
+	ParamsSchema json.RawMessage
+}
+
+// uiCatalogEntries decodes the agent's stored v2 engine catalog — the
+// BACKEND-45 passthrough's source: the schemas ride the §2.4/§2.5 engines
+// rows so the UI renders the agent's OWN param shapes (hysteria's
+// obfs/bandwidth, sing-box's protocol fields, gost's service family,
+// frp's vhost family) instead of guessing from the fallback table.
+func (h uiStoreHandle) uiCatalogEntries(agentID string) []uiCatalogEntry {
 	v2, err := h.AgentV2(agentID)
 	if err != nil || strings.TrimSpace(v2.EngineCatalog) == "" {
 		return nil
 	}
 	var catalog []struct {
-		ID string `json:"id"`
+		ID           string          `json:"id"`
+		Version      string          `json:"version,omitempty"`
+		ParamsSchema json.RawMessage `json:"params_schema,omitempty"`
 	}
 	if json.Unmarshal([]byte(v2.EngineCatalog), &catalog) != nil {
 		return nil
 	}
-	out := make([]string, 0, len(catalog))
+	out := make([]uiCatalogEntry, 0, len(catalog))
 	for _, c := range catalog {
-		if c.ID != "" {
-			out = append(out, c.ID)
+		if c.ID == "" {
+			continue
+		}
+		out = append(out, uiCatalogEntry{ID: c.ID, Version: c.Version, ParamsSchema: c.ParamsSchema})
+	}
+	return out
+}
+
+// uiCatalogSchemas maps engine id → the hello-catalog params_schema (the
+// uiEngineList rows' additive field).
+func (h uiStoreHandle) uiCatalogSchemas(agentID string) map[string]json.RawMessage {
+	entries := h.uiCatalogEntries(agentID)
+	if len(entries) == 0 {
+		return nil
+	}
+	out := make(map[string]json.RawMessage, len(entries))
+	for _, c := range entries {
+		if len(c.ParamsSchema) > 0 {
+			out[c.ID] = c.ParamsSchema
 		}
 	}
 	return out

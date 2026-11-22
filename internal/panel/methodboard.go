@@ -91,6 +91,15 @@ var methodCatalog = map[string]methodBoardMeta{
 	"aestun":    {Layer: "l3", Transport: "udp", IPVer: "v4"},
 	"rakhsh":    {Layer: "l4", Transport: "tcp/tls/ws/quic", IPVer: "v4"},
 	"udp2raw":   {Layer: "l4", Transport: "raw", IPVer: "v4"},
+	// BACKEND-45: the new engines' grounded metadata (the UI's per-core
+	// pages label rows with these). Grounding: hysteria = a QUIC carrier —
+	// UDP only (AGENT-31; the cores manifest agrees: transport udp, ipver
+	// both), its QUIC listen ":port" is dual-stack; sing-box carries both
+	// TCP (shadowsocks/vless/vmess/trojan/anytls/shadowtls/snell/naive) and
+	// UDP (hysteria2/hysteria/tuic) protocols, and the driver renders the
+	// listen as "0.0.0.0" — the IPv4 wildcard.
+	"hysteria": {Layer: "l4", Transport: "udp", IPVer: "v4+v6"},
+	"singbox":  {Layer: "l4", Transport: "tcp/udp", IPVer: "v4"},
 }
 
 type methodBoardMeta struct{ Layer, Transport, IPVer string }
@@ -472,6 +481,13 @@ func bestAny(best string) any {
 // manifest methods of the catalog-agreed cores (the BACKEND-43 join; empty
 // until a manifest publishes methods[]). Catalog-engine rows keep
 // method == engine; manifest-method rows carry their own method id.
+//
+// BACKEND-45: the join now visits EVERY catalog-agreed engine — the old
+// code only visited the engines OUTSIDE uiKnownEngines, so cores that
+// publish methods[] while riding the known set (sing-box 16 rows,
+// hysteria 2 — verified against the landed manifests) never enumerated
+// their methods. The unknown-extras path keeps its exact previous
+// behavior (their rows still append after the known set).
 func methodBoardCandidates(iranCatalog, kharejCatalog []string) []string {
 	seen := map[string]bool{}
 	out := []string{}
@@ -486,20 +502,31 @@ func methodBoardCandidates(iranCatalog, kharejCatalog []string) []string {
 	for _, e := range kharejCatalog {
 		inKharej[e] = true
 	}
-	both := []string{}
+	agreed := []string{}
+	agreedSeen := map[string]bool{}
 	for _, e := range iranCatalog {
-		if e == "" || seen[e] || !inKharej[e] {
+		if e == "" || !inKharej[e] || agreedSeen[e] {
+			continue
+		}
+		agreedSeen[e] = true
+		agreed = append(agreed, e)
+	}
+	sort.Strings(agreed)
+	both := []string{}
+	for _, e := range agreed {
+		if seen[e] {
 			continue
 		}
 		seen[e] = true
 		both = append(both, e)
 	}
-	sort.Strings(both)
 	out = append(out, both...)
 	// the manifest-method join: for each catalog-agreed CORE whose manifest
 	// publishes methods[], every method id becomes a board row (engine =
-	// core, method = the manifest's own id — verbatim, no reshaping)
-	for _, core := range both {
+	// the agents' engine id, method = the manifest's driver-consumable
+	// spelling — verbatim, no reshaping; the engine rows came first, so a
+	// manifest method named like an engine never shadows it)
+	for _, core := range agreed {
 		for _, m := range mboardManifestMethodsFn(core) {
 			if m.ID == "" || seen[m.ID] {
 				continue

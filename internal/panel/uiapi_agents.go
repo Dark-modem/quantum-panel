@@ -259,7 +259,7 @@ func handleUIAgentDetail(w http.ResponseWriter, r *http.Request) {
 		},
 		"topologies":    topos,
 		"tunnels":       tunRows,
-		"engines":       h.uiEngineList(ag, h.uiCatalogOf(ag.ID)),
+		"engines":       h.uiEngineList(ag, h.uiCatalogOf(ag.ID), h.uiCatalogSchemas(ag.ID)),
 		"recent_errors": recent,
 		"traffic24":     traffic24,
 	})
@@ -396,7 +396,7 @@ func handleUIAgentEngines(w http.ResponseWriter, r *http.Request) {
 		uiErrWrite(w, r, "E-NOTFOUND", map[string]any{"agent": r.PathValue("id")}, "")
 		return
 	}
-	list := h.uiEngineList(ag, h.uiCatalogOf(ag.ID))
+	list := h.uiEngineList(ag, h.uiCatalogOf(ag.ID), h.uiCatalogSchemas(ag.ID))
 	// Enrich with artifact availability + can_enable/block_reason.
 	artifacts, _ := h.ListEngineArtifacts()
 	arch := ag.Arch
