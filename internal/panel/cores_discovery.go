@@ -22,6 +22,7 @@ package panel
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -162,14 +163,23 @@ type coreAssetView struct {
 
 // coreRow is the wire shape of one discovered core (§2.22). Error is
 // populated when the core is discoverable but its latest release lists no
-// usable artifacts (normally empty).
+// usable artifacts (normally empty). BACKEND-43 addendum fields (all
+// additive, ALWAYS present): methods is the core MANIFEST.json methods[]
+// VERBATIM (null when the manifest does not publish one or is
+// unreachable); installed_version is the newest version any enrolled
+// agent reported installed ("" = none reported); outdated compares that
+// against latest_version (null when either side is unknown — the §2.20
+// honest-unknown rule).
 type coreRow struct {
-	Core          string          `json:"core"`
-	LatestTag     string          `json:"latest_tag"`
-	LatestVersion string          `json:"latest_version"`
-	PublishedAt   string          `json:"published_at,omitempty"`
-	Assets        []coreAssetView `json:"assets"`
-	Error         string          `json:"error,omitempty"`
+	Core             string          `json:"core"`
+	LatestTag        string          `json:"latest_tag"`
+	LatestVersion    string          `json:"latest_version"`
+	PublishedAt      string          `json:"published_at,omitempty"`
+	Assets           []coreAssetView `json:"assets"`
+	Error            string          `json:"error,omitempty"`
+	Methods          json.RawMessage `json:"methods"`
+	InstalledVersion string          `json:"installed_version"`
+	Outdated         *bool           `json:"outdated"`
 }
 
 // parseCoreAssetOSArch extracts the os/arch segments from
@@ -252,14 +262,33 @@ func discoverCores(rels []ghRelease) []coreRow {
 // (empty repo / no contract-shaped tags / unreachable — the error field
 // distinguishes unreachable), a row carries error when that core's latest
 // release is unusable. checked_at = the last SUCCESSFUL fetch.
+//
+// BACKEND-43 addendum: each row additionally carries the core's
+// MANIFEST.json methods[] VERBATIM (null = not published / unreachable)
+// and the installed_version/outdated pair from the enrolled agents'
+// reported engine versions (null = unknown on either side). Both fills are
+// best-effort — a manifest miss or a closed store never fails the row.
 func handleCoresAvailable(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Query().Get("refresh") == "1" {
 		dropCoresReleaseCache()
+		dropCoresManifestCache()
 	}
 	rels, err := fetchCoresReleasesCached()
 	var rows []coreRow
 	if err == nil {
 		rows = discoverCores(rels)
+	}
+	// the additive fills (methods[] + installed/outdated): best-effort,
+	// never fatal — the endpoint's §2.22.1 honest-partial contract stands
+	s := meshStorePeek()
+	for i := range rows {
+		if entry := fetchCoresManifestCached(rows[i].Core); entry != nil {
+			rows[i].Methods = entry.Methods
+		}
+		if s != nil {
+			rows[i].InstalledVersion, rows[i].Outdated =
+				coreRowInstalledOutdated(s, rows[i].Core, rows[i].LatestVersion)
+		}
 	}
 	resp := map[string]any{"cores": rows}
 	if err != nil {
