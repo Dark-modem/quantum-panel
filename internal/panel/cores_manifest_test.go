@@ -267,7 +267,8 @@ func TestCoresAvailableHandlerAdditiveFields(t *testing.T) {
 	if methodsEmpty() {
 		t.Fatalf("ctunnel methods[] never landed")
 	}
-	if !strings.Contains(string(ct.Methods), `"id":"ct-udpcrypt-1"`) {
+	if !strings.Contains(string(ct.Methods), `"id":2`) ||
+		!strings.Contains(string(ct.Methods), `"name":"udpcrypt-1"`) {
 		t.Fatalf("methods passthrough altered: %s", ct.Methods)
 	}
 	if ct.InstalledVersion != "1.1.1" || ct.Outdated == nil || !*ct.Outdated {
