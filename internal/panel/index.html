@@ -3099,10 +3099,15 @@
       <section id="tab-benchmark" role="tabpanel" hidden>
         <div class="tunnel-card u-mb-20">
           <div class="tc-header u-bb-ln u-pb-16 u-mb-16">
-            <div>
-              <span class="tc-title u-fs-18 u-fw-700" data-i18n="bench_wiz_title">Pair Benchmark</span>
-              <div class="qs-hint u-mt-4" data-i18n="bench_wiz_sub">Pick a topology, then its Iran and foreign agents, and run a full benchmark through the engines you choose. Real temporary tunnels are built, measured and removed — no invented numbers.</div>
+            <div class="bw-hero">
+              <span class="bw-hero-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 18l4-8 4 4 3-6 5 10" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="13" r="1.6"/></svg></span>
+              <div>
+                <span class="tc-title u-fs-18 u-fw-700" data-i18n="bench_wiz_title">Pair Benchmark</span>
+                <div class="qs-hint u-mt-4" data-i18n="bench_wiz_sub">Compare cores between two agents in different datacenters within one topology.</div>
+                <div class="bw-hero-note" data-i18n="bench_wiz_note">Temporary test tunnels are created, measured and removed after the benchmark.</div>
+              </div>
             </div>
+            <span class="bw-hero-badge"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.5-4.8 2.5.9-5.4L4.2 7.7l5.4-.8z"/></svg><span data-i18n="bench_wiz_badge">Real measurements · No simulated results</span></span>
           </div>
           <div id="benchWizard"></div>
         </div>

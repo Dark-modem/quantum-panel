@@ -947,7 +947,9 @@ const I18N = {
     bench_tbl_action: "Action",
 
     bench_wiz_title: "Pair Benchmark",
-    bench_wiz_sub: "Pick a topology, then its Iran and foreign agents, and run a full benchmark through the engines you choose. Real temporary tunnels are built, measured and removed — no invented numbers.",
+    bench_wiz_sub: "Compare cores between two agents in different datacenters within one topology.",
+    bench_wiz_note: "Temporary test tunnels are created, measured and removed after the benchmark.",
+    bench_wiz_badge: "Real measurements · No simulated results",
 
     // Diagnostics / Doctor Tab
     doc_title: "Network Doctor & Diagnostic Suite",
@@ -9262,242 +9264,597 @@ function editMainPortsClick() {
   if (ov) ov.addEventListener('click', e => { if (e.target === ov) closeEditPorts(); });
 })();
 
-// ---------- Pair Benchmark (tab-benchmark): topology -> Iran agent ->
-// foreign agent -> every engine enabled on both -> real temporary tunnels,
-// measured and removed. Replaces the old carrier-benchmark leftovers.
-let bwState = { step: 1, topo: null, topoName: '', iran: null, iranAgent: '', foreign: null, foreignAgent: '', engines: [], picked: [], pool: null, running: false, view: null, timer: null };
+// ---------- Pair Benchmark (tab-benchmark) — the four-step wizard ----------
+// topology -> Iran agent -> foreign agent -> cores. Cores WITH a method
+// catalog (ctunnel) run every method through the method-board runner on the
+// same agent pair; cores without one run the classic engine benchmark
+// (pair-run). Both runners are the existing backend logic — nothing new
+// server-side, no simulated numbers anywhere.
+let bwState = {
+  step: 1, topo: null, topoName: '',
+  iran: null, iranAgent: '', iranDC: '',
+  foreign: null, foreignAgent: '', foreignDC: '',
+  picked: [], pool: null,
+  running: false, view: null, timer: null,
+  boardRunning: false, boardView: null,
+  pairErr: null, boardErr: null, boardNote: '', loadErr: null,
+};
+// per-topology members, per-agent facts and the datacenter list — cached so
+// stepping back and forth never refetches what it already knows
+let bwCache = { members: {}, agents: {}, engines: {}, dcs: null, topos: null, topoBusy: {}, dcIds: {} };
 
 async function loadBenchWizard() {
   const host = $('benchWizard');
   if (!host) return;
-  if (bwState.running) { bwPoll(); return; }
+  if (bwState.running || bwState.boardRunning) { bwPoll(); return; }
+  if ((bwState.view && (bwState.view.results || []).length) || (bwState.boardView && (bwState.boardView.rows || []).length)) { bwRenderRun(); return; }
   host.innerHTML = '<div class="u-grid u-gap-8">' + skel(4) + '</div>';
+  bwState.loadErr = null;
   try {
-    const [topos, st] = await Promise.all([api('/api/mesh/topologies'), api('/api/benchmark/pair')]);
-    if (st.running) { bwState.running = true; bwState.view = st; bwTimer = setTimeout(bwPoll, 2000); bwRenderRun(st); return; }
-    // a finished (or restart-interrupted) run keeps its results on show
-    if ((st.results || []).length) { bwState.running = false; bwState.view = st; bwRenderRun(st); return; }
-    bwState.pool = topos.topologies || [];
+    const [topos, st] = await Promise.all([
+      api('/api/mesh/topologies'),
+      api('/api/benchmark/pair'),
+    ]);
+    bwCache.topos = (topos && topos.topologies) || [];
+    bwState.pool = bwCache.topos;
+    if (st.running) { bwState.running = true; bwState.view = st; bwState.timer = setTimeout(bwPoll, 2000); bwRenderRun(); return; }
+    if ((st.results || []).length) { bwState.view = st; bwRenderRun(); return; }
     bwRender();
   } catch (err) {
-    host.innerHTML = stateError(err.message, 'benchwiz', true);
+    bwState.loadErr = (err && err.message) || String(err);
+    bwRender();
   }
 }
-
-function bwCard(icon, title, sub, on) {
-  return '<button type="button" class="mtb-agent-card bw-card' + (on ? ' on' : '') + '">' +
-    '<span class="mtb-agc-ico">' + icon + '</span>' +
-    '<span class="mtb-agc-tx"><b>' + esc(title) + '</b>' + (sub ? '<i>' + esc(sub) + '</i>' : '') + '</span>' +
-    (on ? '<span class="tu-pick-ok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg></span>' : '') +
-    '</button>';
+// step completion drives the stepper: done = green + tick, current = blue,
+// future = gray and not navigable until the previous step completes
+function bwStepDone(n) {
+  if (n === 1) return !!bwState.topo;
+  if (n === 2) return !!bwState.iran;
+  if (n === 3) return !!bwState.foreign;
+  if (n === 4) return (bwState.picked || []).length > 0;
+  return false;
 }
-
+function bwStepperHTML() {
+  const steps = [[1, 'Topology'], [2, 'Iran agent'], [3, 'Foreign agent'], [4, 'Cores']];
+  return '<div class="pbw-steps" role="list" aria-label="' + esc(tr('', 'Benchmark steps')) + '">' +
+    steps.map(([n, lbl], i) => {
+      const done = bwStepDone(n) && n < bwState.step;
+      const cur = n === bwState.step;
+      const reachable = n <= bwState.step;
+      const cls = 'pbw-step' + (cur ? ' cur' : '') + (done ? ' done' : '');
+      return '<button type="button" role="listitem" class="' + cls + '" data-bw-goto="' + n + '"' + (reachable ? '' : ' disabled') + '>' +
+        '<span class="pbw-dot">' + (done ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>' : String(n)) + '</span>' +
+        '<span class="pbw-lbl">' + esc(tr('', lbl)) + '</span></button>' +
+        (i < steps.length - 1 ? '<span class="pbw-line' + (bwStepDone(steps[i + 1][0]) ? ' filled' : '') + '" aria-hidden="true"></span>' : '');
+    }).join('') + '</div>';
+}
+// the persistent selection summary — visible from step 1, collapsible on mobile
+function bwSummaryHTML() {
+  const g = bwState;
+  const row = (k, v) => '<div class="pbw-sum-row"><span>' + esc(k) + '</span><b>' + v + '</b></div>';
+  let methods = 0;
+  (g.picked || []).forEach(e => { methods += bwCoreMethodCount(e); });
+  const dash = '<span class="art-dash">—</span>';
+  const coresVal = (g.picked || []).length
+    ? esc(String(g.picked.length)) + ' · ' + esc(tr('', '{n} methods').replace('{n}', String(methods)))
+    : dash;
+  const open = window.matchMedia && window.matchMedia('(max-width: 700px)').matches ? '' : ' open';
+  return '<details class="pbw-sum"' + open + '><summary>' + esc(tr('', 'Selection summary')) +
+    '<span class="pbw-sum-badge">' + esc(String((g.picked || []).length)) + ' ' + esc(tr('', 'cores')) + '</span></summary>' +
+    '<div class="pbw-sum-body">' +
+    row(tr('', 'Topology'), g.topoName ? esc(g.topoName) : dash) +
+    row(tr('', 'Iran agent'), g.iran ? esc(bwMemberName('iran', g.iran)) : dash) +
+    row(tr('', 'Iran datacenter'), g.iranDC ? esc(bwDcLabel(g.iranDC)) : dash) +
+    row(tr('', 'Foreign agent'), g.foreign ? esc(bwMemberName('foreign', g.foreign)) : dash) +
+    row(tr('', 'Foreign datacenter'), g.foreignDC ? esc(bwDcLabel(g.foreignDC)) : dash) +
+    row(tr('', 'Selected cores'), coresVal) +
+    '</div></details>';
+}
+function bwMemberName(side, id) {
+  const m = bwMembers(side).find(x => String(x.id) === String(id));
+  return m ? (m.name || '#' + m.id) : (id ? '#' + id : '—');
+}
+function bwMembers(side) {
+  const m = bwState.topo != null ? bwCache.members[bwState.topo] : null;
+  return (m && m[side]) || [];
+}
+async function bwFetchMembers(topoId) {
+  if (bwCache.members[topoId]) return bwCache.members[topoId];
+  const d = await api('/api/ui/topologies/' + encodeURIComponent(topoId));
+  const members = (d && d.members) || { iran: [], foreign: [] };
+  bwCache.members[topoId] = members;
+  return members;
+}
+async function bwFetchAgent(aid) {
+  if (bwCache.agents[aid]) return bwCache.agents[aid];
+  const d = await api('/api/ui/agents/' + encodeURIComponent(aid));
+  bwCache.agents[aid] = d || null;
+  return bwCache.agents[aid];
+}
+async function bwFetchEngines(aid) {
+  if (bwCache.engines[aid]) return bwCache.engines[aid];
+  const d = await api('/api/ui/agents/' + encodeURIComponent(aid) + '/engines');
+  const rows = (d && d.engines) || [];
+  bwCache.engines[aid] = rows;
+  return rows;
+}
+async function bwFetchDCs() {
+  if (bwCache.dcs) return bwCache.dcs;
+  try {
+    const d = await api('/api/mesh/datacenters');
+    bwCache.dcs = (d && d.datacenters) || [];
+  } catch (e) {
+    bwCache.dcs = [];
+  }
+  return bwCache.dcs;
+}
+// the REAL datacenter identifier for a member: resolved through the
+// datacenters list, never guessed from the display name alone
+async function bwResolveDcIds() {
+  const members = bwState.topo != null ? bwCache.members[bwState.topo] : null;
+  if (!members) return;
+  const dcs = await bwFetchDCs();
+  ['iran', 'foreign'].forEach(side => (members[side] || []).forEach(m => {
+    const key = String(m.id);
+    if (bwCache.dcIds[key]) return;
+    const nameEn = String(m.datacenter_en || '').toLowerCase();
+    const nameFa = String(m.datacenter || '').toLowerCase();
+    const dc = dcs.find(d => {
+      const en = String(d.datacenter_en || d.name_en || '').toLowerCase();
+      const fa = String(d.name || '').toLowerCase();
+      return (nameEn && en === nameEn) || (nameFa && fa === nameFa);
+    });
+    bwCache.dcIds[key] = dc ? String(dc.id) : (nameEn || nameFa);
+  }));
+}
+function bwDcLabel(dcKey) {
+  const dcs = bwCache.dcs || [];
+  const dc = dcs.find(d => String(d.id) === String(dcKey));
+  if (dc) return dc.datacenter_en || dc.name_en || dc.name || String(dcKey);
+  return String(dcKey);
+}
 function bwRender() {
   const host = $('benchWizard');
   if (!host) return;
-  const steps = ['Topology', 'Iran agent', 'Foreign agent', 'Engines'];
-  let html = '<div class="mtb-wiz" id="bwSteps">' + steps.map((lb, i) =>
-    '<div class="mtb-wstep' + (i + 1 === bwState.step ? ' on' : '') + (i + 1 < bwState.step ? ' done' : '') + '" data-st="' + (i + 1) + '"><span class="mtb-wstep-dot">' + (i + 1 < bwState.step ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>' : (i + 1)) + '</span><span class="mtb-wstep-lbl">' + esc(tr('', lb)) + '</span></div>' +
-    (i < steps.length - 1 ? '<span class="mtb-wline"></span>' : '')).join('') + '</div>';
-  html += '<div id="bwBody"></div>';
-  html += '<div class="mtb-acts"><button type="button" class="quantum-btn quantum-btn-secondary" id="bwBack"' + (bwState.step === 1 ? ' hidden' : '') + '>' + esc(tr('', 'Back')) + '</button>' +
-    '<button type="button" class="quantum-btn quantum-btn-primary" id="bwNext"' + (bwState.step === 4 ? '' : '') + '>' + esc(bwState.step === 4 ? tr('', 'Run full benchmark') : tr('', 'Next')) + '</button></div>';
-  host.innerHTML = html;
-  bwRenderBody();
+  if (bwState.loadErr) { host.innerHTML = stateError(bwState.loadErr, 'benchwiz', true); return; }
+  const stepTitles = {
+    1: ['Select topology', 'Choose one existing topology for this benchmark.'],
+    2: ['Select Iran agent', 'Pick the Iran agent of this benchmark — only members of the selected topology.'],
+    3: ['Select foreign agent', 'Pick the foreign agent — it must sit in a different datacenter than the Iran agent.'],
+    4: ['Select cores to benchmark', 'Select one or more cores. Every available method belonging to each selected core will be tested.'],
+  };
+  const t = stepTitles[bwState.step] || stepTitles[1];
+  const nextLbl = bwState.step === 4 ? tr('', 'Start benchmark') : tr('', 'Next');
+  host.innerHTML =
+    '<div class="pbw-stepper-wrap">' + bwStepperHTML() + '</div>' +
+    '<div class="pbw-sum-wrap" id="pbwSumWrap">' + bwSummaryHTML() + '</div>' +
+    '<div class="pbw-step-head"><span class="pbw-step-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="5" cy="6" r="2.5"/><circle cx="19" cy="6" r="2.5"/><circle cx="12" cy="19" r="2.5"/><path d="M7.5 6h9M6.3 8l4.7 8.8M17.7 8l-4.7 8.8"/></svg></span>' +
+    '<div><h2 class="tc-title u-fs-16 u-fw-700 u-m-0">' + esc(tr('', t[0])) + '</h2>' +
+    '<span class="pbw-step-sub">' + esc(tr('', t[1])) + '</span></div></div>' +
+    '<div id="bwBody"></div>' +
+    '<div class="pbw-acts">' +
+    '<button type="button" class="quantum-btn quantum-btn-secondary" id="bwBack"' + (bwState.step === 1 ? ' hidden' : '') + '>' + esc(tr('', 'Back')) + '</button>' +
+    '<span class="u-flex-1"></span>' +
+    '<button type="button" class="quantum-btn quantum-btn-primary" id="bwNext">' + esc(nextLbl) + '</button>' +
+    '</div>';
+  bwBody();
   const back = $('bwBack'), next = $('bwNext');
   if (back) back.onclick = () => { if (bwState.step > 1) { bwState.step--; bwRender(); } };
   if (next) next.onclick = bwNext;
-  // delegation: the step bodies render async, so the card handlers ride the
-  // host element once instead of chasing every re-render
-  if (!host.__bwWired) {
-    host.__bwWired = true;
-    host.addEventListener('click', ev => {
-      const pick = ev.target && ev.target.closest ? ev.target.closest('[data-bwpick]') : null;
-      if (pick) {
-        const kind = pick.getAttribute('data-bwpick'), v = pick.getAttribute('data-bwv');
-        if (kind === 'topo') { bwState.topo = v; bwState.topoName = pick.getAttribute('data-bwname') || v; bwState.iran = null; bwState.foreign = null; bwState.engines = null; bwState.picked = null; }
-        if (kind === 'iran') { bwState.iran = v; bwState.iranAgent = pick.getAttribute('data-bwagent') || ''; bwState.foreign = null; bwState.foreignAgent = ''; bwState.engines = null; bwState.picked = null; }
-        if (kind === 'foreign') { bwState.foreign = v; bwState.foreignAgent = pick.getAttribute('data-bwagent') || ''; bwState.engines = null; bwState.picked = null; }
-        bwState.step++;
-        bwRender();
-        return;
-      }
-      const eng = ev.target && ev.target.closest ? ev.target.closest('[data-bweng]') : null;
-      if (eng) {
-        const e = eng.getAttribute('data-bweng');
-        const k = bwState.picked.indexOf(e);
-        if (k >= 0) bwState.picked.splice(k, 1); else bwState.picked.push(e);
-        const on = bwState.picked.indexOf(e) >= 0;
-        eng.classList.toggle('on', on);
-        eng.setAttribute('aria-pressed', String(on));
-        // the pick check is part of the markup, not CSS-gated: swap it here
-        const mark = eng.querySelector('.tu-pick-ok');
-        if (on && !mark) eng.insertAdjacentHTML('beforeend', '<span class="tu-pick-ok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg></span>');
-        if (!on && mark) mark.remove();
-        const ok = $('bwNext');
-        if (ok) ok.disabled = !bwState.picked.length;
-      }
-    });
-  }
+  bwSyncNext();
 }
-
-async function bwRenderBody() {
+// the Next/Start button enables only when the current step holds a valid pick
+function bwSyncNext() {
+  const next = $('bwNext');
+  if (!next) return;
+  let ok = false;
+  if (bwState.step === 1) ok = !!bwState.topo;
+  if (bwState.step === 2) ok = !!bwState.iran;
+  if (bwState.step === 3) ok = !!bwState.foreign;
+  if (bwState.step === 4) ok = (bwState.picked || []).length > 0;
+  next.disabled = !ok;
+}
+// step-1 eligibility: per-topology member fetches run once and cache
+async function bwLoadElig() {
+  const topos = bwState.pool || [];
+  await Promise.all(topos.map(async t => {
+    if (bwCache.members[t.id] || bwCache.topoBusy[t.id]) return;
+    bwCache.topoBusy[t.id] = true;
+    try { await bwFetchMembers(t.id); } catch (e) { /* the card renders counts as — */ }
+    delete bwCache.topoBusy[t.id];
+    if (bwState.step === 1) bwRenderTopoCards();
+  }));
+}
+function bwRenderTopoCards() {
+  const body = $('bwBody');
+  if (!body || bwState.step !== 1) return;
+  const topos = bwState.pool || [];
+  const cards = topos.map(t => {
+    const m = bwCache.members[t.id];
+    const iran = m ? m.iran.length : null;
+    const foreign = m ? m.foreign.length : null;
+    const bad = m ? (m.iran.length === 0 || m.foreign.length === 0) : false;
+    const on = String(bwState.topo) === String(t.id);
+    const counts = [];
+    if (iran != null) counts.push(esc(tr('', 'Iran: {n}').replace('{n}', String(iran))));
+    if (foreign != null) counts.push(esc(tr('', 'Foreign: {n}').replace('{n}', String(foreign))));
+    const countLine = counts.length ? '<span class="pbw-card-sub">' + counts.join(' · ') + '</span>' : '';
+    const reason = bad ? '<span class="pbw-card-bad">' + esc(tr('', 'No Iran/foreign pair in this topology')) + '</span>' : '';
+    return '<button type="button" class="pbw-card' + (on ? ' on' : '') + (bad ? ' disabled' : '') + '" data-bw-topo="' + esc(String(t.id)) + '" data-bw-name="' + esc(t.name || '') + '"' + (bad ? ' disabled' : '') + ' aria-pressed="' + on + '">' +
+      '<span class="pbw-card-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="6" r="2.5"/><circle cx="19" cy="6" r="2.5"/><circle cx="12" cy="19" r="2.5"/><path d="M7.5 6h9M6.3 8l4.7 8.8M17.7 8l-4.7 8.8"/></svg></span>' +
+      '<span class="pbw-card-tx"><b>' + esc(t.name || '#' + t.id) + '</b>' + countLine + reason + '</span>' +
+      '<span class="pbw-radio' + (on ? ' on' : '') + '" aria-hidden="true">' + (on ? '<svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>' : '') + '</span>' +
+      '</button>';
+  }).join('');
+  body.innerHTML =
+    '<div class="pbw-cards pbw-cards-3">' + (cards || '<div class="ent-empty ent-empty-sm" role="status"><b>' + esc(tr('', 'No topologies yet')) + '</b></div>') + '</div>' +
+    '<p class="pbw-hint"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M12 11v5"/></svg>' + esc(tr('', 'Only agents belonging to the selected topology will be available in the next steps.')) + '</p>';
+}
+function bwAgentCard(m, side, picked, disabled, reason) {
+  const detail = m.agent ? bwCache.agents[m.agent.id] : null;
+  const ag = detail ? (detail.agent || {}) : {};
+  const rowStatus = (m.agent && m.agent.status) || ag.status || '';
+  const online = String(rowStatus) === 'online';
+  const country = String(ag.country || '').toLowerCase();
+  const flag = side === 'iran' ? topologyFlagSvg('ir') : topologyFlagSvg(country);
+  const ip = ag.effective_public_ip || ag.public_ip || '';
+  const sub = [m.datacenter_en || m.datacenter || '—', country || '', ip ? '<bdi dir="ltr">' + esc(ip) + '</bdi>' : '']
+    .filter(Boolean).map(x => String(x)).join(' · ');
+  return '<button type="button" class="pbw-card pbw-agent' + (picked ? ' on' : '') + (disabled ? ' disabled' : '') + '" data-bw-agent="' + side + '" data-bw-v="' + esc(String(m.id)) + '"' + (disabled ? ' disabled' : '') + ' aria-pressed="' + picked + '">' +
+    '<span class="pbw-card-ico">' + flag + '</span>' +
+    '<span class="pbw-card-tx"><b>' + esc(m.name || '#' + m.id) + '</b>' +
+    '<span class="pbw-card-sub">' + sub + '</span></span>' +
+    '<span class="badge ' + (online ? 'ok' : 'dim') + '"><span class="dot"></span>' + esc(online ? tr('', 'Online') : tr('', 'Offline')) + '</span>' +
+    '<span class="pbw-radio' + (picked ? ' on' : '') + '" aria-hidden="true">' + (picked ? '<svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>' : '') + '</span>' +
+    (disabled && reason ? '<span class="pbw-card-bad pbw-bad-full">' + esc(reason) + '</span>' : '') +
+    '</button>';
+}
+async function bwRenderAgentStep(side) {
+  const body = $('bwBody');
+  if (!body) return;
+  body.innerHTML = '<div class="u-grid u-gap-8">' + skel(3) + '</div>';
+  let members;
+  try { members = await bwFetchMembers(bwState.topo); }
+  catch (err) { body.innerHTML = stateError(err.message, 'bwmem', true); return; }
+  const list = members[side] || [];
+  // enrich the cards with the agent detail facts (country, public IP, status)
+  await Promise.all(list.map(async m => {
+    if (!m.agent || !m.agent.id) return;
+    try { await bwFetchAgent(m.agent.id); } catch (e) { /* the card renders what the member row carries */ }
+  }));
+  await bwResolveDcIds();
+  const iranDcId = bwCache.dcIds[String(bwState.iran)] || '';
+  const cards = list.map(m => {
+    const detail = m.agent ? bwCache.agents[m.agent.id] : null;
+    const ag = detail ? (detail.agent || {}) : {};
+    const online = String(ag.status || (m.agent && m.agent.status) || '') === 'online';
+    const picked = String(side === 'iran' ? bwState.iran : bwState.foreign) === String(m.id);
+    let disabled = false;
+    let reason = '';
+    if (!m.agent) { disabled = true; reason = tr('', 'No enrolled agent on this server'); }
+    else if (!online) { disabled = true; reason = tr('', 'The agent is offline'); }
+    if (!isIranSide(side) && !disabled && bwState.iran) {
+      const myDc = bwCache.dcIds[String(m.id)] || '';
+      if (myDc && iranDcId && myDc === iranDcId) { disabled = true; reason = tr('', 'Same datacenter as the Iran agent — pick a different datacenter'); }
+    }
+    return bwAgentCard(m, side, picked, disabled, reason);
+  }).join('');
+  const info = isIranSide(side)
+    ? tr('', 'Only agents belonging to the selected topology will be available in the next steps.')
+    : tr('', 'The foreign agent must sit in a different datacenter than the Iran agent.');
+  body.innerHTML = '<div class="pbw-cards pbw-cards-2">' + (cards || '<div class="ent-empty ent-empty-sm" role="status"><b>' + esc(tr('', 'No agents on this side yet')) + '</b></div>') + '</div>' +
+    '<p class="pbw-hint"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M12 11v5"/></svg>' + esc(info) + '</p>';
+}
+function isIranSide(side) { return side === 'iran'; }
+function bwCoreMethodCount(engine) {
+  const repo = artRepoRow(engine);
+  const methods = ctunMethods(repo);
+  return methods ? methods.length : 0;
+}
+async function bwRenderCoreStep() {
+  const body = $('bwBody');
+  if (!body) return;
+  body.innerHTML = '<div class="u-grid u-gap-8">' + skel(3) + '</div>';
+  let engA = [], engB = [];
+  try { engA = await bwFetchEngines(bwState.iranAgent); engB = await bwFetchEngines(bwState.foreignAgent); }
+  catch (err) { body.innerHTML = stateError(err.message, 'bweng', true); return; }
+  // the engines enabled on BOTH endpoint agents — the same rule pair-run enforces
+  const runOf = rows => { const set = {}; rows.forEach(e => { if (e.enabled === true) set[e.engine] = e; }); return set; };
+  const mA = runOf(engA), mB = runOf(engB);
+  const common = Object.keys(mA).filter(e => mB[e]).sort();
+  const cores = common.map(e => {
+    const version = (mA[e] && mA[e].version) || (mB[e] && mB[e].version) || '';
+    const both = !!(mA[e] && mA[e].version && mB[e] && mB[e].version);
+    return { engine: e, version: version, both: both, methods: bwCoreMethodCount(e) };
+  });
+  bwState.cores = cores;
+  bwState.picked = (bwState.picked || []).filter(e => common.indexOf(e) >= 0);
+  bwSyncNext();
+  if (!cores.length) {
+    body.innerHTML = '<div class="ent-empty" role="status"><b>' + esc(tr('', 'No engine is enabled on both agents')) + '</b>' +
+      '<span>' + esc(tr('', 'Enable a core on both endpoint agents and come back — the benchmark runs only what both sides can build.')) + '</span></div>';
+    return;
+  }
+  const cards = cores.map(c => {
+    const on = (bwState.picked || []).indexOf(c.engine) >= 0;
+    const cat = c.engine === 'matrix' ? '<span class="eng-badge eng-badge-cat">' + esc(tr('', 'Recommended')) + '</span>' : '<span class="eng-badge eng-badge-exp">' + esc(tr('', 'Experimental')) + '</span>';
+    const methodLine = c.methods > 0
+      ? '<span class="pbw-methods"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 9h18M8 13h8"/></svg>' + esc(tr('', 'All {n} methods will be tested').replace('{n}', String(c.methods))) + '</span>'
+      : '<span class="pbw-methods dim">' + esc(tr('', 'Engine benchmark — the core publishes no method catalog')) + '</span>';
+    const ready = c.both
+      ? '<span class="pbw-ready ok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>' + esc(tr('', 'Ready on both agents')) + (c.version ? ' · <bdi dir="ltr">v' + esc(c.version) + '</bdi>' : '') + '</span>'
+      : '<span class="pbw-ready dim">' + esc(tr('', 'Enabled, but no reported version')) + '</span>';
+    return '<button type="button" class="pbw-card pbw-core' + (on ? ' on' : '') + '" data-bw-core="' + esc(c.engine) + '" aria-pressed="' + on + '">' +
+      '<span class="pbw-check' + (on ? ' on' : '') + '" aria-hidden="true">' + (on ? '<svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>' : '') + '</span>' +
+      '<span class="pbw-card-tx"><b>' + esc(CORES_ENGINE_NAME[c.engine] || c.engine) + '</b>' + cat +
+      '<span class="pbw-card-sub"><bdi dir="ltr">' + esc(c.engine) + '</bdi></span>' +
+      methodLine + ready + '</span>' +
+      '</button>';
+  }).join('');
+  const anyCatalog = cores.some(c => c.methods > 0);
+  const execNote = anyCatalog
+    ? tr('', 'Catalog cores run every method through the method probes on the same agent pair; cores without a catalog run the classic engine benchmark.')
+    : tr('', 'Each selected core builds a temporary tunnel between the two agents, is measured, then removed.');
+  body.innerHTML = '<div class="pbw-cards pbw-cards-2">' + cards + '</div>' +
+    '<p class="pbw-hint"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M12 11v5"/></svg>' + esc(execNote) + '</p>' +
+    '<div class="pbw-warn" role="note"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>' +
+    esc(tr('', 'Temporary test tunnels will be created between the selected agents and removed after the benchmark.')) + '</div>';
+}
+async function bwBody() {
   const body = $('bwBody');
   if (!body) return;
   if (bwState.step === 1) {
-    body.innerHTML = '<p class="qs-hint u-m-0">' + esc(tr('', 'Pick one of your existing topologies')) + '</p>' +
-      '<div class="tu-cards">' + (bwState.pool || []).map(t =>
-        bwCard('<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="6" r="2.5"/><circle cx="19" cy="6" r="2.5"/><circle cx="12" cy="19" r="2.5"/><path d="M7.5 6h9M6.3 8l4.7 8.8M17.7 8l-4.7 8.8"/></svg>', t.name, t.address || '', t.name === bwState.topoName).replace('class="mtb-agent-card', 'data-bwpick="topo" data-bwv="' + esc(t.id) + '" data-bwname="' + esc(t.name) + '" class="mtb-agent-card')) + '</div>';
+    body.innerHTML = '<div class="u-grid u-gap-8">' + skel(3) + '</div>';
+    bwRenderTopoCards();
+    bwLoadElig();
     return;
   }
-  if (bwState.step === 2 || bwState.step === 3) {
-    const side = bwState.step === 2 ? 'iran' : 'foreign';
-    const lbl = bwState.step === 2 ? tr('', 'Pick the Iran agent of this topology') : tr('', 'Pick the foreign agent of this topology');
-    body.innerHTML = '<p class="qs-hint u-m-0">' + esc(lbl) + '</p><div class="u-grid u-gap-8">' + skel(3) + '</div>';
-    try {
-      const d = await api('/api/ui/topologies/' + encodeURIComponent(bwState.topo));
-      const members = (d.members && d.members[side]) || [];
-      const others = bwState.step === 2 ? (d.members && d.members.iran) || [] : (d.members && d.members.foreign) || [];
-      void others;
-      body.innerHTML = '<p class="qs-hint u-m-0">' + esc(lbl) + '</p>' +
-        (members.length ? '<div class="tu-cards">' + members.map(m => {
-          const ag = m.agent || {};
-          const flag = bwState.step === 2 ? topologyFlagSvg('ir') : topologyFlagSvg(String(ag.country || m.country || '').toLowerCase());
-          const picked = (bwState.step === 2 ? bwState.iran : bwState.foreign) === String(m.id);
-          return '<button type="button" class="mtb-agent-card bw-card' + (picked ? ' on' : '') + '" data-bwpick="' + side + '" data-bwv="' + esc(m.id) + '" data-bwagent="' + esc((m.agent || {}).id || '') + '">' +
-            '<span class="mtb-agc-ico">' + flag + '</span>' +
-            '<span class="mtb-agc-tx"><b>' + esc(m.name || ('#' + m.id)) + '</b><i>' + esc(m.datacenter_en || m.datacenter || '') + '</i></span>' +
-            (picked ? '<span class="tu-pick-ok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg></span>' : '') +
-            '</button>';
-        }).join('') + '</div>' : '<p class="qs-hint u-m-0">' + esc(tr('', 'No agents on this side yet')) + '</p>');
-    } catch (err) {
-      body.innerHTML = stateError(err.message, 'bwmem', true);
-    }
-    return;
-  }
-  // step 4: the engines enabled on BOTH agents
-  body.innerHTML = '<p class="qs-hint u-m-0">' + esc(tr('', 'Engines enabled on both agents — pick the ones to benchmark')) + '</p><div class="u-grid u-gap-8">' + skel(3) + '</div>';
-  try {
-    const [a, b] = await Promise.all([
-      api('/api/ui/agents/' + encodeURIComponent(bwState.iranAgent) + '/engines'),
-      api('/api/ui/agents/' + encodeURIComponent(bwState.foreignAgent) + '/engines')
-    ]);
-    // «installed and usable for a tunnel» = the engine is ENABLED on that
-    // agent — the same rule the pair-run endpoint re-checks server-side
-    const runOf = list => { const m = {}; (list.engines || []).forEach(e => { if (e.enabled === true) m[e.engine] = true; }); return m; };
-    const mA = runOf(a), mB = runOf(b);
-    const common = Object.keys(mA).filter(e => mB[e]).sort();
-    bwState.engines = common;
-    bwState.picked = common.slice();
-    if (!common.length) {
-      body.innerHTML = '<p class="qs-hint u-m-0">' + esc(tr('', 'No engine is enabled on both agents — enable one on both and come back.')) + '</p>';
-      const nx = $('bwNext'); if (nx) nx.disabled = true;
-      return;
-    }
-    // the pick check renders ONLY on picked cards (like every other step) —
-    // an always-on check made unchecking look like nothing happened
-    body.innerHTML = '<p class="qs-hint u-m-0">' + esc(tr('', 'Engines enabled on both agents — pick the ones to benchmark')) + '</p>' +
-      '<div class="tu-cards">' + common.map(e => {
-        const on = bwState.picked.indexOf(e) >= 0;
-        return '<button type="button" class="mtb-agent-card bw-card' + (on ? ' on' : '') + '" data-bweng="' + esc(e) + '" aria-pressed="' + on + '">' +
-          '<span class="mtb-agc-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3.2M12 18.3v3.2M2.5 12h3.2M18.3 12h3.2M5.3 5.3l2.2 2.2M16.5 16.5l2.2 2.2M18.7 5.3l-2.2 2.2M7.5 16.5l-2.2 2.2"/></svg></span>' +
-          '<span class="mtb-agc-tx"><b>' + esc(e) + '</b></span>' +
-          (on ? '<span class="tu-pick-ok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg></span>' : '') +
-          '</button>';
-      }).join('') + '</div>';
-  } catch (err) {
-    body.innerHTML = stateError(err.message, 'bweng', true);
-  }
+  if (bwState.step === 2) { await bwRenderAgentStep('iran'); return; }
+  if (bwState.step === 3) { await bwRenderAgentStep('foreign'); return; }
+  await bwRenderCoreStep();
 }
-
-function bwNext() {
-  if (bwState.running) return;
-  if (bwState.step === 1 && !bwState.topo) { toastWarn(tr('', 'Benchmark'), tr('', 'Pick a topology first')); return; }
-  if (bwState.step === 2 && !bwState.iran) { toastWarn(tr('', 'Benchmark'), tr('', 'Pick the Iran agent first')); return; }
-  if (bwState.step === 3 && !bwState.foreign) { toastWarn(tr('', 'Benchmark'), tr('', 'Pick the foreign agent first')); return; }
-  if (bwState.step === 4) {
-    if (!bwState.picked || !bwState.picked.length) { toastWarn(tr('', 'Benchmark'), tr('', 'Pick at least one engine')); return; }
-    bwRun();
-    return;
+// stepping forward revalidates the dependent picks: a topology change resets
+// the agents, an Iran change re-checks the foreign datacenter rule
+function bwPickTopo(id, name) {
+  if (String(bwState.topo) === String(id)) return;
+  bwState.topo = id;
+  bwState.topoName = name || '';
+  bwState.iran = null; bwState.iranAgent = ''; bwState.iranDC = '';
+  bwState.foreign = null; bwState.foreignAgent = ''; bwState.foreignDC = '';
+  bwState.picked = [];
+  bwRender();
+}
+async function bwPickAgent(side, id) {
+  const members = bwMembers(side);
+  const m = members.find(x => String(x.id) === String(id));
+  if (!m) return;
+  await bwResolveDcIds();
+  const dcId = bwCache.dcIds[String(m.id)] || '';
+  if (side === 'iran') {
+    if (String(bwState.iran) === String(id)) return; // single select, no toggle-off
+    bwState.iran = m.id;
+    bwState.iranAgent = (m.agent && m.agent.id) || '';
+    bwState.iranDC = dcId;
+    // the foreign pick revalidates against the new Iran datacenter
+    if (bwState.foreign && bwCache.dcIds[String(bwState.foreign)] === dcId) {
+      bwState.foreign = null; bwState.foreignAgent = ''; bwState.foreignDC = '';
+    }
+  } else {
+    bwState.foreign = m.id;
+    bwState.foreignAgent = (m.agent && m.agent.id) || '';
+    bwState.foreignDC = dcId;
   }
+  bwRender();
+}
+function bwPickCore(engine) {
+  const k = (bwState.picked || []).indexOf(engine);
+  if (k >= 0) bwState.picked.splice(k, 1); else bwState.picked.push(engine);
+  bwSyncNext();
+  bwSyncSummary();
+  bwRenderCoreStep();
+}
+// the summary rides every pick without re-rendering the whole step
+function bwSyncSummary() {
+  const w = $('pbwSumWrap');
+  if (w) w.innerHTML = bwSummaryHTML();
+}
+function bwNext() {
+  if (bwState.step === 4) { bwStart(); return; }
   bwState.step++;
   bwRender();
 }
-
-async function bwRun() {
-  const host = $('benchWizard');
-  bwState.running = true;
-  host.innerHTML = '<div class="u-grid u-gap-8">' + skel(3) + '</div>';
-  try {
-    const st = await api('/api/benchmark/pair-run', {
-      topology_id: Number(bwState.topo),
-      iran_server: Number(bwState.iran),
-      foreign_server: Number(bwState.foreign),
-      engines: bwState.picked
-    });
-    bwState.view = st;
-  } catch (err) {
-    host.innerHTML = stateError(err.message, 'bwrun', true);
-    bwState.running = false;
-    return;
+async function bwStart() {
+  const picked = bwState.picked || [];
+  if (!picked.length) return;
+  const catalogCores = picked.filter(e => bwCoreMethodCount(e) > 0);
+  const plainEngines = picked.filter(e => bwCoreMethodCount(e) === 0);
+  bwState.running = plainEngines.length > 0;
+  bwState.boardRunning = catalogCores.length > 0;
+  bwState.pairErr = null;
+  bwState.boardErr = null;
+  bwState.boardNote = '';
+  bwRenderRun();
+  if (bwState.running) {
+    try {
+      const st = await api('/api/benchmark/pair-run', {
+        topology_id: Number(bwState.topo),
+        iran_server: Number(bwState.iran),
+        foreign_server: Number(bwState.foreign),
+        engines: plainEngines,
+      });
+      bwState.view = st;
+    } catch (err) {
+      bwState.running = false;
+      bwState.pairErr = (err && err.message) || String(err);
+    }
   }
+  if (bwState.boardRunning) {
+    try {
+      const d = await api('/api/benchmark/method-board?iran=' + encodeURIComponent(bwState.iranAgent) + '&kharej=' + encodeURIComponent(bwState.foreignAgent) + '&run=1');
+      bwState.boardView = ctbNormBoard(d);
+      if (bwState.boardView && !bwState.boardView.running) bwState.boardRunning = false;
+    } catch (err) {
+      bwState.boardRunning = false;
+      bwState.boardErr = (err && err.message) || String(err);
+    }
+  }
+  if (!bwState.running && !bwState.boardRunning) { bwRenderRun(); return; }
   bwPoll();
 }
-
 async function bwPoll() {
-  if (!bwState.running) return;
-  try {
-    const st = await api('/api/benchmark/pair');
-    bwState.view = st;
-    bwRenderRun(st);
-    if (st.running) bwTimer = setTimeout(bwPoll, 2000);
-    else { bwState.running = false; toastOk(tr('', 'Benchmark'), tr('', 'Benchmark finished')); }
-  } catch (err) {
-    bwTimer = setTimeout(bwPoll, 3000);
+  if (!bwState.running && !bwState.boardRunning) { bwRenderRun(); return; }
+  const jobs = [];
+  if (bwState.running) {
+    jobs.push(api('/api/benchmark/pair').then(st => { bwState.view = st; if (!st.running) bwState.running = false; }).catch(err => { bwState.pairErr = (err && err.message) || String(err); }));
   }
+  if (bwState.boardRunning && bwState.iranAgent && bwState.foreignAgent) {
+    jobs.push(api('/api/benchmark/method-board?iran=' + encodeURIComponent(bwState.iranAgent) + '&kharej=' + encodeURIComponent(bwState.foreignAgent))
+      .then(d => { bwState.boardView = ctbNormBoard(d); if (bwState.boardView && !bwState.boardView.running) bwState.boardRunning = false; })
+      .catch(err => { bwState.boardErr = (err && err.message) || String(err); }));
+  }
+  await Promise.all(jobs);
+  bwRenderRun();
+  if (bwState.running || bwState.boardRunning) bwState.timer = setTimeout(bwPoll, 2000);
+  else toastOk(tr('', 'Benchmark'), tr('', 'Benchmark finished'));
 }
-
 function bwStop() {
   api('/api/benchmark/pair-stop', {}, 'POST').catch(() => {});
+  // the method probes have no stop endpoint — the run continues and the
+  // view says so honestly instead of pretending it stopped
+  if (bwState.boardRunning) bwState.boardNote = tr('', 'The method probes keep running to completion — they have no stop switch.');
+  bwRenderRun();
 }
-
-function bwRenderRun(st) {
+// per-item status vocabulary: Completed / Failed / Stopped / Pending —
+// mapped from the two runners' real rows, nothing invented
+function bwRunStatus(status) {
+  const s = String(status || '');
+  if (s === 'ok') return ['ok', tr('', 'Completed')];
+  if (s === 'converge-timeout') return ['bad', tr('', 'Did not come up')];
+  if (s === 'failed') return ['bad', tr('', 'Failed')];
+  if (s === 'stopped') return ['warn', tr('', 'Stopped')];
+  return ['dim', s || tr('', 'Pending')];
+}
+function bwPhaseLine() {
+  const g = bwState;
+  const pairPhase = { create: 'Building the temporary tunnels', converge: 'Waiting for the tunnels to come up', measure: 'Measuring the counters', cleanup: 'Removing the temporary tunnels' };
+  const parts = [];
+  if (g.running && g.view) {
+    const ph = String(g.view.phase || '');
+    parts.push(esc(tr('', 'Cores')) + ': <b>' + esc(String(g.view.cur_engine || '')) + '</b> — ' + esc(tr('', pairPhase[ph] || ph || 'Running')));
+  }
+  if (g.boardRunning && g.boardView) {
+    parts.push(esc(tr('', 'Method probes')) + ': <b>' + esc(String(g.boardView.cur || '')) + '</b>');
+  }
+  if (g.pairErr) parts.push('<span class="pbw-pollerr">' + esc(tr('', 'Engine benchmark')) + ': ' + esc(g.pairErr) + '</span>');
+  if (g.boardErr) parts.push('<span class="pbw-pollerr">' + esc(tr('', 'Method probes')) + ': ' + esc(g.boardErr) + '</span>');
+  if (g.boardNote) parts.push('<span class="pbw-pollerr">' + esc(g.boardNote) + '</span>');
+  return parts.length ? '<div class="pbw-progress">' + parts.map(p => '<div>' + p + '</div>').join('') + '</div>' : '';
+}
+function bwRenderRun() {
   const host = $('benchWizard');
   if (!host) return;
-  const res = st.results || [];
-  const rows = res.map(r => '<tr><td class="mono" dir="ltr">' + esc(r.engine) + '</td>' +
-    '<td>' + (r.status === 'ok' ? '<span class="badge ok">' + esc(tr('', 'Measured')) + '</span>' : (r.status === 'stopped' ? '<span class="badge dim">' + esc(tr('', 'Stopped')) + '</span>' : '<span class="badge err">' + esc(tr('', r.status === 'converge-timeout' ? 'Did not come up' : 'Failed')) + '</span>')) + '</td>' +
-    '<td class="u-text-center">' + (r.converge_s != null ? esc(Number(r.converge_s).toFixed(1) + 's') : '—') + '</td>' +
-    '<td class="u-text-center">' + (r.down_bps ? '<bdi dir="ltr">' + esc(fmtSpeedRate(r.down_bps)) + '</bdi>' : '—') + '</td>' +
-    '<td class="u-text-center">' + (r.up_bps ? '<bdi dir="ltr">' + esc(fmtSpeedRate(r.up_bps)) + '</bdi>' : '—') + '</td>' +
-    '<td class="u-text-center">' + (r.rtt_ms ? esc(Math.round(r.rtt_ms) + ' ms') : '—') + '</td>' +
-    '<td class="u-text-center">' + (r.score ? esc(String(r.score)) : '—') + '</td>' +
-    '<td class="u-text-center">' + (r.note ? '<span class="qs-hint">' + esc(r.note) + '</span>' : '—') + '</td></tr>').join('');
-  // the orchestration phases read as status text, not machine words
-  const bwPhase = { create: 'Building the temporary tunnel', converge: 'Waiting for the tunnel to come up', measure: 'Measuring the counters', cleanup: 'Removing the tunnel' };
-  const cur = st.running ? '<div class="u-hint-12 u-mb-12">' + esc(tr('', 'Running')) + ': <b>' + esc(String(st.cur_engine || '')) + '</b> — ' + esc(tr('', bwPhase[String(st.phase || '')] || String(st.phase || ''))) + '</div>' : '';
+  const g = bwState;
+  const pairRows = (g.view && g.view.results) || [];
+  const boardRows = (g.boardView && g.boardView.rows) || [];
+  const doneCount = pairRows.filter(r => r.status === 'ok').length + boardRows.filter(r => ctbReach(r.reachability) === 'ok').length;
+  const cleanupLine = g.running
+    ? (String((g.view || {}).phase) === 'cleanup' ? esc(tr('', 'Cleaning up the temporary tunnels…')) : esc(tr('', 'Temporary tunnels are removed after each measurement.')))
+    : (pairRows.length ? esc(tr('', 'Temporary tunnels removed — cleanup confirmed.')) : '');
+  const pairTable = pairRows.length
+    ? '<h3 class="pbw-sec-title">' + esc(tr('', 'Core benchmarks')) + '</h3>' +
+      '<div class="bench-table-wrap"><table class="quantum-table"><thead><tr>' +
+      '<th>' + esc(tr('', 'Core')) + '</th><th>' + esc(tr('', 'Status')) + '</th><th>' + esc(tr('', 'Converge')) + '</th>' +
+      '<th>' + esc(tr('', 'Download')) + '</th><th>' + esc(tr('', 'Upload')) + '</th><th>' + esc(tr('', 'RTT')) + '</th>' +
+      '<th>' + esc(tr('', 'Score')) + '</th><th>' + esc(tr('', 'Note')) + '</th></tr></thead><tbody>' +
+      pairRows.map(r => {
+        const st = bwRunStatus(r.status);
+        const badge = '<span class="badge ' + st[0] + '"><span class="dot"></span>' + esc(st[1]) + '</span>';
+        return '<tr><td class="mono" dir="ltr">' + esc(r.engine) + '</td>' +
+          '<td>' + badge + '</td>' +
+          '<td class="u-text-center">' + (r.converge_s != null ? esc(Number(r.converge_s).toFixed(1) + 's') : '—') + '</td>' +
+          '<td class="u-text-center">' + (r.down_bps ? '<bdi dir="ltr">' + esc(fmtSpeedRate(r.down_bps)) + '</bdi>' : '—') + '</td>' +
+          '<td class="u-text-center">' + (r.up_bps ? '<bdi dir="ltr">' + esc(fmtSpeedRate(r.up_bps)) + '</bdi>' : '—') + '</td>' +
+          '<td class="u-text-center">' + (r.rtt_ms ? esc(Math.round(r.rtt_ms) + ' ms') : '—') + '</td>' +
+          '<td class="u-text-center">' + (r.score ? esc(String(r.score)) : '—') + '</td>' +
+          '<td class="u-text-center">' + (r.note ? '<span class="qs-hint">' + esc(r.note) + '</span>' : '—') + '</td></tr>';
+      }).join('') + '</tbody></table></div>'
+    : '';
+  const boardTable = boardRows.length
+    ? '<h3 class="pbw-sec-title">' + esc(tr('', 'Method probes')) + '</h3>' +
+      '<div class="bench-table-wrap"><table class="quantum-table"><thead><tr>' +
+      '<th>' + esc(tr('', 'Method')) + '</th><th>' + esc(tr('', 'Core')) + '</th><th>' + esc(tr('', 'Status')) + '</th>' +
+      '<th>' + esc(tr('', 'Latency')) + '</th><th>' + esc(tr('', 'Throughput')) + '</th><th>' + esc(tr('', 'PMTU')) + '</th>' +
+      '<th>' + esc(tr('', 'Score')) + '</th><th>' + esc(tr('', 'Error')) + '</th></tr></thead><tbody>' +
+      boardRows.map(r => {
+        const st = ctbReach(r.reachability);
+        const badge = st === 'ok'
+          ? '<span class="badge ok"><span class="dot"></span>' + esc(tr('', 'Completed')) + '</span>'
+          : st === 'bad'
+            ? '<span class="badge err"><span class="dot"></span>' + esc(tr('', 'Failed')) + '</span>'
+            : (r.reachability ? '<span class="badge dim"><bdi dir="ltr">' + esc(String(r.reachability)) + '</bdi></span>' : '<span class="badge dim">' + esc(tr('', 'Pending')) + '</span>');
+        return '<tr><td class="mono" dir="ltr">' + esc(r.method || '—') + '</td>' +
+          '<td class="mono" dir="ltr">' + esc(r.engine || '—') + '</td>' +
+          '<td>' + badge + '</td>' +
+          '<td class="u-text-center">' + (r.latency_ms != null && r.latency_ms !== '' ? '<bdi dir="ltr">' + esc(String(Math.round(Number(r.latency_ms) * 100) / 100)) + ' ms</bdi>' : '—') + '</td>' +
+          '<td class="u-text-center">' + (r.throughput != null && r.throughput !== '' && Number(r.throughput) > 0 ? '<bdi dir="ltr">' + esc(ctbRate(Number(r.throughput))) + '</bdi>' : '—') + '</td>' +
+          '<td class="u-text-center">' + (r.pmtu != null && r.pmtu !== '' ? esc(String(r.pmtu)) : '—') + '</td>' +
+          '<td class="u-text-center">' + (r.score != null && r.score !== '' ? '<bdi dir="ltr">' + esc(String(r.score)) + '</bdi>' : '—') + '</td>' +
+          '<td class="u-text-center">' + (r.error ? '<span class="qs-hint" title="' + esc(String(r.error)) + '">' + esc(String(r.error).slice(0, 80)) + '</span>' : '—') + '</td></tr>';
+      }).join('') + '</tbody></table></div>'
+    : '';
   host.innerHTML =
-    '<div class="tc-header u-bb-ln u-pb-16 u-mb-16"><div><span class="tc-title u-fs-18 u-fw-700">' + esc(tr('', 'Pair benchmark')) + '</span>' +
-    '<div class="qs-hint u-mt-4">' + esc(String(st.topo_name || '')) + '</div></div></div>' +
-    cur +
-    '<div class="bench-table-wrap"><table class="quantum-table"><thead><tr>' +
-    '<th>' + esc(tr('', 'Engine')) + '</th><th>' + esc(tr('', 'Status')) + '</th><th>' + esc(tr('', 'Converge')) + '</th>' +
-    '<th>' + esc(tr('', 'Download')) + '</th><th>' + esc(tr('', 'Upload')) + '</th><th>' + esc(tr('', 'RTT')) + '</th>' +
-    '<th>' + esc(tr('', 'Score')) + '</th><th>' + esc(tr('', 'Note')) + '</th></tr></thead><tbody>' +
-    (rows || '<tr><td colspan="8" class="u-text-center">' + skel(2) + '</td></tr>') + '</tbody></table></div>' +
-    '<p class="qs-hint">' + esc(tr('', 'Real temporary tunnels: built through each engine, measured from the agents\u2019 own counter samples, then removed.')) + '</p>' +
-    '<div class="mtb-acts"><button type="button" class="quantum-btn quantum-btn-secondary" id="bwStop"' + (st.running ? '' : ' hidden') + '>' + esc(tr('', 'Stop')) + '</button>' +
+    '<div class="pbw-stepper-wrap">' + bwStepperHTML() + '</div>' +
+    '<div class="pbw-progress-head">' +
+    '<span class="badge ' + (g.running || g.boardRunning ? 'ok' : 'dim') + '"><span class="dot"></span>' + esc(g.running || g.boardRunning ? tr('', 'Running') : tr('', 'Finished')) + '</span>' +
+    '<span class="qs-hint">' + esc(tr('', '{n} completed').replace('{n}', String(doneCount))) + '</span>' +
+    '<span class="u-flex-1"></span>' +
+    (cleanupLine ? '<span class="qs-hint pbw-cleanup">' + cleanupLine + '</span>' : '') +
+    '</div>' +
+    bwPhaseLine() +
+    (g.running || g.boardRunning ? '<div class="u-grid u-gap-8">' + skel(2) + '</div>' : '') +
+    pairTable + boardTable +
+    (g.boardNote ? '<p class="qs-hint">' + esc(g.boardNote) + '</p>' : '') +
+    '<div class="mtb-acts">' +
+    '<button type="button" class="quantum-btn quantum-btn-secondary" id="bwStop"' + (g.running ? '' : ' hidden') + '>' + esc(tr('', 'Stop')) + '</button>' +
     '<button type="button" class="quantum-btn quantum-btn-secondary" id="bwAgain">' + esc(tr('', 'Run again')) + '</button>' +
     '<button type="button" class="quantum-btn quantum-btn-primary" id="bwNew">' + esc(tr('', 'New benchmark')) + '</button></div>';
   const stopB = $('bwStop'), againB = $('bwAgain'), newB = $('bwNew');
   if (stopB) stopB.onclick = bwStop;
-  if (againB) againB.onclick = () => { bwState.running = false; clearTimeout(bwTimer); loadBenchWizard(); };
+  if (againB) againB.onclick = () => { clearTimeout(g.timer); g.running = false; g.boardRunning = false; bwStart(); };
   if (newB) newB.onclick = async () => {
     await api('/api/benchmark/pair-clear', {}, 'POST').catch(() => {});
-    bwState = { step: 1, topo: null, topoName: '', iran: null, iranAgent: '', foreign: null, foreignAgent: '', engines: [], picked: [], pool: null, running: false, view: null, timer: null };
+    clearTimeout(g.timer);
+    bwState = {
+      step: 1, topo: null, topoName: '', iran: null, iranAgent: '', iranDC: '',
+      foreign: null, foreignAgent: '', foreignDC: '',
+      picked: [], pool: bwCache.topos,
+      running: false, view: null, timer: null,
+      boardRunning: false, boardView: null,
+      pairErr: null, boardErr: null, boardNote: '', loadErr: null,
+    };
     loadBenchWizard();
   };
 }
+(function bwWire() {
+  const host = $('benchWizard');
+  if (!host) return;
+  host.addEventListener('click', ev => {
+    const el = ev.target && ev.target.closest ? ev.target.closest.bind(ev.target) : null;
+    if (!el) return;
+    const goto = el('[data-bw-goto]');
+    if (goto) {
+      const n = Number(goto.getAttribute('data-bw-goto')) || 1;
+      if (n <= bwState.step && n !== bwState.step) { bwState.step = n; bwRender(); }
+      return;
+    }
+    const topo = el('[data-bw-topo]');
+    if (topo) { bwPickTopo(topo.getAttribute('data-bw-topo'), topo.getAttribute('data-bw-name')); return; }
+    const agent = el('[data-bw-agent]');
+    if (agent && !agent.disabled) { bwPickAgent(agent.getAttribute('data-bw-agent'), agent.getAttribute('data-bw-v')); return; }
+    const core = el('[data-bw-core]');
+    if (core) { bwPickCore(core.getAttribute('data-bw-core')); return; }
+  });
+})();
 
 // ---------- C-Tunnel method board (tab-cboard, §2.23) ----------------------
 // The live test page dedicated to the ctunnel core: pick an Iran and a
