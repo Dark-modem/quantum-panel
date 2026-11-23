@@ -53,6 +53,65 @@ var coresReleaseAPI = "https://api.github.com/repos/Dark-modem/quantum-cores/rel
 // stay refused.
 var coresTagRe = regexp.MustCompile(`^([a-z][a-z0-9_-]*)-v(\d+\.\d+(\.\d+)?)$`)
 
+// coresNaiveTagRe is the naive core's OWN tag contract (BACKEND-47):
+// `naive-v<4 numeric segments>-<build>` — the shape the real repo
+// publishes (naive-v154.0.8037.49-5). Every other core keeps coresTagRe
+// UNCHANGED; naive would not match it (4 segments + a build suffix).
+var coresNaiveTagRe = regexp.MustCompile(`^(naive)-v(\d+\.\d+\.\d+\.\d+-\d+)$`)
+
+// coresNaiveVersionRe splits a naive version into its four numeric
+// components + the build number for ordering.
+var coresNaiveVersionRe = regexp.MustCompile(`^(\d+)\.(\d+)\.(\d+)\.(\d+)-(\d+)$`)
+
+// coresTagParts is the ONLY release-tag parser: the dedicated naive shape
+// first, then the historical coresTagRe for every other core. version is
+// the tag's version text WITHOUT the leading "v".
+func coresTagParts(tag string) (core, version string, ok bool) {
+	if m := coresNaiveTagRe.FindStringSubmatch(tag); m != nil {
+		return m[1], m[2], true
+	}
+	if m := coresTagRe.FindStringSubmatch(tag); m != nil {
+		return m[1], m[2], true
+	}
+	return "", "", false
+}
+
+// parseNaiveVersion decodes a naive version ("154.0.8037.49-5").
+func parseNaiveVersion(v string) ([5]int, bool) {
+	var nums [5]int
+	m := coresNaiveVersionRe.FindStringSubmatch(v)
+	if m == nil {
+		return nums, false
+	}
+	for i := 0; i < 5; i++ {
+		nums[i], _ = strconv.Atoi(m[i+1])
+	}
+	return nums, true
+}
+
+// compareCoreTagVersions orders two version texts for one core: naive's
+// four numeric components + build number compare numerically; every other
+// core keeps the historical compareVersions.
+func compareCoreTagVersions(core, a, b string) int {
+	if core != "naive" {
+		return compareVersions("v"+a, "v"+b)
+	}
+	na, oka := parseNaiveVersion(a)
+	nb, okb := parseNaiveVersion(b)
+	if !oka || !okb {
+		return compareVersions("v"+a, "v"+b)
+	}
+	for i := 0; i < 5; i++ {
+		if na[i] != nb[i] {
+			if na[i] < nb[i] {
+				return -1
+			}
+			return 1
+		}
+	}
+	return 0
+}
+
 // coresAssetRe matches a usable release asset: `<core>-<os>-<arch>.tar.gz`
 // (the trailing .sig companion files are NOT usable artifacts — they ride
 // alongside by name).
@@ -210,14 +269,14 @@ func discoverCores(rels []ghRelease) []coreRow {
 		if rels[i].Draft {
 			continue
 		}
-		m := coresTagRe.FindStringSubmatch(rels[i].Tag)
-		if m == nil {
+		core, verText, ok := coresTagParts(rels[i].Tag)
+		if !ok {
 			continue
 		}
-		ver := "v" + m[2]
-		cur := bests[m[1]]
-		if cur == nil || compareVersions(ver, cur.ver) > 0 {
-			bests[m[1]] = &latest{tag: rels[i].Tag, ver: ver, rel: &rels[i]}
+		ver := "v" + verText
+		cur := bests[core]
+		if cur == nil || compareCoreTagVersions(core, verText, strings.TrimPrefix(cur.ver, "v")) > 0 {
+			bests[core] = &latest{tag: rels[i].Tag, ver: ver, rel: &rels[i]}
 		}
 	}
 	if len(bests) == 0 {
@@ -328,12 +387,12 @@ func pickCoreRelease(core, version string, rels []ghRelease) (string, *ghRelease
 		if rels[i].Draft {
 			continue
 		}
-		m := coresTagRe.FindStringSubmatch(rels[i].Tag)
-		if m == nil || m[1] != core {
+		coreName, verText, ok := coresTagParts(rels[i].Tag)
+		if !ok || coreName != core {
 			continue
 		}
-		ver := "v" + m[2]
-		if bestTag == "" || compareVersions(ver, bestVer) > 0 {
+		ver := "v" + verText
+		if bestTag == "" || compareCoreTagVersions(core, verText, strings.TrimPrefix(bestVer, "v")) > 0 {
 			bestTag, bestVer, bestRel = rels[i].Tag, ver, &rels[i]
 		}
 	}

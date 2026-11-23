@@ -296,12 +296,12 @@ func coresManifestMethodEntry(method string) (methodManifestEntry, bool) {
 		cores := make([]string, 0, len(rels))
 		seen := map[string]bool{}
 		for i := range rels {
-			m := coresTagRe.FindStringSubmatch(rels[i].Tag)
-			if m == nil || seen[m[1]] {
+			core, _, ok := coresTagParts(rels[i].Tag)
+			if !ok || seen[core] {
 				continue
 			}
-			seen[m[1]] = true
-			cores = append(cores, m[1])
+			seen[core] = true
+			cores = append(cores, core)
 		}
 		sort.Strings(cores)
 		for _, c := range cores {
@@ -332,15 +332,19 @@ func coresManifestMethodEntry(method string) (methodManifestEntry, bool) {
 // ---- installed_version / outdated (§2.22 addendum) ------------------------
 
 // coresVersionCompare is the §2.20 comparison RULES over the cores' own
-// version shape: the cores feed only publishes digits+dots (coresTagRe:
-// 2 or 3 numeric segments — semver AND the CALVER form), so the compare
-// is segment-wise numeric with zero padding. A non-parsable (non
-// digits+dots) version never claims newer: it compares equal (outdated
-// stays null/false rather than guessing).
+// version shape: the feed publishes digits+dots versions (2 or 3 numeric
+// segments — semver AND the CALVER form), and BACKEND-47 added naive's
+// four numeric segments + `-<build>` suffix (naive-v154.0.8037.49-5), so
+// the compare is segment-wise numeric with zero padding, then the build
+// number. A non-parsable version never claims newer: it compares equal
+// (outdated stays null/false rather than guessing).
 func coresVersionCompare(a, b string) int {
-	na := coresVersionSegs(a)
-	nb := coresVersionSegs(b)
-	for i := 0; i < 3; i++ {
+	na, oka := coresVersionSegs(a)
+	nb, okb := coresVersionSegs(b)
+	if !oka || !okb {
+		return 0
+	}
+	for i := 0; i < 5; i++ {
 		if na[i] != nb[i] {
 			if na[i] < nb[i] {
 				return -1
@@ -351,22 +355,32 @@ func coresVersionCompare(a, b string) int {
 	return 0
 }
 
-func coresVersionSegs(v string) [3]int {
-	var out [3]int
-	for i, seg := range strings.Split(strings.TrimPrefix(strings.TrimSpace(v), "v"), ".") {
-		if i >= 3 {
-			break
+// coresVersionSegs parses up to four numeric segments plus an optional
+// trailing `-<build>` (naive). ok=false = outside the cores contract's
+// shape (treated as all-zeros by the comparison).
+func coresVersionSegs(v string) ([5]int, bool) {
+	var out [5]int
+	v = strings.TrimPrefix(strings.TrimSpace(v), "v")
+	if i := strings.LastIndexByte(v, '-'); i > 0 {
+		n, err := strconv.Atoi(v[i+1:])
+		if err != nil {
+			return out, false
 		}
+		out[4] = n
+		v = v[:i]
+	}
+	parts := strings.Split(v, ".")
+	if len(parts) > 4 {
+		return out, false
+	}
+	for i, seg := range parts {
 		n, err := strconv.Atoi(seg)
 		if err != nil {
-			// a non-numeric segment poisons the comparison — the version is
-			// out of the cores contract's shape; treat as all-zeros so it
-			// never claims newer
-			return [3]int{}
+			return [5]int{}, false
 		}
 		out[i] = n
 	}
-	return out
+	return out, true
 }
 
 // coresInstalledVersions answers, for one core, the newest version any

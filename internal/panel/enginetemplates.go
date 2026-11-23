@@ -80,13 +80,15 @@ var engineParamTemplates = map[string][]engineParamField{
 		{JSON: "sha256_arm64", LabelEn: "sha256 (arm64)", LabelFa: "sha256 (arm64)", Kind: "secret", Required: true},
 		{JSON: "signature_amd64", LabelEn: "ed25519 signature (amd64)", LabelFa: "امضا (amd64)", Kind: "secret", Required: true},
 		{JSON: "signature_arm64", LabelEn: "ed25519 signature (arm64)", LabelFa: "امضا (arm64)", Kind: "secret", Required: true},
-		{JSON: "remote_addr", LabelEn: "Foreign host", LabelFa: "هاست خارج", Kind: "string", Required: true},
+		{JSON: "server_addr", LabelEn: "Foreign host", LabelFa: "هاست خارج", Kind: "string", Required: true, Hint: "frps host as seen from the frpc side (the driver's server_addr)"},
 		{JSON: "server_port", LabelEn: "frps control port", LabelFa: "پورت کنترل", Kind: "number", Default: "7000", Required: true},
 		{JSON: "token", LabelEn: "Shared token", LabelFa: "توکن مشترک", Kind: "secret", Generator: "secret32", Required: true, Hint: "generated in the browser; same value both ends"},
 		{JSON: "remote_port", LabelEn: "Forwarded port (foreign)", LabelFa: "پورت فوروارد", Kind: "number", Required: true},
 		{JSON: "local_addr", LabelEn: "Iran target host", LabelFa: "هاست مقصد ایران", Kind: "string", Default: "127.0.0.1", Required: true},
 		{JSON: "local_port", LabelEn: "Iran target port", LabelFa: "پورت مقصد ایران", Kind: "number", Required: true},
-		{JSON: "dash_port", LabelEn: "Dashboard port", LabelFa: "پورت داشبورد", Kind: "number", Default: "7500"},
+		{JSON: "dashboard_port", LabelEn: "Dashboard port", LabelFa: "پورت داشبورد", Kind: "number", Default: "7500", Hint: "frps 127.0.0.1 webServer (payload counters)"},
+		{JSON: "allow_port_min", LabelEn: "Smallest allowed remote port", LabelFa: "کمینه پورت مجاز", Kind: "number", Hint: "frps allowPorts lower bound (0 = unset)"},
+		{JSON: "allow_port_max", LabelEn: "Largest allowed remote port", LabelFa: "بیشینه پورت مجاز", Kind: "number", Hint: "frps allowPorts upper bound (0 = unset)"},
 		// BACKEND-45: the OVERNIGHT-A/A2/A3 additions — proxy_type family +
 		// secret-proxy key + the vhost family (the frps vhost ports route by
 		// domain; vhost proxy blocks carry NO remote_port).
@@ -202,6 +204,42 @@ var engineParamTemplates = map[string][]engineParamField{
 		{JSON: "masque_user", LabelEn: "MASQUE auth user", LabelFa: "کاربر MASQUE", Kind: "string", Hint: "service=masque (HTTP Basic)"},
 		{JSON: "masque_password", LabelEn: "MASQUE auth password", LabelFa: "رمز MASQUE", Kind: "secret", Generator: "secret32", Hint: "service=masque (HTTP Basic)"},
 	},
+	// BACKEND-47: the WaterWall driver's typed form (quantum-agent
+	// waterwall_driver.go — the 18-method allowlist plus the reverse chain).
+	// The artifact is the unversioned cores asset; method picks which of the
+	// per-method auth/TLS/obfs fields render (dead fields are refused by the
+	// agent's Validate, not silently dropped here).
+	"waterwall": {
+		{JSON: "server_side", LabelEn: "Server end (foreign name)", LabelFa: "سمت سرور (نام خارج)", Kind: "string", Required: true, Hint: "the end hosting the WaterWall server"},
+		{JSON: "version", LabelEn: "Artifact version", LabelFa: "نسخه", Kind: "string", Default: "1.6.0", Required: true},
+		{JSON: "artifact", LabelEn: "Artifact name template", LabelFa: "قالب نام فایل", Kind: "string", Default: "waterwall-linux-{arch}.tar.gz", Required: true},
+		{JSON: "sha256_amd64", LabelEn: "sha256 (amd64)", LabelFa: "sha256 (amd64)", Kind: "secret", Required: true},
+		{JSON: "sha256_arm64", LabelEn: "sha256 (arm64)", LabelFa: "sha256 (arm64)", Kind: "secret", Required: true},
+		{JSON: "signature_amd64", LabelEn: "ed25519 signature (amd64)", LabelFa: "امضا (amd64)", Kind: "secret", Required: true},
+		{JSON: "signature_arm64", LabelEn: "ed25519 signature (arm64)", LabelFa: "امضا (arm64)", Kind: "secret", Required: true},
+		{JSON: "method", LabelEn: "WaterWall method", LabelFa: "روش WaterWall", Kind: "string", Default: "quic", Required: true, Hint: "quic|kcp|enet|reality|trojan|vless|vmess|wireguard|rtmp|gns|bgp4|http|socks5|fake-tcp|obfuscator|connection-fisher|connection-stripe|mux|reverse"},
+		{JSON: "server_addr", LabelEn: "Carrier host:port (server listen / client dial)", LabelFa: "آدرس حامل host:port", Kind: "string", Default: "0.0.0.0:4433", Required: true},
+		{JSON: "local_addr", LabelEn: "Server-end dial target host", LabelFa: "هاست مقصد سمت سرور", Kind: "string", Default: "127.0.0.1", Required: true, Hint: "the tunnel's destination host (bare host/IP, no port)"},
+		{JSON: "local_port", LabelEn: "Local port (client ingress / server target)", LabelFa: "پورت محلی", Kind: "number", Required: true},
+		{JSON: "auth_user", LabelEn: "Auth user", LabelFa: "کاربر احراز", Kind: "string", Hint: "socks5/http (with auth_password); forbidden with no_auth"},
+		{JSON: "auth_password", LabelEn: "Auth password", LabelFa: "رمز احراز", Kind: "secret", Generator: "secret32", Hint: "trojan/reality/bgp4/fake-tcp/reverse/http/socks5"},
+		{JSON: "uuid", LabelEn: "VLESS/VMess uuid", LabelFa: "uuid", Kind: "secret", Generator: "uuid", Hint: "vless/vmess only"},
+		{JSON: "tls_cert", LabelEn: "TLS cert path (PEM)", LabelFa: "مسیر گواهی TLS", Kind: "string", Hint: "TLS-bearing methods: cert pair required"},
+		{JSON: "tls_key", LabelEn: "TLS key path (PEM)", LabelFa: "مسیر کلید TLS", Kind: "string", Hint: "TLS-bearing methods"},
+		{JSON: "sni", LabelEn: "Client SNI", LabelFa: "SNI کلاینت", Kind: "string", Hint: "quic/tls clients"},
+		{JSON: "wg_private_key", LabelEn: "WireGuard private key", LabelFa: "کلید خصوصی WireGuard", Kind: "secret", Generator: "secret32", Hint: "method=wireguard"},
+		{JSON: "wg_auth_secret", LabelEn: "WireGuard auth secret", LabelFa: "رمز احراز WireGuard", Kind: "secret", Generator: "secret32", Hint: "method=wireguard; same value both ends"},
+		{JSON: "obfs_method", LabelEn: "Obfs method", LabelFa: "روش استتار", Kind: "string", Default: "xor", Hint: "gns/obfuscator only; the driver supports xor"},
+		{JSON: "obfs_key", LabelEn: "Obfs key byte (0-255)", LabelFa: "کلید استتار (۰-۲۵۵)", Kind: "number", Hint: "gns/obfuscator; the xor byte"},
+		{JSON: "send_mtu", LabelEn: "Send MTU (0 = default)", LabelFa: "MTU ارسال (۰ = پیش‌فرض)", Kind: "number", Hint: "0 = upstream default"},
+		{JSON: "kcp_fec", LabelEn: "KCP FEC", LabelFa: "FEC در KCP", Kind: "bool", Hint: "method=kcp"},
+		{JSON: "rtmp_app", LabelEn: "RTMP application", LabelFa: "اپلیکیشن RTMP", Kind: "string", Hint: "method=rtmp"},
+		{JSON: "rtmp_stream", LabelEn: "RTMP stream key", LabelFa: "کلید استریم RTMP", Kind: "string", Hint: "method=rtmp"},
+		{JSON: "no_auth", LabelEn: "No auth (loopback only)", LabelFa: "بدون احراز (فقط loopback)", Kind: "bool", Hint: "http/socks5 without auth; forbids auth_user/auth_password"},
+		{JSON: "fake_tcp_port", LabelEn: "Fake-TCP header port (0 = default)", LabelFa: "پورت هدر fake-TCP", Kind: "number", Hint: "method=fake-tcp"},
+		{JSON: "ww_insecure", LabelEn: "Skip QUIC TLS verify", LabelFa: "بدون تأیید TLS کوئیک", Kind: "bool", Hint: "quic client trust override for self-signed pairs"},
+		{JSON: "reverse_port", LabelEn: "Reverse public port (foreign)", LabelFa: "پورت عمومی معکوس", Kind: "number", Hint: "method=reverse: public users hit foreign:reverse_port"},
+	},
 	"xray": {
 		{JSON: "server_side", LabelEn: "Server end (foreign name)", LabelFa: "سمت سرور (نام خارج)", Kind: "string", Required: true},
 		{JSON: "version", LabelEn: "Artifact version", LabelFa: "نسخه", Kind: "string", Default: "24.12.31", Required: true},
@@ -243,6 +281,13 @@ var engineParamTemplates = map[string][]engineParamField{
 		{JSON: "server_addr", LabelEn: "QUIC host:port (server listen / client dial)", LabelFa: "آدرس QUIC host:port", Kind: "string", Default: "0.0.0.0:36712", Required: true},
 		{JSON: "auth_password", LabelEn: "Auth password", LabelFa: "رمز احراز", Kind: "secret", Generator: "secret32", Required: true, Hint: "same value both ends"},
 		{JSON: "obfs_password", LabelEn: "Salamander obfs password", LabelFa: "رمز استتار سالاماندر", Kind: "secret", Generator: "secret32", Hint: "optional; same value both ends"},
+		// BACKEND-47: the OVERNIGHT-A gecko/udphop additions — obfs_type
+		// picks the obfuscator (""|salamander|gecko); the min/max packet
+		// bounds apply to gecko only; hop_interval drives port hopping.
+		{JSON: "obfs_type", LabelEn: "Obfuscator type", LabelFa: "نوع استتار", Kind: "string", Hint: "empty | salamander | gecko (gecko uses the packet bounds)"},
+		{JSON: "obfs_min_pkt", LabelEn: "Gecko min packet size", LabelFa: "کمینه بسته gecko", Kind: "number", Hint: "obfs_type=gecko only"},
+		{JSON: "obfs_max_pkt", LabelEn: "Gecko max packet size", LabelFa: "بیشینه بسته gecko", Kind: "number", Hint: "obfs_type=gecko only"},
+		{JSON: "hop_interval", LabelEn: "Port-hop interval", LabelFa: "بازه تغییر پورت", Kind: "string", Default: "30s", Hint: "UDP port hopping (e.g. 30s); same value both ends"},
 		{JSON: "tls_cert", LabelEn: "TLS cert path (PEM, server end)", LabelFa: "مسیر گواهی TLS", Kind: "string", Hint: "server end; hysteria2 is always TLS — self-signed pairs are legitimate"},
 		{JSON: "tls_key", LabelEn: "TLS key path (PEM, server end)", LabelFa: "مسیر کلید TLS", Kind: "string", Hint: "server end"},
 		{JSON: "sni", LabelEn: "Client SNI", LabelFa: "SNI کلاینت", Kind: "string"},
@@ -275,6 +320,8 @@ var engineParamTemplates = map[string][]engineParamField{
 		{JSON: "sni", LabelEn: "Client SNI", LabelFa: "SNI کلاینت", Kind: "string"},
 		{JSON: "insecure", LabelEn: "Skip TLS verify (self-signed)", LabelFa: "بدون تأیید TLS", Kind: "bool"},
 		{JSON: "local_mode", LabelEn: "Client ingress mode", LabelFa: "حالت ورودی کلاینت", Kind: "string", Default: "proxy", Hint: "proxy (mixed socks+http) | forward (direct inbound) — exactly one"},
+		// BACKEND-47: the OVERNIGHT-A6 L3/transparent ingress family.
+		{JSON: "ingress", LabelEn: "L3/transparent ingress", LabelFa: "ورودی L3/شفاف", Kind: "string", Hint: "empty = local_mode machinery | tun (gvisor+auto_route) | redirect | tproxy (tcp+udp) | socks | http | mixed"},
 		{JSON: "local_port", LabelEn: "Client ingress listen port", LabelFa: "پورت ورودی کلاینت", Kind: "number", Required: true},
 		{JSON: "forward_addr", LabelEn: "Forward destination host:port", LabelFa: "مقصد فوروارد host:port", Kind: "string", Hint: "mode=forward: dialed by the SERVER end through the tunnel"},
 		{JSON: "obfs", LabelEn: "hysteria v1 obfs password", LabelFa: "رمز استتار hysteria v1", Kind: "string"},
