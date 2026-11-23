@@ -112,13 +112,20 @@ func compileDesiredTunnelSpecs(s *store.Store, ag store.Agent) (server store.Ser
 				remote = rs.Name
 			}
 		}
+		params := json.RawMessage(t.EngineParams)
+		if t.Engine == "frp" {
+			params, err = normalizeLegacyFRPParams(t.TunnelKey, params)
+			if err != nil {
+				return store.Server{}, nil, nil, nil, nil, "", err
+			}
+		}
 		specs = append(specs, protocol.TunnelSpec{
 			ID:           t.TunnelKey,
 			TopologyID:   topo.Name,
 			LocalServer:  local,
 			RemoteServer: remote,
 			Engine:       t.Engine,
-			EngineParams: json.RawMessage(t.EngineParams),
+			EngineParams: params,
 			Enabled:      true,
 		})
 		engineUsed[t.Engine] = true
