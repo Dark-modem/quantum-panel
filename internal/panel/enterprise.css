@@ -1927,7 +1927,9 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
    corner bubble) and the grid card below it */
 /* one compact toolbar row: title at the start, search + filter pills filling
    the rest — the old two-row stack left a wide empty band under the title */
-.eng-headcard { display:flex; flex-wrap:wrap; align-items:center; gap:12px 14px; padding:12px 16px;
+/* title on its own line, then the search and the filter chips: one cramped
+   row of title + search + five chips read as a jumble */
+.eng-headcard { display:grid; grid-template-columns:minmax(0,1fr); align-content:start; gap:12px; padding:14px 16px;
   position:relative; overflow:hidden; border:1px solid var(--ln); border-radius:14px;
   background:
     radial-gradient(circle at 16% 20%, color-mix(in srgb, var(--ac) 9%, transparent) 0%, transparent 55%),
@@ -1946,8 +1948,8 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 .eng-head-ic svg { width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
 .eng-head-tx { min-width:0; }
 .eng-head-sub { margin:2px 0 0; font-size:13px; color:var(--mu); }
-.eng-tools { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:0; flex:1 1 auto; justify-content:flex-end; }
-.eng-search { position:relative; flex:1 1 220px; width:auto; max-width:360px; }
+.eng-tools { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:0; }
+.eng-search { position:relative; flex:1 1 240px; width:auto; max-width:none; }
 .eng-search svg { position:absolute; inset-inline-start:12px; top:50%; transform:translateY(-50%); width:15px; height:15px; fill:none; stroke:var(--mu); stroke-width:2; stroke-linecap:round; pointer-events:none; }
 .eng-search input { width:100%; padding:9px 14px 9px 38px; border-radius:10px; border:1px solid var(--ln); background:var(--sunk); color:var(--tx); font:inherit; font-size:13px; }
 .eng-search input:focus { border-color:var(--ac); outline:none; }
@@ -1968,9 +1970,9 @@ html[dir="rtl"] .eng-search input { padding:9px 38px 9px 14px; }
 .eng-grid { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:12px; }
 @media (max-width:1240px) { .eng-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); } }
 @media (max-width:760px) { .eng-grid { grid-template-columns:minmax(0, 1fr); } }
-.eng-card { display:flex; flex-direction:column; gap:12px; border:1px solid var(--ln); border-radius:12px; background:var(--sunk); padding:14px; min-width:0; height:100%; }
+.eng-card { display:flex; flex-direction:column; gap:10px; border:1px solid var(--ln); border-radius:12px; background:var(--sunk); padding:16px; min-width:0; height:100%; }
 .eng-card-top { display:flex; align-items:center; gap:12px; }
-.eng-logo { width:44px; height:44px; display:inline-flex; align-items:center; justify-content:center; flex:none; border-radius:11px;
+.eng-logo { width:40px; height:40px; display:inline-flex; align-items:center; justify-content:center; flex:none; border-radius:10px;
   background:color-mix(in srgb, var(--ac) 12%, transparent); color:var(--ac); overflow:hidden;
   box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--ac) 20%, transparent); }
 .eng-logo img { max-width:28px; max-height:28px; object-fit:contain; }
@@ -1981,19 +1983,21 @@ html[dir="rtl"] .eng-search input { padding:9px 38px 9px 14px; }
 .eng-badge { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:99px; font-size:12px; font-weight:700; white-space:nowrap; }
 .eng-badge svg { width:10px; height:10px; fill:none; stroke:currentColor; stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; }
 .eng-badge-cat { background:color-mix(in srgb, var(--ac) 14%, transparent); color:var(--ac); border:1px solid color-mix(in srgb, var(--ac) 40%, transparent); }
-.eng-badge-exp { background:color-mix(in srgb, var(--wr) 12%, transparent); color:var(--wr); border:1px solid color-mix(in srgb, var(--wr) 38%, transparent); }
+/* experimental is the norm, not a warning: a neutral chip keeps the page from
+   reading as one wall of amber */
+.eng-badge-exp { background:color-mix(in srgb, var(--tx) 7%, transparent); color:var(--tx2); border:1px solid var(--ln); }
 /* the per-core METHOD COUNT line: the real §2.22 manifest count, and its
    honest pending mark while a core's catalog has not landed */
 .eng-installed { color:var(--tx2); font-size:12.5px; }
 .eng-installed-n { color:var(--info); font-weight:600; }
 .eng-installed-pend { color:var(--mu); font-weight:600; }
-.eng-verchip { flex:none; padding:2px 8px; border-radius:7px; border:1px solid var(--ln); color:var(--tx2); font-size:12px; font-weight:600; }
+.eng-verchip { flex:none; padding:2px 7px; border-radius:7px; border:0; background:color-mix(in srgb, var(--tx) 6%, transparent); color:var(--mu); font-size:11.5px; font-weight:600; }
 .eng-verchip bdi { direction:ltr; unicode-bidi:isolate; }
 .eng-progress { height:6px; border-radius:99px; background:color-mix(in srgb, var(--ln) 55%, transparent); overflow:hidden; }
 .eng-progress-fill { height:100%; border-radius:99px; background:var(--ac); transition:width .3s ease; }
 /* foot: release state on one side, actions on the other, never wrapping —
    the card bottom is pinned so a row of cards lines up */
-.eng-card-foot { display:flex; flex-direction:column; align-items:stretch; gap:8px; margin-top:auto; padding-top:2px; min-width:0; }
+.eng-card-foot { display:flex; flex-direction:column; align-items:stretch; gap:8px; margin-top:auto; padding-top:10px; border-top:1px solid var(--ln); min-width:0; }
 .eng-status { display:inline-flex; align-items:center; gap:8px; min-width:0; flex:1 1 auto; }
 /* the state chips shrink with an ellipsis instead of being cut mid-glyph */
 .eng-status > * { min-width:0; flex:0 1 auto; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -2001,12 +2005,14 @@ html[dir="rtl"] .eng-search input { padding:9px 38px 9px 14px; }
 .eng-rel { display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600; }
 .eng-rel svg { width:13px; height:13px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
 .eng-rel.ok { color:var(--ok); }
-.eng-rel.na { color:var(--wr); }
+/* "no release available" is a routine state, not a warning */
+.eng-rel.na { color:var(--mu); }
+.eng-rel.repo { color:var(--info); }
 .eng-outdated { color:var(--wr); font-size:12px; font-weight:600; }
-.eng-act { min-height:34px; padding:0 14px; border-radius:9px; border:1px solid var(--ln); background:var(--s2); color:var(--tx2); font:inherit; font-size:12.5px; font-weight:700; cursor:pointer; flex:none; }
+.eng-act { min-height:32px; padding:0 12px; border-radius:8px; border:1px solid var(--ln); background:var(--s2); color:var(--tx2); font:inherit; font-size:12px; font-weight:700; cursor:pointer; flex:none; }
 .eng-act.pri { background:var(--ac); border-color:var(--ac); color:#fff; }
 .eng-act.pri:hover:not(:disabled) { filter:brightness(1.08); }
-.eng-act:disabled { opacity:.55; cursor:not-allowed; }
+.eng-act:disabled { opacity:.45; background:transparent; cursor:not-allowed; }
 .eng-empty { padding:30px; text-align:center; }
 .eng-empty b { color:var(--tx2); font-size:14px; }
 .eng-skel { pointer-events:none; }
