@@ -13099,8 +13099,12 @@ function coresMethodBadge(g) {
   const mc = coresMethodCount(g);
   if (!mc) return '';
   if (mc.known) {
+    // one method reads as singular — three cores publish exactly one
+    const count = mc.n === 1
+      ? esc(tr('', '1 method'))
+      : tr('', '{n} methods').replace('{n}', '<bdi dir="ltr">' + esc(String(mc.n)) + '</bdi>');
     return '<span class="eng-badge eng-badge-mc" title="' + esc(tr('', 'Methods published in the core manifest')) + '">' + CORES_ICO_MC +
-      tr('', '{n} methods').replace('{n}', '<bdi dir="ltr">' + esc(String(mc.n)) + '</bdi>') + '</span>';
+      count + '</span>';
   }
   return '<span class="eng-badge eng-badge-mc-pend" title="' + esc(tr('', 'The method catalog for this core has not landed on the feed yet')) + '">' + CORES_ICO_MC +
     esc(tr('', 'Methods pending')) + '</span>';
@@ -13508,7 +13512,7 @@ function renderCtunPage() {
     if (!coresAvailBusy && !coresAvailErr) {
       clearTimeout(ctunFeedRetryTimer);
       ctunFeedRetryTimer = setTimeout(() => {
-        if (ctunOpen && !ctunMethods(artRepoRow(ctunOpen))) loadCoresAvailable(true);
+        if (ctunOpen && !ctunMethods(artRepoRow(ctunOpen))) loadCoresAvailable(false, true);
       }, 2000);
     }
     middle = feedErr +
@@ -13882,9 +13886,37 @@ async function loadArtStore(force) {
     renderArtStore();
   }
 }
-async function loadCoresAvailable(force) {
+// The panel reads each core's MANIFEST.json in the BACKGROUND, so the first
+// feed answer after a panel start (or after an expired manifest cache) can
+// carry methods:null for every core while the catalogs are still on their
+// way. That answer used to stick for the whole session: every card read
+// "Methods pending" and the drill-down "No method catalog yet" even though a
+// read a second later carried the full catalog. A pending answer now re-reads
+// itself (bounded, and WITHOUT ?refresh=1 — the backend re-joins methods[]
+// from its cache on every request, so the light read is the whole fix).
+let coresAvailRetryTimer = 0;
+let coresAvailRetryN = 0;
+function coresAvailPending() {
+  const rows = (coresAvail && coresAvail.cores) || [];
+  if (!rows.length) return false;
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    if (r && (!Array.isArray(r.methods) || r.methods.length === 0)) return true;
+  }
+  return false;
+}
+function scheduleCoresAvailReread() {
+  clearTimeout(coresAvailRetryTimer);
+  if (coresAvailRetryN >= 3) return;
+  coresAvailRetryTimer = setTimeout(() => {
+    if (coresAvailBusy) { scheduleCoresAvailReread(); return; }
+    coresAvailRetryN++;
+    loadCoresAvailable(false, true);
+  }, 2500);
+}
+async function loadCoresAvailable(force, reread) {
   if (!$('engArtList') || coresAvailBusy) return;
-  if (!force && coresAvail) return;
+  if (!force && !reread && coresAvail) return;
   coresAvailBusy = true;
   coresAvailErr = null;
   renderArtStore();
@@ -13901,6 +13933,11 @@ async function loadCoresAvailable(force) {
     coresAvailAt = 0;
   } finally {
     coresAvailBusy = false;
+    if (coresAvail && !coresAvailErr) {
+      if (force) coresAvailRetryN = 0; // an explicit refresh restarts the budget
+      if (coresAvailPending()) scheduleCoresAvailReread();
+      else coresAvailRetryN = 0;
+    }
     renderArtStore();
     coresMergeFeedGroups();
     renderCores();
