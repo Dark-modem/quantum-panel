@@ -558,8 +558,14 @@
     // instead of pushing the row wider, paddings and action buttons tighten
     '.mtb-tun-tbl tbody td { padding:8px 9px; white-space:normal; }',
     '.mtb-tun-tbl tbody td .mtb-tuside-tx b, .mtb-tun-tbl tbody td .mtb-topobadge, .mtb-tun-tbl tbody td .badge { white-space:nowrap; }',
-    '.mtb-tun-tbl .mtb-tupath { flex-direction:column; align-items:flex-start; gap:3px; }',
-    '.mtb-tun-tbl .mtb-tuarrow svg { transform:rotate(90deg); }',
+    // the path stays one horizontal chain (flag name → flag name): stacking the
+    // two ends made the cell three lines tall. Long names ellipsis instead of
+    // stretching the column, so the row keeps its width.
+    '.mtb-tun-tbl .mtb-tupath { flex-wrap:nowrap; }',
+    '.mtb-tun-tbl .mtb-tuarrow svg { transform:none; }',
+    '.mtb-tun-tbl .mtb-tuside { min-width:0; padding:2px 6px; gap:6px; }',
+    '.mtb-tun-tbl .mtb-tuside-tx { min-width:0; }',
+    '.mtb-tun-tbl .mtb-tuside-tx b, .mtb-tun-tbl .mtb-tuside-tx .mtb-muted { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }',
     '.mtb-tun-tbl .mtb-acts-row { gap:4px; }',
     '.mtb-tun-tbl .mtb-act { width:26px; height:26px; border-radius:7px; }',
     '.mtb-tun-tbl .mtb-act svg { width:13px; height:13px; }',
