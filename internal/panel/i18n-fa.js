@@ -3620,6 +3620,7 @@ window.FA_TEXT = {
  "The per-method transport catalog for this core has not landed on the feed — the table appears as soon as the backend serves methods[].": "کاتالوگ روش‌های حمل این هسته هنوز روی فید نیامده — جدول به‌محض سرو شدن methods[] از بک‌اند ظاهر می‌شود.",
  "Methods pending": "روش‌ها در انتظار",
  "1 method": "۱ روش",
+ "Forged source IP over WireGuard — a tunnel method for whitelist firewalls": "جعل IP مبدأ روی WireGuard — یک روش تانل برای فایروال‌های لیست‌سفید",
  "1 tunnel method": "۱ روش تانل",
  "{n} tunnel methods": "{n} روش تانل",
  "Methods published in the core manifest": "روش‌های منتشرشده در مانیفست هسته",

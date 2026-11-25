@@ -341,7 +341,9 @@ window.addEventListener('hashchange', function () {
     const m = (location.hash || '').match(/^#t=([a-z-]+)/);
     if (!m) return;
     let name = m[1] === 'topology' ? 'tunnel' : m[1];
-    const routed = ['dashboard','tunnel','cores','cluster','setup','xray','firewall','logs','perf','watchdog','doctor','benchmark','cboard','spoof','netopt','update','settings','terminal'];
+    // spoof is a core now: an old #t=spoof link opens its core page
+    if (name === 'spoof') { goTab('spoof'); return; }
+    const routed = ['dashboard','tunnel','cores','cluster','setup','xray','firewall','logs','perf','watchdog','doctor','benchmark','cboard','netopt','update','settings','terminal'];
     if (routed.indexOf(name) < 0) return;
     const el = $('tab-' + name);
     if (el && el.hidden) goTab(name);
@@ -360,10 +362,13 @@ function goTab(name) {
   }
   if (name === 'terminal' && !$('termNav').classList.contains('hidden') && $('tab-terminal').hidden && !termState.ready) { /* allowed: overlay shows connect */ }
   if (name === 'terminal' && $('termNav').classList.contains('hidden')) return; // flag off: tab doesn't exist
-  if (name === 'add-peer') { goTab('setup'); const c = $('setupAddPeerStep'); if (c && c.scrollIntoView) c.scrollIntoView({behavior: 'smooth', block: 'start'}); return; }
+    if (name === 'add-peer') { goTab('setup'); const c = $('setupAddPeerStep'); if (c && c.scrollIntoView) c.scrollIntoView({behavior:'smooth', block:'start'}); return; }
   // Bagher lives in Setup (create) and Tunnel (run) like every other tunnel.
   if (name === 'sshfwd' || name === 'bagher') { openBagherSetup(); return; }
-  ['dashboard','tunnel','cores','cluster','setup','xray','firewall','logs','perf','watchdog','doctor','benchmark','cboard','spoof','netopt','update','settings','terminal'].forEach(t => { const el = $('tab-'+t); if (el) el.hidden = t !== name; });
+  // Spoof is a tunnel method, so it is a core: its old tab routes into the
+  // cores drill-down (core page), never a standalone page.
+  if (name === 'spoof') { goTab('cores'); ctunPageOpen('spoof'); return; }
+  ['dashboard','tunnel','cores','cluster','setup','xray','firewall','logs','perf','watchdog','doctor','benchmark','cboard','netopt','update','settings','terminal'].forEach(t => { const el = $('tab-'+t); if (el) el.hidden = t !== name; });
   const markTab = b => {
     const on = b.dataset.tab === name;
     b.classList.toggle('on', on);
@@ -388,7 +393,6 @@ function goTab(name) {
   if (name === 'benchmark') { loadBenchWizard(); }
   if (name === 'cboard') loadCtunBoard();
   if (name === 'netopt') loadKernelTuning();
-  if (name === 'spoof') loadSpoof();
   if (name === 'xray') loadXray();
   if (name === 'update') loadVersion();
   if (name === 'logs') { refreshLogPeers(); loadLogs(); loadErrors(); armLogFollow(); }
@@ -650,7 +654,6 @@ const I18N = {
     ctb_sub: "Pick an Iran and a foreign agent, then run the live board: every ctunnel transport method is probed through the real pair — reachability, latency, throughput, PMTU and a score, with the best method suggested at the end.",
     kt_title: "Kernel Tuning",
     kt_sub: "Live kernel network state per agent: TCP congestion control (BBR), queue discipline, GSO and MTU probing — read from the agents, nothing simulated.",
-    nav_spoof: "Spoof",
     spoof_title: "Spoof Tunnel",
     spoof_sub: "A tunnel that forges its source IP on both servers to cross whitelist-based Layer-3 firewalls, wrapped with WireGuard for a real encrypted link. Test which spoof IPs get through first, then bring the tunnel up.",
     spoof_idle: "Not configured",
@@ -6115,50 +6118,50 @@ function pollSwap(id) {
   }, 1000);
 }
 
-// ---------- Spoof Tunnel (tab-spoof) ----------
+// ---------- Spoof core (cores -> Spoof -> Details) ----------
 // An IP-spoofing UDP pipe (ParsaKSH/spoof-tunnel) wrapped with WireGuard. The
-// Iran server is "local", the foreign server "remote". Everything is rendered
-// into #spoofBody from the /api/spoof state.
+// Iran server is "local", the foreign server "remote". Spoof is a TUNNEL
+// METHOD, so it lives in the cores drill-down like every other core: the
+// state still comes from /api/spoof, and the page is drawn by
+// renderCtunPage (renderSpoofCore) — the old sidebar tab is gone.
 let _spoof = null;
+let _spoofErr = '';
 let _spoofTesterTimer = null;
 const SPOOF_TRANSPORTS = ['tcp', 'udp', 'icmp', 'icmpv6'];
 
 async function loadSpoof() {
-  const body = $('spoofBody');
-  if (!body) return;
   try {
     _spoof = await api('/api/spoof');
+    _spoofErr = '';
   } catch (e) {
-    body.innerHTML = stateError(e.message, null, true);
-    return;
+    _spoofErr = e.message;
   }
-  renderSpoof();
+  if (ctunOpen === 'spoof') renderCtunPage();
   loadSpoofTester();
 }
 
-function spoofBadge(d, h) {
-  const b = $('spoofBadge');
-  if (!b) return;
+// spoofBadgeHTML: the core page's state pill (idle/configured/starting/up).
+function spoofBadgeHTML(d) {
+  if (!d) return '';
+  const h = d.health || {};
   let cls = 'dim', txt = tr('spoof_idle', 'Not configured');
-  if (d.enabled && h && h.core_active && h.wg_active) { cls = 'ok'; txt = tr('', 'Tunnel up'); }
+  if (d.enabled && h.core_active && h.wg_active) { cls = 'ok'; txt = tr('', 'Tunnel up'); }
   else if (d.enabled) { cls = 'warn'; txt = tr('', 'Starting…'); }
   else if (d.has_keys || (d.spoof_ips && d.spoof_ips.length)) { cls = 'info'; txt = tr('', 'Configured'); }
-  b.className = 'badge ' + cls;
-  b.textContent = txt;
+  return '<span class="badge ' + cls + '">' + esc(txt) + '</span>';
 }
 
 function spoofOpt(sel, cur) {
   return SPOOF_TRANSPORTS.map(t => `<option value="${t}"${t === cur ? ' selected' : ''}>${t.toUpperCase()}</option>`).join('');
 }
 
-function renderSpoof() {
-  const d = _spoof, h = d.health || {};
-  spoofBadge(d, h);
-  const body = $('spoofBody');
-  if (!d.installed) {
-    body.innerHTML = `<div class="sw-result warn">${esc(tr('', 'The spoof core is not installed on this server yet. Install it from the terminal:'))}
+// the page body under the core hero (role, health, setup form, bundle, tester)
+function spoofPageBody() {
+  const d = _spoof;
+  if (!d) return '<div class="u-grid u-gap-8">' + skel(3) + '</div>';
+  const h = d.health || {};
+  const notInst = d.installed ? '' : `<div class="sw-result warn">${esc(tr('', 'The spoof core is not installed on this server yet. Install it from the terminal:'))}
       <textarea class="quantum-input sw-bundle" readonly data-no-i18n>quantum spoof install</textarea></div>`;
-  }
   const isLocal = d.role === 'local';
   const roleSeg = `<div class="qs-seg u-mb-12" role="group">
       <button type="button" id="spRoleLocal" class="${isLocal ? 'active' : ''}" aria-pressed="${isLocal}">${esc(tr('', 'This is the Iran server'))}</button>
@@ -6213,7 +6216,24 @@ function renderSpoof() {
       <button type="button" class="quantum-btn quantum-btn-secondary u-btn-30" id="spImportBtn">${esc(tr('', 'Import bundle'))}</button></div>`;
   }
 
-  body.innerHTML = (d.installed ? '' : body.innerHTML) + roleSeg + health + form + keyBlock + spoofTesterHTML();
+  return notInst + roleSeg + health + form + keyBlock + spoofTesterHTML();
+}
+
+// renderSpoofCore paints the whole spoof core page into the drill-down host.
+function renderSpoofCore() {
+  const host = $('ctunPage');
+  if (!host) return;
+  if (_spoofErr) { host.innerHTML = stateError(_spoofErr, null, true); return; }
+  const ico = '<span class="ctun-hero-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2l7 4v6c0 4-3 7-7 10-4-3-7-6-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg></span>';
+  const hero = '<div class="ctun-hero">' + ico +
+    '<div class="ctun-hero-tx"><h2 class="tc-title u-fs-16 u-fw-700 u-m-0">' + esc(tr('spoof_title', 'Spoof Tunnel')) + '</h2>' +
+    '<span class="ctun-hero-sub">' + esc(tr('', 'Forged source IP over WireGuard — a tunnel method for whitelist firewalls')) + '</span></div>' +
+    '<span class="u-flex-1"></span>' + spoofBadgeHTML(_spoof) +
+    '<button type="button" class="quantum-btn quantum-btn-secondary" data-ctun-back>' + esc(tr('', 'Back to cores')) + '</button></div>';
+  // the long explanation lives under the hero, not inside it (a long sub-line
+  // wrapped the whole title onto its own row)
+  const intro = '<p class="qs-hint sp-intro">' + esc(tr('spoof_sub', 'A tunnel that forges its source IP on both servers to cross whitelist-based Layer-3 firewalls, wrapped with WireGuard for a real encrypted link. Test which spoof IPs get through first, then bring the tunnel up.')) + '</p>';
+  host.innerHTML = hero + intro + spoofPageBody();
   spoofWire();
   renderSpoofTester();
 }
@@ -13400,9 +13420,10 @@ function coresViewSync() {
   detail.hidden = !on;
 }
 function ctunPageOpen(engine) {
-  const g = ctunGroup(engine);
-  if (!g) return;
+  // a known core, or the list is still loading (the skeleton covers it)
+  if (!ctunGroup(engine) && coresCache !== null) return;
   ctunOpen = (CORES_ALIAS[engine] || engine);
+  if (ctunOpen === 'spoof') { if (!_spoof) loadSpoof(); }
   ctunLayer = 'all';
   ctunSearch = '';
   ctunF = { transport: '', ipver: '', port: '', userspace: '', mikrotik: '' };
@@ -13480,6 +13501,8 @@ function ctunNoticeLine(repo) {
 function renderCtunPage() {
   const body = $('ctunPage');
   if (!body || !ctunOpen) return;
+  // spoof is a core with its own logic page, not a method catalog
+  if (ctunOpen === 'spoof') { renderSpoofCore(); return; }
   const g = ctunGroup(ctunOpen);
   const repo = artRepoRow(ctunOpen);
   const disp = CORES_ENGINE_NAME[ctunOpen] || ctunOpen;

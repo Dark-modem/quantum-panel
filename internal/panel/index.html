@@ -1539,7 +1539,6 @@
 <button role="tab" aria-selected="false" aria-controls="tab-logs" tabindex="-1" class="nav-item" data-tab="logs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span data-i18n="nav_logs">Logs</span></button>
 <button role="tab" aria-selected="false" aria-controls="tab-settings" tabindex="-1" class="nav-item" data-tab="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.06-.4.1-.8.1-1.2z"/></svg><span data-i18n="nav_settings">Settings</span></button>
 <button role="tab" aria-selected="false" aria-controls="tab-doctor" tabindex="-1" class="nav-item" data-tab="doctor" id="doctorNav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><span data-i18n="nav_doctor">Diagnostics</span><span class="nav-badge hidden u-ml-auto"></span></button>
-<button role="tab" aria-selected="false" aria-controls="tab-spoof" tabindex="-1" class="nav-item" data-tab="spoof" id="spoofNav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2l7 4v6c0 4-3 7-7 10-4-3-7-6-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg><span data-i18n="nav_spoof">Spoof</span></button>
 <button role="tab" aria-selected="false" aria-controls="tab-terminal" tabindex="-1" class="nav-item hidden" data-tab="terminal" id="termNav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M7 9l3 3-3 3M12 15h5"/></svg><span data-i18n="nav_terminal">Terminal</span><span class="term-live hidden u-ml-auto" id="termLiveDot" ></span></button>
 </nav>
     <div class="sidebar-foot">
@@ -3139,19 +3138,6 @@
             </div>
           </div>
           <div id="ctunBoard"><div class="ent-skel u-h-14"></div></div>
-        </div>
-      </section>
-      <!-- Tab: Spoof Tunnel -->
-      <section id="tab-spoof" role="tabpanel" hidden>
-        <div class="tunnel-card u-mb-20">
-          <div class="tc-header u-bb-ln u-pb-16 u-mb-16">
-            <div>
-              <span class="tc-title u-fs-18 u-fw-700" data-i18n="spoof_title">Spoof Tunnel</span>
-              <div class="qs-hint u-mt-4" data-i18n="spoof_sub">A tunnel that forges its source IP on both servers to cross whitelist-based Layer-3 firewalls, wrapped with WireGuard for a real encrypted link. Test which spoof IPs get through first, then bring the tunnel up.</div>
-            </div>
-            <span class="badge dim" id="spoofBadge" data-i18n="spoof_idle">Not configured</span>
-          </div>
-          <div id="spoofBody"><div class="ent-skel u-h-14"></div></div>
         </div>
       </section>
       <section id="tab-xray" role="tabpanel" hidden>

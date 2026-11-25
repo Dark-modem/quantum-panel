@@ -973,7 +973,8 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 /* Forwarded port count on tunnel cards (portCount in app.js) */
 .det-count { font-weight: 600; color: var(--tx); font-variant-numeric: tabular-nums; }
 
-/* ---- Spoof Tunnel tab (tab-spoof): sp-* ---- */
+/* ---- Spoof core page (cores -> Spoof -> Details): sp-* ---- */
+.sp-intro { margin:0 0 12px; }
 .sp-health { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin: 4px 0 16px; font-size: var(--fs-small); color: var(--mu); }
 .sp-hdot { display: inline-flex; align-items: center; gap: 6px; }
 .sp-hdot::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--dim); display: inline-block; }
