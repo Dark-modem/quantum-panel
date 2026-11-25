@@ -204,6 +204,7 @@
     tuNew: ['تانل جدید', 'New tunnel'],
     tuNewHint: ['ترتیب را دنبال کنید: توپولوژی، سرور ایران، سرور خارج، هسته — سپس کلید تانل.', 'Follow the flow: topology, Iran server, foreign server, engine — then the tunnel key.'],
     tuNeedTopo: ['اول یک توپولوژی بسازید — تانل بدون توپولوژی معنا ندارد.', 'Build a topology first — a tunnel needs one.'],
+    tuNameCol: ['نام', 'Name'],
     tuPath: ['مسیر', 'Path'],
     tuD7: ['ترافیک ۷\u00a0روزه', '7d\u00a0traffic'],
     tuD30: ['ترافیک ۳۰\u00a0روزه', '30d\u00a0traffic'],
@@ -1296,7 +1297,7 @@
       return '<tr data-tu-row="' + esc(r.key) + '">' +
         // the copy button went away on request — the key still opens the
         // tunnel's page on click and keeps its hover tooltip
-        '<td data-l="' + esc(L('tunnelKey')) + '"><b class="mono mtb-tun-key tu-open" dir="ltr" data-tuopen="' + esc(r.key) + '" title="' + esc(r.key) + '">' + esc(r.key) + '</b></td>' +
+        '<td data-l="' + esc(L('tuNameCol')) + '"><b class="mono mtb-tun-key tu-open" dir="ltr" data-tuopen="' + esc(r.key) + '" title="' + esc(r.key) + '">' + esc(r.key) + '</b></td>' +
         '<td data-l="' + esc(L('topologyCol')) + '"><button type="button" class="mtb-topobadge" data-tutopo="' + esc(r.topoId) + '" data-tuname="' + esc(r.topo) + '" title="' + esc(L('tuOpenTopo')) + '">' + MTB_ICO.mesh + esc(r.topo) + '</button></td>' +
         '<td data-l="' + esc(L('tuPath')) + '"><div class="mtb-tupath">' + tuSideChip(r.local) + '<span class="mtb-tuarrow">' + MTB_ICO.tun + '</span>' + tuSideChip(r.remote) + '</div></td>' +
         '<td data-l="' + esc(L('engineCol')) + '"><div class="mtb-engpair">' + engBadge + '</div></td>' +
@@ -1346,7 +1347,7 @@
       '<div class="tunnel-card mtb-agfilter">' + tcbar + '</div>' +
       '<div class="tunnel-card">' +
       '<div class="ent-tbl-wrap"><table class="ent-tbl mtb-tun-tbl"><thead><tr>' +
-      '<th><span class="mtb-th">' + MTB_ICO.tun + esc(L('tunnelKey')) + '</span></th>' +
+      '<th><span class="mtb-th">' + MTB_ICO.tag + esc(L('tuNameCol')) + '</span></th>' +
       '<th><span class="mtb-th">' + MTB_ICO.mesh + esc(L('topologyCol')) + '</span></th>' +
       '<th class="mtb-thc"><span class="mtb-th">' + MTB_ICO.chain + esc(L('tuPath')) + '</span></th>' +
       '<th><span class="mtb-th">' + MTB_ICO.cube + esc(L('engineCol')) + '</span></th>' +
