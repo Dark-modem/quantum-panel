@@ -471,6 +471,16 @@ html[data-rs="0"] .right-sidebar { display:none; }
 .ent-tbl-wrap { max-height:min(60dvh, 520px); }
 html[data-dens="compact"] .ent-tbl tbody td, html[data-dens="compact"] .ent-tbl thead th { padding-block:4px; }
 html[data-dens="compact"] .quantum-table th, html[data-dens="compact"] .quantum-table td { padding-block:6px !important; }
+/* the benchmark result tables were the only .quantum-table users and the class
+   had no rules at all: the table shrank to the width of its cells and left a
+   dead grey block across the rest of the card. One base block styles them. */
+.quantum-table { width:100%; min-width:620px; border-collapse:separate; border-spacing:0; margin:0; }
+.quantum-table th { padding:11px 14px; font-size:11.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+  color:var(--mu); text-align:start; background:var(--sunk); border-bottom:1px solid var(--ln); white-space:nowrap; }
+.quantum-table td { padding:12px 14px; font-size:13px; color:var(--tx2); text-align:start; vertical-align:middle; white-space:nowrap;
+  border-bottom:1px solid color-mix(in srgb, var(--ln) 55%, transparent); }
+.quantum-table tbody tr:last-child td { border-bottom:none; }
+.quantum-table tbody tr:hover { background:color-mix(in srgb, var(--ac) 6%, transparent); }
 .quantum-table thead th { position:sticky; top:0; z-index:1; }
 [dir="rtl"] .ent-tbl thead th, [dir="rtl"] .ent-tbl td.num { text-align:right; }
 @media (max-width:640px) {
