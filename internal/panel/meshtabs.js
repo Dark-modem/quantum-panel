@@ -292,7 +292,7 @@
     agentCol: ['ایجنت', 'Agent'], roleCol: ['نقش', 'Role'],
     versionCol: ['نسخه', 'Version'], archCol: ['معماری', 'Arch'],
     lastSeenCol: ['آخرین حضور', 'Last seen'],
-    cpuCol: ['پردازنده', 'CPU'], memCol: ['حافظه', 'RAM'], diskCol: ['دیسک', 'Disk'],
+    cpuCol: ['پردازنده', 'CPU'], memCol: ['حافظه', 'RAM'],
     roleIran: ['ایران', 'Iran'], roleForeign: ['خارج', 'Foreign'],
     agentCountry: ['کشور میزبان', 'Hosting country'],
     pickCountry: ['کشور میزبان را انتخاب کنید', 'Pick a hosting country'],
@@ -2674,8 +2674,6 @@
       }));
       return;
     }
-    // cpu/mem/disk columns appear only if the payload actually carries resources
-    var hasRes = ags.some(function (a) { return a.cpu || a.mem || a.disk || a.resources; });
     var header = agentHeader();
     var filtered = agtFilter(ags);
     var PS = agtPerPage;
@@ -2694,8 +2692,6 @@
       (anyF ? '<button type="button" class="mtb-fclear" data-cdd-clear title="' + esc(L('agAllF')) + '">\u00d7</button>' : '') +
       '</div></div>';
     var trs = pageAgs.map(function (a) {
-      var r = a.resources || a;
-
       var dc = dcDisp((a.server && a.server.datacenter) || '', a.server && a.server.datacenter_en);
       var row = '<tr>' +
         '<td><b class="mtb-aglink" data-agd="' + esc(a.id) + '"><span class="mtb-ag-ic" aria-hidden="true">' + ICO_AGT + '</span>' + esc(a.name || a.id) + '</b>' +
@@ -2716,11 +2712,6 @@
         '</div>' +
         '<button type="button" class="mtb-act mtb-acts-kebab" data-actskebab title="' + esc(L('agActMore')) + '" aria-label="' + esc(L('agActMore')) + '"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="19" r="1.7"/></svg></button>' +
         '</div></td>';
-      if (hasRes) {
-        row += tdNum(r.cpu && r.cpu.percent != null ? pct(r.cpu.percent) : (r.cpu_pct != null ? pct(r.cpu_pct) : '—'));
-        row += tdNum(r.mem ? (r.mem.total_mb ? pct(r.mem.used_mb / r.mem.total_mb * 100) : (r.mem.used_mb != null ? bytes(r.mem.used_mb * 1048576) : '—')) : (r.mem_pct != null ? pct(r.mem_pct) : '—'));
-        row += tdNum(r.disk ? (r.disk.total_gb ? pct(r.disk.used_gb / r.disk.total_gb * 100) : (r.disk.used_gb != null ? bytes(r.disk.used_gb * 1073741824) : '—')) : (r.disk_pct != null ? pct(r.disk_pct) : '—'));
-      }
       return row + '</tr>';
     }).join('');
     var emptyRow = filtered.length ? '' : '<tr><td colspan="8">' + entEmpty(L('agNoMatch')) + '</td></tr>';
@@ -2737,7 +2728,6 @@
       '<th><span class="mtb-th">' + MTB_ICO.chip + esc(L('archCol')) + '</span></th>' +
       '<th><span class="mtb-th">' + MTB_ICO.mesh + esc(L('agToposH')) + '</span></th>' +
       '<th><span class="mtb-th">' + MTB_ICO.sliders + esc(L('agActs')) + '</span></th>' +
-      (hasRes ? '<th class="num">' + esc(L('cpuCol')) + '</th><th class="num">' + esc(L('memCol')) + '</th><th class="num">' + esc(L('diskCol')) + '</th>' : '') +
       '</tr></thead><tbody>' + (emptyRow || trs) + '</tbody></table></div>' +
       (function () {
         var pages;
