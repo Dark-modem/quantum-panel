@@ -2417,17 +2417,19 @@ html[dir="rtl"] .eng-search input { padding:9px 38px 9px 14px; }
 .bw-hero-badge svg { width:12px; height:12px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
 /* stepper */
 .pbw-stepper-wrap { margin-bottom:14px; }
-.pbw-steps { display:flex; align-items:center; gap:8px; overflow-x:auto; padding:4px 2px; }
-.pbw-step { display:inline-flex; align-items:center; gap:8px; padding:7px 12px; border-radius:99px; border:1px solid transparent; background:transparent; color:var(--mu); font:inherit; font-size:12.5px; font-weight:700; cursor:pointer; flex:none; min-height:36px; }
+.pbw-steps { display:flex; align-items:center; gap:6px; overflow-x:auto; padding:4px 2px; }
+.pbw-step { display:inline-flex; align-items:center; gap:8px; padding:6px 11px; border-radius:99px; border:1px solid var(--ln); background:var(--s2); color:var(--mu); font:inherit; font-size:12.5px; font-weight:700; cursor:pointer; flex:none; min-height:34px; }
+.pbw-lbl { white-space:nowrap; }
 .pbw-step .pbw-dot { width:24px; height:24px; border-radius:50%; display:grid; place-items:center; flex:none; background:var(--sunk); border:1px solid var(--ln); font-size:12px; font-weight:700; color:var(--mu); }
 .pbw-step .pbw-dot svg { width:12px; height:12px; fill:none; stroke:currentColor; stroke-width:2.6; stroke-linecap:round; stroke-linejoin:round; }
-.pbw-step.cur { color:var(--ac); background:var(--ac-soft); border-color:var(--ac-b30, var(--ln)); }
-.pbw-step.cur .pbw-dot { background:var(--ac-fill); border-color:var(--ac); color:var(--ac-on); }
+/* the current step reads as one solid blue pill, so "where am I" is obvious */
+.pbw-step.cur { color:var(--ac-on); background:var(--ac-fill); border-color:var(--ac); }
+.pbw-step.cur .pbw-dot { background:color-mix(in srgb, #fff 22%, transparent); border-color:transparent; color:var(--ac-on); }
 .pbw-step.done { color:var(--ok); }
 .pbw-step.done .pbw-dot { background:var(--ok-soft); border-color:var(--ok-badge-b); color:var(--ok); }
 .pbw-step:disabled { cursor:default; opacity:.75; }
 .pbw-step:not(:disabled):hover { border-color:var(--ac-b30, var(--ln)); }
-.pbw-line { flex:1 1 24px; min-width:24px; height:2px; border-radius:2px; background:var(--ln); }
+.pbw-line { flex:0 0 16px; height:2px; border-radius:2px; background:var(--ln); }
 .pbw-line.filled { background:color-mix(in srgb, var(--ok) 45%, var(--ln)); }
 /* selection summary */
 .pbw-sum-wrap { margin-bottom:14px; }
@@ -2437,20 +2439,31 @@ html[dir="rtl"] .eng-search input { padding:9px 38px 9px 14px; }
 .pbw-sum summary::before { content:''; width:0; height:0; border-inline-start:5px solid transparent; border-inline-end:5px solid transparent; border-top:6px solid var(--mu); transition:transform .15s ease; }
 .pbw-sum[open] summary::before { transform:rotate(180deg); }
 .pbw-sum-badge { margin-inline-start:auto; padding:2px 10px; border-radius:99px; background:var(--ac-soft); color:var(--ac); font-size:12px; font-weight:700; }
-.pbw-sum-body { padding:4px 14px 10px; display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:2px 18px; }
-.pbw-sum-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:5px 0; border-bottom:1px dashed var(--ln); font-size:12.5px; }
-.pbw-sum-row span { color:var(--mu); }
-.pbw-sum-row b { color:var(--tx); text-align:end; min-width:0; overflow:hidden; text-overflow:ellipsis; }
+/* six small tiles instead of six label→dash rows: the label sits above its
+   value, so an empty pick no longer reads as an em dash at the far edge */
+.pbw-sum-body { padding:10px 14px 14px; display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:8px; }
+.pbw-sum-row { display:flex; flex-direction:column; align-items:flex-start; gap:3px; padding:8px 11px; border:1px solid var(--ln); border-radius:10px; background:var(--sunk); font-size:12.5px; min-width:0; }
+.pbw-sum-row span { color:var(--mu); font-size:11.5px; }
+.pbw-sum-row b { color:var(--tx); text-align:start; font-size:13px; max-width:100%; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 /* step head */
-.pbw-step-head { display:flex; align-items:center; gap:11px; margin-bottom:12px; }
+/* a hairline separates the step's own area from the stepper and summary above */
+.pbw-step-head { display:flex; align-items:center; gap:11px; margin:2px 0 12px; padding-top:14px; border-top:1px solid var(--ln); }
+.pbw-step-head > div { display:flex; flex-direction:column; gap:2px; min-width:0; }
 .pbw-step-ico { width:36px; height:36px; border-radius:10px; display:grid; place-items:center; flex:none; background:var(--ac-soft); color:var(--ac); }
 .pbw-step-ico svg { width:17px; height:17px; fill:none; stroke:currentColor; stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }
 .pbw-step-sub { display:block; font-size:12.5px; color:var(--mu); }
 /* selection cards */
 .pbw-cards { display:grid; gap:10px; margin-bottom:10px; }
-.pbw-cards-3 { grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); }
+.pbw-cards-3 { grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); }
 .pbw-cards-2 { grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); }
-.pbw-card { display:flex; align-items:center; gap:11px; text-align:start; padding:12px 14px; border-radius:var(--r-md); border:1px solid var(--ln); background:var(--s2); color:var(--tx2); font:inherit; cursor:pointer; min-width:0; transition:border-color .15s ease, background-color .15s ease; min-height:56px; }
+.pbw-card { display:grid; grid-template-columns:auto minmax(0, 1fr) auto; align-items:center; column-gap:11px; text-align:start; padding:11px 13px; border-radius:var(--r-md); border:1px solid var(--ln); background:var(--s2); color:var(--tx2); font:inherit; cursor:pointer; min-width:0; transition:border-color .15s ease, background-color .15s ease; min-height:56px; }
+/* the name and its counts share one column, so they always start at the same
+   edge, and the selector closes the card at the far end */
+/* names are latin, and a plaintext bidi paragraph would align them by their own
+   direction (left) while the persian counts beside them sit right — force the
+   card's own direction so both lines start at the same edge */
+.pbw-card > .pbw-card-tx, .pbw-card > .pbw-card-tx * { unicode-bidi:normal; }
+.pbw-card > .pbw-card-tx { justify-self:stretch; }
 .pbw-card:hover:not(:disabled) { border-color:var(--ac-b30, var(--ln)); }
 .pbw-card.on { border-color:var(--ac); background:var(--ac-soft); }
 .pbw-card.disabled { opacity:.55; cursor:not-allowed; }
@@ -2458,9 +2471,10 @@ html[dir="rtl"] .eng-search input { padding:9px 38px 9px 14px; }
 .pbw-card-ico svg { width:20px; height:20px; }
 .pbw-card-tx { display:flex; flex-direction:column; gap:2px; min-width:0; flex:1; }
 .pbw-card-tx b { color:var(--tx); font-size:13.5px; }
-.pbw-card-sub { font-size:12px; color:var(--mu); display:block; }
+.pbw-card-sub { font-size:12px; color:var(--mu); display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .pbw-card-bad { font-size:12px; font-weight:700; color:var(--er); }
 .pbw-bad-full { grid-column:1 / -1; }
+.pbw-card > .pbw-card-bad { grid-column:1 / -1; }
 .pbw-radio, .pbw-check { width:22px; height:22px; border-radius:50%; border:2px solid var(--ln2, var(--ln)); display:grid; place-items:center; flex:none; color:var(--ac-on); background:transparent; }
 .pbw-check { border-radius:7px; }
 .pbw-radio.on, .pbw-check.on { background:var(--ac-fill); border-color:var(--ac); }
