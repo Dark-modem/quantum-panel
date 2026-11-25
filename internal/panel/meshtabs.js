@@ -535,7 +535,11 @@
     '.mtb-tunhead::after { content:""; position:absolute; width:96px; height:96px; border-radius:50%; top:-34px; inset-inline-start:-34px; pointer-events:none; background:radial-gradient(circle at 35% 35%, color-mix(in srgb, var(--ac) 26%, transparent) 0%, color-mix(in srgb, var(--ac) 9%, transparent) 72%); }',
     '.mtb-tunhead > * { position:relative; z-index:1; }',
     '.mtb-tunhead .mtb-agintro-row { flex-direction:row; }',
-    '.mtb-tunhead-id { display:flex; align-items:center; gap:10px; }',
+    '.mtb-tunhead-id { display:flex; align-items:center; gap:11px; }',
+    // the page name is the one heading on the strip: it carries the max size and
+    // weight, and its tunnel glyph matches so it is not a speck next to it
+    '.mtb-tunhead .mtb-tunhead-id .dcard-title { font-size:18px; font-weight:800; letter-spacing:-.015em; }',
+    '.mtb-tunhead .mtb-tunhead-id .dcard-title svg { width:22px; height:22px; stroke-width:2.2; }',
     '.mtb-keycopy { display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; margin-inline-start:6px; border:1px solid var(--ln, rgba(148,163,184,.25)); border-radius:6px; background:transparent; color:var(--mu, #94a3b8); cursor:pointer; vertical-align:middle; transition:color .15s, border-color .15s; }',
     '.mtb-keycopy svg { width:13px; height:13px; flex:none; fill:none; stroke:currentColor; stroke-width:1.7; }',
     '.mtb-keycopy:hover { color:var(--ac); border-color:var(--ac); }',
