@@ -333,7 +333,20 @@ function topTitleSync(id) {
   }
   span.textContent = lbl.textContent;
 }
-window.addEventListener('hashchange', function () { try { topTitleSync(); } catch (e) {} });
+window.addEventListener('hashchange', function () {
+  try { topTitleSync(); } catch (e) {}
+  // Back/forward (and a hand-edited #t=…) must actually switch the page; the
+  // mesh tabs (magt/mtun/…) keep their own router in mesh.js.
+  try {
+    const m = (location.hash || '').match(/^#t=([a-z-]+)/);
+    if (!m) return;
+    let name = m[1] === 'topology' ? 'tunnel' : m[1];
+    const routed = ['dashboard','tunnel','cores','cluster','setup','xray','firewall','logs','perf','watchdog','doctor','benchmark','cboard','spoof','netopt','update','settings','terminal'];
+    if (routed.indexOf(name) < 0) return;
+    const el = $('tab-' + name);
+    if (el && el.hidden) goTab(name);
+  } catch (e) { /* hash routing is best-effort */ }
+});
 window.topTitleSync = topTitleSync;
 try { topTitleSync(); } catch (e) {} // sync now — no static «Quantum» flash
 window.addEventListener('load', function () { try { topTitleSync(); } catch (e) {} });
@@ -350,7 +363,7 @@ function goTab(name) {
   if (name === 'add-peer') { goTab('setup'); const c = $('setupAddPeerStep'); if (c && c.scrollIntoView) c.scrollIntoView({behavior: 'smooth', block: 'start'}); return; }
   // Bagher lives in Setup (create) and Tunnel (run) like every other tunnel.
   if (name === 'sshfwd' || name === 'bagher') { openBagherSetup(); return; }
-  ['dashboard','tunnel','cores','cluster','setup','xray','logs','perf','watchdog','doctor','benchmark','cboard','spoof','netopt','update','settings','terminal'].forEach(t => { const el = $('tab-'+t); if (el) el.hidden = t !== name; });
+  ['dashboard','tunnel','cores','cluster','setup','xray','firewall','logs','perf','watchdog','doctor','benchmark','cboard','spoof','netopt','update','settings','terminal'].forEach(t => { const el = $('tab-'+t); if (el) el.hidden = t !== name; });
   const markTab = b => {
     const on = b.dataset.tab === name;
     b.classList.toggle('on', on);

@@ -3236,7 +3236,7 @@
           <div id="fwOut" class="ops-out u-mono" dir="ltr" aria-live="polite"></div>
           <div class="dr"><span class="k" data-i18n="ops_ports">Listening ports (from the agent)</span></div>
           <div id="fwPorts" class="ops-out u-mono" dir="ltr" aria-live="polite"></div>
-          <div class="u-flex u-gap-8 u-mt-8">
+          <div class="u-flex u-flex-wrap u-gap-8 u-mt-8">
             <button type="button" class="quantum-btn quantum-btn-secondary" id="fwApplyBtn" data-i18n="ops_fw_plan">Plan / Apply firewall change</button>
             <button type="button" class="quantum-btn quantum-btn-danger" id="fwTeardownBtn" data-i18n="ops_fw_teardown">Teardown owner rules</button>
           </div>
@@ -4011,7 +4011,15 @@
     var btn = document.getElementById('themeBtnTop');
     if (!btn) return;
     var side = document.getElementById('themeBtn');
-    btn.addEventListener('click', function () { if (side) side.click(); });
+    btn.addEventListener('click', function () {
+      if (side) { side.click(); return; }
+      // The sidebar #themeBtn was dropped in the ui/live redesign; fall back to
+      // app.js setTheme() so the topbar toggle keeps working.
+      if (typeof window.setTheme === 'function') {
+        var cur = document.body.getAttribute('data-t') || document.documentElement.getAttribute('data-t');
+        window.setTheme(cur === 'light' ? 'dark' : 'light');
+      }
+    });
     function curTheme() {
       var t = document.body.getAttribute('data-t') || document.documentElement.getAttribute('data-t');
       if (!t) { try { t = localStorage.getItem('gre_theme'); } catch (e) { /* storage blocked */ } }
