@@ -3090,6 +3090,7 @@ window.FA_TEXT = {
  "Install on agents": "نصب روی ایجنت‌ها",
  "Update all": "به‌روزرسانی همه",
  "Installed on agents": "نصب‌شده روی ایجنت‌ها",
+ "Installed": "نصب‌شده",
  "Up to date": "به‌روز",
  "Outdated": "قدیمی",
  "Never installed": "هیچ‌جا نصب نشده",
