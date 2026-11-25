@@ -1292,6 +1292,10 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 /* colored trio: white-ringed view, green power while the pair is active, red delete */
 .topo-inline-btn.topo-view { color:var(--tx); border-color:color-mix(in srgb, var(--tx) 60%, transparent); }
 .topo-inline-btn.topo-view:hover { color:var(--tx); border-color:var(--tx); background:color-mix(in srgb, var(--tx) 10%, transparent); }
+/* the pencil used the faint --ln ring, so on the card it read as borderless next
+   to the white-ringed view and the red delete; it now carries the accent ring */
+.topo-inline-btn.topo-edit { color:var(--ac); border-color:color-mix(in srgb, var(--ac) 40%, transparent); background:color-mix(in srgb, var(--ac) 8%, transparent); }
+.topo-inline-btn.topo-edit:hover { color:var(--ac); border-color:var(--ac); background:color-mix(in srgb, var(--ac) 16%, transparent); }
 .topo-inline-btn.topo-power:not([data-active="true"]) { color:var(--ok); border-color:color-mix(in srgb, var(--ok) 45%, transparent); background:color-mix(in srgb, var(--ok) 10%, transparent); }
 .topo-inline-btn.topo-power:not([data-active="true"]):hover { color:var(--ok); border-color:var(--ok); background:color-mix(in srgb, var(--ok) 18%, transparent); }
 .topo-inline-btn.topo-delete { color:var(--er); border-color:color-mix(in srgb, var(--er) 35%, transparent); }
