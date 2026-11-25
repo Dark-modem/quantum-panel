@@ -1839,10 +1839,24 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 }
 .topbar .tb-title-txt { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .topbar h1.tb-title .mtb-bc { display:inline-flex; align-items:center; gap:7px; min-width:0; overflow:hidden; }
-/* Breadcrumb lives inside the chip: the parent is quiet, the current page is
-   the only strong word (the injected default made the parent an accent link). */
-.topbar .tb-title .mtb-bc-link { color:var(--mu); font-weight:500; }
-.topbar .tb-title .mtb-bc-link:hover { color:var(--ac); }
+/* Breadcrumb lives inside the chip: the parent reads as a small button (a pill
+   with its own border and fill), never as an underlined link, and the current
+   page stays the only strong word. */
+.topbar .tb-title .mtb-bc-link {
+  display:inline-flex; align-items:center;
+  height:24px; padding:0 10px; margin-inline-end:2px;
+  border-radius:8px;
+  border:1px solid color-mix(in srgb, var(--tx) 13%, transparent);
+  background:color-mix(in srgb, var(--tx) 6%, transparent);
+  color:var(--tx2); font-weight:600;
+  text-decoration:none; cursor:pointer;
+  transition:color .18s ease, background .18s ease, border-color .18s ease;
+}
+.topbar .tb-title .mtb-bc-link:hover, .topbar .tb-title .mtb-bc-link:focus-visible {
+  color:var(--ac); text-decoration:none;
+  border-color:color-mix(in srgb, var(--ac) 42%, transparent);
+  background:color-mix(in srgb, var(--ac) 14%, transparent);
+}
 .topbar .tb-title .mtb-bc-sep { color:var(--dim); font-weight:400; }
 .topbar .tb-title .mtb-bc-cur { min-width:0; overflow:hidden; text-overflow:ellipsis; }
 .topbar .tb-head .sub { margin:0; min-width:0; max-width:32vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
