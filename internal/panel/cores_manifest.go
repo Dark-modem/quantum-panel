@@ -31,6 +31,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -189,10 +190,11 @@ func parseCoresManifest(core string, body []byte) (methods json.RawMessage, lice
 
 // coresEngineAlias maps an engine id to the cores-repo core folder name
 // where they differ (verified against the repo layout 2026-11-22: the
-// wstunnel core drives the panel's wst engine, and the sing-box core
-// folder is `sing-box/` while the agent's driver id is `singbox` —
-// quantum-agent singbox_driver.go singboxID; without the second alias
-// the sing-box row never joins its manifest methods[]/installed_version).
+// wstunnel core drives the panel's wst engine. BACKEND-45 adds sing-box —
+// the core folder/repo name carries the dash, the agents' engine id does
+// not (quantum-agent singbox_driver.go singboxID); without the second
+// alias the sing-box row never joins its manifest methods[] or its
+// installed_version resolution).
 var coresEngineAlias = map[string]string{"wst": "wstunnel", "singbox": "sing-box"}
 
 // coresCoreOfEngine resolves the repo core folder for an engine id.
@@ -218,29 +220,71 @@ func coresEngineOfCore(core string) string {
 // implementation: the verbatim manifest methods[] of one core, decoded
 // ONLY into the board's identity columns (the §2.22 passthrough itself
 // stays raw).
+//
+// BACKEND-45 fixes (found by the acceptance pass against the REAL landed
+// manifests): every live manifest publishes `id` as a JSON NUMBER (ctunnel
+// 49 rows, sing-box 16, hysteria 2, easytier 1, waterwall 18 — all ints),
+// which the old `ID string` decode rejected wholesale — the join silently
+// yielded zero rows for every core. The decode is now id-shape-agnostic,
+// and the board's method id is the manifest's `name` — the DRIVER-
+// consumable spelling (the ctunnel driver's ctMethods keys are the names:
+// "6to4", "6to4-gre", …; the numeric id is the manifest's own row number
+// and no driver accepts it). A manifest without `name` falls back to the
+// verbatim id text. The row's Engine is the ENGINE id the agents report
+// (coresEngineOfCore: the sing-box core drives engine "singbox"), never
+// the repo folder name — a probe tunnel for an unreported engine id can
+// never converge.
 func coresManifestMethods(core string) []methodManifestEntry {
 	entry := fetchCoresManifestCached(core)
 	if entry == nil || entry.Err != nil || len(entry.Methods) == 0 {
 		return nil
 	}
 	var methods []struct {
-		ID        string `json:"id"`
-		Layer     string `json:"layer"`
-		Transport string `json:"transport"`
-		IPVer     string `json:"ipver"`
+		ID        json.RawMessage `json:"id"`
+		Name      string          `json:"name"`
+		Layer     string          `json:"layer"`
+		Transport string          `json:"transport"`
+		IPVer     string          `json:"ipver"`
 	}
 	if err := json.Unmarshal(entry.Methods, &methods); err != nil {
 		return nil
 	}
+	engine := coresEngineOfCore(core)
 	out := make([]methodManifestEntry, 0, len(methods))
 	for _, m := range methods {
-		if m.ID == "" {
+		id := manifestMethodIDText(m.ID)
+		if m.Name != "" {
+			id = m.Name
+		}
+		if id == "" {
 			continue
 		}
-		out = append(out, methodManifestEntry{ID: m.ID, Engine: core,
+		out = append(out, methodManifestEntry{ID: id, Engine: engine,
 			Layer: m.Layer, Transport: m.Transport, IPVer: m.IPVer})
 	}
 	return out
+}
+
+// manifestMethodIDText renders a manifest method id's raw JSON as plain
+// text: a JSON string unquotes, a number keeps its literal digits,
+// anything else (objects/arrays) yields "" — no invented ids.
+func manifestMethodIDText(raw json.RawMessage) string {
+	trimmed := strings.TrimSpace(string(raw))
+	if trimmed == "" || trimmed == "null" {
+		return ""
+	}
+	if len(trimmed) > 1 && trimmed[0] == '"' && trimmed[len(trimmed)-1] == '"' {
+		var s string
+		if err := json.Unmarshal(raw, &s); err != nil {
+			return ""
+		}
+		return s
+	}
+	var n json.Number
+	if err := json.Unmarshal(raw, &n); err == nil {
+		return n.String()
+	}
+	return ""
 }
 
 // coresManifestMethodEntry is the method-board join's reverse lookup
@@ -248,17 +292,32 @@ func coresManifestMethods(core string) []methodManifestEntry {
 // release feed knows (the feed cache answers locally; a manifest miss is
 // a cached no-op), then the manifest cache itself as the fallback for a
 // temporarily unreachable feed.
+//
+// BACKEND-46: the scan is SORTED-CORE order, not the feed's order. The
+// release list arrives in GitHub's order, and the real landed manifests
+// publish the SAME method id from several cores ("hysteria2" in hysteria
+// AND sing-box; "vless"/"vmess"/"trojan"/"wireguard" in sing-box AND
+// waterwall AND ctunnel) — a feed-order scan resolves those ids to
+// different engines run to run. The forward join (methodBoardCandidates)
+// dedups in sorted-agreed-engine order, whose live alias map sorts the
+// same way, so sorted-core order here elects the same winner the
+// enumeration kept and the board's identity columns stay deterministic.
 func coresManifestMethodEntry(method string) (methodManifestEntry, bool) {
 	rels, err := fetchCoresReleasesCached()
 	if err == nil {
+		cores := make([]string, 0, len(rels))
 		seen := map[string]bool{}
 		for i := range rels {
-			m := coresTagRe.FindStringSubmatch(rels[i].Tag)
-			if m == nil || seen[m[1]] {
+			core, _, ok := coresTagParts(rels[i].Tag)
+			if !ok || seen[core] {
 				continue
 			}
-			seen[m[1]] = true
-			for _, e := range coresManifestMethods(m[1]) {
+			seen[core] = true
+			cores = append(cores, core)
+		}
+		sort.Strings(cores)
+		for _, c := range cores {
+			for _, e := range coresManifestMethods(c) {
 				if e.ID == method {
 					return e, true
 				}
@@ -266,12 +325,13 @@ func coresManifestMethodEntry(method string) (methodManifestEntry, bool) {
 		}
 	}
 	coresManifestMu.Lock()
-	cores := make([]string, 0, len(coresManifestCache))
+	cacheCores := make([]string, 0, len(coresManifestCache))
 	for c := range coresManifestCache {
-		cores = append(cores, c)
+		cacheCores = append(cacheCores, c)
 	}
 	coresManifestMu.Unlock()
-	for _, c := range cores {
+	sort.Strings(cacheCores)
+	for _, c := range cacheCores {
 		for _, e := range coresManifestMethods(c) {
 			if e.ID == method {
 				return e, true
@@ -284,15 +344,19 @@ func coresManifestMethodEntry(method string) (methodManifestEntry, bool) {
 // ---- installed_version / outdated (§2.22 addendum) ------------------------
 
 // coresVersionCompare is the §2.20 comparison RULES over the cores' own
-// version shape: the cores feed only publishes digits+dots (coresTagRe:
-// 2 or 3 numeric segments — semver AND the CALVER form), so the compare
-// is segment-wise numeric with zero padding. A non-parsable (non
-// digits+dots) version never claims newer: it compares equal (outdated
-// stays null/false rather than guessing).
+// version shape: the feed publishes digits+dots versions (2 or 3 numeric
+// segments — semver AND the CALVER form), and BACKEND-47 added naive's
+// four numeric segments + `-<build>` suffix (naive-v154.0.8037.49-5), so
+// the compare is segment-wise numeric with zero padding, then the build
+// number. A non-parsable version never claims newer: it compares equal
+// (outdated stays null/false rather than guessing).
 func coresVersionCompare(a, b string) int {
-	na := coresVersionSegs(a)
-	nb := coresVersionSegs(b)
-	for i := 0; i < 3; i++ {
+	na, oka := coresVersionSegs(a)
+	nb, okb := coresVersionSegs(b)
+	if !oka || !okb {
+		return 0
+	}
+	for i := 0; i < 5; i++ {
 		if na[i] != nb[i] {
 			if na[i] < nb[i] {
 				return -1
@@ -303,22 +367,32 @@ func coresVersionCompare(a, b string) int {
 	return 0
 }
 
-func coresVersionSegs(v string) [3]int {
-	var out [3]int
-	for i, seg := range strings.Split(strings.TrimPrefix(strings.TrimSpace(v), "v"), ".") {
-		if i >= 3 {
-			break
+// coresVersionSegs parses up to four numeric segments plus an optional
+// trailing `-<build>` (naive). ok=false = outside the cores contract's
+// shape (treated as all-zeros by the comparison).
+func coresVersionSegs(v string) ([5]int, bool) {
+	var out [5]int
+	v = strings.TrimPrefix(strings.TrimSpace(v), "v")
+	if i := strings.LastIndexByte(v, '-'); i > 0 {
+		n, err := strconv.Atoi(v[i+1:])
+		if err != nil {
+			return out, false
 		}
+		out[4] = n
+		v = v[:i]
+	}
+	parts := strings.Split(v, ".")
+	if len(parts) > 4 {
+		return out, false
+	}
+	for i, seg := range parts {
 		n, err := strconv.Atoi(seg)
 		if err != nil {
-			// a non-numeric segment poisons the comparison — the version is
-			// out of the cores contract's shape; treat as all-zeros so it
-			// never claims newer
-			return [3]int{}
+			return [5]int{}, false
 		}
 		out[i] = n
 	}
-	return out
+	return out, true
 }
 
 // coresInstalledVersions answers, for one core, the newest version any

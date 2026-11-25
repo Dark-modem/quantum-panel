@@ -91,6 +91,15 @@ var methodCatalog = map[string]methodBoardMeta{
 	"aestun":    {Layer: "l3", Transport: "udp", IPVer: "v4"},
 	"rakhsh":    {Layer: "l4", Transport: "tcp/tls/ws/quic", IPVer: "v4"},
 	"udp2raw":   {Layer: "l4", Transport: "raw", IPVer: "v4"},
+	// BACKEND-45: the new engines' grounded metadata (the UI's per-core
+	// pages label rows with these). Grounding: hysteria = a QUIC carrier —
+	// UDP only (AGENT-31; the cores manifest agrees: transport udp, ipver
+	// both), its QUIC listen ":port" is dual-stack; sing-box carries both
+	// TCP (shadowsocks/vless/vmess/trojan/anytls/shadowtls/snell/naive) and
+	// UDP (hysteria2/hysteria/tuic) protocols, and the driver renders the
+	// listen as "0.0.0.0" — the IPv4 wildcard.
+	"hysteria": {Layer: "l4", Transport: "udp", IPVer: "v4+v6"},
+	"singbox":  {Layer: "l4", Transport: "tcp/udp", IPVer: "v4"},
 }
 
 type methodBoardMeta struct{ Layer, Transport, IPVer string }
@@ -472,6 +481,13 @@ func bestAny(best string) any {
 // manifest methods of the catalog-agreed cores (the BACKEND-43 join; empty
 // until a manifest publishes methods[]). Catalog-engine rows keep
 // method == engine; manifest-method rows carry their own method id.
+//
+// BACKEND-45: the join now visits EVERY catalog-agreed engine — the old
+// code only visited the engines OUTSIDE uiKnownEngines, so cores that
+// publish methods[] while riding the known set (sing-box 16 rows,
+// hysteria 2 — verified against the landed manifests) never enumerated
+// their methods. The unknown-extras path keeps its exact previous
+// behavior (their rows still append after the known set).
 func methodBoardCandidates(iranCatalog, kharejCatalog []string) []string {
 	seen := map[string]bool{}
 	out := []string{}
@@ -486,20 +502,31 @@ func methodBoardCandidates(iranCatalog, kharejCatalog []string) []string {
 	for _, e := range kharejCatalog {
 		inKharej[e] = true
 	}
-	both := []string{}
+	agreed := []string{}
+	agreedSeen := map[string]bool{}
 	for _, e := range iranCatalog {
-		if e == "" || seen[e] || !inKharej[e] {
+		if e == "" || !inKharej[e] || agreedSeen[e] {
+			continue
+		}
+		agreedSeen[e] = true
+		agreed = append(agreed, e)
+	}
+	sort.Strings(agreed)
+	both := []string{}
+	for _, e := range agreed {
+		if seen[e] {
 			continue
 		}
 		seen[e] = true
 		both = append(both, e)
 	}
-	sort.Strings(both)
 	out = append(out, both...)
 	// the manifest-method join: for each catalog-agreed CORE whose manifest
 	// publishes methods[], every method id becomes a board row (engine =
-	// core, method = the manifest's own id — verbatim, no reshaping)
-	for _, core := range both {
+	// the agents' engine id, method = the manifest's driver-consumable
+	// spelling — verbatim, no reshaping; the engine rows came first, so a
+	// manifest method named like an engine never shadows it)
+	for _, core := range agreed {
 		for _, m := range mboardManifestMethodsFn(core) {
 			if m.ID == "" || seen[m.ID] {
 				continue
@@ -516,6 +543,31 @@ func methodBoardCandidates(iranCatalog, kharejCatalog []string) []string {
 // whether the method IS a manifest method.
 func mboardManifestEntryOf(method string) (methodManifestEntry, bool) {
 	return mboardManifestEntryFn(method)
+}
+
+// mboardEngineRowID says whether a board candidate is a CATALOG-ENGINE row
+// (method == engine): the panel-known engine ids plus the methodCatalog
+// keys. The candidates join seeds the engine ids BEFORE any manifest
+// method, so a manifest method named like an engine never enumerates a
+// second row for it — and the probe/unprobed render must resolve the
+// identity the SAME way. This is not hypothetical: the real landed
+// manifests publish methods literally named "hysteria" (sing-box block)
+// and "wireguard" (ctunnel, sing-box AND waterwall blocks), and both are
+// panel engine ids — without the engine-first rule the engine rows' probe
+// tunnels would be created under the manifest method's engine with a
+// {"method": id} param that engine's driver never consumes (BACKEND-46).
+// Catalog-agreed extras outside both sets stay manifest-resolvable (their
+// manifests name no engine today; documented honest edge).
+func mboardEngineRowID(method string) bool {
+	if _, ok := methodCatalog[method]; ok {
+		return true
+	}
+	for _, e := range uiKnownEngines {
+		if e == method {
+			return true
+		}
+	}
+	return false
 }
 
 // agentEngineCatalogList parses the agent's stored v2 engine catalog (the
@@ -623,16 +675,21 @@ func (p *mboardState) finish() {
 // timeout rows and cleanup on every exit path.
 func (p *mboardState) probeOne(method string) {
 	row := methodBoardRow{Method: method}
-	if m, ok := mboardManifestEntryOf(method); ok {
+	if mboardEngineRowID(method) {
+		// catalog-engine row FIRST (the candidates join seeded it as an
+		// engine id) — a manifest method with the same name never re-labels
+		// it (BACKEND-46; "hysteria"/"wireguard" ship inside real manifests)
+		row.Engine = method
+		if meta, ok := methodCatalog[method]; ok {
+			row.Layer, row.Transport, row.IPVer = meta.Layer, meta.Transport, meta.IPVer
+		}
+	} else if m, ok := mboardManifestEntryOf(method); ok {
 		row.Engine = m.Engine
 		row.Layer = strings.ToLower(strings.TrimSpace(m.Layer))
 		row.Transport = m.Transport
 		row.IPVer = m.IPVer
 	} else {
 		row.Engine = method
-		if meta, ok := methodCatalog[method]; ok {
-			row.Layer, row.Transport, row.IPVer = meta.Layer, meta.Transport, meta.IPVer
-		}
 	}
 	if p.stoppedNow() {
 		row.Reachability = "stopped"
@@ -646,13 +703,15 @@ func (p *mboardState) probeOne(method string) {
 	iranSrv, kharejSrv, topoID := p.iranSrv, p.kharejSrv, p.topoID
 	p.mu.Unlock()
 	params := "{}"
-	if _, isManifest := mboardManifestEntryOf(method); isManifest {
-		// the AGENT-30 driver consumes method from the engine params; a
-		// driver that predates it probes its default — but a manifest method
-		// row only exists once the manifest publishes methods[], which only
-		// happens with the v2 core, so the sequencing keeps the identity
-		// honest
-		params = `{"method":` + strconv.Quote(method) + `}`
+	if !mboardEngineRowID(method) {
+		if _, isManifest := mboardManifestEntryOf(method); isManifest {
+			// the AGENT-30 driver consumes method from the engine params; a
+			// driver that predates it probes its default — but a manifest method
+			// row only exists once the manifest publishes methods[], which only
+			// happens with the v2 core, so the sequencing keeps the identity
+			// honest
+			params = `{"method":` + strconv.Quote(method) + `}`
+		}
 	}
 	id, err := p.store.UpsertTunnel(store.Tunnel{
 		TunnelKey: key, TopologyID: topoID,
@@ -891,16 +950,19 @@ func unprobedRows(methods []string) []methodBoardRow {
 	rows := []methodBoardRow{}
 	for _, m := range methods {
 		r := methodBoardRow{Method: m, Reachability: "unprobed"}
-		if entry, isManifest := mboardManifestEntryOf(m); isManifest {
+		if mboardEngineRowID(m) {
+			// engine row first — the same precedence probeOne applies
+			r.Engine = m
+			if meta, ok := methodCatalog[m]; ok {
+				r.Layer, r.Transport, r.IPVer = meta.Layer, meta.Transport, meta.IPVer
+			}
+		} else if entry, isManifest := mboardManifestEntryOf(m); isManifest {
 			r.Engine = entry.Engine
 			r.Layer = strings.ToLower(strings.TrimSpace(entry.Layer))
 			r.Transport = entry.Transport
 			r.IPVer = entry.IPVer
 		} else {
 			r.Engine = m
-			if meta, ok := methodCatalog[m]; ok {
-				r.Layer, r.Transport, r.IPVer = meta.Layer, meta.Transport, meta.IPVer
-			}
 		}
 		rows = append(rows, r)
 	}
