@@ -78,11 +78,17 @@ var coresManifestFetcher = func(core string) ([]byte, error) {
 // coresManifestCacheEntry is one core's cached manifest view. Methods is
 // the VERBATIM methods[] JSON (nil = the manifest does not publish one,
 // has not been fetched yet, or is unreachable — the row renders null,
-// never a guessed shape; Err distinguishes the failure).
+// never a guessed shape; Err distinguishes the failure). License and
+// Upstream are the manifest's own informational lines, passed through
+// VERBATIM ("" = the manifest does not publish the field or the manifest
+// is unreachable — never guessed; a manifest parse failure also answers
+// "" for both: a failed read never half-lands).
 type coresManifestCacheEntry struct {
-	Methods json.RawMessage
-	At      time.Time
-	Err     error
+	Methods  json.RawMessage
+	License  string
+	Upstream string
+	At       time.Time
+	Err      error
 }
 
 var (
@@ -123,7 +129,7 @@ func fetchCoresManifestCached(core string) *coresManifestCacheEntry {
 		body, err := coresManifestFetcher(core)
 		newEntry := &coresManifestCacheEntry{At: time.Now(), Err: err}
 		if err == nil && len(body) > 0 {
-			newEntry.Methods, err = parseCoresManifestMethods(core, body)
+			newEntry.Methods, newEntry.License, newEntry.Upstream, err = parseCoresManifest(core, body)
 			newEntry.Err = err
 		}
 		coresManifestMu.Lock()
@@ -152,37 +158,43 @@ func dropCoresManifestCache() {
 
 var coresManifestDropAt time.Time
 
-// parseCoresManifestMethods extracts methods[] from a manifest body —
-// verbatim; the only validation is "the manifest is JSON" and "methods is
-// a JSON array".
-func parseCoresManifestMethods(core string, body []byte) (json.RawMessage, error) {
+// parseCoresManifest extracts methods[] plus the informational
+// license/upstream lines from a manifest body — verbatim; the only
+// validation is "the manifest is JSON" and "methods is a JSON array".
+// A parse failure returns "" for license/upstream too: a failed read
+// never half-lands.
+func parseCoresManifest(core string, body []byte) (methods json.RawMessage, license, upstream string, err error) {
 	var manifest struct {
-		Methods json.RawMessage `json:"methods"`
+		Methods  json.RawMessage `json:"methods"`
+		License  string          `json:"license"`
+		Upstream string          `json:"upstream"`
 	}
-	if err := json.Unmarshal(body, &manifest); err != nil {
-		return nil, fmt.Errorf("cores manifest %s: not valid JSON", core)
+	if err = json.Unmarshal(body, &manifest); err != nil {
+		return nil, "", "", fmt.Errorf("cores manifest %s: not valid JSON", core)
 	}
+	license, upstream = manifest.License, manifest.Upstream
 	if len(manifest.Methods) == 0 {
-		return nil, nil // published without methods[] — honest null
+		return nil, license, upstream, nil // published without methods[] — honest null
 	}
 	var probe []json.RawMessage
-	if err := json.Unmarshal(manifest.Methods, &probe); err != nil {
-		return nil, fmt.Errorf("cores manifest %s: methods is not an array", core)
+	if err = json.Unmarshal(manifest.Methods, &probe); err != nil {
+		return nil, "", "", fmt.Errorf("cores manifest %s: methods is not an array", core)
 	}
 	// JSON null decodes into RawMessage as the literal "null" bytes —
 	// normalize it to nil so the cache semantics stay "absent = nil"
 	if len(probe) == 0 {
-		return nil, nil
+		return nil, license, upstream, nil
 	}
-	return manifest.Methods, nil
+	return manifest.Methods, license, upstream, nil
 }
 
 // coresEngineAlias maps an engine id to the cores-repo core folder name
 // where they differ (verified against the repo layout 2026-11-22: the
-// wstunnel core drives the panel's wst engine; BACKEND-45 adds sing-box —
+// wstunnel core drives the panel's wst engine. BACKEND-45 adds sing-box —
 // the core folder/repo name carries the dash, the agents' engine id does
-// not, so the sing-box manifest join and the sing-box rows'
-// installed_version resolution both need the alias).
+// not (quantum-agent singbox_driver.go singboxID); without the second
+// alias the sing-box row never joins its manifest methods[] or its
+// installed_version resolution).
 var coresEngineAlias = map[string]string{"wst": "wstunnel", "singbox": "sing-box"}
 
 // coresCoreOfEngine resolves the repo core folder for an engine id.

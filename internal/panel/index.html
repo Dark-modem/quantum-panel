@@ -1535,6 +1535,7 @@
 <button role="tab" aria-selected="false" aria-controls="tab-perf" tabindex="-1" class="nav-item" data-tab="perf" id="perfNav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg><span data-i18n="nav_perf">Performance</span></button>
 <button role="tab" aria-selected="false" aria-controls="tab-watchdog" tabindex="-1" class="nav-item" data-tab="watchdog" id="watchdogNav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><span data-i18n="nav_watchdog">Watchdog</span></button>
 <button role="tab" aria-selected="false" aria-controls="tab-benchmark" tabindex="-1" class="nav-item" data-tab="benchmark" id="benchmarkNav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg><span data-i18n="nav_benchmark">Benchmark</span></button>
+<button role="tab" aria-selected="false" aria-controls="tab-cboard" tabindex="-1" class="nav-item" data-tab="cboard" id="cboardNav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg><span data-i18n="nav_cboard">Method Board</span></button>
 <button role="tab" aria-selected="false" aria-controls="tab-logs" tabindex="-1" class="nav-item" data-tab="logs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span data-i18n="nav_logs">Logs</span></button>
 <button role="tab" aria-selected="false" aria-controls="tab-settings" tabindex="-1" class="nav-item" data-tab="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.06-.4.1-.8.1-1.2z"/></svg><span data-i18n="nav_settings">Settings</span></button>
 <button role="tab" aria-selected="false" aria-controls="tab-doctor" tabindex="-1" class="nav-item" data-tab="doctor" id="doctorNav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><span data-i18n="nav_doctor">Diagnostics</span><span class="nav-badge hidden u-ml-auto"></span></button>
@@ -2088,6 +2089,7 @@
       </section>
       <!-- ==================== CORES TAB ==================== -->
       <section id="tab-cores" role="tabpanel" hidden>
+        <div id="coresList">
         <div class="ent-card eng-headcard">
           <div class="eng-head">
             <span class="eng-head-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><ellipse cx="12" cy="12" rx="10" ry="4.2" transform="rotate(-30 12 12)"/></svg></span>
@@ -2102,6 +2104,43 @@
           </div>
         </div>
         <div class="ent-card eng-gridcard" id="engList"></div>
+        <div class="ent-card eng-artcard" id="engArtCard">
+          <div class="eng-art-head">
+            <div class="eng-art-title">
+              <span class="eng-art-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg></span>
+              <div class="eng-art-titletxt">
+                <p class="tc-title" data-i18n="eng_art_title">Artifact store</p>
+                <p class="ent-help eng-art-sub" data-i18n="eng_art_sub">Signed core binaries the agents install — fetch from the quantum-cores repo or upload manually.</p>
+              </div>
+            </div>
+            <div class="eng-art-actions">
+              <span class="eng-art-feed" id="engArtFeed"></span>
+              <button type="button" class="eng-act" id="engArtRefresh"><span data-i18n="eng_refresh">Refresh</span></button>
+              <button type="button" class="eng-act pri" id="engArtAdd"><span data-i18n="eng_art_add">Add artifact</span></button>
+            </div>
+          </div>
+          <div id="engArtList"></div>
+        </div>
+        <!-- Overnight methods checker (ui/ux-1): per source project, methods found vs added -->
+        <div class="ent-card eng-artcard" id="chkCard">
+          <div class="eng-art-head">
+            <div class="eng-art-title">
+              <span class="eng-art-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h7"/><path d="M15 15l3 3 4-5"/></svg></span>
+              <div class="eng-art-titletxt">
+                <p class="tc-title" data-i18n="chk_title">Methods checker</p>
+                <p class="ent-help eng-art-sub" data-i18n="chk_sub">Per source project: tunnel methods found upstream vs added to the cores manifests — the overnight completeness program.</p>
+              </div>
+            </div>
+            <div class="eng-art-actions">
+              <span class="eng-art-feed" id="chkFeed"></span>
+              <button type="button" class="eng-act" id="chkRefresh"><span data-i18n="eng_refresh">Refresh</span></button>
+            </div>
+          </div>
+          <div id="chkBody"></div>
+        </div>
+        </div>
+        <!-- Core detail drill-down page: a core card (or its Details button) opens it -->
+        <div id="coresDetail" hidden><div id="ctunPage"></div></div>
       </section>
       <!-- ==================== CLUSTER TAB ==================== -->
       <section id="tab-cluster" role="tabpanel" hidden>
@@ -3077,12 +3116,29 @@
       <section id="tab-benchmark" role="tabpanel" hidden>
         <div class="tunnel-card u-mb-20">
           <div class="tc-header u-bb-ln u-pb-16 u-mb-16">
-            <div>
-              <span class="tc-title u-fs-18 u-fw-700" data-i18n="bench_wiz_title">Pair Benchmark</span>
-              <div class="qs-hint u-mt-4" data-i18n="bench_wiz_sub">Pick a topology, then its Iran and foreign agents, and run a full benchmark through the engines you choose. Real temporary tunnels are built, measured and removed — no invented numbers.</div>
+            <div class="bw-hero">
+              <span class="bw-hero-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 18l4-8 4 4 3-6 5 10" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="13" r="1.6"/></svg></span>
+              <div>
+                <span class="tc-title u-fs-18 u-fw-700" data-i18n="bench_wiz_title">Pair Benchmark</span>
+                <div class="qs-hint u-mt-4" data-i18n="bench_wiz_sub">Compare cores between two agents in different datacenters within one topology.</div>
+                <div class="bw-hero-note" data-i18n="bench_wiz_note">Temporary test tunnels are created, measured and removed after the benchmark.</div>
+              </div>
             </div>
+            <span class="bw-hero-badge"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.5-4.8 2.5.9-5.4L4.2 7.7l5.4-.8z"/></svg><span data-i18n="bench_wiz_badge">Real measurements · No simulated results</span></span>
           </div>
           <div id="benchWizard"></div>
+        </div>
+      </section>
+      <!-- Tab: C-Tunnel Method Board (§2.23) -->
+      <section id="tab-cboard" role="tabpanel" hidden>
+        <div class="tunnel-card u-mb-20">
+          <div class="tc-header u-bb-ln u-pb-16 u-mb-16">
+            <div>
+              <span class="tc-title u-fs-18 u-fw-700" data-i18n="ctb_title">C-Tunnel Method Board</span>
+              <div class="qs-hint u-mt-4" data-i18n="ctb_sub">Pick an Iran and a foreign agent, then run the live board: every ctunnel transport method is probed through the real pair — reachability, latency, throughput, PMTU and a score, with the best method suggested at the end.</div>
+            </div>
+          </div>
+          <div id="ctunBoard"><div class="ent-skel u-h-14"></div></div>
         </div>
       </section>
       <!-- Tab: Spoof Tunnel -->
@@ -3188,6 +3244,16 @@
         </div>
       </section>
       <section id="tab-netopt" role="tabpanel" hidden>
+        <div class="tunnel-card u-mb-20">
+          <div class="tc-header u-bb-ln u-pb-16 u-mb-16">
+            <div>
+              <span class="tc-title u-fs-18 u-fw-700" data-i18n="kt_title">Kernel Tuning</span>
+              <div class="qs-hint u-mt-4" data-i18n="kt_sub">Live kernel network state per agent: TCP congestion control (BBR), queue discipline, GSO and MTU probing — read from the agents, nothing simulated.</div>
+            </div>
+            <button type="button" class="quantum-btn quantum-btn-secondary" id="ktRefresh">Refresh</button>
+          </div>
+          <div id="ktBody"><div class="ent-skel u-h-14"></div></div>
+        </div>
         <div class="tunnel-card">
           <div class="tc-header"><p class="tc-title" data-i18n="netopt_title">Network Optimization</p><span class="badge warn"><span class="dot"></span><span data-i18n="planned_badge">Planned — engine integrated, UI pending</span></span></div>
           <p class="qs-hint" data-i18n="netopt_hint">The Session 2 engine is integrated: hardware detection that refuses aggressive profiles over unreadable facts, conservative/balanced/performance plans, owned sysctl files, an apply journal with rollback, and the real-pair measurement harness in tests/netopt. The HTTP API and per-Agent desired-state operations are the next milestone — until then no values are invented here.</p>

@@ -8,6 +8,8 @@ const elements = new Map();
 function el(id) {
   if (id === 'topologyUnassignedCard' || id === 'topologyUnassigned') return null;
   if (!elements.has(id)) elements.set(id, {id, hidden:false, disabled:false, value:'', textContent:'',innerHTML:'',
+    dataset:{}, getAttribute(){return null},
+    parentElement:{hidden:false, querySelector(){return null}},
     classList:{_toggles:[],toggle(c,v){this._toggles.push([c,v]);},add(){},remove(){}},
     setAttribute(){}, addEventListener(){}, contains(){return false}, focus(){}});
   return elements.get(id);
@@ -38,14 +40,14 @@ assert.ok(!unsafeEndpoints.includes('<foreign>'));assert.ok(!unsafeEndpoints.inc
 assert.ok(unsafeEndpoints.includes('&lt;foreign&gt;&amp;&quot;'));assert.ok(unsafeEndpoints.includes('&lt;iran&gt;&amp;&quot;'));
 assert.ok(unsafeEndpoints.indexOf('&lt;iran&gt;')<unsafeEndpoints.indexOf('&lt;foreign&gt;'),'foreign local role reverses Iran/foreign graph endpoints');
 const designed=topologyGraph(topo,one);
-assert.ok(designed.includes('topo-map-scroll')&&designed.includes('cl-legend'),'graph keeps the cluster-map chrome: sunken scroll well and legend row');
-assert.ok(designed.includes('topo-e-dots')&&designed.includes('topo-e-pulse'),'healthy beams carry beacon dots and the marching pulse');
-assert.ok(!topologyGraph(topo,five.slice(1)).includes('topo-e-pulse'),'down beams never animate the pulse');
-assert.ok(designed.includes('topo-dot ok'),'all-healthy tunnels light the node dot green');
-assert.ok(topologyGraph(topo,five).includes('topo-dot warn'),'mixed tunnel health marks the node dot warn');
+assert.ok(designed.includes('topo-map-scroll')&&designed.includes('topo-map-foot'),'graph keeps the mockup chrome: sunken scroll well and the footer legend strip');
+assert.ok(designed.includes('cl-e ok topo-cable'),'healthy tunnels draw as connected cables (mockup rebuild dropped the animated dots)');
+assert.ok(!topologyGraph(topo,five.slice(1)).includes('cl-e ok'),'down-only graphs never claim a connected cable');
+assert.ok(designed.includes('data-topology-cable="matrix"')&&designed.includes('aria-label'),'cables keep their tunnel identity and accessible state label');
+assert.ok(topologyGraph(topo,five).includes('cl-e err'),'stopped tunnels draw in the stopped class');
 const empty=topologyGraph(topo,[]);
-assert.ok(!empty.includes('topo-dot'),'no tunnels hides the health dot instead of a dead grey one');
-assert.ok(empty.includes('topo-idle')&&empty.includes('No tunnel attached yet'),'the empty state draws a quiet placeholder cable with its label');
+assert.ok(!empty.includes('topo-cable'),'no tunnels draws no cable');
+assert.ok(empty.includes('topo-colbox')&&empty.includes('topo-map-foot'),'an empty topology still renders both columns and the legend (the mockup rebuild retired the idle placeholder)');
 assert.ok(designed.includes('topo-flag-svg'),'graph nodes embed the flag as inline SVG, not emoji in <text>');
 assert.ok(topologyGraph({...topo,country:'de'},one).includes('#000000')&&topologyGraph({...topo,country:'de'},one).includes('#dd0000'),'foreign graph node draws the chosen country flag');
 assert.equal(topologyTunnelKey(2),'peer:2');assert.equal(topologyKind('peer:2'),2);
@@ -73,8 +75,9 @@ for(const action of ['data-topo-open','data-topo-delete']) {
 }
 assert.ok(listHTML.includes('data-topo-id="'+esc(unsafePair.id)+'"'),'row ID is escaped');
 assert.equal((listHTML.match(/<tr\\b/g)||[]).length,1,'one semantic row per topology');
-assert.equal((listHTML.match(/<td\\b/g)||[]).length,6,'name, iran, foreign, count, status and actions cells');
-for(const cell of ['name','iran','foreign','tunnels','state','actions']) assert.ok(listHTML.includes('class="topo-cell-'+cell+'" data-label='),cell+' supports narrow-screen labels');
+assert.equal((listHTML.match(/<td\\b/g)||[]).length,7,'name, state, tunnels, foreign, iran, row number and actions cells');
+for(const cell of ['name','state','tunnels','foreign','iran','actions']) assert.ok(listHTML.includes('class="topo-cell-'+cell+'" data-label='),cell+' supports narrow-screen labels');
+assert.ok(listHTML.includes('class="topo-cell-no"'),'the row-number cell renders without a narrow-screen label');
 assert.ok(!listHTML.includes('topo-dot'),'no status dot next to the topology name');
 assert.ok(!listHTML.includes('topo-cell-status'),'status column is gone');
 assert.ok(listHTML.includes('tabindex="0"'),'rows are keyboard reachable');
@@ -90,7 +93,6 @@ const germanCell=$('topologiesList').innerHTML.match(/<td\\b[^>]*class="topo-cel
 assert.ok(germanCell.includes('topo-flag-svg')&&germanCell.includes('#dd0000'),'user-chosen country renders the embedded German flag');
 topologyData={topologies:[unsafePair],tunnels:one};topologyRender();
 const countCell=listHTML.match(/<td\\b[^>]*class="topo-cell-tunnels"[^>]*>([\\s\\S]*?)<\\/td>/)[1];
-assert.ok(countCell.includes('class="topo-count"'),'tunnel count keeps a semantic class');
 assert.ok(!countCell.includes('badge'),'tunnel count is plain text, not a badge');
 const actionCell=listHTML.match(/<td\\b[^>]*class="topo-cell-actions"[^>]*>([\\s\\S]*?)<\\/td>/)[1];
 const actionText=actionCell.replace(/<[^>]*>/g,'').trim();
@@ -99,14 +101,13 @@ assert.ok(!actionText.includes('Delete topology'),'explicit Delete stays compact
 assert.ok(actionCell.includes('aria-label="Delete topology"'));
 const deleteBtn=actionCell.match(/<button[^>]*data-topo-delete[^>]*>/)[0];
 assert.ok(!/\\sdisabled(\\s|>)/.test(deleteBtn),'delete button is never disabled');
-assert.ok(deleteBtn.includes('quantum-btn-danger'),'delete button is styled as a danger action');
+assert.ok(deleteBtn.includes('topo-delete'),'delete keeps its dedicated affordance (inline icon; the kebab variant carries the danger styling)');
 topologyData={topologies:[topo],tunnels:[...one,{...one[0]}, {id:'unrelated',state:'down'}]};topologyRender();
 const populated=$('topologiesList').innerHTML;
-assert.ok(populated.includes('aria-label="1 existing tunnel(s)">1</span>'),'duplicate inventory and deleted IDs do not inflate count');
+assert.ok((populated.match(/<td\\b[^>]*class="topo-cell-tunnels"[^>]*>\\s*1\\s*<\\/td>/)||[]).length===1,'duplicate inventory and deleted IDs do not inflate count');
 topologyData={topologies:[],tunnels:one};topologyRender();
-assert.ok($('topologiesList').innerHTML.includes('colspan="6"'),'empty state spans the table');
+assert.ok($('topologiesList').innerHTML.includes('colspan="7"'),'empty state spans the table');
 assert.ok(!$('topologiesList').innerHTML.includes('topo-list-row'),'no phantom topology row when empty');
-assert.equal($('topologyCount').textContent,'0');
 topologyData={topologies:[topo],tunnels:one};topologySelected='t';
 assert.deepEqual(topologyFilterRows([{kind:'main'},{kind:'matrix'},{kind:2}]).map(x=>x.kind),['main','matrix',2],'unassigned tunnels stay visible inside the open topology');
 topologyData={topologies:[topo,{...topo,id:'t2',name:'Other pair',tunnel_ids:['main']}],tunnels:one};topologySelected='t';
@@ -122,18 +123,8 @@ assert.ok(!$('topologyCountryDD').innerHTML.includes('<select'),'no native selec
 assert.ok(!/[\\u{1F1E6}-\\u{1F1FF}]/u.test($('topologyCountryDD').innerHTML),'country dropdown uses embedded SVG flags, no emoji');
 assert.ok($('topologyCountryDD').innerHTML.includes('aria-haspopup="listbox"'),'the dropdown trigger announces the listbox');
 assert.ok(topoCountryOptionsHtml('topologyCountryDD', topoCountryIndex('de'), topoCountryIndex('de')).includes('aria-selected="true" data-dd-value="de"'),'current country is preselected');
-const candidates=[
- {id:'candidate',name:'Existing tunnel',engine:'frp',remote_ip:topo.remote_ip},
- {id:'unknown',name:'Unknown endpoint',engine:'frp'},
- {id:'multi',name:'Multiple endpoints',engine:'frp',remote_ip:'192.0.2.1',remote_ips:[topo.remote_ip]},
- {id:'other-pair',name:'Other pair',engine:'frp',remote_ip:'192.0.2.2'},
- {id:'assigned-elsewhere',name:'Already assigned',engine:'frp',remote_ip:topo.remote_ip}
-];
-topologyData={topologies:[topo,{id:'other',tunnel_ids:['assigned-elsewhere']}],tunnels:[...one,...candidates]};
-topologyRender();
-const options=$('topologyAttachSelect').innerHTML;
-for(const id of ['candidate','unknown','multi']) assert.ok(options.includes('value="'+id+'"'),id+' remains attachable');
-for(const id of ['matrix','other-pair','assigned-elsewhere']) assert.ok(!options.includes('value="'+id+'"'),id+' is excluded');
+// the attach-select picker retired with the five-step new-tunnel wizard
+// (its flow and its tunnel_ids PATCH now live in topology_wizard_ui.test.cjs)
 assert.ok($('topologyGraph').innerHTML.includes('data-topology-cable="matrix"'));
 assert.ok($('topologyBoundList').innerHTML.includes('data-topo-view-tunnel="matrix"'));
 assert.equal($('topologyUnassignedCard'),null);assert.equal($('topologyUnassigned'),null);
@@ -144,21 +135,19 @@ topologySearchQuery=String(topo.local_ip);topologyRender();
 assert.ok($('topologiesList').innerHTML.includes('data-topo-id="'+esc(topo.id)+'"'),'search matches the server IP');
 topologySearchQuery=topo.name.toLowerCase();topologyRender();
 assert.ok($('topologiesList').innerHTML.includes('data-topo-id="'+esc(topo.id)+'"'),'search is case-insensitive on the name');
-topologySearchQuery='';topologySetView('grid');
-assert.ok(el('topologyListTable').classList._toggles.some(([c,v])=>c==='topo-grid'&&v===true),'grid view toggles the card class on the table');
-topologySetView('list');
-assert.ok(el('topologyListTable').classList._toggles.some(([c,v])=>c==='topo-grid'&&v===false),'list view restores the row layout');
+topologySearchQuery='';
+// the list/grid view toggle retired with the mockup rebuild — the list is the only view now
 topologyData={topologies:[topo],tunnels:one};
 // First-load skeleton: while the first fetch is in flight the list shows
-// skeleton rows and never the "No topology yet" empty state.
+// skeleton rows and never the "Build your first topology" empty state.
 assert.equal(topologyLoadedOnce,false,'no load has finished yet');
 topologyLoading=true;topologyData={topologies:[],tunnels:[]};topologyRender();
 let loadingHTML=$('topologiesList').innerHTML;
 assert.ok(loadingHTML.includes('ent-skel'),'first load renders skeleton bars');
 assert.ok(loadingHTML.includes('topo-list-skel'),'skeleton row keeps the empty-row slot');
-assert.ok(!loadingHTML.includes('No topology yet'),'empty state must not flash during the first load');
+assert.ok(!loadingHTML.includes('Build your first topology'),'empty state must not flash during the first load');
 topologyLoading=false;topologyLoadedOnce=true;topologyRender();
-assert.ok($('topologiesList').innerHTML.includes('No topology yet'),'finished first load with zero topologies shows the empty state');
+assert.ok($('topologiesList').innerHTML.includes('Build your first topology'),'finished first load with zero topologies shows the empty state');
 topologyLoading=false;topologyLoadedOnce=true;topologyData={topologies:[topo],tunnels:one};topologyRender();
 assert.ok($('topologiesList').innerHTML.includes('topo-list-row'),'finished first load with data renders rows');
 assert.ok(!$('topologiesList').innerHTML.includes('ent-skel'),'no skeleton once data is on screen');
@@ -171,10 +160,8 @@ topologyData={topologies:[topo],tunnels:one};
 // Tunnels and Actions on fixed tracks, and the embedded flags get a fixed
 // footprint so they line up with the mono IP in both directions.
 const entCss=fs.readFileSync(path.join(__dirname,'enterprise.css'),'utf8');
-assert.ok(/\.topo-list-head\s*,\s*\.topo-list-row\s*\{[^}]*grid-template-columns\s*:[^;}]*minmax\(0,[^;}]*64px\s+96px\s+56px/.test(entCss),'shared grid strips content minimums and fixes the Tunnels/Actions tracks');
-assert.ok(/\.topo-list-head\s+th:nth-child\(4\)\s*\{[^}]*text-align\s*:\s*center/.test(entCss),'Tunnels header is centred over its column');
-assert.ok(/\.topo-list-head\s+th:nth-child\(5\)\s*\{[^}]*text-align\s*:\s*center/.test(entCss),'Status header is centred over its column');
-assert.ok(/\.topo-list-head\s+th:nth-child\(6\)\s*\{[^}]*text-align\s*:\s*end/.test(entCss),'Actions header is end-aligned like its buttons');
+assert.ok(/\.topo-list-head\s*,\s*\.topo-list-row\s*\{[^}]*grid-template-columns\s*:[^;}]*minmax\(0,[^;}]*28px\s+136px/.test(entCss),'shared grid strips content minimums and fixes the row-number/Actions tracks');
+assert.ok(/\.topo-list-head\s+th:nth-child\(7\)/.test(entCss),'Actions header aligns with its end-edge buttons');
 assert.ok(/\.topo-flag-svg\s*\{[^}]*width\s*:\s*20px[^}]*height\s*:\s*14px/.test(entCss),'embedded flags keep a fixed 20x14 footprint');
 (async()=>{
  // loadedOnce gate: topologyReload paints the skeleton before the first
@@ -183,20 +170,17 @@ assert.ok(/\.topo-flag-svg\s*\{[^}]*width\s*:\s*20px[^}]*height\s*:\s*14px/.test
  const pending=vm.runInContext('topologyReload()',sandbox);
  let duringLoad=el("topologiesList").innerHTML;
  assert.ok(duringLoad.includes('ent-skel'),'topologyReload paints the skeleton synchronously on the first load');
- assert.ok(!duringLoad.includes('No topology yet'),'empty state never flashes while the first fetch is in flight');
+ assert.ok(!duringLoad.includes('Build your first topology'),'empty state never flashes while the first fetch is in flight');
  await pending;
  assert.equal(vm.runInContext('topologyLoadedOnce',sandbox),true,'first response marks the load complete');
- assert.ok(el('topologiesList').innerHTML.includes('No topology yet'),'zero topologies after the first load shows the empty state');
+ assert.ok(el('topologiesList').innerHTML.includes('Build your first topology'),'zero topologies after the first load shows the empty state');
  sandbox.api=async(p,b,m)=>{calls.push({path:p,body:b,method:m});if(p==='/api/topologies'&&!b)throw new Error('boom');return {};};
  calls=[];await vm.runInContext('topologyReload()',sandbox);
  assert.equal(vm.runInContext('topologyLoadedOnce',sandbox),true,'a failed first load also completes the gate');
  assert.equal(el('topologyError').hidden,false,'errors keep the topologyError banner');
  sandbox.api=async(p,b,m)=>{calls.push({path:p,body:b,method:m});if(p==='/api/topologies'&&!b)return {topologies:[],tunnels:[]};return {topology:{id:'new'}};};
  vm.runInContext("topologyData={topologies:[topo],tunnels:one};topologySelected='t'",sandbox);
- calls=[];el('topologyAttachSelect').value='candidate';await sandbox.topologyAttach();
- assert.equal(calls[0].path,'/api/topologies/t');assert.equal(calls[0].method,'PATCH');
- assert.deepEqual(Array.from(calls[0].body.tunnel_ids),['matrix','peer:2','candidate']);
- vm.runInContext("topologyData={topologies:[topo],tunnels:one};topologySelected='t'",sandbox);
+ calls=[];await sandbox.topologyDelete('t');
  calls=[];await sandbox.topologyDelete('t');
  assert.equal(calls.length,0,'configured tunnel blocks topology deletion');
  vm.runInContext('topologyData.tunnels=[]',sandbox);
@@ -235,12 +219,15 @@ assert.ok(/\.topo-flag-svg\s*\{[^}]*width\s*:\s*20px[^}]*height\s*:\s*14px/.test
  vm.runInContext('topologySelected=null;topologyRender()',sandbox);
  vm.runInContext("topologyData={topologies:[topo],tunnels:one};topologySelected='t';_tunnelDetail=null;topologyRender()",sandbox);
  const actBtn=el('topologyActivateBtn');
- // The icon lives in the static markup, the label is the only dynamic part.
+ // The header's power toggle is two static buttons (green Activate, red
+ // Deactivate); topologyRender flips their hidden state, no label rewrite.
  const detailMarkup=fs.readFileSync(path.join(__dirname,'index.html'),'utf8');
  const powerBtn=detailMarkup.slice(detailMarkup.indexOf('id="topologyActivateBtn"'),detailMarkup.indexOf('id="topologyEditBtn"'));
- assert.ok(/<svg[^>]*topo-act-ic/.test(powerBtn)&&powerBtn.includes('id="topologyActivateLbl"'),'the power button pairs its icon with the label span');
- assert.ok(el('topologyActivateLbl').textContent==='Deactivate','a healthy pair offers Deactivate');
+ assert.ok(/<svg[^>]*topo-act-ic/.test(powerBtn)&&powerBtn.includes('data-i18n="Activate"'),'the power button pairs its icon with an i18n label span');
+ assert.ok(powerBtn.includes('id="topologyDeactivateBtn"'),'the Deactivate twin rides the same header group');
+ vm.runInContext("topologyData={topologies:[topo],tunnels:one};topologySelected='t';_tunnelDetail=null;topologyRender()",sandbox);
+ assert.ok(el('topologyActivateBtn').hidden===true&&el('topologyDeactivateBtn').hidden===false,'a healthy pair offers Deactivate');
  vm.runInContext("topologyData={topologies:[topo],tunnels:[{id:'matrix',name:'Matrix',engine:'matrix',state:'down'}]};topologyRender()",sandbox);
- assert.ok(el('topologyActivateLbl').textContent==='Activate','a down pair offers Activate');
- console.log('Topology UI: semantic table/actions, escaping, embedded SVG flag columns, country selector, aligned columns, plain counts, keyboard rows, view/back, first-load skeleton gate, absent overview card, attachment and safe deletion PASS');
+ assert.ok(el('topologyActivateBtn').hidden===false&&el('topologyDeactivateBtn').hidden===true,'a down pair offers Activate');
+ console.log('Topology UI: semantic table/actions, escaping, embedded SVG flag columns, country selector, aligned columns, plain counts, keyboard rows, view/back, first-load skeleton gate, absent overview card, power toggle and safe deletion PASS');
 })().catch(e=>{console.error(e);process.exitCode=1;});

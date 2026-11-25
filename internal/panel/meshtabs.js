@@ -236,7 +236,26 @@
     tuWizHint2: ['سرور سمت ایران را انتخاب کنید', 'Pick the Iran-side server'],
     tuWizHint3: ['سرور سمت خارج را انتخاب کنید', 'Pick the foreign-side server'],
     tuWizHint4: ['هسته تانل را انتخاب کنید', 'Pick the tunnel engine'],
-    tuWizHint5: ['کلید را بنویسید و بازبینی کنید', 'Type the key and review'],
+    tuWizHint5: ['روش را انتخاب کنید و پارامترها را پر کنید', 'Pick a method and fill its parameters'],
+    tuWizHint6: ['کلید را بنویسید و بازبینی کنید', 'Type the key and review'],
+    tuStMethod: ['روش و پارامترها', 'Method & parameters'],
+    tuMethodsCount: ['{n} روش', '{n} methods'],
+    tuMethodsPending: ['کاتالوگ روش‌ها هنوز نیامده', 'methods catalog pending'],
+    tuMethodDefault: ['پیش‌فرض موتور', 'Engine default'],
+    tuMethodDefaultSub: ['بدون قفل روش — رفتار خود هسته', 'No method pin — the core behaves as it always has'],
+    tuMethodCatHint: ['کاتالوگ روش‌های این هسته از خوراک cores می‌آید — همان فهرستی که صفحهٔ خود هسته رندر می‌کند.', "This core's method catalog rides the cores feed — the same list the core's own page renders."],
+    tuMethodsEmpty: ['هنوز هیچ روشی برای این هسته منتشر نشده — با پیش‌فرض موتور ادامه دهید.', 'No methods are published for this core yet — continue with the engine default.'],
+    tuNoMethodCat: ['برای این موتور کاتالوگ روش مستقل منتشر نمی‌شود — پیش‌فرض موتور اعمال می‌شود.', 'This engine publishes no per-method catalog — the engine default applies.'],
+    tuCoresFeedErr: ['خوراک cores در دسترس نیست — فهرست روش‌ها به‌محض پاسخ ظاهر می‌شود.', 'The cores feed is unreachable — the method list appears as soon as it answers.'],
+    tuMethodParamsT: ['پارامترها', 'Parameters'],
+    tuParamsSchemaNote: ['قالب پارامترهای تأییدشدهٔ این روش هنوز منتشر نشده — فقط شناسهٔ روش در engine_params ثبت می‌شود.', 'No verified param schema is published for this method yet — only the method id rides engine_params.'],
+    tuParamsSecretNote: ['رمزها فقط یک‌بار نوشته می‌شوند و پس از ذخیره هرگز نمایش داده نمی‌شوند؛ خالی گذاشتن یعنی حفظ مقدار فعلی.', 'Secrets are write-only: never shown again after saving; leaving one empty keeps the stored value.'],
+    tuParamsGen: ['تولید', 'generate'],
+    tuMethodR: ['روش', 'Method'],
+    tuParamsR: ['پارامترها', 'Parameters'],
+    tuParamsCount: ['{n} پارامتر', '{n} params'],
+    tuParamsNone: ['—', '—'],
+    tuLayerL: ['لایه', 'Layer'], tuTransportL: ['حامل', 'Transport'], tuIpverL: ['IP', 'IP'],
     tuAutoOn: ['فعال — خودکار', 'Enabled — automatic'],
     tuPickNeed: ['اول انتخاب این مرحله را انجام دهید', 'Make the choice for this step first'],
     tuNoneSide: ['سروری در این سمت نیست', 'No server on this side'],
@@ -603,6 +622,27 @@
     '.mtb-wstep.done .mtb-wstep-lbl { color:var(--tx2); }',
     '.tu-review { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:8px; margin-bottom:10px; }',
     '.tu-rev { display:flex; flex-direction:column; gap:2px; padding:8px 12px; border:1px solid var(--ln, rgba(148,163,184,.22)); border-radius:10px; }',
+    // ---- method & parameters page (ui-ux-2) ----
+    '.tu-mcat-hint { margin:2px 0 8px; }',
+    '.tu-mchips { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 8px; }',
+    '.tu-mchip { display:inline-flex; align-items:center; gap:5px; padding:5px 11px; min-height:32px; border-radius:999px; border:1px solid var(--ln, rgba(148,163,184,.25)); background:transparent; color:var(--tx2, #cbd5e1); font-size:12.5px; cursor:pointer; }',
+    '.tu-mchip i { font-style:normal; opacity:.75; }',
+    '.tu-mchip.on { background:var(--ac, #38bdf8); border-color:var(--ac, #38bdf8); color:var(--ac-on, #0b1220); font-weight:700; }',
+    '.tu-mgrid { grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); }',
+    '.tu-mmeta { display:flex; flex-wrap:wrap; gap:4px 8px; margin-top:5px; font-size:11.5px; color:var(--mu, #94a3b8); }',
+    '.tu-mbit { display:inline-flex; align-items:center; gap:4px; }',
+    '.tu-mbit i { font-style:normal; color:var(--mu, #94a3b8); }',
+    '.tu-mbit bdi { color:var(--tx2, #cbd5e1); }',
+    '.tu-mbit-layer bdi { color:var(--ac, #38bdf8); font-weight:700; }',
+    '.tu-pblock { margin-top:12px; padding:10px 12px; border:1px solid var(--ln, rgba(148,163,184,.22)); border-radius:12px; display:flex; flex-direction:column; gap:8px; }',
+    '.tu-params-t { margin:0; font-size:13px; font-weight:700; color:var(--tx2, #cbd5e1); }',
+    '.tu-pfield { display:flex; flex-direction:column; gap:4px; }',
+    '.tu-pfield > label { font-size:12px; color:var(--mu, #94a3b8); }',
+    '.tu-pfield-req { color:var(--er, #f87171); }',
+    '.tu-pfield input, .tu-pfield select { width:100%; max-width:420px; min-height:36px; }',
+    '.tu-pfield-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }',
+    '.tu-phint { font-size:11.5px; color:var(--mu, #94a3b8); overflow-wrap:anywhere; }',
+    '@media (max-width: 560px) { .tu-mgrid { grid-template-columns:1fr; } .tu-pfield input, .tu-pfield select { max-width:none; } }',
     '.tu-set-grid { display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-top:10px; }',
     '.tu-set-toggle { font-size:13.5px; }',
     '.tu-set-grid select { min-width:200px; }',
@@ -901,7 +941,209 @@
   var TU_WTH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6a3 3 0 0 1 6 0"/><path d="M6.5 6h11l2.5 12h-16l2.5-12z"/></svg>';
   var TU_STTH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg>';
   var TU_CHTH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>';
-  var TU_ENG_DISP = { aestun: 'AESTun', rakhsh: 'Rakhsh', matrix: 'Matrix', frp: 'FRP', backhaul: 'Backhaul', gost: 'Gost', xray: 'Xray', wireguard: 'WireGuard', wst: 'wstunnel', wstunnel: 'wstunnel', chisel: 'Chisel', rathole: 'Rathole', tinc: 'Tinc', backpack: 'BackPack', dagger: 'DaggerConnect', easytier: 'EasyTier', hysteria: 'Hysteria', midos: 'Midos', narnia: 'Narnia', paqet: 'Paqet', pengo: 'Pengo', singbox: 'sing-box', spoof: 'Spoof', udp2raw: 'udp2raw', waterwall: 'WaterWall', wattunnel: 'WatTunnel' };
+  var TU_ENG_DISP = { aestun: 'AESTun', rakhsh: 'Rakhsh', matrix: 'Matrix', frp: 'FRP', backhaul: 'Backhaul', gost: 'Gost', xray: 'Xray', wireguard: 'WireGuard', wst: 'wstunnel', wstunnel: 'wstunnel', chisel: 'Chisel', ctunnel: 'C-Tunnel', rathole: 'Rathole', tinc: 'Tinc', backpack: 'BackPack', dagger: 'DaggerConnect', easytier: 'EasyTier', hysteria: 'Hysteria', midos: 'Midos', narnia: 'Narnia', naive: 'Naive', paqet: 'Paqet', pengo: 'Pengo', singbox: 'sing-box', spoof: 'Spoof', udp2raw: 'udp2raw', waterwall: 'WaterWall', wattunnel: 'WatTunnel', vortexl2: 'VortexL2' };
+  // engine id → the §2.22 cores-feed row: agents report ENGINE ids while the
+  // feed rows are CORE names — both spellings resolve through this map
+  // (the panel's own coresEngineOfCore alias, mirrored client-side).
+  var TU_CORE_ALIAS = { wst: 'wstunnel', singbox: 'sing-box' };
+  function tuCoreOf(eng) {
+    return TU_CORE_ALIAS[eng] || eng;
+  }
+  // The core's methods[] row from a /api/cores/available payload (§2.22.1):
+  // {core, latest_version, methods:[…]|null, installed_version, outdated, …}.
+  // Returns null when the cores feed has no row for this engine (a
+  // panel-internal engine like matrix/bagher never has one).
+  function tuCoreRow(coresPayload, eng) {
+    var rows = (coresPayload && Array.isArray(coresPayload.cores) && coresPayload.cores) || [];
+    var core = tuCoreOf(eng);
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i] && rows[i].core === core) return rows[i];
+    }
+    return null;
+  }
+  // The verbatim methods[] array for one engine from the cores feed
+  // (§2.22 addendum schema {id,name,title,layer,transport,ipver,overhead,
+  // needs_port,userspace,mikrotik,family}) — null = the core exists but
+  // publishes no methods[] (the honest catalog-pending state).
+  function tuCoreMethods(coresPayload, eng) {
+    var row = tuCoreRow(coresPayload, eng);
+    if (!row) return null;
+    return Array.isArray(row.methods) && row.methods.length ? row.methods : null;
+  }
+
+  // ---- per-method param fields (ui-ux-2) ----------------------------------
+  // Sources, in priority order (the first one that serves fields wins):
+  //   1. the cores-feed method's own `params[]` — the verified per-method
+  //      catalog exposure (BACKEND-45, contract-first; additive on the
+  //      §2.22 methods[] rows — not served yet, the resolver is ready);
+  //   2. the engine template row's `methods[methodId]` — the same
+  //      verified exposure keyed per method on the templates payload;
+  //   3. the engines-catalog params schema — the agents' hello
+  //      params_schema (additive `.schema` on the templates row) unioned
+  //      with the panel's typed fallback fields (`GET
+  //      api/mesh/engines/templates`, live today);
+  //   4. the panel's typed fallback fields alone.
+  // Every source keeps the ONE field contract the panel already renders
+  // (engineParamField: {json,label_en,label_fa,kind,generator,required,
+  // default,hint} + enum options). Nothing is invented: no source → null,
+  // and the wizard says so honestly.
+  var TU_FIELD_KINDS = { number: 1, string: 1, secret: 1, bool: 1, enum: 1 };
+  function tuFieldOK(f) {
+    return f && typeof f.json === 'string' && f.json && TU_FIELD_KINDS[f.kind] &&
+      (!f.options || (Array.isArray(f.options) && f.options.every(function (o) { return typeof o === 'string'; })));
+  }
+  // The agents' hello params_schema is a verbatim hints object:
+  // {key: "" | "a|b|c" | 0 | false | ["x"]}. Converted, never guessed:
+  // "a|b|c" → enum select (empty segment = the value is optional),
+  // number → number, boolean → bool, "" → string, arrays/objects stay
+  // raw JSON strings (the operator pastes the list the driver expects).
+  function tuSchemaFields(schema) {
+    if (!schema || typeof schema !== 'object' || Array.isArray(schema)) return [];
+    return Object.keys(schema).map(function (k) {
+      var v = schema[k], f = { json: k, label_en: k, label_fa: k, kind: 'string' };
+      if (typeof v === 'number' && isFinite(v)) f.kind = 'number';
+      else if (typeof v === 'boolean') f.kind = 'bool';
+      else if (typeof v === 'string' && v.indexOf('|') >= 0) {
+        var opts = v.split('|').filter(function (s) { return s !== ''; });
+        if (opts.length > 1) { f.kind = 'enum'; f.options = opts; }
+      } else if (v && typeof v === 'object') f.hint = 'JSON ' + (Array.isArray(v) ? 'array' : 'object');
+      else if (v === '') f.kind = 'string';
+      else f.hint = String(v);
+      return f;
+    }).filter(tuFieldOK);
+  }
+  // Union the schema-derived fields with the panel's typed fallback
+  // fields; on a key collision the panel field wins (it carries the
+  // fa/en labels, the secret discipline and the browser generators).
+  function tuUnionFields(schemaFields, tplFields) {
+    var out = [], seen = {};
+    (Array.isArray(tplFields) ? tplFields : []).forEach(function (f) {
+      if (tuFieldOK(f)) { seen[f.json] = 1; out.push(f); }
+    });
+    (Array.isArray(schemaFields) ? schemaFields : []).forEach(function (f) {
+      if (!seen[f.json] && tuFieldOK(f)) out.push(f);
+    });
+    return out;
+  }
+  // The param fields for one pinned method (the resolver above).
+  function tuMethodParamFields(coresMethod, tplRow) {
+    if (coresMethod && Array.isArray(coresMethod.params) && coresMethod.params.length) {
+      var mf = coresMethod.params.filter(tuFieldOK);
+      if (mf.length) return { fields: mf, src: 'method-catalog' };
+    }
+    if (tplRow && typeof tplRow === 'object') {
+      if (tplRow.methods && typeof tplRow.methods === 'object' &&
+          Array.isArray(tplRow.methods[coresMethod && coresMethod.name]) ) {
+        var tf = tplRow.methods[coresMethod.name].filter(tuFieldOK);
+        if (tf.length) return { fields: tf, src: 'method-catalog' };
+      }
+      var schemaFields = tuSchemaFields(tplRow.schema);
+      var union = tuUnionFields(schemaFields, tplRow.fields);
+      if (union.length) return { fields: union, src: schemaFields.length ? 'catalog' : 'engine' };
+      if (Array.isArray(tplRow.fields) && tplRow.fields.length) {
+        var pf = tplRow.fields.filter(tuFieldOK);
+        if (pf.length) return { fields: pf, src: 'engine' };
+      }
+    }
+    return null;
+  }
+  // A pinned method replaces the engine's own free-text `method` field
+  // (the ctunnel template's): the pin rides engine_params.method exactly
+  // like the §2.23.1 method-board probe rows do.
+  function tuDropMethodField(fields) {
+    return fields.filter(function (f) { return f.json !== 'method'; });
+  }
+  // One input value coerced by field kind (the pure half of collection;
+  // the DOM half reads inputs by id and calls this per field).
+  function tuParamValue(f, raw) {
+    var v = raw == null ? '' : String(raw).trim();
+    if (f.kind === 'number') {
+      if (v === '') return undefined;
+      var n = parseInt(v, 10);
+      return isFinite(n) ? n : undefined;
+    }
+    if (f.kind === 'bool') return v === 'true' || v === 'on' || v === '1';
+    if (f.kind === 'secret') return v === '' ? undefined : v; // masked-empty = keep stored
+    if (v === '') return undefined;
+    if (f.kind === 'enum') return f.options && f.options.indexOf(v) >= 0 ? v : undefined;
+    return v;
+  }
+  // Collect a values map into the engine_params object (undefined values
+  // drop out — an empty form collects {}).
+  function tuParamCollect(fields, values) {
+    var out = {};
+    (fields || []).forEach(function (f) {
+      var v = tuParamValue(f, values ? values[f.json] : undefined);
+      if (v !== undefined) out[f.json] = v;
+    });
+    return out;
+  }
+  // The layer/transport/ipver badge strip for one methods[] row — the
+  // same vocabulary the per-core page renders, null = '—' (never 0).
+  function tuMethodMeta(m) {
+    var bit = function (lbl, v, cls) {
+      var s = v == null || v === '' ? null : String(v);
+      return '<span class="tu-mbit' + (cls ? ' ' + cls : '') + '"><i>' + esc(lbl) + '</i> <bdi dir="ltr">' +
+        (s ? esc(s) : '\u2014') + '</bdi></span>';
+    };
+    return bit(L('tuLayerL'), m && m.layer, 'tu-mbit-layer') +
+      bit(L('tuTransportL'), m && m.transport) +
+      bit(L('tuIpverL'), m && m.ipver);
+  }
+  // One param field's HTML (id-namespaced per wizard slot; secret fields
+  // render masked with the in-browser generator — the value is born in
+  // the browser and never echoes back).
+  function tuParamFieldHTML(f, id, val, fa) {
+    var lbl = fa ? (f.label_fa || f.label_en || f.json) : (f.label_en || f.label_fa || f.json);
+    var v = val == null ? '' : String(val);
+    var html = '<div class="tu-pfield"><label for="' + esc(id) + '">' + esc(lbl) +
+      (f.required ? ' <b class="tu-pfield-req" aria-hidden="true">*</b>' : '') + '</label>';
+    if (f.kind === 'enum') {
+      html += '<select id="' + esc(id) + '" data-pf="' + esc(f.json) + '" data-pkind="enum">' +
+        '<option value=""></option>' +
+        (f.options || []).map(function (o) {
+          return '<option value="' + esc(o) + '"' + (v === o ? ' selected' : '') + '>' + esc(o) + '</option>';
+        }).join('') + '</select>';
+    } else if (f.kind === 'bool') {
+      html += '<select id="' + esc(id) + '" data-pf="' + esc(f.json) + '" data-pkind="bool">' +
+        '<option value=""></option><option value="true"' + (v === 'true' ? ' selected' : '') + '>' + esc(fa ? 'فعال' : 'true') + '</option>' +
+        '<option value="false"' + (v === 'false' ? ' selected' : '') + '>' + esc(fa ? 'غیرفعال' : 'false') + '</option></select>';
+    } else if (f.kind === 'number') {
+      html += '<input type="number" id="' + esc(id) + '" data-pf="' + esc(f.json) + '" data-pkind="number" dir="ltr" value="' + esc(v) + '">';
+    } else if (f.kind === 'secret') {
+      html += '<span class="tu-pfield-row">' +
+        '<input type="password" id="' + esc(id) + '" data-pf="' + esc(f.json) + '" data-pkind="secret" dir="ltr" value="" autocomplete="new-password"' +
+        (f.generator ? ' data-pgen="' + esc(f.generator) + '"' : '') + '>';
+      if (f.generator) html += '<button type="button" class="quantum-btn quantum-btn-secondary u-btn-xs" data-pgenbtn="' + esc(id) + '">' + esc(L('tuParamsGen')) + '</button>';
+      html += '</span>';
+    } else {
+      html += '<input type="text" id="' + esc(id) + '" data-pf="' + esc(f.json) + '" data-pkind="string" dir="ltr" value="' + esc(v) + '"' +
+        (f.hint ? ' placeholder="' + esc(f.hint) + '"' : '') + '>';
+    }
+    html += (f.hint && f.kind !== 'string' ? '<span class="tu-phint">' + esc(f.hint) + '</span>' : '') + '</div>';
+    return html;
+  }
+  // Wire the in-browser secret generators (crypto.getRandomValues — the
+  // same discipline wizard.js uses; uuid = the uuid generator).
+  function tuWireGenerators(root) {
+    if (!root) return;
+    root.querySelectorAll('[data-pgenbtn]').forEach(function (b) {
+      b.onclick = function () {
+        var inp = document.getElementById(b.getAttribute('data-pgenbtn'));
+        if (!inp) return;
+        var bytes = new Uint8Array(24);
+        crypto.getRandomValues(bytes);
+        var val = btoa(String.fromCharCode.apply(null, bytes));
+        if (inp.getAttribute('data-pgen') === 'uuid') {
+          var h = '';
+          bytes.forEach(function (x) { h += ('0' + x.toString(16)).slice(-2); });
+          val = h.slice(0, 8) + '-' + h.slice(8, 12) + '-' + h.slice(12, 16) + '-' + h.slice(16, 20) + '-' + h.slice(20);
+        }
+        inp.value = val;
+        inp.type = 'text';
+      };
+    });
+  }
   var TU_ENG_IMG = { aestun: 'img/engines/aestun.png', rakhsh: 'img/engines/rakhsh.png', gost: 'img/engines/gost.png', xray: 'img/engines/xray.svg', wireguard: 'img/engines/wireguard.png', rathole: 'img/engines/rathole.png', wst: 'img/engines/wstunnel.png', wstunnel: 'img/engines/wstunnel.png', tinc: 'img/engines/tinc.svg', hysteria: 'img/engines/hysteria.png', singbox: 'img/engines/singbox.png', midos: 'img/engines/midos.png', dagger: 'img/engines/dagger.png', pengo: 'img/engines/pengo.png', backhaul: 'img/engines/backhaul.png', backpack: 'img/engines/backpack.png', narnia: 'img/engines/narnia.png', waterwall: 'img/engines/waterwall.png', wattunnel: 'img/engines/wattunnel.png', udp2raw: 'img/engines/udp2raw.png', paqet: 'img/engines/paqet.png', frp: 'img/engines/frp.png', easytier: 'img/engines/easytier.png', chisel: 'img/engines/chisel.png' };
   var TU_ENG_Q = (typeof engImgTag !== 'undefined' && engImgTag) ? '?v=' + engImgTag : '';
   function tuEngLogo(eng, disp) {
@@ -1560,9 +1802,39 @@
 
     var TU_PLUS = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
     var TU_CHECK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>';
-    var sel = { topo: null, iran: null, foreign: null, engine: 'matrix', key: '' }; // created enabled, always
-    var step = 1, TOTAL = 5;
-    var stepLbl = [L('topoCol'), L('tuStIran'), L('tuStForeign'), L('engineCol'), L('tuStKey')];
+    var sel = { topo: null, iran: null, foreign: null, engine: 'matrix', method: '', pvals: {}, key: '' }; // created enabled, always
+    var step = 1, TOTAL = 6;
+    var stepLbl = [L('topoCol'), L('tuStIran'), L('tuStForeign'), L('engineCol'), L('tuStMethod'), L('tuStKey')];
+    // the method-page filter (search + layer chip), and the async data the
+    // method page renders over: the §2.22 cores feed (methods[] catalogs)
+    // + the engines-catalog templates (param schemas)
+    var mFilter = { q: '', layer: '' };
+    var WIZC = { cores: null, coresErr: null, busy: false };
+    var WIZT = { tpl: null, busy: false };
+    function loadWizData() {
+      if (!WIZC.busy && !WIZC.cores && !WIZC.coresErr) {
+        WIZC.busy = true;
+        apiGet('api/cores/available').then(function (j) {
+          WIZC.cores = j || {}; WIZC.busy = false;
+          if (step === 4 || step === 5) sync();
+        }).catch(function (e) {
+          WIZC.coresErr = (e && e.message) || 'HTTP error'; WIZC.busy = false;
+          if (step === 4 || step === 5) sync();
+        });
+      }
+      if (!WIZT.busy && !WIZT.tpl) {
+        WIZT.busy = true;
+        apiGet('api/mesh/engines/templates').then(function (j) {
+          var m = {};
+          ((j && j.templates) || []).forEach(function (t) { if (t && t.engine) m[t.engine] = t; });
+          WIZT.tpl = m; WIZT.busy = false;
+          if (step === 5) sync();
+        }).catch(function () { WIZT.tpl = {}; WIZT.busy = false; if (step === 5) sync(); });
+      }
+    }
+    // The template row for the picked engine — null when the templates
+    // payload has not landed (the params resolver then says so honestly).
+    function tplRowOf(eng) { return WIZT.tpl ? WIZT.tpl[eng] : null; }
 
     function packOf() {
       return packs.filter(function (p) { return String(p.tp.id) === String(sel.topo); })[0];
@@ -1594,18 +1866,150 @@
     }
     function engCards() {
       return Object.keys(TU_ENG_DISP).map(function (n) {
+        // the §2.22 sub-line: the core's REAL method count when the feed
+        // serves methods[], the honest catalog-pending mark when the core
+        // exists without one, nothing for panel-internal engines
+        var ms = tuCoreMethods(WIZC.cores, n);
+        var row = tuCoreRow(WIZC.cores, n);
+        var sub = ms ? Lf('tuMethodsCount', { n: ms.length })
+                     : (row ? L('tuMethodsPending') : '');
         return card('<span class="mtb-eng-logo e-' + esc(n) + '">' + tuEngLogo(n, TU_ENG_DISP[n]) + '</span>',
-          TU_ENG_DISP[n], '', 'engine', n, sel.engine === n);
+          TU_ENG_DISP[n], sub, 'engine', n, sel.engine === n);
       }).join('');
+    }
+    function methodCards() {
+      var ms = tuCoreMethods(WIZC.cores, sel.engine) || [];
+      var q = (mFilter.q || '').toLowerCase();
+      var rows = ms.map(function (m, i) { return { m: m, i: i }; }).filter(function (x) {
+        var m = x.m;
+        if (mFilter.layer && String(m && m.layer || '').toUpperCase() !== mFilter.layer) return false;
+        if (q) {
+          var hay = [m && m.name, m && m.title, m && m.family, m && m.transport]
+            .map(function (v) { return String(v || '').toLowerCase(); }).join(' ');
+          if (hay.indexOf(q) < 0) return false;
+        }
+        return true;
+      });
+      if (!rows.length) return entEmpty(L('tuNoMatch'));
+      return rows.map(function (x) {
+        var m = x.m;
+        var name = m && m.name != null && m.name !== '' ? String(m.name) : '\u2014';
+        var sub = m && m.title ? String(m.title) : '';
+        var on = String(sel.method) === name;
+        return '<button type="button" class="mtb-agent-card tu-pick' + (on ? ' on' : '') + '" data-tupick="method" data-tuv="' + esc(name) + '">' +
+          '<span class="mtb-agc-ico"><bdi dir="ltr">#' + esc(String(m && m.id != null ? m.id : (x.i + 1))) + '</bdi></span>' +
+          '<span class="mtb-agc-tx"><b><bdi dir="ltr">' + esc(name) + '</bdi></b>' + (sub ? '<i>' + esc(sub) + '</i>' : '') +
+          '<span class="tu-mmeta">' + tuMethodMeta(m) + '</span></span>' +
+          (on ? '<span class="tu-pick-ok">' + TU_CHECK + '</span>' : '') +
+          '</button>';
+      }).join('');
+    }
+    function methodPickerBlock() {
+      var ms = tuCoreMethods(WIZC.cores, sel.engine);
+      var row = tuCoreRow(WIZC.cores, sel.engine);
+      var hint = '<p class="mtb-muted tu-mcat-hint">' + esc(L('tuMethodCatHint')) + '</p>';
+      // the cores feed answered an error AND the core has no catalog
+      if (WIZC.coresErr && !ms) {
+        return hint + '<div class="ent-empty ent-error" role="alert"><b>' + esc(L('tuCoresFeedErr')) + '</b>' +
+          '<button type="button" class="quantum-btn quantum-btn-secondary u-btn-xs" data-tucores-retry>' + esc(L('retry')) + '</button></div>';
+      }
+      if (!ms) {
+        // honest: a known core without methods[] (catalog pending) or a
+        // panel-internal engine (matrix/bagher/…) with no core row at all
+        var body = row ? L('tuMethodsEmpty') : L('tuNoMethodCat');
+        return hint + '<div class="ent-empty"><span class="ent-empty-ic" aria-hidden="true">' + ICO_EMPTY + '</span><b>' + esc(body) + '</b></div>';
+      }
+      var layers = [];
+      ms.forEach(function (m) {
+        var l = String(m && m.layer || '').toUpperCase();
+        if (l && layers.indexOf(l) < 0) layers.push(l);
+      });
+      layers.sort();
+      var chips = layers.length > 1
+        ? '<div class="tu-mchips" role="group" aria-label="' + esc(L('tuLayerL')) + '">' +
+          [''].concat(layers).map(function (l) {
+            var n = l === '' ? ms.length : ms.filter(function (m) { return String(m && m.layer || '').toUpperCase() === l; }).length;
+            return '<button type="button" class="tu-mchip' + (mFilter.layer === l ? ' on' : '') + '" data-tumlayer="' + esc(l) + '" aria-pressed="' + (mFilter.layer === l ? 'true' : 'false') + '">' +
+              esc(l === '' ? L('noneOpt') : l) + ' <i>' + esc(String(n)) + '</i></button>';
+          }).join('') + '</div>'
+        : '';
+      var search = ms.length > 8
+        ? '<div class="mtb-field"><span class="mtb-field-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg></span>' +
+          '<input type="search" class="quantum-input" data-tumq value="' + esc(mFilter.q) + '" placeholder="' + esc(L('tuSearchPh')) + '" aria-label="' + esc(L('tuSearchPh')) + '"></div>'
+        : '';
+      return hint + search + chips +
+        '<div class="tu-cards tu-mgrid" data-tumlist>' +
+        '<button type="button" class="mtb-agent-card tu-pick' + (sel.method === '' ? ' on' : '') + '" data-tupick="method" data-tuv="">' +
+        '<span class="mtb-agc-ico">' + MTB_ICO.tun + '</span>' +
+        '<span class="mtb-agc-tx"><b>' + esc(L('tuMethodDefault')) + '</b><i>' + esc(L('tuMethodDefaultSub')) + '</i></span>' +
+        (sel.method === '' ? '<span class="tu-pick-ok">' + TU_CHECK + '</span>' : '') +
+        '</button>' +
+        methodCards() +
+        '</div>';
+    }
+    // The param form for the pinned method (the engines-catalog params
+    // resolver). No schema served → the honest note; the method id still
+    // rides engine_params.
+    function paramsBlock() {
+      if (!sel.method) return '';
+      var ms = tuCoreMethods(WIZC.cores, sel.engine) || [];
+      var mrow = null;
+      ms.forEach(function (m) { if (m && String(m.name) === String(sel.method)) mrow = m; });
+      var res = tuMethodParamFields(mrow, tplRowOf(sel.engine));
+      var fields = res ? tuDropMethodField(res.fields) : [];
+      var fa = isFa();
+      var html = '<div class="tu-pblock"><p class="tu-params-t">' + esc(L('tuMethodParamsT')) + '</p>';
+      if (!fields.length) {
+        html += '<p class="mtb-muted">' + esc(L('tuParamsSchemaNote')) + '</p></div>';
+        return html;
+      }
+      html += '<p class="mtb-muted">' + esc(L('tuParamsSecretNote')) + '</p>';
+      for (var i = 0; i < fields.length; i++) {
+        var f = fields[i];
+        var id = 'tuPf-' + i;
+        var cur = (sel.pvals && sel.pvals[f.json] != null && sel.pvals[f.json] !== '') ? sel.pvals[f.json]
+                                                                                              : (f.default != null ? f.default : '');
+        html += tuParamFieldHTML(f, id, cur, fa);
+      }
+      html += '</div>';
+      return html;
+    }
+    // engine_params for the create POST: the pinned method id (the
+    // §2.23.1 board convention) + the collected param values. No method
+    // pinned → null (the payload omits engine_params entirely).
+    function collectEngineParams() {
+      if (!sel.method) return null;
+      var eparams = { method: sel.method };
+      var ms = tuCoreMethods(WIZC.cores, sel.engine) || [];
+      var mrow = null;
+      ms.forEach(function (m) { if (m && String(m.name) === String(sel.method)) mrow = m; });
+      var res = tuMethodParamFields(mrow, tplRowOf(sel.engine));
+      var fields = res ? tuDropMethodField(res.fields) : [];
+      var vals = {};
+      ov.querySelectorAll('[data-pf]').forEach(function (inp) {
+        vals[inp.getAttribute('data-pf')] = inp.value;
+      });
+      var collected = tuParamCollect(fields, vals);
+      Object.keys(collected).forEach(function (k) { eparams[k] = collected[k]; });
+      return eparams;
+    }
+    // The review summary for the params row: a COUNT of filled values,
+    // secrets counted as set without their values ever appearing.
+    function paramsSummary() {
+      var ep = collectEngineParams();
+      if (!ep) return '\u2014';
+      var n = Object.keys(ep).filter(function (k) { return k !== 'method'; }).length;
+      return n > 0 ? Lf('tuParamsCount', { n: n }) : '\u2014';
     }
     function reviewRow(lbl, v) {
       return '<div class="tu-rev"><span class="mtb-muted">' + esc(lbl) + '</span><b>' + esc(v) + '</b></div>';
     }
     function page(n) {
       if (n === 1) return '<div class="tu-cards">' + topoCards() + '</div>';
-      if (n === 2) return '<div class="tu-cards">' + sideCards('iran', 'iran') + '</div>';
+      if (n === 2) return '<div class="tu-cards tu-enggrid">' + sideCards('iran', 'iran') + '</div>';
       if (n === 3) return '<div class="tu-cards">' + sideCards('foreign', 'foreign') + '</div>';
       if (n === 4) return '<div class="tu-cards tu-enggrid">' + engCards() + '</div>';
+      if (n === 5) return methodPickerBlock() + paramsBlock();
       var tp = packOf();
       var iran = members('iran').filter(function (m) { return String(m.id) === String(sel.iran); })[0];
       var foreign = members('foreign').filter(function (m) { return String(m.id) === String(sel.foreign); })[0];
@@ -1614,6 +2018,8 @@
         reviewRow(L('tuSideIran'), (iran && iran.name) || '\u2014') +
         reviewRow(L('tuSideForeign'), (foreign && foreign.name) || '\u2014') +
         reviewRow(L('engineCol'), TU_ENG_DISP[sel.engine] || sel.engine) +
+        reviewRow(L('tuMethodR'), sel.method ? sel.method : L('tuMethodDefault')) +
+        reviewRow(L('tuParamsR'), paramsSummary()) +
         reviewRow(L('enabled'), L('tuAutoOn')) +
         '</div>' +
         '<div class="mtb-field"><span class="mtb-field-ico">' + MTB_ICO.tun + '</span>' +
@@ -1625,7 +2031,8 @@
         '<div class="mtb-wpage" data-pg="2" hidden>' + page(2) + '</div>' +
         '<div class="mtb-wpage" data-pg="3" hidden>' + page(3) + '</div>' +
         '<div class="mtb-wpage" data-pg="4" hidden>' + page(4) + '</div>' +
-        '<div class="mtb-wpage" data-pg="5" hidden>' + page(5) + '</div>';
+        '<div class="mtb-wpage" data-pg="5" hidden>' + page(5) + '</div>' +
+        '<div class="mtb-wpage" data-pg="6" hidden>' + page(6) + '</div>';
     }
     function valid() {
       if (step === 1) return sel.topo != null;
@@ -1665,30 +2072,78 @@
 
     paintPages();
     sync();
+    // the cores feed + templates load async — pages 4/5 re-paint when they
+    // answer (the engine sub-lines and the method catalog fill in place)
+    loadWizData();
 
     // card picks — one tap marks the choice and arms Next
     ov.addEventListener('click', function (e) {
+      var cr = e.target && e.target.closest ? e.target.closest('[data-tucores-retry]') : null;
+      if (cr) { WIZC.coresErr = null; WIZC.cores = null; loadWizData(); if (step === 5) sync(); return; }
+      var chp = e.target && e.target.closest ? e.target.closest('[data-tumlayer]') : null;
+      if (chp) {
+        mFilter.layer = chp.getAttribute('data-tumlayer') || '';
+        var lst = ov.querySelector('[data-tumlist]');
+        if (lst) {
+          lst.innerHTML = methodCards();
+          ov.querySelectorAll('[data-tumlayer]').forEach(function (b2) {
+            b2.classList.toggle('on', b2 === chp);
+            b2.setAttribute('aria-pressed', b2 === chp ? 'true' : 'false');
+          });
+        }
+        return;
+      }
       var c = e.target && e.target.closest ? e.target.closest('.tu-pick') : null;
       if (!c) return;
       var attr = c.getAttribute('data-tupick');
       sel[attr] = c.getAttribute('data-tuv');
+      if (attr === 'engine') {
+        // the method pin belongs to the picked engine — reset it with its
+        // filter and collected values so a stale id never rides the payload
+        sel.method = '';
+        sel.pvals = {};
+        mFilter = { q: '', layer: '' };
+      }
       ov.querySelectorAll('.tu-pick[data-tupick="' + attr + '"]').forEach(function (x) {
         x.classList.toggle('on', x === c);
         var ok = x.querySelector('.tu-pick-ok');
         if (ok) ok.remove();
         if (x === c) x.insertAdjacentHTML('beforeend', '<span class="tu-pick-ok">' + TU_CHECK + '</span>');
       });
+      if (attr === 'method') {
+        // the params block reacts to the pin — repaint page 5 in place
+        var pg5 = ov.querySelector('.mtb-wpage[data-pg="5"]');
+        if (pg5 && step === 5) { pg5.innerHTML = methodPickerBlock() + paramsBlock(); wireMethodPage(); }
+      }
       sync();
     });
+    // the method page's live inputs: search narrows in place (no full
+    // re-render — the input keeps focus), param edits persist into
+    // sel.pvals so page repaints keep the operator's values
+    function wireMethodPage() {
+      var q = ov.querySelector('[data-tumq]');
+      if (q) q.oninput = function () {
+        mFilter.q = q.value;
+        var lst = ov.querySelector('[data-tumlist]');
+        if (lst) lst.innerHTML = methodCards();
+      };
+      ov.querySelectorAll('[data-pf]').forEach(function (inp) {
+        inp.onchange = function () {
+          sel.pvals[inp.getAttribute('data-pf')] = inp.value;
+        };
+      });
+      tuWireGenerators(ov);
+    }
 
     document.getElementById('tuWizBack').addEventListener('click', function () {
-      if (step > 1) { step--; sync(); }
+      if (step > 1) { step--; sync(); if (step === 5) wireMethodPage(); }
     });
     document.getElementById('tuWizNext').addEventListener('click', function () {
       if (step < TOTAL) {
         if (!valid()) { mtbToast(L('tuPickNeed'), 'err'); return; }
         step++;
         sync();
+        if (step === 5) wireMethodPage();
         return;
       }
       // final page = review + create
@@ -1697,11 +2152,17 @@
       if (!/^[a-z0-9-_.]{1,128}$/.test(key)) { mtbToast(L('tuKeyBad'), 'err'); return; }
       if (!sel.topo || !sel.iran || !sel.foreign) { mtbToast(L('pickBoth'), 'err'); return; }
       var btn = this; btn.disabled = true;
-      // the mesh create route is flat: POST /api/mesh/tunnels with topology_id in the body
-      apiSend('POST', 'api/mesh/tunnels', {
+      // engine_params rides when a method is pinned: the method id (the
+      // §2.23.1 board convention the AGENT-30-era drivers consume) + the
+      // schema-driven fields the operator filled — secrets stay masked
+      var body = {
         topology_id: Number(sel.topo), local_server_id: Number(sel.iran), remote_server_id: Number(sel.foreign),
         tunnel_key: key, engine: sel.engine, enabled: true
-      }).then(function () {
+      };
+      var eparams = collectEngineParams();
+      if (eparams && Object.keys(eparams).length) body.engine_params = eparams;
+      // the mesh create route is flat: POST /api/mesh/tunnels with topology_id in the body
+      apiSend('POST', 'api/mesh/tunnels', body).then(function () {
         ov.remove(); mtbToast(L('created'));
         loadTun();
       }).catch(function (e) { btn.disabled = false; tuFail(e); });
@@ -3579,6 +4040,18 @@
       activate(m[1]);
     }
   }
+
+  // VM-test surface: the pure wizard helpers (no DOM) — the mesh tunnel
+  // wizard's method catalog + params resolver, consumed by
+  // meshtabs_wizard_ui.test.cjs; harmless in the browser.
+  try {
+    window.__tuPure = {
+      tuCoreOf: tuCoreOf, tuCoreRow: tuCoreRow, tuCoreMethods: tuCoreMethods,
+      tuSchemaFields: tuSchemaFields, tuUnionFields: tuUnionFields,
+      tuMethodParamFields: tuMethodParamFields, tuDropMethodField: tuDropMethodField,
+      tuParamValue: tuParamValue, tuParamCollect: tuParamCollect, tuFieldOK: tuFieldOK
+    };
+  } catch (e) { /* non-fatal */ }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();

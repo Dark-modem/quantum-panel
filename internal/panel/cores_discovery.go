@@ -228,7 +228,9 @@ type coreAssetView struct {
 // unreachable); installed_version is the newest version any enrolled
 // agent reported installed ("" = none reported); outdated compares that
 // against latest_version (null when either side is unknown — the §2.20
-// honest-unknown rule).
+// honest-unknown rule). license/upstream (ui/ux-1 addendum, ALWAYS
+// present) are the manifest's own informational lines VERBATIM
+// ("" = not published / manifest unreachable — never guessed).
 type coreRow struct {
 	Core             string          `json:"core"`
 	LatestTag        string          `json:"latest_tag"`
@@ -239,6 +241,8 @@ type coreRow struct {
 	Methods          json.RawMessage `json:"methods"`
 	InstalledVersion string          `json:"installed_version"`
 	Outdated         *bool           `json:"outdated"`
+	License          string          `json:"license"`
+	Upstream         string          `json:"upstream"`
 }
 
 // parseCoreAssetOSArch extracts the os/arch segments from
@@ -337,12 +341,15 @@ func handleCoresAvailable(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		rows = discoverCores(rels)
 	}
-	// the additive fills (methods[] + installed/outdated): best-effort,
-	// never fatal — the endpoint's §2.22.1 honest-partial contract stands
+	// the additive fills (methods[] + license/upstream + installed/outdated):
+	// best-effort, never fatal — the endpoint's §2.22.1 honest-partial
+	// contract stands
 	s := meshStorePeek()
 	for i := range rows {
 		if entry := fetchCoresManifestCached(rows[i].Core); entry != nil {
 			rows[i].Methods = entry.Methods
+			rows[i].License = entry.License
+			rows[i].Upstream = entry.Upstream
 		}
 		if s != nil {
 			rows[i].InstalledVersion, rows[i].Outdated =

@@ -192,6 +192,26 @@ func TestCoresInstalledOutdated(t *testing.T) {
 	if installed != "9.9.9" || outdated == nil || *outdated {
 		t.Fatalf("alias resolution: %q %v", installed, outdated)
 	}
+	// the sing-box alias: the agent's driver id is `singbox`, the cores
+	// row is `sing-box` (quantum-cores folder) — without it the row never
+	// joins its methods[]/installed_version
+	if err := s.UpsertAgentEngine(store.AgentEngine{AgentID: "agt_0b0b0b0b0b0b",
+		Engine: "singbox", Installed: true, Version: "1.12.40", UpdatedAt: time.Now().Unix()}); err != nil {
+		t.Fatal(err)
+	}
+	// 1.12.40 installed vs 1.12.39 repo → installed is newer, outdated false
+	installed, outdated = coreRowInstalledOutdated(s, "sing-box", "1.12.39")
+	if installed != "1.12.40" || outdated == nil || *outdated {
+		t.Fatalf("singbox alias resolution: %q %v", installed, outdated)
+	}
+	// 1.12.41 repo → the honest newer-version flag rides the alias too
+	_, outdated = coreRowInstalledOutdated(s, "sing-box", "1.12.41")
+	if outdated == nil || !*outdated {
+		t.Fatalf("singbox alias outdated direction: %v", outdated)
+	}
+	if coresCoreOfEngine("singbox") != "sing-box" || coresEngineOfCore("sing-box") != "singbox" {
+		t.Fatalf("singbox alias both ways broken: %q %q", coresCoreOfEngine("singbox"), coresEngineOfCore("sing-box"))
+	}
 }
 
 func TestCoresAvailableHandlerAdditiveFields(t *testing.T) {
@@ -274,7 +294,13 @@ func TestCoresAvailableHandlerAdditiveFields(t *testing.T) {
 	if ct.InstalledVersion != "1.1.1" || ct.Outdated == nil || !*ct.Outdated {
 		t.Fatalf("ctunnel installed/outdated: %q %v (latest %s)", ct.InstalledVersion, ct.Outdated, ct.LatestVersion)
 	}
-	// frp: manifest 404 → methods null; nothing installed → ""/null
+	// the manifest's informational lines pass through verbatim (ui/ux-1
+	// addendum) — landed together with methods[] on the same read
+	if ct.License != "AGPL-3.0" || ct.Upstream != "https://github.com/CIAUB/C-Tunnel" {
+		t.Fatalf("license/upstream passthrough: %q %q", ct.License, ct.Upstream)
+	}
+	// frp: manifest 404 → methods null; nothing installed → ""/null;
+	// license/upstream "" as well (an unreachable manifest answers nothing)
 	var frp *coreRow
 	for i := range resp.Cores {
 		if resp.Cores[i].Core == "frp" {
@@ -286,6 +312,33 @@ func TestCoresAvailableHandlerAdditiveFields(t *testing.T) {
 	frpMethodsAbsent := frp != nil && (frp.Methods == nil || string(frp.Methods) == "null")
 	if frp == nil || !frpMethodsAbsent || frp.InstalledVersion != "" || frp.Outdated != nil {
 		t.Fatalf("frp row: %+v", frp)
+	}
+	if frp.License != "" || frp.Upstream != "" {
+		t.Fatalf("frp license/upstream must be empty on a failed manifest: %q %q", frp.License, frp.Upstream)
+	}
+}
+
+// A manifest that publishes license/upstream without methods[] renders the
+// informational lines and the honest null — the fields are independent.
+func TestCoresManifestInfoWithoutMethods(t *testing.T) {
+	coresManifestReset(t)
+	coresManifestFetcher = func(core string) ([]byte, error) {
+		return []byte(`{"core":"gost","upstream":"https://github.com/go-gost/gost","license":"MIT","latest":"3.0.0"}`), nil
+	}
+	entry := fetchCoresManifestCached("gost")
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if entry.Err != nil || entry.Upstream != "" {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+		entry = fetchCoresManifestCached("gost")
+	}
+	if entry.Err != nil {
+		t.Fatalf("manifest without methods is not a failure: %v", entry.Err)
+	}
+	if entry.Upstream != "https://github.com/go-gost/gost" || entry.License != "MIT" || len(entry.Methods) != 0 {
+		t.Fatalf("info passthrough: %+v", entry)
 	}
 }
 

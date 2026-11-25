@@ -1,13 +1,13 @@
 // matrix_scheme_test.go — BACKEND-40 tests: the panel's Matrix instance
-// pool mirrored from quantum-agent @ 2f240d2 (AGENT-27). Three legs:
+// pool mirrored from quantum-agent @ 2f240d2 (AGENT-27). Two legs:
 // (1) GOLDEN ALIGNMENT — the agent's scheme values pinned as literals with
 // provenance, so any drift between the repos fails HERE first and the
 // panel re-aligns to the agent (the executor), never the other way round;
-// (2) the whole-pool sweep (panel port of the agent's
-// TestMatrixInstanceOctetsUniqueAcrossWholePool); (3) validation
-// boundaries at the lifted cap. Historical invariant: for n <= 25 the
-// derived addresses are byte-identical to the old 230+N scheme, so no
-// address any panel could previously emit has changed.
+// (2) validation boundaries at the lifted cap (the whole-pool sweep lives
+// on matrix_instances_test.go, the ui/live leg that pins every subnet).
+// Historical invariant: for n <= 25 the derived addresses are
+// byte-identical to the old 230+N scheme, so no address any panel could
+// previously emit has changed.
 
 package panel
 

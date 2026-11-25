@@ -118,6 +118,9 @@ const STATE_ACTIONS = {
   benchmark: () => loadBenchWizard(), logs: () => loadLogs(),
   errors: () => loadErrors(), status: () => refresh(), rslogs: () => refreshRightSidebarLogs(),
   setup: () => goTab('setup'),
+  ctbagents: () => { ctbAgents = null; ctbAgentsErr = null; loadCtunBoard(); },
+  ctbrun: () => ctbRun(),
+  kt: () => loadKernelTuning(),
 };
 // Command output of a tunnel action, in a closable panel under the actions.
 function showActOut(title, text) {
@@ -204,6 +207,11 @@ async function api(path, body, method) {
       if (j.error_code) {
         const e = new Error((j.error_code ? '[' + j.error_code + '] ' : '') + (j.error || r.statusText) + (j.hint ? '\n\u21AA ' + j.hint : ''));
         e.code = j.error_code; e.hint = j.hint; e.steps = j.steps;
+        // the §1 structured packet (ui.title/what_to_do/details): surfaces that
+        // render the localized detailed form read it from here — additive,
+        // existing code keeps using code/hint/steps
+        e.ui = j.ui || null;
+        e.status = j.http_status;
         throw e;
       }
     } catch(e) { if (e.code) throw e; }
@@ -301,6 +309,18 @@ function topTitleSync(id) {
     h1.querySelector('.mtb-bc-cur').textContent = window.mtbAgtDetail;
     return;
   }
+  if (nid === 'cores') {
+    // a core detail page is open: breadcrumb like the topology's — Cores ‹ core name.
+    // Guarded: topTitleSync's early boot call runs before the ctun state parses.
+    try {
+      if (ctunOpen) {
+        h1.innerHTML = '<span class="mtb-bc"><a href="#t=cores" data-ctun-back class="mtb-bc-link"></a><span class="mtb-bc-sep"> ‹ </span><span class="mtb-bc-cur"></span></span>';
+        h1.querySelector('.mtb-bc-link').textContent = lbl ? lbl.textContent : 'Cores';
+        h1.querySelector('.mtb-bc-cur').textContent = CORES_ENGINE_NAME[ctunOpen] || ctunOpen;
+        return;
+      }
+    } catch (e) { /* ctun state not parsed yet — goTab re-syncs the title later */ }
+  }
   if (!lbl) return;
   // Keep the title text in its own span so the glass chip can ellipsize it
   // instead of clipping mid-glyph on narrow topbars.
@@ -330,7 +350,7 @@ function goTab(name) {
   if (name === 'add-peer') { goTab('setup'); const c = $('setupAddPeerStep'); if (c && c.scrollIntoView) c.scrollIntoView({behavior: 'smooth', block: 'start'}); return; }
   // Bagher lives in Setup (create) and Tunnel (run) like every other tunnel.
   if (name === 'sshfwd' || name === 'bagher') { openBagherSetup(); return; }
-  ['dashboard','tunnel','cores','cluster','setup','xray','logs','perf','watchdog','doctor','benchmark','spoof','update','settings','terminal'].forEach(t => { const el = $('tab-'+t); if (el) el.hidden = t !== name; });
+  ['dashboard','tunnel','cores','cluster','setup','xray','logs','perf','watchdog','doctor','benchmark','cboard','spoof','netopt','update','settings','terminal'].forEach(t => { const el = $('tab-'+t); if (el) el.hidden = t !== name; });
   const markTab = b => {
     const on = b.dataset.tab === name;
     b.classList.toggle('on', on);
@@ -343,6 +363,7 @@ function goTab(name) {
   tabHashWrite(name);
   topTitleSync(name);
   if (name === 'setup' || name === 'tunnel') { loadSSHFwd(); loadMatrix(); }
+  if (name === 'cores') { loadCores(); loadCoresAvailable(); coresViewSync(); if (ctunOpen) renderCtunPage(); }
   if (name === 'cluster') {
     loadClusterStatus();
   }
@@ -352,6 +373,8 @@ function goTab(name) {
   if (name === 'watchdog') loadWatchdog();
   if (name === 'doctor') loadDoctor();
   if (name === 'benchmark') { loadBenchWizard(); }
+  if (name === 'cboard') loadCtunBoard();
+  if (name === 'netopt') loadKernelTuning();
   if (name === 'spoof') loadSpoof();
   if (name === 'xray') loadXray();
   if (name === 'update') loadVersion();
@@ -371,13 +394,15 @@ function goTab(name) {
 // refresh via the URL hash. Best-effort only; the dashboard stays the fallback.
 function tabHashWrite(name) {
   const topo = name === 'tunnel' && typeof topologySelected !== 'undefined' && topologySelected ? '&topo=' + encodeURIComponent(topologySelected) : '';
-  try { history.replaceState(null, '', '#t=' + name + topo); } catch (e) { /* hash persistence is best-effort */ }
+  const core = name === 'cores' && typeof ctunOpen !== 'undefined' && ctunOpen ? '&core=' + encodeURIComponent(ctunOpen) : '';
+  try { history.replaceState(null, '', '#t=' + name + topo + core); } catch (e) { /* hash persistence is best-effort */ }
 }
 function bootRestoreTab() {
-  const m = (location.hash || '').match(/^#t=([a-z-]+)(?:&topo=([^&]+))?/);
+  const m = (location.hash || '').match(/^#t=([a-z-]+)(?:&topo=([^&]+))?(?:&core=([^&]+))?/);
   if (!m) return;
   const name = m[1];
   if (name === 'tunnel' && m[2] && typeof topologySelected !== 'undefined') topologySelected = decodeURIComponent(m[2]);
+  if (name === 'cores' && m[3] && typeof ctunOpen !== 'undefined') ctunPendingCore = decodeURIComponent(m[3]);
   if (name !== 'dashboard' && $('tab-' + name)) goTab(name);
 }
 document.querySelectorAll('[data-tab]').forEach(b => { b.onclick = () => goTab(b.dataset.tab); });
@@ -505,6 +530,11 @@ const I18N = {
     eng_title: "Cores",
     eng_search_ph: "Search engines by name...",
     eng_refresh: "Refresh",
+    eng_art_title: "Artifact store",
+    eng_art_sub: "Signed core binaries the agents install — fetch from the quantum-cores repo or upload manually.",
+    eng_art_add: "Add artifact",
+    chk_title: "Methods checker",
+    chk_sub: "Per source project: tunnel methods found upstream vs added to the cores manifests — the overnight completeness program.",
     topo_tunnels_t: "Established tunnels",
     topology_map_t: "Topology map",
     nav_agents: "Agents",
@@ -602,6 +632,11 @@ const I18N = {
     nav_watchdog: "Watchdog",
     nav_doctor: "Diagnostics",
     nav_benchmark: "Benchmark",
+    nav_cboard: "Method Board",
+    ctb_title: "C-Tunnel Method Board",
+    ctb_sub: "Pick an Iran and a foreign agent, then run the live board: every ctunnel transport method is probed through the real pair — reachability, latency, throughput, PMTU and a score, with the best method suggested at the end.",
+    kt_title: "Kernel Tuning",
+    kt_sub: "Live kernel network state per agent: TCP congestion control (BBR), queue discipline, GSO and MTU probing — read from the agents, nothing simulated.",
     nav_spoof: "Spoof",
     spoof_title: "Spoof Tunnel",
     spoof_sub: "A tunnel that forges its source IP on both servers to cross whitelist-based Layer-3 firewalls, wrapped with WireGuard for a real encrypted link. Test which spoof IPs get through first, then bring the tunnel up.",
@@ -914,7 +949,9 @@ const I18N = {
     bench_tbl_action: "Action",
 
     bench_wiz_title: "Pair Benchmark",
-    bench_wiz_sub: "Pick a topology, then its Iran and foreign agents, and run a full benchmark through the engines you choose. Real temporary tunnels are built, measured and removed — no invented numbers.",
+    bench_wiz_sub: "Compare cores between two agents in different datacenters within one topology.",
+    bench_wiz_note: "Temporary test tunnels are created, measured and removed after the benchmark.",
+    bench_wiz_badge: "Real measurements · No simulated results",
 
     // Diagnostics / Doctor Tab
     doc_title: "Network Doctor & Diagnostic Suite",
@@ -9229,242 +9266,973 @@ function editMainPortsClick() {
   if (ov) ov.addEventListener('click', e => { if (e.target === ov) closeEditPorts(); });
 })();
 
-// ---------- Pair Benchmark (tab-benchmark): topology -> Iran agent ->
-// foreign agent -> every engine enabled on both -> real temporary tunnels,
-// measured and removed. Replaces the old carrier-benchmark leftovers.
-let bwState = { step: 1, topo: null, topoName: '', iran: null, iranAgent: '', foreign: null, foreignAgent: '', engines: [], picked: [], pool: null, running: false, view: null, timer: null };
+// ---------- Pair Benchmark (tab-benchmark) — the four-step wizard ----------
+// topology -> Iran agent -> foreign agent -> cores. Cores WITH a method
+// catalog (ctunnel) run every method through the method-board runner on the
+// same agent pair; cores without one run the classic engine benchmark
+// (pair-run). Both runners are the existing backend logic — nothing new
+// server-side, no simulated numbers anywhere.
+let bwState = {
+  step: 1, topo: null, topoName: '',
+  iran: null, iranAgent: '', iranDC: '',
+  foreign: null, foreignAgent: '', foreignDC: '',
+  picked: [], pool: null,
+  running: false, view: null, timer: null,
+  boardRunning: false, boardView: null,
+  pairErr: null, boardErr: null, boardNote: '', loadErr: null,
+};
+// per-topology members, per-agent facts and the datacenter list — cached so
+// stepping back and forth never refetches what it already knows
+let bwCache = { members: {}, agents: {}, engines: {}, dcs: null, topos: null, topoBusy: {}, dcIds: {} };
 
 async function loadBenchWizard() {
   const host = $('benchWizard');
   if (!host) return;
-  if (bwState.running) { bwPoll(); return; }
+  if (bwState.running || bwState.boardRunning) { bwPoll(); return; }
+  if ((bwState.view && (bwState.view.results || []).length) || (bwState.boardView && (bwState.boardView.rows || []).length)) { bwRenderRun(); return; }
   host.innerHTML = '<div class="u-grid u-gap-8">' + skel(4) + '</div>';
+  bwState.loadErr = null;
   try {
-    const [topos, st] = await Promise.all([api('/api/mesh/topologies'), api('/api/benchmark/pair')]);
-    if (st.running) { bwState.running = true; bwState.view = st; bwTimer = setTimeout(bwPoll, 2000); bwRenderRun(st); return; }
-    // a finished (or restart-interrupted) run keeps its results on show
-    if ((st.results || []).length) { bwState.running = false; bwState.view = st; bwRenderRun(st); return; }
-    bwState.pool = topos.topologies || [];
+    const [topos, st] = await Promise.all([
+      api('/api/mesh/topologies'),
+      api('/api/benchmark/pair'),
+    ]);
+    bwCache.topos = (topos && topos.topologies) || [];
+    bwState.pool = bwCache.topos;
+    if (st.running) { bwState.running = true; bwState.view = st; bwState.timer = setTimeout(bwPoll, 2000); bwRenderRun(); return; }
+    if ((st.results || []).length) { bwState.view = st; bwRenderRun(); return; }
     bwRender();
   } catch (err) {
-    host.innerHTML = stateError(err.message, 'benchwiz', true);
+    bwState.loadErr = (err && err.message) || String(err);
+    bwRender();
   }
 }
-
-function bwCard(icon, title, sub, on) {
-  return '<button type="button" class="mtb-agent-card bw-card' + (on ? ' on' : '') + '">' +
-    '<span class="mtb-agc-ico">' + icon + '</span>' +
-    '<span class="mtb-agc-tx"><b>' + esc(title) + '</b>' + (sub ? '<i>' + esc(sub) + '</i>' : '') + '</span>' +
-    (on ? '<span class="tu-pick-ok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg></span>' : '') +
-    '</button>';
+// step completion drives the stepper: done = green + tick, current = blue,
+// future = gray and not navigable until the previous step completes
+function bwStepDone(n) {
+  if (n === 1) return !!bwState.topo;
+  if (n === 2) return !!bwState.iran;
+  if (n === 3) return !!bwState.foreign;
+  if (n === 4) return (bwState.picked || []).length > 0;
+  return false;
 }
-
+function bwStepperHTML() {
+  const steps = [[1, 'Topology'], [2, 'Iran agent'], [3, 'Foreign agent'], [4, 'Cores']];
+  return '<div class="pbw-steps" role="list" aria-label="' + esc(tr('', 'Benchmark steps')) + '">' +
+    steps.map(([n, lbl], i) => {
+      const done = bwStepDone(n) && n < bwState.step;
+      const cur = n === bwState.step;
+      const reachable = n <= bwState.step;
+      const cls = 'pbw-step' + (cur ? ' cur' : '') + (done ? ' done' : '');
+      return '<button type="button" role="listitem" class="' + cls + '" data-bw-goto="' + n + '"' + (reachable ? '' : ' disabled') + '>' +
+        '<span class="pbw-dot">' + (done ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>' : String(n)) + '</span>' +
+        '<span class="pbw-lbl">' + esc(tr('', lbl)) + '</span></button>' +
+        (i < steps.length - 1 ? '<span class="pbw-line' + (bwStepDone(steps[i + 1][0]) ? ' filled' : '') + '" aria-hidden="true"></span>' : '');
+    }).join('') + '</div>';
+}
+// the persistent selection summary — visible from step 1, collapsible on mobile
+function bwSummaryHTML() {
+  const g = bwState;
+  const row = (k, v) => '<div class="pbw-sum-row"><span>' + esc(k) + '</span><b>' + v + '</b></div>';
+  let methods = 0;
+  (g.picked || []).forEach(e => { methods += bwCoreMethodCount(e); });
+  const dash = '<span class="art-dash">—</span>';
+  const coresVal = (g.picked || []).length
+    ? esc(String(g.picked.length)) + ' · ' + esc(tr('', '{n} methods').replace('{n}', String(methods)))
+    : dash;
+  const open = window.matchMedia && window.matchMedia('(max-width: 700px)').matches ? '' : ' open';
+  return '<details class="pbw-sum"' + open + '><summary>' + esc(tr('', 'Selection summary')) +
+    '<span class="pbw-sum-badge">' + esc(String((g.picked || []).length)) + ' ' + esc(tr('', 'cores')) + '</span></summary>' +
+    '<div class="pbw-sum-body">' +
+    row(tr('', 'Topology'), g.topoName ? esc(g.topoName) : dash) +
+    row(tr('', 'Iran agent'), g.iran ? esc(bwMemberName('iran', g.iran)) : dash) +
+    row(tr('', 'Iran datacenter'), g.iranDC ? esc(bwDcLabel(g.iranDC)) : dash) +
+    row(tr('', 'Foreign agent'), g.foreign ? esc(bwMemberName('foreign', g.foreign)) : dash) +
+    row(tr('', 'Foreign datacenter'), g.foreignDC ? esc(bwDcLabel(g.foreignDC)) : dash) +
+    row(tr('', 'Selected cores'), coresVal) +
+    '</div></details>';
+}
+function bwMemberName(side, id) {
+  const m = bwMembers(side).find(x => String(x.id) === String(id));
+  return m ? (m.name || '#' + m.id) : (id ? '#' + id : '—');
+}
+function bwMembers(side) {
+  const m = bwState.topo != null ? bwCache.members[bwState.topo] : null;
+  return (m && m[side]) || [];
+}
+async function bwFetchMembers(topoId) {
+  if (bwCache.members[topoId]) return bwCache.members[topoId];
+  const d = await api('/api/ui/topologies/' + encodeURIComponent(topoId));
+  const members = (d && d.members) || { iran: [], foreign: [] };
+  bwCache.members[topoId] = members;
+  return members;
+}
+async function bwFetchAgent(aid) {
+  if (bwCache.agents[aid]) return bwCache.agents[aid];
+  const d = await api('/api/ui/agents/' + encodeURIComponent(aid));
+  bwCache.agents[aid] = d || null;
+  return bwCache.agents[aid];
+}
+async function bwFetchEngines(aid) {
+  if (bwCache.engines[aid]) return bwCache.engines[aid];
+  const d = await api('/api/ui/agents/' + encodeURIComponent(aid) + '/engines');
+  const rows = (d && d.engines) || [];
+  bwCache.engines[aid] = rows;
+  return rows;
+}
+async function bwFetchDCs() {
+  if (bwCache.dcs) return bwCache.dcs;
+  try {
+    const d = await api('/api/mesh/datacenters');
+    bwCache.dcs = (d && d.datacenters) || [];
+  } catch (e) {
+    bwCache.dcs = [];
+  }
+  return bwCache.dcs;
+}
+// the REAL datacenter identifier for a member: resolved through the
+// datacenters list, never guessed from the display name alone
+async function bwResolveDcIds() {
+  const members = bwState.topo != null ? bwCache.members[bwState.topo] : null;
+  if (!members) return;
+  const dcs = await bwFetchDCs();
+  ['iran', 'foreign'].forEach(side => (members[side] || []).forEach(m => {
+    const key = String(m.id);
+    if (bwCache.dcIds[key]) return;
+    const nameEn = String(m.datacenter_en || '').toLowerCase();
+    const nameFa = String(m.datacenter || '').toLowerCase();
+    const dc = dcs.find(d => {
+      const en = String(d.datacenter_en || d.name_en || '').toLowerCase();
+      const fa = String(d.name || '').toLowerCase();
+      return (nameEn && en === nameEn) || (nameFa && fa === nameFa);
+    });
+    bwCache.dcIds[key] = dc ? String(dc.id) : (nameEn || nameFa);
+  }));
+}
+function bwDcLabel(dcKey) {
+  const dcs = bwCache.dcs || [];
+  const dc = dcs.find(d => String(d.id) === String(dcKey));
+  if (dc) return dc.datacenter_en || dc.name_en || dc.name || String(dcKey);
+  return String(dcKey);
+}
 function bwRender() {
   const host = $('benchWizard');
   if (!host) return;
-  const steps = ['Topology', 'Iran agent', 'Foreign agent', 'Engines'];
-  let html = '<div class="mtb-wiz" id="bwSteps">' + steps.map((lb, i) =>
-    '<div class="mtb-wstep' + (i + 1 === bwState.step ? ' on' : '') + (i + 1 < bwState.step ? ' done' : '') + '" data-st="' + (i + 1) + '"><span class="mtb-wstep-dot">' + (i + 1 < bwState.step ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>' : (i + 1)) + '</span><span class="mtb-wstep-lbl">' + esc(tr('', lb)) + '</span></div>' +
-    (i < steps.length - 1 ? '<span class="mtb-wline"></span>' : '')).join('') + '</div>';
-  html += '<div id="bwBody"></div>';
-  html += '<div class="mtb-acts"><button type="button" class="quantum-btn quantum-btn-secondary" id="bwBack"' + (bwState.step === 1 ? ' hidden' : '') + '>' + esc(tr('', 'Back')) + '</button>' +
-    '<button type="button" class="quantum-btn quantum-btn-primary" id="bwNext"' + (bwState.step === 4 ? '' : '') + '>' + esc(bwState.step === 4 ? tr('', 'Run full benchmark') : tr('', 'Next')) + '</button></div>';
-  host.innerHTML = html;
-  bwRenderBody();
+  if (bwState.loadErr) { host.innerHTML = stateError(bwState.loadErr, 'benchwiz', true); return; }
+  const stepTitles = {
+    1: ['Select topology', 'Choose one existing topology for this benchmark.'],
+    2: ['Select Iran agent', 'Pick the Iran agent of this benchmark — only members of the selected topology.'],
+    3: ['Select foreign agent', 'Pick the foreign agent — it must sit in a different datacenter than the Iran agent.'],
+    4: ['Select cores to benchmark', 'Select one or more cores. Every available method belonging to each selected core will be tested.'],
+  };
+  const t = stepTitles[bwState.step] || stepTitles[1];
+  const nextLbl = bwState.step === 4 ? tr('', 'Start benchmark') : tr('', 'Next');
+  host.innerHTML =
+    '<div class="pbw-stepper-wrap">' + bwStepperHTML() + '</div>' +
+    '<div class="pbw-sum-wrap" id="pbwSumWrap">' + bwSummaryHTML() + '</div>' +
+    '<div class="pbw-step-head"><span class="pbw-step-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="5" cy="6" r="2.5"/><circle cx="19" cy="6" r="2.5"/><circle cx="12" cy="19" r="2.5"/><path d="M7.5 6h9M6.3 8l4.7 8.8M17.7 8l-4.7 8.8"/></svg></span>' +
+    '<div><h2 class="tc-title u-fs-16 u-fw-700 u-m-0">' + esc(tr('', t[0])) + '</h2>' +
+    '<span class="pbw-step-sub">' + esc(tr('', t[1])) + '</span></div></div>' +
+    '<div id="bwBody"></div>' +
+    '<div class="pbw-acts">' +
+    '<button type="button" class="quantum-btn quantum-btn-secondary" id="bwBack"' + (bwState.step === 1 ? ' hidden' : '') + '>' + esc(tr('', 'Back')) + '</button>' +
+    '<span class="u-flex-1"></span>' +
+    '<button type="button" class="quantum-btn quantum-btn-primary" id="bwNext">' + esc(nextLbl) + '</button>' +
+    '</div>';
+  bwBody();
   const back = $('bwBack'), next = $('bwNext');
   if (back) back.onclick = () => { if (bwState.step > 1) { bwState.step--; bwRender(); } };
   if (next) next.onclick = bwNext;
-  // delegation: the step bodies render async, so the card handlers ride the
-  // host element once instead of chasing every re-render
-  if (!host.__bwWired) {
-    host.__bwWired = true;
-    host.addEventListener('click', ev => {
-      const pick = ev.target && ev.target.closest ? ev.target.closest('[data-bwpick]') : null;
-      if (pick) {
-        const kind = pick.getAttribute('data-bwpick'), v = pick.getAttribute('data-bwv');
-        if (kind === 'topo') { bwState.topo = v; bwState.topoName = pick.getAttribute('data-bwname') || v; bwState.iran = null; bwState.foreign = null; bwState.engines = null; bwState.picked = null; }
-        if (kind === 'iran') { bwState.iran = v; bwState.iranAgent = pick.getAttribute('data-bwagent') || ''; bwState.foreign = null; bwState.foreignAgent = ''; bwState.engines = null; bwState.picked = null; }
-        if (kind === 'foreign') { bwState.foreign = v; bwState.foreignAgent = pick.getAttribute('data-bwagent') || ''; bwState.engines = null; bwState.picked = null; }
-        bwState.step++;
-        bwRender();
-        return;
-      }
-      const eng = ev.target && ev.target.closest ? ev.target.closest('[data-bweng]') : null;
-      if (eng) {
-        const e = eng.getAttribute('data-bweng');
-        const k = bwState.picked.indexOf(e);
-        if (k >= 0) bwState.picked.splice(k, 1); else bwState.picked.push(e);
-        const on = bwState.picked.indexOf(e) >= 0;
-        eng.classList.toggle('on', on);
-        eng.setAttribute('aria-pressed', String(on));
-        // the pick check is part of the markup, not CSS-gated: swap it here
-        const mark = eng.querySelector('.tu-pick-ok');
-        if (on && !mark) eng.insertAdjacentHTML('beforeend', '<span class="tu-pick-ok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg></span>');
-        if (!on && mark) mark.remove();
-        const ok = $('bwNext');
-        if (ok) ok.disabled = !bwState.picked.length;
-      }
-    });
-  }
+  bwSyncNext();
 }
-
-async function bwRenderBody() {
+// the Next/Start button enables only when the current step holds a valid pick
+function bwSyncNext() {
+  const next = $('bwNext');
+  if (!next) return;
+  let ok = false;
+  if (bwState.step === 1) ok = !!bwState.topo;
+  if (bwState.step === 2) ok = !!bwState.iran;
+  if (bwState.step === 3) ok = !!bwState.foreign;
+  if (bwState.step === 4) ok = (bwState.picked || []).length > 0;
+  next.disabled = !ok;
+}
+// step-1 eligibility: per-topology member fetches run once and cache
+async function bwLoadElig() {
+  const topos = bwState.pool || [];
+  await Promise.all(topos.map(async t => {
+    if (bwCache.members[t.id] || bwCache.topoBusy[t.id]) return;
+    bwCache.topoBusy[t.id] = true;
+    try { await bwFetchMembers(t.id); } catch (e) { /* the card renders counts as — */ }
+    delete bwCache.topoBusy[t.id];
+    if (bwState.step === 1) bwRenderTopoCards();
+  }));
+}
+function bwRenderTopoCards() {
+  const body = $('bwBody');
+  if (!body || bwState.step !== 1) return;
+  const topos = bwState.pool || [];
+  const cards = topos.map(t => {
+    const m = bwCache.members[t.id];
+    const iran = m ? m.iran.length : null;
+    const foreign = m ? m.foreign.length : null;
+    const bad = m ? (m.iran.length === 0 || m.foreign.length === 0) : false;
+    const on = String(bwState.topo) === String(t.id);
+    const counts = [];
+    if (iran != null) counts.push(esc(tr('', 'Iran: {n}').replace('{n}', String(iran))));
+    if (foreign != null) counts.push(esc(tr('', 'Foreign: {n}').replace('{n}', String(foreign))));
+    const countLine = counts.length ? '<span class="pbw-card-sub">' + counts.join(' · ') + '</span>' : '';
+    const reason = bad ? '<span class="pbw-card-bad">' + esc(tr('', 'No Iran/foreign pair in this topology')) + '</span>' : '';
+    return '<button type="button" class="pbw-card' + (on ? ' on' : '') + (bad ? ' disabled' : '') + '" data-bw-topo="' + esc(String(t.id)) + '" data-bw-name="' + esc(t.name || '') + '"' + (bad ? ' disabled' : '') + ' aria-pressed="' + on + '">' +
+      '<span class="pbw-card-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="6" r="2.5"/><circle cx="19" cy="6" r="2.5"/><circle cx="12" cy="19" r="2.5"/><path d="M7.5 6h9M6.3 8l4.7 8.8M17.7 8l-4.7 8.8"/></svg></span>' +
+      '<span class="pbw-card-tx"><b>' + esc(t.name || '#' + t.id) + '</b>' + countLine + reason + '</span>' +
+      '<span class="pbw-radio' + (on ? ' on' : '') + '" aria-hidden="true">' + (on ? '<svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>' : '') + '</span>' +
+      '</button>';
+  }).join('');
+  body.innerHTML =
+    '<div class="pbw-cards pbw-cards-3">' + (cards || '<div class="ent-empty ent-empty-sm" role="status"><b>' + esc(tr('', 'No topologies yet')) + '</b></div>') + '</div>' +
+    '<p class="pbw-hint"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M12 11v5"/></svg>' + esc(tr('', 'Only agents belonging to the selected topology will be available in the next steps.')) + '</p>';
+}
+function bwAgentCard(m, side, picked, disabled, reason) {
+  const detail = m.agent ? bwCache.agents[m.agent.id] : null;
+  const ag = detail ? (detail.agent || {}) : {};
+  const rowStatus = (m.agent && m.agent.status) || ag.status || '';
+  const online = String(rowStatus) === 'online';
+  const country = String(ag.country || '').toLowerCase();
+  const flag = side === 'iran' ? topologyFlagSvg('ir') : topologyFlagSvg(country);
+  const ip = ag.effective_public_ip || ag.public_ip || '';
+  const sub = [m.datacenter_en || m.datacenter || '—', country || '', ip ? '<bdi dir="ltr">' + esc(ip) + '</bdi>' : '']
+    .filter(Boolean).map(x => String(x)).join(' · ');
+  return '<button type="button" class="pbw-card pbw-agent' + (picked ? ' on' : '') + (disabled ? ' disabled' : '') + '" data-bw-agent="' + side + '" data-bw-v="' + esc(String(m.id)) + '"' + (disabled ? ' disabled' : '') + ' aria-pressed="' + picked + '">' +
+    '<span class="pbw-card-ico">' + flag + '</span>' +
+    '<span class="pbw-card-tx"><b>' + esc(m.name || '#' + m.id) + '</b>' +
+    '<span class="pbw-card-sub">' + sub + '</span></span>' +
+    '<span class="badge ' + (online ? 'ok' : 'dim') + '"><span class="dot"></span>' + esc(online ? tr('', 'Online') : tr('', 'Offline')) + '</span>' +
+    '<span class="pbw-radio' + (picked ? ' on' : '') + '" aria-hidden="true">' + (picked ? '<svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>' : '') + '</span>' +
+    (disabled && reason ? '<span class="pbw-card-bad pbw-bad-full">' + esc(reason) + '</span>' : '') +
+    '</button>';
+}
+async function bwRenderAgentStep(side) {
+  const body = $('bwBody');
+  if (!body) return;
+  body.innerHTML = '<div class="u-grid u-gap-8">' + skel(3) + '</div>';
+  let members;
+  try { members = await bwFetchMembers(bwState.topo); }
+  catch (err) { body.innerHTML = stateError(err.message, 'bwmem', true); return; }
+  const list = members[side] || [];
+  // enrich the cards with the agent detail facts (country, public IP, status)
+  await Promise.all(list.map(async m => {
+    if (!m.agent || !m.agent.id) return;
+    try { await bwFetchAgent(m.agent.id); } catch (e) { /* the card renders what the member row carries */ }
+  }));
+  await bwResolveDcIds();
+  const iranDcId = bwCache.dcIds[String(bwState.iran)] || '';
+  const cards = list.map(m => {
+    const detail = m.agent ? bwCache.agents[m.agent.id] : null;
+    const ag = detail ? (detail.agent || {}) : {};
+    const online = String(ag.status || (m.agent && m.agent.status) || '') === 'online';
+    const picked = String(side === 'iran' ? bwState.iran : bwState.foreign) === String(m.id);
+    let disabled = false;
+    let reason = '';
+    if (!m.agent) { disabled = true; reason = tr('', 'No enrolled agent on this server'); }
+    else if (!online) { disabled = true; reason = tr('', 'The agent is offline'); }
+    if (!isIranSide(side) && !disabled && bwState.iran) {
+      const myDc = bwCache.dcIds[String(m.id)] || '';
+      if (myDc && iranDcId && myDc === iranDcId) { disabled = true; reason = tr('', 'Same datacenter as the Iran agent — pick a different datacenter'); }
+    }
+    return bwAgentCard(m, side, picked, disabled, reason);
+  }).join('');
+  const info = isIranSide(side)
+    ? tr('', 'Only agents belonging to the selected topology will be available in the next steps.')
+    : tr('', 'The foreign agent must sit in a different datacenter than the Iran agent.');
+  body.innerHTML = '<div class="pbw-cards pbw-cards-2">' + (cards || '<div class="ent-empty ent-empty-sm" role="status"><b>' + esc(tr('', 'No agents on this side yet')) + '</b></div>') + '</div>' +
+    '<p class="pbw-hint"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M12 11v5"/></svg>' + esc(info) + '</p>';
+}
+function isIranSide(side) { return side === 'iran'; }
+function bwCoreMethodCount(engine) {
+  const repo = artRepoRow(engine);
+  const methods = ctunMethods(repo);
+  return methods ? methods.length : 0;
+}
+async function bwRenderCoreStep() {
+  const body = $('bwBody');
+  if (!body) return;
+  body.innerHTML = '<div class="u-grid u-gap-8">' + skel(3) + '</div>';
+  let engA = [], engB = [];
+  try { engA = await bwFetchEngines(bwState.iranAgent); engB = await bwFetchEngines(bwState.foreignAgent); }
+  catch (err) { body.innerHTML = stateError(err.message, 'bweng', true); return; }
+  // the engines enabled on BOTH endpoint agents — the same rule pair-run enforces
+  const runOf = rows => { const set = {}; rows.forEach(e => { if (e.enabled === true) set[e.engine] = e; }); return set; };
+  const mA = runOf(engA), mB = runOf(engB);
+  const common = Object.keys(mA).filter(e => mB[e]).sort();
+  const cores = common.map(e => {
+    const version = (mA[e] && mA[e].version) || (mB[e] && mB[e].version) || '';
+    const both = !!(mA[e] && mA[e].version && mB[e] && mB[e].version);
+    return { engine: e, version: version, both: both, methods: bwCoreMethodCount(e) };
+  });
+  bwState.cores = cores;
+  bwState.picked = (bwState.picked || []).filter(e => common.indexOf(e) >= 0);
+  bwSyncNext();
+  if (!cores.length) {
+    body.innerHTML = '<div class="ent-empty" role="status"><b>' + esc(tr('', 'No engine is enabled on both agents')) + '</b>' +
+      '<span>' + esc(tr('', 'Enable a core on both endpoint agents and come back — the benchmark runs only what both sides can build.')) + '</span></div>';
+    return;
+  }
+  const cards = cores.map(c => {
+    const on = (bwState.picked || []).indexOf(c.engine) >= 0;
+    const cat = c.engine === 'matrix' ? '<span class="eng-badge eng-badge-cat">' + esc(tr('', 'Recommended')) + '</span>' : '<span class="eng-badge eng-badge-exp">' + esc(tr('', 'Experimental')) + '</span>';
+    const methodLine = c.methods > 0
+      ? '<span class="pbw-methods"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 9h18M8 13h8"/></svg>' + esc(tr('', 'All {n} methods will be tested').replace('{n}', String(c.methods))) + '</span>'
+      : '<span class="pbw-methods dim">' + esc(tr('', 'Engine benchmark — the core publishes no method catalog')) + '</span>';
+    const ready = c.both
+      ? '<span class="pbw-ready ok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>' + esc(tr('', 'Ready on both agents')) + (c.version ? ' · <bdi dir="ltr">v' + esc(c.version) + '</bdi>' : '') + '</span>'
+      : '<span class="pbw-ready dim">' + esc(tr('', 'Enabled, but no reported version')) + '</span>';
+    return '<button type="button" class="pbw-card pbw-core' + (on ? ' on' : '') + '" data-bw-core="' + esc(c.engine) + '" aria-pressed="' + on + '">' +
+      '<span class="pbw-check' + (on ? ' on' : '') + '" aria-hidden="true">' + (on ? '<svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>' : '') + '</span>' +
+      '<span class="pbw-card-tx"><b>' + esc(CORES_ENGINE_NAME[c.engine] || c.engine) + '</b>' + cat +
+      '<span class="pbw-card-sub"><bdi dir="ltr">' + esc(c.engine) + '</bdi></span>' +
+      methodLine + ready + '</span>' +
+      '</button>';
+  }).join('');
+  const anyCatalog = cores.some(c => c.methods > 0);
+  const execNote = anyCatalog
+    ? tr('', 'Catalog cores run every method through the method probes on the same agent pair; cores without a catalog run the classic engine benchmark.')
+    : tr('', 'Each selected core builds a temporary tunnel between the two agents, is measured, then removed.');
+  body.innerHTML = '<div class="pbw-cards pbw-cards-2">' + cards + '</div>' +
+    '<p class="pbw-hint"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M12 11v5"/></svg>' + esc(execNote) + '</p>' +
+    '<div class="pbw-warn" role="note"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>' +
+    esc(tr('', 'Temporary test tunnels will be created between the selected agents and removed after the benchmark.')) + '</div>';
+}
+async function bwBody() {
   const body = $('bwBody');
   if (!body) return;
   if (bwState.step === 1) {
-    body.innerHTML = '<p class="qs-hint u-m-0">' + esc(tr('', 'Pick one of your existing topologies')) + '</p>' +
-      '<div class="tu-cards">' + (bwState.pool || []).map(t =>
-        bwCard('<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="6" r="2.5"/><circle cx="19" cy="6" r="2.5"/><circle cx="12" cy="19" r="2.5"/><path d="M7.5 6h9M6.3 8l4.7 8.8M17.7 8l-4.7 8.8"/></svg>', t.name, t.address || '', t.name === bwState.topoName).replace('class="mtb-agent-card', 'data-bwpick="topo" data-bwv="' + esc(t.id) + '" data-bwname="' + esc(t.name) + '" class="mtb-agent-card')) + '</div>';
+    body.innerHTML = '<div class="u-grid u-gap-8">' + skel(3) + '</div>';
+    bwRenderTopoCards();
+    bwLoadElig();
     return;
   }
-  if (bwState.step === 2 || bwState.step === 3) {
-    const side = bwState.step === 2 ? 'iran' : 'foreign';
-    const lbl = bwState.step === 2 ? tr('', 'Pick the Iran agent of this topology') : tr('', 'Pick the foreign agent of this topology');
-    body.innerHTML = '<p class="qs-hint u-m-0">' + esc(lbl) + '</p><div class="u-grid u-gap-8">' + skel(3) + '</div>';
-    try {
-      const d = await api('/api/ui/topologies/' + encodeURIComponent(bwState.topo));
-      const members = (d.members && d.members[side]) || [];
-      const others = bwState.step === 2 ? (d.members && d.members.iran) || [] : (d.members && d.members.foreign) || [];
-      void others;
-      body.innerHTML = '<p class="qs-hint u-m-0">' + esc(lbl) + '</p>' +
-        (members.length ? '<div class="tu-cards">' + members.map(m => {
-          const ag = m.agent || {};
-          const flag = bwState.step === 2 ? topologyFlagSvg('ir') : topologyFlagSvg(String(ag.country || m.country || '').toLowerCase());
-          const picked = (bwState.step === 2 ? bwState.iran : bwState.foreign) === String(m.id);
-          return '<button type="button" class="mtb-agent-card bw-card' + (picked ? ' on' : '') + '" data-bwpick="' + side + '" data-bwv="' + esc(m.id) + '" data-bwagent="' + esc((m.agent || {}).id || '') + '">' +
-            '<span class="mtb-agc-ico">' + flag + '</span>' +
-            '<span class="mtb-agc-tx"><b>' + esc(m.name || ('#' + m.id)) + '</b><i>' + esc(m.datacenter_en || m.datacenter || '') + '</i></span>' +
-            (picked ? '<span class="tu-pick-ok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg></span>' : '') +
-            '</button>';
-        }).join('') + '</div>' : '<p class="qs-hint u-m-0">' + esc(tr('', 'No agents on this side yet')) + '</p>');
-    } catch (err) {
-      body.innerHTML = stateError(err.message, 'bwmem', true);
-    }
-    return;
-  }
-  // step 4: the engines enabled on BOTH agents
-  body.innerHTML = '<p class="qs-hint u-m-0">' + esc(tr('', 'Engines enabled on both agents — pick the ones to benchmark')) + '</p><div class="u-grid u-gap-8">' + skel(3) + '</div>';
-  try {
-    const [a, b] = await Promise.all([
-      api('/api/ui/agents/' + encodeURIComponent(bwState.iranAgent) + '/engines'),
-      api('/api/ui/agents/' + encodeURIComponent(bwState.foreignAgent) + '/engines')
-    ]);
-    // «installed and usable for a tunnel» = the engine is ENABLED on that
-    // agent — the same rule the pair-run endpoint re-checks server-side
-    const runOf = list => { const m = {}; (list.engines || []).forEach(e => { if (e.enabled === true) m[e.engine] = true; }); return m; };
-    const mA = runOf(a), mB = runOf(b);
-    const common = Object.keys(mA).filter(e => mB[e]).sort();
-    bwState.engines = common;
-    bwState.picked = common.slice();
-    if (!common.length) {
-      body.innerHTML = '<p class="qs-hint u-m-0">' + esc(tr('', 'No engine is enabled on both agents — enable one on both and come back.')) + '</p>';
-      const nx = $('bwNext'); if (nx) nx.disabled = true;
-      return;
-    }
-    // the pick check renders ONLY on picked cards (like every other step) —
-    // an always-on check made unchecking look like nothing happened
-    body.innerHTML = '<p class="qs-hint u-m-0">' + esc(tr('', 'Engines enabled on both agents — pick the ones to benchmark')) + '</p>' +
-      '<div class="tu-cards">' + common.map(e => {
-        const on = bwState.picked.indexOf(e) >= 0;
-        return '<button type="button" class="mtb-agent-card bw-card' + (on ? ' on' : '') + '" data-bweng="' + esc(e) + '" aria-pressed="' + on + '">' +
-          '<span class="mtb-agc-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3.2M12 18.3v3.2M2.5 12h3.2M18.3 12h3.2M5.3 5.3l2.2 2.2M16.5 16.5l2.2 2.2M18.7 5.3l-2.2 2.2M7.5 16.5l-2.2 2.2"/></svg></span>' +
-          '<span class="mtb-agc-tx"><b>' + esc(e) + '</b></span>' +
-          (on ? '<span class="tu-pick-ok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg></span>' : '') +
-          '</button>';
-      }).join('') + '</div>';
-  } catch (err) {
-    body.innerHTML = stateError(err.message, 'bweng', true);
-  }
+  if (bwState.step === 2) { await bwRenderAgentStep('iran'); return; }
+  if (bwState.step === 3) { await bwRenderAgentStep('foreign'); return; }
+  await bwRenderCoreStep();
 }
-
-function bwNext() {
-  if (bwState.running) return;
-  if (bwState.step === 1 && !bwState.topo) { toastWarn(tr('', 'Benchmark'), tr('', 'Pick a topology first')); return; }
-  if (bwState.step === 2 && !bwState.iran) { toastWarn(tr('', 'Benchmark'), tr('', 'Pick the Iran agent first')); return; }
-  if (bwState.step === 3 && !bwState.foreign) { toastWarn(tr('', 'Benchmark'), tr('', 'Pick the foreign agent first')); return; }
-  if (bwState.step === 4) {
-    if (!bwState.picked || !bwState.picked.length) { toastWarn(tr('', 'Benchmark'), tr('', 'Pick at least one engine')); return; }
-    bwRun();
-    return;
+// stepping forward revalidates the dependent picks: a topology change resets
+// the agents, an Iran change re-checks the foreign datacenter rule
+function bwPickTopo(id, name) {
+  if (String(bwState.topo) === String(id)) return;
+  bwState.topo = id;
+  bwState.topoName = name || '';
+  bwState.iran = null; bwState.iranAgent = ''; bwState.iranDC = '';
+  bwState.foreign = null; bwState.foreignAgent = ''; bwState.foreignDC = '';
+  bwState.picked = [];
+  bwRender();
+}
+async function bwPickAgent(side, id) {
+  const members = bwMembers(side);
+  const m = members.find(x => String(x.id) === String(id));
+  if (!m) return;
+  await bwResolveDcIds();
+  const dcId = bwCache.dcIds[String(m.id)] || '';
+  if (side === 'iran') {
+    if (String(bwState.iran) === String(id)) return; // single select, no toggle-off
+    bwState.iran = m.id;
+    bwState.iranAgent = (m.agent && m.agent.id) || '';
+    bwState.iranDC = dcId;
+    // the foreign pick revalidates against the new Iran datacenter
+    if (bwState.foreign && bwCache.dcIds[String(bwState.foreign)] === dcId) {
+      bwState.foreign = null; bwState.foreignAgent = ''; bwState.foreignDC = '';
+    }
+  } else {
+    bwState.foreign = m.id;
+    bwState.foreignAgent = (m.agent && m.agent.id) || '';
+    bwState.foreignDC = dcId;
   }
+  bwRender();
+}
+function bwPickCore(engine) {
+  const k = (bwState.picked || []).indexOf(engine);
+  if (k >= 0) bwState.picked.splice(k, 1); else bwState.picked.push(engine);
+  bwSyncNext();
+  bwSyncSummary();
+  bwRenderCoreStep();
+}
+// the summary rides every pick without re-rendering the whole step
+function bwSyncSummary() {
+  const w = $('pbwSumWrap');
+  if (w) w.innerHTML = bwSummaryHTML();
+}
+function bwNext() {
+  if (bwState.step === 4) { bwStart(); return; }
   bwState.step++;
   bwRender();
 }
-
-async function bwRun() {
-  const host = $('benchWizard');
-  bwState.running = true;
-  host.innerHTML = '<div class="u-grid u-gap-8">' + skel(3) + '</div>';
-  try {
-    const st = await api('/api/benchmark/pair-run', {
-      topology_id: Number(bwState.topo),
-      iran_server: Number(bwState.iran),
-      foreign_server: Number(bwState.foreign),
-      engines: bwState.picked
-    });
-    bwState.view = st;
-  } catch (err) {
-    host.innerHTML = stateError(err.message, 'bwrun', true);
-    bwState.running = false;
-    return;
+async function bwStart() {
+  const picked = bwState.picked || [];
+  if (!picked.length) return;
+  const catalogCores = picked.filter(e => bwCoreMethodCount(e) > 0);
+  const plainEngines = picked.filter(e => bwCoreMethodCount(e) === 0);
+  bwState.running = plainEngines.length > 0;
+  bwState.boardRunning = catalogCores.length > 0;
+  bwState.pairErr = null;
+  bwState.boardErr = null;
+  bwState.boardNote = '';
+  bwRenderRun();
+  if (bwState.running) {
+    try {
+      const st = await api('/api/benchmark/pair-run', {
+        topology_id: Number(bwState.topo),
+        iran_server: Number(bwState.iran),
+        foreign_server: Number(bwState.foreign),
+        engines: plainEngines,
+      });
+      bwState.view = st;
+    } catch (err) {
+      bwState.running = false;
+      bwState.pairErr = (err && err.message) || String(err);
+    }
   }
+  if (bwState.boardRunning) {
+    try {
+      const d = await api('/api/benchmark/method-board?iran=' + encodeURIComponent(bwState.iranAgent) + '&kharej=' + encodeURIComponent(bwState.foreignAgent) + '&run=1');
+      bwState.boardView = ctbNormBoard(d);
+      if (bwState.boardView && !bwState.boardView.running) bwState.boardRunning = false;
+    } catch (err) {
+      bwState.boardRunning = false;
+      bwState.boardErr = (err && err.message) || String(err);
+    }
+  }
+  if (!bwState.running && !bwState.boardRunning) { bwRenderRun(); return; }
   bwPoll();
 }
-
 async function bwPoll() {
-  if (!bwState.running) return;
-  try {
-    const st = await api('/api/benchmark/pair');
-    bwState.view = st;
-    bwRenderRun(st);
-    if (st.running) bwTimer = setTimeout(bwPoll, 2000);
-    else { bwState.running = false; toastOk(tr('', 'Benchmark'), tr('', 'Benchmark finished')); }
-  } catch (err) {
-    bwTimer = setTimeout(bwPoll, 3000);
+  if (!bwState.running && !bwState.boardRunning) { bwRenderRun(); return; }
+  const jobs = [];
+  if (bwState.running) {
+    jobs.push(api('/api/benchmark/pair').then(st => { bwState.view = st; if (!st.running) bwState.running = false; }).catch(err => { bwState.pairErr = (err && err.message) || String(err); }));
   }
+  if (bwState.boardRunning && bwState.iranAgent && bwState.foreignAgent) {
+    jobs.push(api('/api/benchmark/method-board?iran=' + encodeURIComponent(bwState.iranAgent) + '&kharej=' + encodeURIComponent(bwState.foreignAgent))
+      .then(d => { bwState.boardView = ctbNormBoard(d); if (bwState.boardView && !bwState.boardView.running) bwState.boardRunning = false; })
+      .catch(err => { bwState.boardErr = (err && err.message) || String(err); }));
+  }
+  await Promise.all(jobs);
+  bwRenderRun();
+  if (bwState.running || bwState.boardRunning) bwState.timer = setTimeout(bwPoll, 2000);
+  else toastOk(tr('', 'Benchmark'), tr('', 'Benchmark finished'));
 }
-
 function bwStop() {
   api('/api/benchmark/pair-stop', {}, 'POST').catch(() => {});
+  // the method probes have no stop endpoint — the run continues and the
+  // view says so honestly instead of pretending it stopped
+  if (bwState.boardRunning) bwState.boardNote = tr('', 'The method probes keep running to completion — they have no stop switch.');
+  bwRenderRun();
 }
-
-function bwRenderRun(st) {
+// per-item status vocabulary: Completed / Failed / Stopped / Pending —
+// mapped from the two runners' real rows, nothing invented
+function bwRunStatus(status) {
+  const s = String(status || '');
+  if (s === 'ok') return ['ok', tr('', 'Completed')];
+  if (s === 'converge-timeout') return ['bad', tr('', 'Did not come up')];
+  if (s === 'failed') return ['bad', tr('', 'Failed')];
+  if (s === 'stopped') return ['warn', tr('', 'Stopped')];
+  return ['dim', s || tr('', 'Pending')];
+}
+function bwPhaseLine() {
+  const g = bwState;
+  const pairPhase = { create: 'Building the temporary tunnels', converge: 'Waiting for the tunnels to come up', measure: 'Measuring the counters', cleanup: 'Removing the temporary tunnels' };
+  const parts = [];
+  if (g.running && g.view) {
+    const ph = String(g.view.phase || '');
+    parts.push(esc(tr('', 'Cores')) + ': <b>' + esc(String(g.view.cur_engine || '')) + '</b> — ' + esc(tr('', pairPhase[ph] || ph || 'Running')));
+  }
+  if (g.boardRunning && g.boardView) {
+    parts.push(esc(tr('', 'Method probes')) + ': <b>' + esc(String(g.boardView.cur || '')) + '</b>');
+  }
+  if (g.pairErr) parts.push('<span class="pbw-pollerr">' + esc(tr('', 'Engine benchmark')) + ': ' + esc(g.pairErr) + '</span>');
+  if (g.boardErr) parts.push('<span class="pbw-pollerr">' + esc(tr('', 'Method probes')) + ': ' + esc(g.boardErr) + '</span>');
+  if (g.boardNote) parts.push('<span class="pbw-pollerr">' + esc(g.boardNote) + '</span>');
+  return parts.length ? '<div class="pbw-progress">' + parts.map(p => '<div>' + p + '</div>').join('') + '</div>' : '';
+}
+function bwRenderRun() {
   const host = $('benchWizard');
   if (!host) return;
-  const res = st.results || [];
-  const rows = res.map(r => '<tr><td class="mono" dir="ltr">' + esc(r.engine) + '</td>' +
-    '<td>' + (r.status === 'ok' ? '<span class="badge ok">' + esc(tr('', 'Measured')) + '</span>' : (r.status === 'stopped' ? '<span class="badge dim">' + esc(tr('', 'Stopped')) + '</span>' : '<span class="badge err">' + esc(tr('', r.status === 'converge-timeout' ? 'Did not come up' : 'Failed')) + '</span>')) + '</td>' +
-    '<td class="u-text-center">' + (r.converge_s != null ? esc(Number(r.converge_s).toFixed(1) + 's') : '—') + '</td>' +
-    '<td class="u-text-center">' + (r.down_bps ? '<bdi dir="ltr">' + esc(fmtSpeedRate(r.down_bps)) + '</bdi>' : '—') + '</td>' +
-    '<td class="u-text-center">' + (r.up_bps ? '<bdi dir="ltr">' + esc(fmtSpeedRate(r.up_bps)) + '</bdi>' : '—') + '</td>' +
-    '<td class="u-text-center">' + (r.rtt_ms ? esc(Math.round(r.rtt_ms) + ' ms') : '—') + '</td>' +
-    '<td class="u-text-center">' + (r.score ? esc(String(r.score)) : '—') + '</td>' +
-    '<td class="u-text-center">' + (r.note ? '<span class="qs-hint">' + esc(r.note) + '</span>' : '—') + '</td></tr>').join('');
-  // the orchestration phases read as status text, not machine words
-  const bwPhase = { create: 'Building the temporary tunnel', converge: 'Waiting for the tunnel to come up', measure: 'Measuring the counters', cleanup: 'Removing the tunnel' };
-  const cur = st.running ? '<div class="u-hint-12 u-mb-12">' + esc(tr('', 'Running')) + ': <b>' + esc(String(st.cur_engine || '')) + '</b> — ' + esc(tr('', bwPhase[String(st.phase || '')] || String(st.phase || ''))) + '</div>' : '';
+  const g = bwState;
+  const pairRows = (g.view && g.view.results) || [];
+  const boardRows = (g.boardView && g.boardView.rows) || [];
+  const doneCount = pairRows.filter(r => r.status === 'ok').length + boardRows.filter(r => ctbReach(r.reachability) === 'ok').length;
+  const cleanupLine = g.running
+    ? (String((g.view || {}).phase) === 'cleanup' ? esc(tr('', 'Cleaning up the temporary tunnels…')) : esc(tr('', 'Temporary tunnels are removed after each measurement.')))
+    : (pairRows.length ? esc(tr('', 'Temporary tunnels removed — cleanup confirmed.')) : '');
+  const pairTable = pairRows.length
+    ? '<h3 class="pbw-sec-title">' + esc(tr('', 'Core benchmarks')) + '</h3>' +
+      '<div class="bench-table-wrap"><table class="quantum-table"><thead><tr>' +
+      '<th>' + esc(tr('', 'Core')) + '</th><th>' + esc(tr('', 'Status')) + '</th><th>' + esc(tr('', 'Converge')) + '</th>' +
+      '<th>' + esc(tr('', 'Download')) + '</th><th>' + esc(tr('', 'Upload')) + '</th><th>' + esc(tr('', 'RTT')) + '</th>' +
+      '<th>' + esc(tr('', 'Score')) + '</th><th>' + esc(tr('', 'Note')) + '</th></tr></thead><tbody>' +
+      pairRows.map(r => {
+        const st = bwRunStatus(r.status);
+        const badge = '<span class="badge ' + st[0] + '"><span class="dot"></span>' + esc(st[1]) + '</span>';
+        return '<tr><td class="mono" dir="ltr">' + esc(r.engine) + '</td>' +
+          '<td>' + badge + '</td>' +
+          '<td class="u-text-center">' + (r.converge_s != null ? esc(Number(r.converge_s).toFixed(1) + 's') : '—') + '</td>' +
+          '<td class="u-text-center">' + (r.down_bps ? '<bdi dir="ltr">' + esc(fmtSpeedRate(r.down_bps)) + '</bdi>' : '—') + '</td>' +
+          '<td class="u-text-center">' + (r.up_bps ? '<bdi dir="ltr">' + esc(fmtSpeedRate(r.up_bps)) + '</bdi>' : '—') + '</td>' +
+          '<td class="u-text-center">' + (r.rtt_ms ? esc(Math.round(r.rtt_ms) + ' ms') : '—') + '</td>' +
+          '<td class="u-text-center">' + (r.score ? esc(String(r.score)) : '—') + '</td>' +
+          '<td class="u-text-center">' + (r.note ? '<span class="qs-hint">' + esc(r.note) + '</span>' : '—') + '</td></tr>';
+      }).join('') + '</tbody></table></div>'
+    : '';
+  const boardTable = boardRows.length
+    ? '<h3 class="pbw-sec-title">' + esc(tr('', 'Method probes')) + '</h3>' +
+      '<div class="bench-table-wrap"><table class="quantum-table"><thead><tr>' +
+      '<th>' + esc(tr('', 'Method')) + '</th><th>' + esc(tr('', 'Core')) + '</th><th>' + esc(tr('', 'Status')) + '</th>' +
+      '<th>' + esc(tr('', 'Latency')) + '</th><th>' + esc(tr('', 'Throughput')) + '</th><th>' + esc(tr('', 'PMTU')) + '</th>' +
+      '<th>' + esc(tr('', 'Score')) + '</th><th>' + esc(tr('', 'Error')) + '</th></tr></thead><tbody>' +
+      boardRows.map(r => {
+        const st = ctbReach(r.reachability);
+        const badge = st === 'ok'
+          ? '<span class="badge ok"><span class="dot"></span>' + esc(tr('', 'Completed')) + '</span>'
+          : st === 'bad'
+            ? '<span class="badge err"><span class="dot"></span>' + esc(tr('', 'Failed')) + '</span>'
+            : (r.reachability ? '<span class="badge dim"><bdi dir="ltr">' + esc(String(r.reachability)) + '</bdi></span>' : '<span class="badge dim">' + esc(tr('', 'Pending')) + '</span>');
+        return '<tr><td class="mono" dir="ltr">' + esc(r.method || '—') + '</td>' +
+          '<td class="mono" dir="ltr">' + esc(r.engine || '—') + '</td>' +
+          '<td>' + badge + '</td>' +
+          '<td class="u-text-center">' + (r.latency_ms != null && r.latency_ms !== '' ? '<bdi dir="ltr">' + esc(String(Math.round(Number(r.latency_ms) * 100) / 100)) + ' ms</bdi>' : '—') + '</td>' +
+          '<td class="u-text-center">' + (r.throughput != null && r.throughput !== '' && Number(r.throughput) > 0 ? '<bdi dir="ltr">' + esc(ctbRate(Number(r.throughput))) + '</bdi>' : '—') + '</td>' +
+          '<td class="u-text-center">' + (r.pmtu != null && r.pmtu !== '' ? esc(String(r.pmtu)) : '—') + '</td>' +
+          '<td class="u-text-center">' + (r.score != null && r.score !== '' ? '<bdi dir="ltr">' + esc(String(r.score)) + '</bdi>' : '—') + '</td>' +
+          '<td class="u-text-center">' + (r.error ? '<span class="qs-hint" title="' + esc(String(r.error)) + '">' + esc(String(r.error).slice(0, 80)) + '</span>' : '—') + '</td></tr>';
+      }).join('') + '</tbody></table></div>'
+    : '';
   host.innerHTML =
-    '<div class="tc-header u-bb-ln u-pb-16 u-mb-16"><div><span class="tc-title u-fs-18 u-fw-700">' + esc(tr('', 'Pair benchmark')) + '</span>' +
-    '<div class="qs-hint u-mt-4">' + esc(String(st.topo_name || '')) + '</div></div></div>' +
-    cur +
-    '<div class="bench-table-wrap"><table class="quantum-table"><thead><tr>' +
-    '<th>' + esc(tr('', 'Engine')) + '</th><th>' + esc(tr('', 'Status')) + '</th><th>' + esc(tr('', 'Converge')) + '</th>' +
-    '<th>' + esc(tr('', 'Download')) + '</th><th>' + esc(tr('', 'Upload')) + '</th><th>' + esc(tr('', 'RTT')) + '</th>' +
-    '<th>' + esc(tr('', 'Score')) + '</th><th>' + esc(tr('', 'Note')) + '</th></tr></thead><tbody>' +
-    (rows || '<tr><td colspan="8" class="u-text-center">' + skel(2) + '</td></tr>') + '</tbody></table></div>' +
-    '<p class="qs-hint">' + esc(tr('', 'Real temporary tunnels: built through each engine, measured from the agents\u2019 own counter samples, then removed.')) + '</p>' +
-    '<div class="mtb-acts"><button type="button" class="quantum-btn quantum-btn-secondary" id="bwStop"' + (st.running ? '' : ' hidden') + '>' + esc(tr('', 'Stop')) + '</button>' +
+    '<div class="pbw-stepper-wrap">' + bwStepperHTML() + '</div>' +
+    '<div class="pbw-progress-head">' +
+    '<span class="badge ' + (g.running || g.boardRunning ? 'ok' : 'dim') + '"><span class="dot"></span>' + esc(g.running || g.boardRunning ? tr('', 'Running') : tr('', 'Finished')) + '</span>' +
+    '<span class="qs-hint">' + esc(tr('', '{n} completed').replace('{n}', String(doneCount))) + '</span>' +
+    '<span class="u-flex-1"></span>' +
+    (cleanupLine ? '<span class="qs-hint pbw-cleanup">' + cleanupLine + '</span>' : '') +
+    '</div>' +
+    bwPhaseLine() +
+    (g.running || g.boardRunning ? '<div class="u-grid u-gap-8">' + skel(2) + '</div>' : '') +
+    pairTable + boardTable +
+    (g.boardNote ? '<p class="qs-hint">' + esc(g.boardNote) + '</p>' : '') +
+    '<div class="mtb-acts">' +
+    '<button type="button" class="quantum-btn quantum-btn-secondary" id="bwStop"' + (g.running ? '' : ' hidden') + '>' + esc(tr('', 'Stop')) + '</button>' +
     '<button type="button" class="quantum-btn quantum-btn-secondary" id="bwAgain">' + esc(tr('', 'Run again')) + '</button>' +
     '<button type="button" class="quantum-btn quantum-btn-primary" id="bwNew">' + esc(tr('', 'New benchmark')) + '</button></div>';
   const stopB = $('bwStop'), againB = $('bwAgain'), newB = $('bwNew');
   if (stopB) stopB.onclick = bwStop;
-  if (againB) againB.onclick = () => { bwState.running = false; clearTimeout(bwTimer); loadBenchWizard(); };
+  if (againB) againB.onclick = () => { clearTimeout(g.timer); g.running = false; g.boardRunning = false; bwStart(); };
   if (newB) newB.onclick = async () => {
     await api('/api/benchmark/pair-clear', {}, 'POST').catch(() => {});
-    bwState = { step: 1, topo: null, topoName: '', iran: null, iranAgent: '', foreign: null, foreignAgent: '', engines: [], picked: [], pool: null, running: false, view: null, timer: null };
+    clearTimeout(g.timer);
+    bwState = {
+      step: 1, topo: null, topoName: '', iran: null, iranAgent: '', iranDC: '',
+      foreign: null, foreignAgent: '', foreignDC: '',
+      picked: [], pool: bwCache.topos,
+      running: false, view: null, timer: null,
+      boardRunning: false, boardView: null,
+      pairErr: null, boardErr: null, boardNote: '', loadErr: null,
+    };
     loadBenchWizard();
   };
 }
+(function bwWire() {
+  const host = $('benchWizard');
+  if (!host) return;
+  host.addEventListener('click', ev => {
+    const el = ev.target && ev.target.closest ? ev.target.closest.bind(ev.target) : null;
+    if (!el) return;
+    const goto = el('[data-bw-goto]');
+    if (goto) {
+      const n = Number(goto.getAttribute('data-bw-goto')) || 1;
+      if (n <= bwState.step && n !== bwState.step) { bwState.step = n; bwRender(); }
+      return;
+    }
+    const topo = el('[data-bw-topo]');
+    if (topo) { bwPickTopo(topo.getAttribute('data-bw-topo'), topo.getAttribute('data-bw-name')); return; }
+    const agent = el('[data-bw-agent]');
+    if (agent && !agent.disabled) { bwPickAgent(agent.getAttribute('data-bw-agent'), agent.getAttribute('data-bw-v')); return; }
+    const core = el('[data-bw-core]');
+    if (core) { bwPickCore(core.getAttribute('data-bw-core')); return; }
+  });
+})();
+
+// ---------- C-Tunnel method board (tab-cboard, §2.23) ----------------------
+// The live test page dedicated to the ctunnel core: pick an Iran and a
+// foreign agent, fire GET /api/benchmark/method-board?iran=&kharej=&run=1
+// and every transport method is probed through the real pair — reachability,
+// latency, throughput, PMTU and a score — with the best method suggested.
+// The endpoint is landing in parallel (BACKEND-42/43): until it answers,
+// the page says so honestly instead of inventing numbers.
+let ctbAgents = null;      // the fleet rows from /api/ui/agents
+let ctbAgentsErr = null;
+let ctbAgentsLoading = false;
+let ctbState = { iran: '', kharej: '', running: false, view: null, timer: null, err: null };
+
+async function loadCtunBoard() {
+  const host = $('ctunBoard');
+  if (!host) return;
+  if (ctbState.running) { ctbPoll(); return; }
+  if (!ctbAgents && !ctbAgentsErr && !ctbAgentsLoading) {
+    ctbAgentsLoading = true;
+    try {
+      const d = await api('/api/ui/agents');
+      ctbAgents = (d && d.agents) || [];
+    } catch (err) {
+      ctbAgentsErr = (err && err.message) || String(err);
+    } finally {
+      ctbAgentsLoading = false;
+    }
+  }
+  ctbRender();
+}
+function ctbSideList(side) {
+  const rows = ctbAgents || [];
+  return side === 'iran' ? rows.filter(a => a.role === 'iran') : rows.filter(a => a.role !== 'iran');
+}
+function ctbAgentCard(a, side) {
+  const on = (side === 'iran' ? ctbState.iran : ctbState.kharej) === String(a.id);
+  const online = String(a.status || '') === 'online';
+  return '<button type="button" class="mtb-agent-card bw-card' + (on ? ' on' : '') + '" data-ctb-pick="' + side + '" data-ctb-v="' + esc(String(a.id)) + '" aria-pressed="' + on + '">' +
+    '<span class="mtb-agc-ico">' + topologyFlagSvg(String(a.country || '').toLowerCase()) + '</span>' +
+    '<span class="mtb-agc-tx"><b>' + esc(a.name || '#' + a.id) + '</b><i>' + esc(a.arch || '') + '</i></span>' +
+    '<span class="badge ' + (online ? 'ok' : 'dim') + '"><span class="dot"></span>' + esc(online ? tr('', 'Online') : tr('', 'Offline')) + '</span>' +
+    (on ? '<span class="tu-pick-ok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg></span>' : '') +
+    '</button>';
+}
+function ctbPick(side, v) {
+  if (side !== 'iran' && side !== 'kharej') return;
+  if (!v) return;
+  // a picked card toggles off on a second click
+  if (side === 'iran') ctbState.iran = ctbState.iran === v ? '' : v;
+  else ctbState.kharej = ctbState.kharej === v ? '' : v;
+  ctbState.err = null;
+  ctbRender();
+}
+function ctbRender() {
+  const host = $('ctunBoard');
+  if (!host) return;
+  if (ctbAgentsErr) { host.innerHTML = stateError(ctbAgentsErr, 'ctbagents', true); return; }
+  if (ctbAgentsLoading) { host.innerHTML = '<div class="u-grid u-gap-8">' + skel(3) + '</div>'; return; }
+  if (ctbState.view) { ctbRenderRun(); return; }
+  if (ctbState.err) { host.innerHTML = stateError(ctbState.err, 'ctbrun', true); return; }
+  const sides = [
+    ['iran', tr('', 'Iran side'), tr('', 'Pick the Iran agent of the pair')],
+    ['kharej', tr('', 'Foreign side'), tr('', 'Pick the foreign agent of the pair')],
+  ];
+  const body = sides.map(([side, lbl, hint]) => {
+    const list = ctbSideList(side);
+    return '<div class="ctb-side"><p class="qs-hint u-m-0"><b>' + esc(lbl) + '</b> — ' + esc(hint) + '</p>' +
+      (list.length ? '<div class="tu-cards">' + list.map(a => ctbAgentCard(a, side)).join('') + '</div>'
+        : '<div class="ent-empty ent-empty-sm" role="status"><b>' + esc(tr('', 'No agents on this side yet')) + '</b><span>' + esc(tr('', 'Enroll an agent to test the method board through it.')) + '</span></div>') +
+      '</div>';
+  }).join('');
+  const ready = ctbState.iran && ctbState.kharej;
+  host.innerHTML = '<div class="ctb-pickgrid">' + body + '</div>' +
+    '<div class="mtb-acts"><span class="qs-hint">' + esc(tr('', 'The live run probes every method through the chosen pair — it can take a few minutes.')) + '</span>' +
+    '<button type="button" class="quantum-btn quantum-btn-primary" id="ctbRunBtn"' + (ready ? '' : ' disabled') + '>' + esc(tr('', 'Run live board')) + '</button></div>';
+  const run = $('ctbRunBtn');
+  if (run) run.onclick = ctbRun;
+}
+// ctbNormBoard reads the board payload defensively: the endpoint is landing
+// in parallel, so results may ride `results`/`rows`/`methods` and the best
+// suggestion `best`/`suggested` (object or bare method string) — anything
+// absent stays absent and renders —.
+function ctbNormBoard(d) {
+  if (!d || typeof d !== 'object') return null;
+  const rows = (Array.isArray(d.results) && d.results) || (Array.isArray(d.rows) && d.rows) || (Array.isArray(d.methods) && d.methods) || [];
+  // the backend (BACKEND-42) flags the winner with rows[].recommended and
+  // repeats it as the bare `best` string — prefer the recommended row so the
+  // best card carries the winner's own stats
+  let bestObj = d.best && typeof d.best === 'object' ? d.best : (d.suggested && typeof d.suggested === 'object' ? d.suggested : null);
+  const bestName = (d.best && typeof d.best === 'string' && d.best) || (d.suggested && typeof d.suggested === 'string' && d.suggested) || '';
+  if (!bestObj) {
+    const rec = rows.find(r => r && r.recommended === true);
+    bestObj = rec || (bestName ? { method: bestName } : null);
+  }
+  return {
+    running: d.running === true,
+    phase: d.phase || d.stage || '',
+    cur: d.cur_method || d.current || d.cur || '',
+    iranName: d.iran_name || '',
+    kharejName: d.kharej_name || '',
+    rows: rows,
+    best: bestObj,
+    pmtu: d.pmtu != null ? d.pmtu : (bestObj && bestObj.pmtu != null ? bestObj.pmtu : null),
+    deploy: d.deploy && typeof d.deploy === 'object' ? d.deploy : null,
+    error: d.error || '',
+  };
+}
+// the board's reachability vocabulary (BACKEND-42): ok | converge-timeout |
+// stopped | failed | unprobed — ok/bad get the strong badges, the rest render
+// as a dim badge carrying the raw word (nothing invented)
+function ctbReach(v) {
+  const s = String(v == null ? '' : v).toLowerCase();
+  if (s === 'pass' || s === 'ok' || s === 'reachable' || s === 'up' || s === 'alive') return 'ok';
+  if (s === 'blocked' || s === 'fail' || s === 'failed' || s === 'down' || s === 'unreachable' || s === 'filtered') return 'bad';
+  return '';
+}
+// wire bits-per-second formatter (the board's throughput unit) — bps/Kbps/Mbps/Gbps
+function ctbRate(v) {
+  const n = Number(v);
+  if (!isFinite(n) || n <= 0) return '';
+  if (n >= 1e9) return (n / 1e9).toFixed(1) + ' Gbps';
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + ' Mbps';
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + ' Kbps';
+  return Math.round(n) + ' bps';
+}
+async function ctbRun() {
+  if (ctbState.running || !ctbState.iran || !ctbState.kharej) return;
+  ctbState.running = true;
+  ctbState.err = null;
+  ctbState.view = null;
+  ctbRenderRunning(null);
+  try {
+    const d = await api('/api/benchmark/method-board?iran=' + encodeURIComponent(ctbState.iran) + '&kharej=' + encodeURIComponent(ctbState.kharej) + '&run=1');
+    ctbState.view = ctbNormBoard(d);
+  } catch (err) {
+    ctbState.running = false;
+    ctbState.err = (err && err.message) || String(err);
+    ctbState.view = null;
+    ctbRender();
+    return;
+  }
+  if (ctbState.view && ctbState.view.running) ctbPoll();
+  else { ctbState.running = false; ctbRenderRun(); }
+}
+async function ctbPoll() {
+  if (!ctbState.running) return;
+  try {
+    const d = await api('/api/benchmark/method-board?iran=' + encodeURIComponent(ctbState.iran) + '&kharej=' + encodeURIComponent(ctbState.kharej));
+    ctbState.view = ctbNormBoard(d);
+    ctbState.err = null;
+    ctbRenderRun();
+    if (ctbState.view && ctbState.view.running) ctbState.timer = setTimeout(ctbPoll, 2000);
+    else { ctbState.running = false; ctbRenderRun(); toastOk(tr('', 'Method board'), tr('', 'Live board finished')); }
+  } catch (err) {
+    ctbState.err = (err && err.message) || String(err);
+    ctbRenderRun();
+    ctbState.timer = setTimeout(ctbPoll, 3000);
+  }
+}
+function ctbRenderRunning(view) {
+  const host = $('ctunBoard');
+  if (!host) return;
+  const cur = view && view.cur ? '<b>' + esc(String(view.cur)) + '</b> · ' : '';
+  host.innerHTML = '<div class="ctb-running" role="status"><span class="dot"></span>' +
+    esc(tr('', 'Probing every method through the live pair')) + ' — ' + cur + esc(tr('', 'results stream in as each method answers.')) + '</div>' +
+    '<div class="u-grid u-gap-8">' + skel(4) + '</div>';
+}
+function ctbRow(r) {
+  const reach = ctbReach(r.reachability);
+  const badge = reach === 'ok'
+    ? '<span class="badge ok"><span class="dot"></span>' + esc(tr('', 'Reachable')) + '</span>'
+    : reach === 'bad'
+      ? '<span class="badge err"><span class="dot"></span>' + esc(tr('', 'Blocked')) + '</span>'
+      : (r.reachability
+        ? '<span class="badge dim" title="' + esc(tr('', 'converge-timeout / stopped / unprobed — the row keeps its honest word')) + '"><bdi dir="ltr">' + esc(String(r.reachability)) + '</bdi></span>'
+        : '<span class="badge dim">—</span>');
+  const lat = (r.latency_ms != null && r.latency_ms !== '') ? '<bdi dir="ltr">' + esc(String(Math.round(Number(r.latency_ms) * 100) / 100)) + ' ms</bdi>' : '—';
+  const thr = (r.throughput != null && r.throughput !== '' && Number(r.throughput) > 0) ? '<bdi dir="ltr">' + esc(ctbRate(Number(r.throughput))) + '</bdi>' : '—';
+  const pmtu = (r.pmtu != null && r.pmtu !== '') ? esc(String(r.pmtu)) : '—';
+  const score = (r.score != null && r.score !== '') ? '<bdi dir="ltr">' + esc(String(r.score)) + '</bdi>' : '—';
+  const bestMark = r.recommended === true ? '<span class="ctun-yes" title="' + esc(tr('', 'Recommended by the board')) + '"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.5-4.8 2.5.9-5.4L4.2 7.7l5.4-.8z"/></svg></span>' : '';
+  return '<tr>' +
+    '<td><b>' + esc(r.method || r.name || '—') + '</b>' + bestMark + '</td>' +
+    '<td>' + ctunLayerBadge(r.layer) + '</td>' +
+    '<td>' + ctunTextBadge(r.transport) + '</td>' +
+    '<td class="u-text-center">' + esc(ctunIpver(r.ipver)) + '</td>' +
+    '<td>' + badge + '</td>' +
+    '<td class="num">' + lat + '</td>' +
+    '<td class="num">' + thr + '</td>' +
+    '<td class="num">' + pmtu + '</td>' +
+    '<td class="num">' + score + '</td>' +
+    '<td class="ctb-note">' + (r.error ? '<span class="qs-hint" title="' + esc(String(r.error)) + '">' + esc(String(r.error).slice(0, 80)) + '</span>' : '—') + '</td>' +
+    '</tr>';
+}
+function ctbBestCard(view) {
+  const b = view.best;
+  if (!b) return '';
+  const stat = (k, v) => v ? '<span class="ctb-best-stat"><span>' + esc(k) + '</span><bdi dir="ltr">' + esc(String(v)) + '</bdi></span>' : '';
+  const deployReady = !!view.deploy;
+  return '<div class="ctb-best">' +
+    '<div class="ctb-best-main"><span class="ctb-best-lbl">' + esc(tr('', 'Best method')) + '</span>' +
+    '<b>' + esc(b.method || b.name || '—') + '</b>' +
+    '<i>' + esc([b.layer, b.transport, b.ipver ? ctunIpver(b.ipver) : ''].filter(Boolean).join(' · ') || '—') + '</i></div>' +
+    '<div class="ctb-best-stats">' +
+    stat(tr('', 'Score'), b.score != null && b.score !== '' ? String(b.score) : '') +
+    stat(tr('', 'Latency'), b.latency_ms != null && b.latency_ms !== '' ? Math.round(Number(b.latency_ms) * 100) / 100 + ' ms' : '') +
+    stat(tr('', 'Throughput'), b.throughput != null && b.throughput !== '' && Number(b.throughput) > 0 ? ctbRate(Number(b.throughput)) : '') +
+    stat('PMTU', view.pmtu != null && view.pmtu !== '' ? String(view.pmtu) : '') +
+    '</div>' +
+    '<button type="button" class="quantum-btn quantum-btn-primary" id="ctbDeploy"' + (deployReady ? '' : ' disabled title="' + esc(tr('', 'The deploy action lands with the backend — the suggested method is recorded here')) + '"') + '>' + esc(tr('', 'Deploy best')) + '</button></div>' +
+    (deployReady ? '' : '<p class="qs-hint u-m-0">' + esc(tr('', 'Deploy wiring arrives with the backend — until it lands the card only records the suggestion.')) + '</p>');
+}
+function ctbRenderRun() {
+  const host = $('ctunBoard');
+  if (!host) return;
+  const view = ctbState.view;
+  if (!view) { ctbRender(); return; }
+  // running with no rows yet: the progress banner + skeleton
+  if (view.running && !view.rows.length) { ctbRenderRunning(view); return; }
+  const rows = view.rows.map(ctbRow).join('');
+  const errBox = ctbState.err
+    ? '<div class="ctb-pollerr" role="alert">' + esc(tr('', 'Polling error — retrying')) + ': ' + esc(ctbState.err) + '</div>'
+    : '';
+  const feedErr = view.error && !view.rows.length
+    ? stateError(view.error, 'ctbrun', true)
+    : '';
+  // live run: the banner rides the table so rows-so-far stream in as each
+  // method answers; the best card waits for the finished board
+  const runBanner = view.running
+    ? '<div class="ctb-running" role="status"><span class="dot"></span>' +
+      esc(tr('', 'Probing every method through the live pair')) + ' — ' +
+      (view.cur ? '<b>' + esc(String(view.cur)) + '</b> · ' : '') +
+      esc(tr('', 'results stream in as each method answers.')) + '</div>'
+    : '';
+  host.innerHTML =
+    '<div class="tc-header u-bb-ln u-pb-16 u-mb-16"><div><span class="tc-title u-fs-16 u-fw-700">' + esc(tr('', 'Live board')) + '</span>' +
+    '<div class="qs-hint u-mt-4">' + esc(tr('', 'Pair: {iran} \u2194 {kharej}')
+      .replace('{iran}', view.iranName || ctbAgentName(ctbState.iran)).replace('{kharej}', view.kharejName || ctbAgentName(ctbState.kharej))) + '</div></div>' +
+    '<span class="badge ' + (view.rows.length ? 'ok' : 'dim') + '"><span class="dot"></span>' + esc(tr('', '{n} methods probed').replace('{n}', String(view.rows.length))) + '</span></div>' +
+    errBox + feedErr + runBanner +
+    (view.rows.length
+      ? '<div class="bench-table-wrap"><table class="quantum-table"><thead><tr>' +
+        '<th>' + esc(tr('', 'Method')) + '</th><th>' + esc(tr('', 'Layer')) + '</th><th>' + esc(tr('', 'Transport')) + '</th><th>' + esc(tr('', 'IP')) + '</th>' +
+        '<th>' + esc(tr('', 'Reachability')) + '</th><th>' + esc(tr('', 'Latency')) + '</th><th>' + esc(tr('', 'Throughput')) + '</th>' +
+        '<th>' + esc(tr('', 'PMTU')) + '</th><th>' + esc(tr('', 'Score')) + '</th><th>' + esc(tr('', 'Error')) + '</th>' +
+        '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
+        (view.running ? '' : ctbBestCard(view))
+      : (!feedErr ? '<div class="ent-empty" role="status"><b>' + esc(tr('', 'No method results yet')) + '</b><span>' + esc(tr('', 'Run the live board to probe every ctunnel method through the pair.')) + '</span></div>' : '')) +
+    (view.running ? '' : '<div class="mtb-acts"><button type="button" class="quantum-btn quantum-btn-secondary" id="ctbAgain">' + esc(tr('', 'Run again')) + '</button>' +
+    '<button type="button" class="quantum-btn quantum-btn-secondary" id="ctbNew">' + esc(tr('', 'New pair')) + '</button></div>');
+  const again = $('ctbAgain'), fresh = $('ctbNew');
+  if (again) again.onclick = () => { ctbRun(); };
+  if (fresh) fresh.onclick = () => { clearTimeout(ctbState.timer); ctbState = { iran: '', kharej: '', running: false, view: null, timer: null, err: null }; ctbRender(); };
+  const dep = $('ctbDeploy');
+  if (dep && view.deploy) dep.onclick = ctbDeployBest;
+}
+function ctbAgentName(id) {
+  const a = (ctbAgents || []).find(x => String(x.id) === String(id));
+  return a ? (a.name || '#' + a.id) : (id ? '#' + id : '—');
+}
+async function ctbDeployBest() {
+  const view = ctbState.view;
+  if (!view || !view.best || !view.deploy) return;
+  try {
+    await api('/api/benchmark/method-board/deploy', {
+      iran: ctbState.iran, kharej: ctbState.kharej, method: view.best.method || view.best.name || '',
+    }, 'POST');
+    toastOk(tr('', 'Method board'), tr('', 'Best method deploy requested: {m}').replace('{m}', String(view.best.method || '')));
+  } catch (err) {
+    toastErr(tr('', 'Method board'), (err && err.message) || String(err));
+  }
+}
+
+// ---------- Kernel Tuning (tab-netopt) -------------------------------------
+// Live kernel network state per agent — BBR, queue discipline, GSO and MTU
+// probing — from GET /api/optimization/kernel. The endpoint is landing in
+// parallel (BACKEND-42/43): until it answers the card shows the honest
+// error/empty state, never invented values.
+let ktData = null;
+let ktErr = null;
+let ktLoading = false;
+// ktNorm reads the payload defensively: the real shape (BACKEND-42) rides
+// `agents` as {agent, name, online, status, congestion_control, bbr_available,
+// qdisc, tcp_mtu_probing, gso, …error} — but the fallback spellings stay so a
+// future field rename cannot silently blank the card. Each fact may be a
+// boolean or a sysctl string ('bbr', 'fq', '1'…).
+function ktNorm(d) {
+  const rows = Array.isArray(d) ? d : (d && (d.agents || d.rows || d.kernels || d.nodes)) || [];
+  return rows.map(r => {
+    const ag = r.agent && typeof r.agent === 'object' ? r.agent : {};
+    // the display name wins over the agent-id string (the real shape carries
+    // agent: id + name: display name side by side)
+    const name = ag.name || r.name || r.agent_name || (typeof r.agent === 'string' ? r.agent : '') || r.agent_id || r.id || '';
+    const id = ag.id || r.agent_id || r.agent || r.id || '';
+    const bbr = r.bbr != null ? r.bbr : (r.congestion_control != null ? r.congestion_control : null);
+    const fq = r.fq != null ? r.fq : (r.qdisc != null ? r.qdisc : null);
+    const gso = r.gso != null ? r.gso : (r.gso_enabled != null ? r.gso_enabled : null);
+    const mtu = r.mtu_probing != null ? r.mtu_probing : (r.tcp_mtu_probing != null ? r.tcp_mtu_probing : (r.mtu_probe != null ? r.mtu_probe : null));
+    const offline = r.online === false;
+    return { id, name, bbr, fq, gso, mtu, offline, detail: r.detail || r.error || (offline ? tr('', 'Agent offline') : '') };
+  }).filter(r => r.id || r.name);
+}
+function ktCell(v, goodVal) {
+  if (v == null || v === '') return '<span class="art-dash">—</span>';
+  if (v === true) return '<span class="ctun-yes" aria-label="on">✓</span>';
+  if (v === false) return '<span class="ctun-no" aria-label="off">✗</span>';
+  const s = String(v);
+  const on = ktCellTruth(s, goodVal);
+  return '<span class="' + (on ? 'ctun-yes' : 'ctun-tb') + '"><bdi dir="ltr">' + esc(s) + '</bdi></span>';
+}
+function renderKernelTuning() {
+  const host = $('ktBody');
+  if (!host) return;
+  if (ktLoading) { host.innerHTML = '<div class="u-grid u-gap-8">' + skel(3) + '</div>'; return; }
+  if (ktErr) { host.innerHTML = stateError(ktErr, 'kt', true); return; }
+  const rows = ktData || [];
+  if (!rows.length) {
+    host.innerHTML = '<div class="ent-empty" role="status"><b>' + esc(tr('', 'No kernel state reported yet')) + '</b>' +
+      '<span>' + esc(tr('', 'The agents report their kernel tuning here as soon as the optimization endpoint serves it.')) + '</span></div>';
+    return;
+  }
+  const bbrOn = rows.filter(r => ktCellTruth(r.bbr, 'bbr')).length;
+  host.innerHTML = '<p class="qs-hint u-m-0">' + esc(tr('', '{n} of {m} agents report BBR').replace('{n}', String(bbrOn)).replace('{m}', String(rows.length))) + '</p>' +
+    '<div class="kt-tblwrap"><table class="ent-tbl kt-tbl"><thead><tr>' +
+    '<th>' + esc(tr('', 'Agent')) + '</th><th>' + esc(tr('', 'BBR')) + '</th><th>' + esc(tr('', 'Queue (fq)')) + '</th>' +
+    '<th>' + esc(tr('', 'GSO')) + '</th><th>' + esc(tr('', 'MTU probing')) + '</th><th>' + esc(tr('', 'Notes')) + '</th>' +
+    '</tr></thead><tbody>' +
+    rows.map(r => '<tr>' +
+      '<td><b>' + esc(r.name || '—') + '</b></td>' +
+      '<td>' + ktCell(r.bbr, 'bbr') + '</td>' +
+      '<td>' + ktCell(r.fq, 'fq') + '</td>' +
+      '<td>' + ktCell(r.gso) + '</td>' +
+      '<td>' + ktCell(r.mtu) + '</td>' +
+      '<td class="ctb-note">' + (r.detail ? '<span class="qs-hint" title="' + esc(String(r.detail)) + '">' + esc(String(r.detail).slice(0, 80)) + '</span>' : '—') + '</td>' +
+      '</tr>').join('') +
+    '</tbody></table></div>' +
+    '<p class="qs-hint u-m-0">' + esc(tr('', 'Read-only for now: the apply path for kernel tuning lands with the backend.')) + '</p>';
+}
+// boolean/string truthiness for the summary line (mirrors ktCell's on-rule);
+// 'fq_codel' counts as a fair queue the same way 'fq' does
+function ktCellTruth(v, goodVal) {
+  if (v === true) return true;
+  if (v === false || v == null || v === '') return false;
+  const s = String(v);
+  if (goodVal) return s.toLowerCase().split(/[\s,]+/).some(t => t === goodVal || t.startsWith(goodVal + '_'));
+  return /^(1|on|yes|enabled|true)$/i.test(s);
+}
+async function loadKernelTuning() {
+  const host = $('ktBody');
+  if (!host || ktLoading) return;
+  ktLoading = true;
+  ktErr = null;
+  renderKernelTuning();
+  try {
+    const d = await api('/api/optimization/kernel');
+    ktData = ktNorm(d);
+  } catch (err) {
+    ktErr = (err && err.message) || String(err);
+    ktData = null;
+  } finally {
+    ktLoading = false;
+    renderKernelTuning();
+  }
+}
+(function ktWire() {
+  const ref = $('ktRefresh');
+  if (ref) ref.addEventListener('click', () => loadKernelTuning());
+})();
+(function ctbWire() {
+  const host = $('ctunBoard');
+  if (!host) return;
+  host.addEventListener('click', e => {
+    const pick = e.target && e.target.closest ? e.target.closest('[data-ctb-pick]') : null;
+    if (pick) { ctbPick(pick.getAttribute('data-ctb-pick'), pick.getAttribute('data-ctb-v')); }
+  });
+})();
 
 // ---------- Bagher (SSH pool carrier): created in Setup, run from the Tunnel tab ----------
 _sshfwdData = null;
@@ -9476,6 +10244,8 @@ function formatSpeedRate(bytesPerSec) {
   const i = Math.min(Math.floor(Math.log(bytesPerSec) / Math.log(k)), sizes.length - 1);
   return (bytesPerSec / Math.pow(k, i)).toFixed(1) + ' ' + sizes[i];
 }
+// bwRenderRun and the method-board table call it fmtSpeedRate — same formatter
+function fmtSpeedRate(v) { return formatSpeedRate(v); }
 
 async function loadSSHFwd() {
   try {
@@ -12176,23 +12946,38 @@ let coresSearch = '';
 let coresLoading = false;
 let coresError = null;
 let coresPick = null; // { engine, disp }
-const CORES_ENGINE_IMG = { aestun: 'img/engines/aestun.png', rakhsh: 'img/engines/rakhsh.png', gost: 'img/engines/gost.png', xray: 'img/engines/xray.svg', wireguard: 'img/engines/wireguard.png', rathole: 'img/engines/rathole.png', wst: 'img/engines/wstunnel.png', wstunnel: 'img/engines/wstunnel.png', tinc: 'img/engines/tinc.svg', hysteria: 'img/engines/hysteria.png', singbox: 'img/engines/singbox.png', midos: 'img/engines/midos.png', dagger: 'img/engines/dagger.png', pengo: 'img/engines/pengo.png', backhaul: 'img/engines/backhaul.png', backpack: 'img/engines/backpack.png', narnia: 'img/engines/narnia.png', waterwall: 'img/engines/waterwall.png', wattunnel: 'img/engines/wattunnel.png', udp2raw: 'img/engines/udp2raw.png', paqet: 'img/engines/paqet.png', frp: 'img/engines/frp.png', easytier: 'img/engines/easytier.png', chisel: 'img/engines/chisel.png' };
-const CORES_ENGINE_NAME = { aestun: 'AESTun', rakhsh: 'Rakhsh', matrix: 'Matrix', frp: 'FRP', backhaul: 'Backhaul', bagher: 'Bagher', gost: 'Gost', xray: 'Xray', wireguard: 'WireGuard', wst: 'wstunnel', wstunnel: 'wstunnel', chisel: 'Chisel', rathole: 'Rathole', tinc: 'Tinc', backpack: 'BackPack', dagger: 'DaggerConnect', easytier: 'EasyTier', hysteria: 'Hysteria', midos: 'Midos', narnia: 'Narnia', paqet: 'Paqet', pengo: 'Pengo', singbox: 'sing-box', spoof: 'Spoof', udp2raw: 'udp2raw', waterwall: 'WaterWall', wattunnel: 'WatTunnel' };
-const CORES_ALIAS = { wst: 'wstunnel' };
+const CORES_ENGINE_IMG = { aestun: 'img/engines/aestun.png', rakhsh: 'img/engines/rakhsh.png', gost: 'img/engines/gost.png', xray: 'img/engines/xray.svg', wireguard: 'img/engines/wireguard.png', rathole: 'img/engines/rathole.png', wst: 'img/engines/wstunnel.png', wstunnel: 'img/engines/wstunnel.png', tinc: 'img/engines/tinc.svg', hysteria: 'img/engines/hysteria.png', singbox: 'img/engines/singbox.png', 'sing-box': 'img/engines/singbox.png', midos: 'img/engines/midos.png', dagger: 'img/engines/dagger.png', pengo: 'img/engines/pengo.png', backhaul: 'img/engines/backhaul.png', backpack: 'img/engines/backpack.png', narnia: 'img/engines/narnia.png', waterwall: 'img/engines/waterwall.png', wattunnel: 'img/engines/wattunnel.png', udp2raw: 'img/engines/udp2raw.png', paqet: 'img/engines/paqet.png', frp: 'img/engines/frp.png', easytier: 'img/engines/easytier.png', chisel: 'img/engines/chisel.png' };
+const CORES_ENGINE_NAME = { aestun: 'AESTun', rakhsh: 'Rakhsh', matrix: 'Matrix', frp: 'FRP', backhaul: 'Backhaul', bagher: 'Bagher', gost: 'Gost', xray: 'Xray', wireguard: 'WireGuard', wst: 'wstunnel', wstunnel: 'wstunnel', chisel: 'Chisel', rathole: 'Rathole', tinc: 'Tinc', backpack: 'BackPack', ctunnel: 'C-Tunnel', dagger: 'DaggerConnect', easytier: 'EasyTier', hysteria: 'Hysteria', midos: 'Midos', narnia: 'Narnia', naive: 'Naive', 'naive-http2': 'Naive (HTTP/2)', paqet: 'Paqet', pengo: 'Pengo', singbox: 'sing-box', 'sing-box': 'sing-box', spoof: 'Spoof', udp2raw: 'udp2raw', waterwall: 'WaterWall', wattunnel: 'WatTunnel', vortexl2: 'VortexL2' };
+const CORES_ALIAS = { wst: 'wstunnel', singbox: 'sing-box' };
 // Matrix is the default and recommended engine; everything else is experimental.
 const CORES_CATS = { matrix: ['Recommended', 'Default'] };
 const CORES_SEARCH_ICO = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>';
 const CORES_QMARK = '<svg viewBox="0 0 100 100" aria-hidden="true"><path d="M50 48 C42 38 26 32 12 42 C4 48 1 56 3 62 C6 60 12 54 20 55 C32 56 42 60 50 52 C58 60 68 56 80 55 C88 54 94 60 97 62 C99 56 96 48 88 42 C74 32 58 38 50 48 Z" fill="#38bdf8"/></svg>';
+const CORES_ICO_MC = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M7.5 13h4M7.5 16.5h7"/></svg>';
+// the §2.22 method count for one grid card: {n, known} — known=true only
+// when the cores feed serves a non-empty methods[] for the core (the count
+// is REAL manifest data); known=false with a repo row = the honest
+// catalog-pending state; null = no resolvable §2.22 row (panel-internal
+// engines, feed not loaded / unreachable) — the badge renders nothing
+// rather than inventing a number or a premature pending
+function coresMethodCount(g) {
+  const repo = artRepoRow(g.engine);
+  if (!repo) return null;
+  return Array.isArray(repo.methods) && repo.methods.length
+    ? { n: repo.methods.length, known: true }
+    : { n: 0, known: false };
+}
 async function loadCores(force) {
   const list = $('engList');
   if (!list || coresLoading) return;
-  if (!force && coresCache && !coresError) { renderCores(); return; }
+  if (!force && coresCache && !coresError) { renderCores(); ctunPendingConsume(); return; }
   coresLoading = true;
   coresError = null;
   renderCores();
   try {
     const d = await api('/api/ui/engines');
     window.__coresAgents = ((d && d.agents) || []);
+    window.__engKeyCfg = !!(d && d.key_configured);
     const arts = ((d && d.artifacts) || []);
     const byEngine = {};
     arts.forEach(a => {
@@ -12231,13 +13016,47 @@ async function loadCores(force) {
       });
     });
     coresCache = Object.keys(byEngine).sort((x, y) => (CORES_ENGINE_NAME[x] || x).localeCompare(CORES_ENGINE_NAME[y] || y)).map(k => byEngine[k]);
+    coresMergeFeedGroups();
     renderCores();
   } catch (e) {
     coresError = e.message || String(e);
     renderCores();
   } finally {
     coresLoading = false;
+    // a deep link (#t=cores&core=…) opens its detail page once the data lands
+    ctunPendingConsume();
   }
+}
+// opens the deep-linked core once the grid data is present (no-op when the
+// hash carried no core, or the data has not landed yet — retried by the
+// next load cycle; a core the panel no longer knows drops silently)
+function ctunPendingConsume() {
+  if (!ctunPendingCore || coresCache === null) return;
+  const c = ctunPendingCore;
+  ctunPendingCore = '';
+  if (ctunGroup(c)) ctunPageOpen(c);
+}
+// the §2.22 feed knows cores no agent reports yet (waterwall, easytier,
+// vortexl2, wattunnel, naive — the overnight cores before their drivers
+// land): merge them into the grid as catalog-only groups so EVERY core the
+// repo publishes renders. The card stays honest — the 'In repo v…' release
+// line, no install without an artifact, the drill-down opens with the full
+// manifest catalog (methods[], license/upstream NOTICE, version badge).
+function coresMergeFeedGroups() {
+  const rows = (coresAvail && Array.isArray(coresAvail.cores) && coresAvail.cores) || [];
+  if (!rows.length || !Array.isArray(coresCache)) return;
+  const have = {};
+  coresCache.forEach(g => { have[CORES_ALIAS[g.engine] || g.engine] = true; });
+  let added = false;
+  rows.forEach(r => {
+    if (!r || !r.core) return;
+    const key = CORES_ALIAS[r.core] || r.core;
+    if (have[key]) return;
+    have[key] = true;
+    coresCache.push({ engine: r.core, latest: r.latest_version || '', builds: [], installed: {}, detail: {}, feedOnly: true });
+    added = true;
+  });
+  if (added) coresCache.sort((x, y) => (CORES_ENGINE_NAME[x.engine] || x.engine).localeCompare(CORES_ENGINE_NAME[y.engine] || y.engine));
 }
 function a_name(ag) { return ag.name || ''; }
 function coresInstalled(g) {
@@ -12257,6 +13076,21 @@ function coresBadges(g) {
   if (cats) return cats.map(c => `<span class="eng-badge eng-badge-cat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.5-4.8 2.5.9-5.4L4.2 7.7l5.4-.8z"/></svg>${esc(tr('', c))}</span>`).join('');
   return `<span class="eng-badge eng-badge-exp">${esc(tr('', 'Experimental'))}</span>`;
 }
+// the per-core METHOD COUNT badge (overnight order): the REAL count of the
+// §2.22 manifest methods[] when the feed serves it, the honest 'pending'
+// mark when the core exists on the feed without its catalog yet — never an
+// invented number; a core the §2.22 row doesn't resolve for (panel-internal
+// engines) renders no badge at all
+function coresMethodBadge(g) {
+  const mc = coresMethodCount(g);
+  if (!mc) return '';
+  if (mc.known) {
+    return '<span class="eng-badge eng-badge-mc" title="' + esc(tr('', 'Methods published in the core manifest')) + '">' + CORES_ICO_MC +
+      tr('', '{n} methods').replace('{n}', '<bdi dir="ltr">' + esc(String(mc.n)) + '</bdi>') + '</span>';
+  }
+  return '<span class="eng-badge eng-badge-mc-pend" title="' + esc(tr('', 'The method catalog for this core has not landed on the feed yet')) + '">' + CORES_ICO_MC +
+    esc(tr('', 'Methods pending')) + '</span>';
+}
 function coresEngineCard(g) {
   const disp = CORES_ENGINE_NAME[g.engine] || g.engine || '';
   const img = CORES_ENGINE_IMG[g.engine] ? '<img src="' + CORES_ENGINE_IMG[g.engine] + '" alt="' + esc(disp) + '" draggable="false">' : CORES_QMARK;
@@ -12266,10 +13100,19 @@ function coresEngineCard(g) {
   const hasArt = (g.builds || []).length > 0;
   const pct = total ? Math.round(installed / total * 100) : 0;
   // release line + context-aware action: never offer installation without a
-  // valid release artifact
+  // valid release artifact. When the local store has nothing but the public
+  // repo carries the core, point at the repo instead of a bare "no release".
+  const repoRow = artRepoRow(g.engine);
+  const repoNewer = hasArt && repoRow && repoRow.latest_version && g.latest &&
+    verCmp(repoRow.latest_version, g.latest) > 0 ? repoRow.latest_version : '';
   const rel = hasArt
     ? '<span class="eng-rel ok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>' + esc(tr('', 'Release available')) + '</span>'
-    : '<span class="eng-rel na"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 15.5h.01"/></svg>' + esc(tr('', 'No release available')) + '</span>';
+    : (repoRow && repoRow.latest_version
+      ? '<span class="eng-rel repo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/></svg>' + esc(tr('', 'In repo')) + ' <bdi dir="ltr">v' + esc(repoRow.latest_version) + '</bdi></span>'
+      : '<span class="eng-rel na"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 15.5h.01"/></svg>' + esc(tr('', 'No release available')) + '</span>');
+  const repoChip = repoNewer
+    ? '<span class="eng-repo-chip" title="' + esc(tr('', 'A newer version is available in the repo — add it from the artifact store')) + '">' + esc(tr('', 'Newer in repo')) + ' <bdi dir="ltr">v' + esc(repoNewer) + '</bdi></span>'
+    : '';
   let act;
   if (!hasArt) act = '<button type="button" class="eng-act" disabled title="' + esc(tr('', 'No release available')) + '">' + esc(tr('', 'Unavailable')) + '</button>';
   else if (stale > 0) act = '<button type="button" class="eng-act pri" data-cores-pick="' + esc(g.engine) + '">' + esc(tr('', 'Update')) + '</button>';
@@ -12277,13 +13120,14 @@ function coresEngineCard(g) {
   else act = '<button type="button" class="eng-act pri" data-cores-pick="' + esc(g.engine) + '">' + esc(tr('', 'Install')) + '</button>';
   const ver = g.latest ? '<span class="eng-ver"><bdi dir="ltr">v' + esc(g.latest) + '</bdi></span>' : '';
   const outdatedNote = stale > 0 ? '<span class="eng-outdated">' + esc(tr('', '{n} outdated').replace('{n}', String(stale))) + '</span>' : '';
-  return '<div class="eng-card">' +
+  const openBtn = '<button type="button" class="eng-act" data-cores-open="' + esc(g.engine) + '">' + esc(tr('', 'Details')) + '</button>';
+  return '<div class="eng-card" data-cores-open="' + esc(g.engine) + '">' +
     '<div class="eng-card-top"><span class="eng-logo">' + img + '</span>' +
-    '<div class="eng-card-id"><div class="eng-card-namerow"><b>' + esc(disp) + '</b>' + coresBadges(g) + '</div>' +
+    '<div class="eng-card-id"><div class="eng-card-namerow"><b>' + esc(disp) + '</b>' + coresBadges(g) + coresMethodBadge(g) + '</div>' +
     '<span class="eng-installed">' + esc(tr('', 'Installed on {n} of {m} agents').replace('{n}', String(installed)).replace('{m}', String(total))) + '</span></div>' +
     (ver ? '<span class="eng-verchip"><bdi dir="ltr">v' + esc(g.latest) + '</bdi></span>' : '') + '</div>' +
     '<div class="eng-progress" role="img" aria-label="' + esc(tr('', 'Installed on {n} of {m} agents').replace('{n}', String(installed)).replace('{m}', String(total))) + '"><div class="eng-progress-fill" style="width:' + pct + '%"></div></div>' +
-    '<div class="eng-card-foot">' + rel + outdatedNote + '<span class="u-flex-1"></span>' + act + '</div>' +
+    '<div class="eng-card-foot">' + rel + repoChip + outdatedNote + '<span class="u-flex-1"></span>' + openBtn + act + '</div>' +
     '</div>';
 }
 function renderCores() {
@@ -12315,6 +13159,10 @@ function renderCores() {
   list.innerHTML = groups.length
     ? '<div class="eng-grid">' + groups.map(coresEngineCard).join('') + '</div>'
     : '<div class="eng-empty"><b>' + esc(tr('', 'No engines match your search.')) + '</b></div>';
+  // the drill-down detail rides the same render: when a core is open the
+  // grid stays fresh behind it and the detail page repaints on every load
+  coresViewSync();
+  if (ctunOpen) renderCtunPage();
 }
 function coresPickerOpen(engine) {
   const g = (coresCache || []).find(x => x.engine === engine);
@@ -12398,6 +13246,434 @@ async function coresUpdateAll(engine) {
   else toastOk(tr('', 'Cores'), tr('', 'Update requested on {n} agent(s)').replace('{n}', String(stale.length)));
   loadCores(true);
 }
+// ===== Core details drill-down page (§2.22 additive fields) ==============
+// Clicking a core card (or its Details button) opens a dedicated page
+// inside the Cores tab — like a topology opening inside the Tunnel tab:
+// the §2.22 method catalog (ctunnel carries the 49-method transport
+// table) plus the installed_version / outdated pair. Everything reads
+// from the already loaded feed — no extra fetch; every absent field
+// renders — honestly.
+let ctunOpen = null;        // engine id the detail page shows (null = list view)
+let ctunLayer = 'all';      // method table layer filter
+let ctunPendingCore = '';   // core from #t=cores&core=…, opened once data lands
+let ctunSearch = '';        // method catalog search box
+let ctunF = { transport: '', ipver: '', port: '', userspace: '', mikrotik: '' };
+let ctunPageNo = 1;         // 1-based catalog page
+let ctunPerPage = 10;       // 10 / 25 / 50 rows per page
+let ctunDetail = null;      // the method whose details panel is open
+let ctunFeedRetryTimer = null; // the one-shot cold-cache catalog retry
+const CTUN_LAYER_KEY = { L2: 2, L3: 3, L4: 4 };
+const CTUN_ICO_EYE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1.5 12S5.5 5 12 5s10.5 7 10.5 7-4 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+const CTUN_ICO_INFO = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M12 11v5"/></svg>';
+const CTUN_ICO_LINK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>';
+const CTUN_ICO_CUBE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>';
+const CTUN_ICO_AGENT = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="11" rx="2"/><path d="M8 20h8M12 16v4"/></svg>';
+const CTUN_ICO_VER = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>';
+function ctunGroup(engine) {
+  const key = CORES_ALIAS[engine] || engine;
+  return (coresCache || []).find(x => (CORES_ALIAS[x.engine] || x.engine) === key) || null;
+}
+function ctunInstalledVersion(g, repo) {
+  // the contract field wins; without it the newest version actually
+  // installed on an agent stands in (computed, labeled as such)
+  if (repo && repo.installed_version) return String(repo.installed_version);
+  const det = (g && g.detail) || {};
+  let best = '';
+  Object.keys(det).forEach(id => {
+    const v = det[id] && det[id].version;
+    if (det[id] && det[id].installed && v && (!best || verCmp(v, best) > 0)) best = v;
+  });
+  return best;
+}
+// three-state: true / false / null (unknown — the field has not landed yet
+// and the fallback comparison cannot decide either)
+function ctunOutdated(repo, installed) {
+  if (repo && repo.outdated === true) return true;
+  if (repo && repo.outdated === false) return false;
+  if (installed && repo && repo.latest_version) return verCmp(repo.latest_version, installed) > 0;
+  return null;
+}
+function ctunMethods(repo) {
+  return repo && Array.isArray(repo.methods) ? repo.methods : null;
+}
+// tri-state mapper for the yes/no filters: true→'yes', false→'no', null→''
+function ctunTri(v) { return v === true ? 'yes' : v === false ? 'no' : ''; }
+function ctunPill(v) {
+  if (v === true) return '<span class="ctun-pill ctun-pill-yes">' + esc(tr('', 'Yes')) + '</span>';
+  if (v === false) return '<span class="ctun-pill">' + esc(tr('', 'No')) + '</span>';
+  return '<span class="art-dash">—</span>';
+}
+function ctunLayerBadge(layer) {
+  const l = String(layer || '').toUpperCase();
+  if (!l) return '<span class="art-dash">—</span>';
+  // the canonical layers keep their colored badges; any other value the
+  // manifest publishes (compound forms like L3/L4) renders a neutral badge
+  // verbatim — the new cores' catalogs are passed through untouched
+  if (!CTUN_LAYER_KEY[l]) return '<span class="ctun-lb ctun-lb-x"><bdi dir="ltr">' + esc(l) + '</bdi></span>';
+  return '<span class="ctun-lb ctun-lb-' + l + '">' + esc(l) + '</span>';
+}
+// the distinct layer values one catalog actually publishes, chip order:
+// 'all', the canonical L2/L3/L4 (each only when present), then the rest
+// sorted — data-derived so every core's own vocabulary renders
+function ctunLayersOf(methods) {
+  const seen = [];
+  (methods || []).forEach(m => {
+    const l = String((m && m.layer) || '').toUpperCase();
+    if (l && !seen.includes(l)) seen.push(l);
+  });
+  return ['all'].concat(['L2', 'L3', 'L4'].filter(l => seen.includes(l)), seen.filter(l => !CTUN_LAYER_KEY[l]).sort());
+}
+function ctunTextBadge(v) {
+  if (v == null || v === '') return '<span class="art-dash">—</span>';
+  return '<span class="ctun-tb"><bdi dir="ltr">' + esc(String(v)) + '</bdi></span>';
+}
+function ctunIpver(v) {
+  const s = String(v || '').toLowerCase();
+  if (s === 'v4' || s === '4') return 'IPv4';
+  if (s === 'v6' || s === '6') return 'IPv6';
+  if (s === 'both') return 'v4+v6';
+  return v ? String(v) : '—';
+}
+// the manifest's title reads "name (technical description)" — the
+// parenthetical becomes the method's gray second line; anything else
+// renders the full title untouched (nothing invented)
+function ctunNameDesc(m) {
+  const name = String(m.name || '');
+  const title = String(m.title || '');
+  let desc = '';
+  if (title && name && title.toLowerCase().startsWith(name.toLowerCase() + ' ')) {
+    const rest = title.slice(name.length + 1).trim();
+    const mm = /^\((.*)\)$/.exec(rest);
+    desc = mm ? mm[1] : rest;
+  } else if (title && title !== name) {
+    desc = title;
+  }
+  return { name: name || title || '—', desc: desc };
+}
+// layer + search + the toolbar filters, composed; every method keeps its
+// original catalog index (the details button and # column ride it)
+function ctunFiltered(repo) {
+  const methods = ctunMethods(repo) || [];
+  const q = ctunSearch.trim().toLowerCase();
+  return methods
+    .map((m, i) => ({ m: m, i: i }))
+    .filter(x => {
+      const m = x.m;
+      if (ctunLayer !== 'all' && String(m.layer || '').toUpperCase() !== ctunLayer) return false;
+      if (ctunF.transport && String(m.transport || '') !== ctunF.transport) return false;
+      if (ctunF.ipver && String(m.ipver || '') !== ctunF.ipver) return false;
+      if (ctunF.port && ctunTri(m.needs_port) !== ctunF.port) return false;
+      if (ctunF.userspace && ctunTri(m.userspace) !== ctunF.userspace) return false;
+      if (ctunF.mikrotik && ctunTri(m.mikrotik) !== ctunF.mikrotik) return false;
+      if (q) {
+        const hay = [m.name, m.title, m.family, m.transport].map(v => String(v || '').toLowerCase()).join(' ');
+        if (hay.indexOf(q) < 0) return false;
+      }
+      return true;
+    });
+}
+// list/detail view sync: a core open → the grid + artifact cards hide and
+// the detail page paints; closing restores the list. Safe to call anytime.
+function coresViewSync() {
+  const list = $('coresList'), detail = $('coresDetail');
+  if (!list || !detail) return;
+  const on = !!ctunOpen;
+  list.hidden = on;
+  detail.hidden = !on;
+}
+function ctunPageOpen(engine) {
+  const g = ctunGroup(engine);
+  if (!g) return;
+  ctunOpen = (CORES_ALIAS[engine] || engine);
+  ctunLayer = 'all';
+  ctunSearch = '';
+  ctunF = { transport: '', ipver: '', port: '', userspace: '', mikrotik: '' };
+  ctunPageNo = 1;
+  // the repo feed may not have loaded yet — pull it so the version strip
+  // and the method catalog fill in as soon as it answers
+  if (!coresAvail && !coresAvailErr && !coresAvailBusy) loadCoresAvailable();
+  renderCores(); // renders the detail through coresViewSync + renderCtunPage
+  topTitleSync('cores');
+  tabHashWrite('cores');
+}
+function ctunPageClose() {
+  if (!ctunOpen) return;
+  ctunOpen = null;
+  ctunLayer = 'all';
+  ctunSearch = '';
+  ctunF = { transport: '', ipver: '', port: '', userspace: '', mikrotik: '' };
+  ctunPageNo = 1;
+  ctunDetailClose();
+  renderCores();
+  topTitleSync('cores');
+  tabHashWrite('cores');
+}
+// the three header stat cards — real backend values only; an unknown
+// count never masquerades as zero and an empty install never as a number
+function ctunStatsCards(g, repo, methods) {
+  const agents = window.__coresAgents || [];
+  const det = (g && g.detail) || {};
+  const known = agents.length > 0 && Object.keys(det).length > 0;
+  const installedCount = known ? coresInstalled(g) : 0;
+  const installedVer = ctunInstalledVersion(g, repo);
+  const outdated = ctunOutdated(repo, installedVer);
+  let instVal = '';
+  let instSub = esc(tr('', 'Installed on agents'));
+  if (!known) instVal = '<span class="ctun-stat-na">' + esc(tr('', 'Not available')) + '</span>';
+  else if (installedCount === 0) instVal = '<span class="ctun-stat-na">' + esc(tr('', 'Not installed')) + '</span>';
+  else {
+    instVal = '<bdi dir="ltr">' + esc(String(installedCount)) + '</bdi>';
+    instSub = esc(tr('', 'of {m} agents').replace('{m}', String(agents.length))) +
+      (installedVer ? ' · <bdi dir="ltr">v' + esc(installedVer) + '</bdi>' : '');
+    if (outdated === true && repo && repo.latest_version) {
+      instSub += '<span class="eng-repo-chip ctun-newer" title="' + esc(tr('', 'A newer version is available — update the core from the artifact store')) + '">' +
+        esc(tr('', 'Newer version available')) + ' <bdi dir="ltr">v' + esc(repo.latest_version) + '</bdi></span>';
+    } else if (outdated === false) {
+      instSub += '<span class="ctun-uptodate"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>' + esc(tr('', 'Up to date')) + '</span>';
+    }
+  }
+  const stat = (ico, val, sub) => '<div class="ctun-stat"><span class="ctun-stat-ic" aria-hidden="true">' + ico + '</span>' +
+    '<div class="ctun-stat-tx"><b>' + val + '</b><span>' + sub + '</span></div></div>';
+  return '<div class="ctun-stats">' +
+    stat(CTUN_ICO_CUBE, methods ? '<bdi dir="ltr">' + esc(String(methods.length)) + '</bdi>' : '<span class="ctun-stat-na">—</span>', esc(tr('', 'Total methods'))) +
+    stat(CTUN_ICO_AGENT, instVal, instSub) +
+    stat(CTUN_ICO_VER, repo && repo.latest_version ? '<bdi dir="ltr">v' + esc(repo.latest_version) + '</bdi>' : '<span class="ctun-stat-na">—</span>', esc(tr('', 'Latest repo version'))) +
+    '</div>';
+}
+// the NOTICE strip: the license and upstream lines the core manifest
+// publishes (§2.22 addendum, ui/ux-1), verbatim — absent fields render
+// nothing (never guessed). The upstream URL only becomes a link over
+// http(s); anything else stays inert text.
+function ctunNoticeLine(repo) {
+  const lic = repo && repo.license ? String(repo.license) : '';
+  const up = repo && repo.upstream ? String(repo.upstream) : '';
+  if (!lic && !up) return '';
+  const bits = [];
+  if (lic) bits.push('<span class="ctun-notice-bit">' + esc(tr('', 'License')) + ': <bdi dir="ltr">' + esc(lic) + '</bdi></span>');
+  if (up) {
+    if (/^https?:\/\//i.test(up)) {
+      bits.push('<span class="ctun-notice-bit">' + esc(tr('', 'Upstream')) + ': <a class="ctun-uplink" href="' + esc(up) + '" target="_blank" rel="noopener noreferrer"><bdi dir="ltr">' + esc(up) + '</bdi>' + CTUN_ICO_LINK + '</a></span>');
+    } else {
+      bits.push('<span class="ctun-notice-bit">' + esc(tr('', 'Upstream')) + ': <bdi dir="ltr">' + esc(up) + '</bdi></span>');
+    }
+  }
+  return '<div class="ctun-notice">' + bits.join('<span class="ctun-notice-sep" aria-hidden="true">·</span>') + '</div>';
+}
+function renderCtunPage() {
+  const body = $('ctunPage');
+  if (!body || !ctunOpen) return;
+  const g = ctunGroup(ctunOpen);
+  const repo = artRepoRow(ctunOpen);
+  const disp = CORES_ENGINE_NAME[ctunOpen] || ctunOpen;
+  if (!g && !repo && (coresLoading || coresCache === null)) {
+    body.innerHTML = '<div class="u-grid u-gap-8">' + skel(3) + '</div>';
+    return;
+  }
+  if (!repo && !g) {
+    body.innerHTML = stateError(tr('', 'This core is not known to the panel yet'), null, true);
+    return;
+  }
+  const methods = ctunMethods(repo);
+  // the repo feed answers honestly when unreachable — the page says so
+  const feedErr = coresAvailErr && !methods
+    ? '<div class="ctun-feederr" role="alert"><b>' + esc(tr('', 'The repo feed is unreachable')) + '</b><span>' + esc(coresAvailErr) + '</span>' +
+      '<button type="button" class="eng-act" data-ctun-feed-retry>' + esc(tr('', 'Retry')) + '</button></div>'
+    : '';
+  const hero =
+    '<div class="ctun-hero"><span class="ctun-hero-ic" aria-hidden="true">' + CTUN_ICO_LINK + '</span>' +
+    '<div class="ctun-hero-tx"><h2 class="tc-title u-fs-16 u-fw-700 u-m-0">' + esc(disp) + ' — ' + esc(tr('', 'Method catalog')) + '</h2>' +
+    '<span class="ctun-hero-sub">' + esc(tr('', 'Browse and manage the {core} methods').replace('{core}', disp)) + '</span></div>' +
+    '<span class="u-flex-1"></span>' +
+    '<button type="button" class="quantum-btn quantum-btn-primary" data-ctun-manage>' + esc(tr('', 'Manage installations')) + '</button>' +
+    '<button type="button" class="quantum-btn quantum-btn-secondary" data-ctun-back>' + esc(tr('', 'Back to cores')) + '</button></div>';
+  let middle = '';
+  if (!methods || !methods.length) {
+    // no catalog yet (or a feed failure) — the honest states, never a fake zero.
+    // a panel restart empties the manifest cache and the first feed read answers
+    // null while the background fetch is in flight: one delayed retry heals it
+    if (!coresAvailBusy && !coresAvailErr) {
+      clearTimeout(ctunFeedRetryTimer);
+      ctunFeedRetryTimer = setTimeout(() => {
+        if (ctunOpen && !ctunMethods(artRepoRow(ctunOpen))) loadCoresAvailable(true);
+      }, 2000);
+    }
+    middle = feedErr +
+      '<div class="ent-empty" role="status"><span class="ent-empty-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 9h18M8 13h8"/></svg></span>' +
+      '<b>' + esc(tr('', 'No method catalog yet')) + '</b>' +
+      '<span>' + esc(tr('', 'The per-method transport catalog for this core has not landed on the feed — the table appears as soon as the backend serves methods[].')) + '</span></div>';
+    body.innerHTML = hero + ctunNoticeLine(repo) + ctunStatsCards(g, repo, methods) + middle;
+    return;
+  }
+  // the layer chips derive from the LIVE catalog, not a fixed list: the
+  // canonical L2/L3/L4 first (when the core publishes them), then any other
+  // layer value the manifest uses (compound forms like L3/L4 ride the new
+  // cores' catalogs verbatim) — a layer with no rows never renders, so no
+  // dead-end filter chip
+  const layers = ctunLayersOf(methods);
+  const count = l => l === 'all' ? methods.length : methods.filter(m => String(m.layer || '').toUpperCase() === l).length;
+  const chips = '<div class="ctun-chips" role="group" aria-label="' + esc(tr('', 'Filter by layer')) + '">' +
+    layers.map(l => '<button type="button" class="ctun-chip' + (ctunLayer === l ? ' on' : '') + '" data-ctun-layer="' + esc(l) + '" aria-pressed="' + (ctunLayer === l ? 'true' : 'false') + '">' +
+      esc(l === 'all' ? tr('', 'All') : l) + ' <i>' + count(l) + '</i></button>').join('') + '</div>';
+  const triOpts = () => [['', tr('', 'All')], ['yes', tr('', 'Yes')], ['no', tr('', 'No')]];
+  const sel = (key, lbl, opts) => '<select class="ctun-sel" data-ctun-f="' + key + '" aria-label="' + esc(lbl) + '">' +
+    opts.map(o => '<option value="' + esc(o[0]) + '"' + (ctunF[key] === o[0] ? ' selected' : '') + '>' + esc(o[1]) + '</option>').join('') + '</select>';
+  const transports = Array.from(new Set(methods.map(m => String(m.transport || '')).filter(Boolean))).sort();
+  const ipvers = Array.from(new Set(methods.map(m => String(m.ipver || '')).filter(Boolean))).sort();
+  const toolbar =
+    '<div class="ctun-toolbar">' +
+    '<div class="ctun-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>' +
+    '<input type="search" data-ctun-search value="' + esc(ctunSearch) + '" placeholder="' + esc(tr('', 'Search method or family…')) + '" aria-label="' + esc(tr('', 'Search method or family…')) + '"></div>' +
+    sel('transport', tr('', 'Transport'), [['', tr('', 'Transport: all')]].concat(transports.map(t => [t, t]))) +
+    sel('ipver', tr('', 'IP version'), [['', tr('', 'IP: all')]].concat(ipvers.map(v => [v, ctunIpver(v)]))) +
+    sel('port', tr('', 'Port required'), triOpts()) +
+    sel('userspace', tr('', 'Userspace'), triOpts()) +
+    sel('mikrotik', tr('', 'MikroTik'), triOpts()) +
+    '<button type="button" class="eng-act" data-ctun-clear>' + esc(tr('', 'Clear filters')) + '</button>' +
+    '</div>';
+  body.innerHTML = hero + ctunNoticeLine(repo) + ctunStatsCards(g, repo, methods) + chips + toolbar +
+    '<div id="ctunTableWrap"></div>';
+  renderCtunTable();
+  ctunWirePage();
+}
+// the catalog table + pagination — re-rendered alone on search/filter/page
+// changes so the search box never loses focus mid-typing
+function renderCtunTable() {
+  const ohTip = tr('', 'Exactly as the quantum-cores manifest publishes it — the upstream defines no unit for this number yet');
+  const wrap = $('ctunTableWrap');
+  if (!wrap) return;
+  const repo = artRepoRow(ctunOpen);
+  const methods = ctunMethods(repo) || [];
+  const filtered = ctunFiltered(repo);
+  const pages = Math.max(1, Math.ceil(filtered.length / ctunPerPage));
+  if (ctunPageNo > pages) ctunPageNo = pages;
+  if (ctunPageNo < 1) ctunPageNo = 1;
+  const a = filtered.length === 0 ? 0 : (ctunPageNo - 1) * ctunPerPage + 1;
+  const b = Math.min(filtered.length, ctunPageNo * ctunPerPage);
+  let rowHtml = '';
+  if (!filtered.length) {
+    rowHtml = '<tr><td colspan="11"><div class="ent-empty ent-empty-sm" role="status"><b>' + esc(tr('', 'No methods match your search.')) + '</b>' +
+      '<button type="button" class="eng-act" data-ctun-clear>' + esc(tr('', 'Clear filters')) + '</button></div></td></tr>';
+  } else {
+    rowHtml = filtered.slice((ctunPageNo - 1) * ctunPerPage, ctunPageNo * ctunPerPage).map(x => {
+      const m = x.m;
+      const nd = ctunNameDesc(m);
+      const oh = (m.overhead != null && m.overhead !== '') ? esc(String(m.overhead)) : '—';
+      const fam = m.family ? '<span class="ctun-fam" data-no-i18n><bdi dir="ltr">' + esc(String(m.family)) + '</bdi></span>' : '<span class="art-dash">—</span>';
+      const num = (m.id != null && m.id !== '') ? esc(String(m.id)) : esc(String(x.i + 1));
+      return '<tr>' +
+        '<td class="num ctun-cell-id" data-lbl="#">' + num + '</td>' +
+        '<td class="ctun-cell-name" data-lbl="' + esc(tr('', 'Method')) + '"><b>' + esc(nd.name) + '</b>' +
+        (nd.desc ? '<span class="ctun-desc">' + esc(nd.desc) + '</span>' : '') + '</td>' +
+        '<td data-lbl="' + esc(tr('', 'Layer')) + '">' + ctunLayerBadge(m.layer) + '</td>' +
+        '<td data-lbl="' + esc(tr('', 'Transport')) + '">' + ctunTextBadge(m.transport) + '</td>' +
+        '<td data-lbl="' + esc(tr('', 'IP version')) + '"><bdi dir="ltr">' + esc(ctunIpver(m.ipver)) + '</bdi></td>' +
+        '<td class="num" data-lbl="' + esc(tr('', 'Overhead')) + '">' + oh + '</td>' +
+        '<td data-lbl="' + esc(tr('', 'Port required')) + '">' + ctunPill(m.needs_port) + '</td>' +
+        '<td data-lbl="' + esc(tr('', 'Userspace')) + '">' + ctunPill(m.userspace) + '</td>' +
+        '<td data-lbl="' + esc(tr('', 'MikroTik')) + '">' + ctunPill(m.mikrotik) + '</td>' +
+        '<td data-lbl="' + esc(tr('', 'Family')) + '">' + fam + '</td>' +
+        '<td class="ctun-cell-act"><button type="button" class="ctun-iconbtn" data-ctun-detail="' + esc(String(x.i)) + '" aria-label="' + esc(tr('', 'Details')) + '" title="' + esc(tr('', 'Details')) + '">' + CTUN_ICO_EYE + '</button></td>' +
+        '</tr>';
+    }).join('');
+  }
+  const pageBtns = [];
+  for (let p = 1; p <= pages; p++) {
+    pageBtns.push('<button type="button" class="ctun-pagebtn' + (p === ctunPageNo ? ' on' : '') + '" data-ctun-goto="' + p + '" aria-label="' + esc(tr('', 'Page {n}').replace('{n}', String(p))) + '">' + p + '</button>');
+  }
+  wrap.innerHTML =
+    '<div class="ctun-tblwrap"><table class="ent-tbl ctun-tbl"><thead><tr>' +
+    '<th class="num">#</th>' +
+    '<th>' + esc(tr('', 'Method')) + '</th>' +
+    '<th>' + esc(tr('', 'Layer')) + '</th>' +
+    '<th>' + esc(tr('', 'Transport')) + '</th>' +
+    '<th>' + esc(tr('', 'IP version')) + '</th>' +
+    '<th class="num ctun-th-oh">' + esc(tr('', 'Overhead')) + '<span class="ctun-info" tabindex="0" role="img" aria-label="' + esc(tr('', 'Overhead')) + '" title="' + esc(ohTip) + '">' + CTUN_ICO_INFO + '</span></th>' +
+    '<th>' + esc(tr('', 'Port required')) + '</th>' +
+    '<th>' + esc(tr('', 'Userspace')) + '</th>' +
+    '<th>' + esc(tr('', 'MikroTik')) + '</th>' +
+    '<th>' + esc(tr('', 'Family')) + '</th>' +
+    '<th>' + esc(tr('', 'Details')) + '</th>' +
+    '</tr></thead><tbody>' + rowHtml + '</tbody></table></div>' +
+    '<div class="ctun-pager">' +
+    '<span class="qs-hint">' + esc(tr('', 'Showing {a}–{b} of {n} methods').replace('{a}', String(a)).replace('{b}', String(b)).replace('{n}', String(filtered.length))) + '</span>' +
+    '<span class="u-flex-1"></span>' +
+    '<label class="ctun-pplbl">' + esc(tr('', 'Per page')) +
+    '<select class="ctun-sel" data-ctun-perpage aria-label="' + esc(tr('', 'Per page')) + '">' +
+    [10, 25, 50].map(n => '<option value="' + n + '"' + (ctunPerPage === n ? ' selected' : '') + '>' + n + '</option>').join('') +
+    '</select></label>' +
+    '<div class="ctun-pagebtns" role="group" aria-label="' + esc(tr('', 'Page')) + '">' + pageBtns.join('') + '</div>' +
+    '</div>';
+}
+// search/filters/pagination are page-local state: the change handlers re-render
+// only the table region, so the search box keeps its focus while typing
+function ctunWirePage() {
+  const page = $('ctunPage');
+  if (!page) return;
+  const si = page.querySelector('[data-ctun-search]');
+  if (si) si.addEventListener('input', function () { ctunSearch = this.value; ctunPageNo = 1; renderCtunTable(); });
+  page.querySelectorAll('select[data-ctun-f]').forEach(s => s.addEventListener('change', function () {
+    ctunF[this.getAttribute('data-ctun-f') || ''] = this.value;
+    ctunPageNo = 1;
+    renderCtunTable();
+  }));
+  const pp = page.querySelector('[data-ctun-perpage]');
+  if (pp) pp.addEventListener('change', function () { ctunPerPage = Number(this.value) || 10; ctunPageNo = 1; renderCtunTable(); });
+}
+// the per-method details panel — every field rides the backend manifest
+function ctunDetailBuild() {
+  let ov = document.getElementById('ctunDetailModal');
+  if (ov) return ov;
+  ov = document.createElement('div');
+  ov.id = 'ctunDetailModal';
+  ov.className = 'ent-modal-ov';
+  ov.innerHTML =
+    '<div class="ent-modal"><div class="ent-card cores-pick-card ctun-detail-card">' +
+    '<div class="art-modal-head"><b id="ctunDTitle"></b><button type="button" class="mtb-toast-x" data-ctun-dclose>×</button></div>' +
+    '<div class="art-modal-body" id="ctunDetailBody"></div>' +
+    '<div class="art-modal-foot"><span class="art-modal-busy"></span>' +
+    '<button type="button" class="quantum-btn quantum-btn-secondary" data-ctun-dclose>' + esc(tr('', 'Close')) + '</button>' +
+    '</div></div></div>';
+  document.body.appendChild(ov);
+  ov.addEventListener('click', e => {
+    if (e.target === ov || e.target.closest('[data-ctun-dclose]')) ctunDetailClose();
+  });
+  return ov;
+}
+function ctunDetailClose() {
+  ctunDetail = null;
+  const ov = document.getElementById('ctunDetailModal');
+  if (ov && ov.hidden !== true) modalHide(ov);
+}
+function ctunDetailOpen(m) {
+  const ov = ctunDetailBuild();
+  const body = $('ctunDetailBody');
+  const title = $('ctunDTitle');
+  ctunDetail = m || null;
+  if (!m) {
+    if (title) title.textContent = tr('', 'Method details');
+    if (body) body.innerHTML = '<div class="ent-empty ent-empty-sm" role="status"><b>' + esc(tr('', 'Method details unavailable')) + '</b>' +
+      '<span>' + esc(tr('', 'This method is not available in the feed yet.')) + '</span></div>';
+    modalShow(ov, ctunDetailClose);
+    return;
+  }
+  const nd = ctunNameDesc(m);
+  if (title) title.textContent = tr('', 'Method details') + ' — ' + nd.name;
+  const row = (k, v) => '<div class="ctun-drow"><span>' + esc(k) + '</span><b>' + v + '</b></div>';
+  if (body) body.innerHTML =
+    (nd.desc ? '<p class="qs-hint u-m-0">' + esc(nd.desc) + '</p>' : '') +
+    row(tr('', 'Method'), esc(nd.name)) +
+    row(tr('', 'Layer'), ctunLayerBadge(m.layer)) +
+    row(tr('', 'Transport'), ctunTextBadge(m.transport)) +
+    row(tr('', 'IP version'), '<bdi dir="ltr">' + esc(ctunIpver(m.ipver)) + '</bdi>') +
+    row(tr('', 'Overhead'), (m.overhead != null && m.overhead !== '') ? '<bdi dir="ltr">' + esc(String(m.overhead)) + '</bdi>' : '—') +
+    '<p class="qs-hint u-m-0 ctun-oh-note">' + esc(tr('', 'The upstream manifest defines no unit for this number yet.')) + '</p>' +
+    row(tr('', 'Port required'), ctunPill(m.needs_port)) +
+    row(tr('', 'Userspace'), ctunPill(m.userspace)) +
+    row(tr('', 'MikroTik'), ctunPill(m.mikrotik)) +
+    row(tr('', 'Family'), m.family ? '<span class="ctun-fam" data-no-i18n><bdi dir="ltr">' + esc(String(m.family)) + '</bdi></span>' : '—');
+  modalShow(ov, ctunDetailClose);
+}
+
 (function coresWire() {
   const tab = $('tab-cores');
   if (!tab) return;
@@ -12408,8 +13684,33 @@ async function coresUpdateAll(engine) {
     if (p) { coresPickerOpen(p.getAttribute('data-cores-pick')); return; }
     const u = e.target.closest('[data-cores-update]');
     if (u) { coresUpdateAll(u.getAttribute('data-cores-update')); return; }
+    const o = e.target.closest('[data-cores-open]');
+    if (o) { ctunPageOpen(o.getAttribute('data-cores-open')); return; }
     if (e.target.closest('[data-cores-pick-go]')) { coresPickInstall(); return; }
     if (e.target.closest('[data-cores-pick-close]')) { const ov = document.getElementById('coresPickModal'); if (ov) ov.hidden = true; }
+    if (e.target.closest('[data-ctun-back]')) { ctunPageClose(); return; }
+    const chip = e.target.closest('[data-ctun-layer]');
+    if (chip) { ctunLayer = chip.getAttribute('data-ctun-layer') || 'all'; ctunPageNo = 1; renderCtunPage(); return; }
+    const mg = e.target.closest('[data-ctun-manage]');
+    if (mg && ctunOpen) { coresPickerOpen(ctunOpen); return; }
+    const det = e.target.closest('[data-ctun-detail]');
+    if (det) {
+      const repo = artRepoRow(ctunOpen);
+      const methods = ctunMethods(repo) || [];
+      const idx = Number(det.getAttribute('data-ctun-detail'));
+      ctunDetailOpen(methods[idx] || null);
+      return;
+    }
+    if (e.target.closest('[data-ctun-clear]')) {
+      ctunSearch = '';
+      ctunF = { transport: '', ipver: '', port: '', userspace: '', mikrotik: '' };
+      ctunPageNo = 1;
+      renderCtunPage();
+      return;
+    }
+    const go = e.target.closest('[data-ctun-goto]');
+    if (go) { ctunPageNo = Number(go.getAttribute('data-ctun-goto')) || 1; renderCtunTable(); return; }
+    if (e.target.closest('[data-ctun-feed-retry]')) { loadCoresAvailable(true); return; }
   });
   const search = $('engSearch');
   if (search) search.addEventListener('input', function () { coresSearch = this.value; renderCores(); });
@@ -12418,6 +13719,711 @@ async function coresUpdateAll(engine) {
     b.onclick = ev => { if (prev) prev.call(b, ev); loadCores(); };
   });
   if ((location.hash || '').indexOf('#t=cores') === 0) loadCores();
+})();
+// the topbar breadcrumb back link lives outside the tab section — a document
+// handler catches it (and the in-page Back button) wherever they render
+document.addEventListener('click', e => {
+  const back = e.target.closest && e.target.closest('[data-ctun-back]');
+  if (!back) return;
+  if (back.tagName === 'A') e.preventDefault();
+  ctunPageClose();
+});
+
+// ===== Cores artifact store (§2.22) =====================================
+// The signed-binary store the agents install from. Sources: the PUBLIC
+// quantum-cores repo (GET /api/cores/available + POST .../artifacts with
+// source=repo — the panel downloads, re-verifies sha256 + ed25519, stores)
+// and the unchanged manual upload (source=upload). Provenance (source) is
+// operator-facing; agent behavior is untouched.
+let artList = null;
+let artLoading = false;
+let artError = null;
+let coresAvail = null;      // the last /api/cores/available payload
+let coresAvailErr = null;   // feed error (payload.cores=null distinguishes unreachable)
+let coresAvailBusy = false;
+let coresAvailAt = 0;       // the feed's last successful check (unix)
+let artEdit = null;         // row being replaced, null = fresh add
+let artMode = 'repo';       // modal pane: 'repo' | 'upload'
+let artPick = { core: '', version: '', arch: '' };
+let artBusy = false;
+const ART_ICO_REPO = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/></svg>';
+const ART_ICO_UPL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4"/><path d="M6 10l6-6 6 6"/><path d="M4 20h16"/></svg>';
+const ART_ENG_RE = /^[a-z][a-z0-9_-]{0,31}$/;
+const ART_VER_RE = /^[0-9A-Za-z][0-9A-Za-z._+-]{0,63}$/;
+// Same numeric-aware comparison the engine cards use; calver rows
+// (udp2raw-v20230206.0) order correctly without special cases.
+function verCmp(a, b) { return String(a || '').localeCompare(String(b || ''), 'en', { numeric: true }); }
+function artRepoRow(engine) {
+  const key = CORES_ALIAS[engine] || engine;
+  const rows = (coresAvail && coresAvail.cores) || [];
+  return rows.find(r => (CORES_ALIAS[r.core] || r.core) === key && r.latest_version) || null;
+}
+// The repo-ahead indicator: repo latest_version strictly newer than the
+// stored row's version. Equal/older/unknown → '' (renders as —).
+function artRepoNewer(row) {
+  const repo = artRepoRow(row.engine);
+  if (!repo || !repo.latest_version || !row.version) return '';
+  return verCmp(repo.latest_version, row.version) > 0 ? repo.latest_version : '';
+}
+function artSize(n) {
+  if (n == null || isNaN(n) || n <= 0) return '—';
+  const mb = n / 1048576;
+  return mb >= 1024 ? (Math.round(mb / 102.4) / 10) + ' GB' : mb >= 1 ? (Math.round(mb * 10) / 10) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+}
+function artDate(sec) {
+  if (!sec) return '—';
+  try { return new Date(sec * 1000).toLocaleDateString(currentLang === 'fa' ? 'fa-IR' : undefined, { year: 'numeric', month: 'short', day: 'numeric' }); }
+  catch (e) { return '—'; }
+}
+function artDateISO(iso) {
+  if (!iso) return '—';
+  const t = Date.parse(iso);
+  return isNaN(t) ? '—' : artDate(Math.floor(t / 1000));
+}
+function artBadge(src) {
+  const isRepo = src === 'repo';
+  return '<span class="eng-badge ' + (isRepo ? 'eng-badge-repo' : 'eng-badge-upl') + '">' + (isRepo ? ART_ICO_REPO : ART_ICO_UPL) + esc(tr('', isRepo ? 'From repo' : 'Manual upload')) + '</span>';
+}
+function artRepoChip(newer) {
+  if (!newer) return '<span class="art-dash">—</span>';
+  return '<span class="eng-repo-chip" title="' + esc(tr('', 'A newer version is available in the repo — add it from the artifact store')) + '">' +
+    esc(tr('', 'Newer in repo')) + ' <bdi dir="ltr">v' + esc(newer) + '</bdi></span>';
+}
+function artRow(a) {
+  const disp = CORES_ENGINE_NAME[a.engine] || a.engine || '—';
+  return '<tr>' +
+    '<td><b>' + esc(disp || '—') + '</b><span class="art-eng-id"><bdi dir="ltr">' + esc(a.engine || '—') + '</bdi></span></td>' +
+    '<td><bdi dir="ltr">' + esc(a.version || '—') + '</bdi></td>' +
+    '<td><bdi dir="ltr">' + esc((a.goos || '—') + ' · ' + (a.goarch || '—')) + '</bdi></td>' +
+    '<td class="num">' + esc(artSize(a.size)) + '</td>' +
+    '<td>' + artBadge(a.source) + '</td>' +
+    '<td>' + esc(artDate(a.uploaded_at)) + '</td>' +
+    '<td>' + artRepoChip(artRepoNewer(a)) + '</td>' +
+    '<td class="art-acts">' +
+    '<button type="button" class="eng-act" data-art-replace="' + esc(String(a.id)) + '">' + esc(tr('', 'Replace')) + '</button>' +
+    '<button type="button" class="eng-act danger" data-art-del="' + esc(String(a.id)) + '">' + esc(tr('', 'Delete')) + '</button>' +
+    '</td></tr>';
+}
+function artSkeleton() {
+  const one = '<div class="art-skel-row"><div class="eng-skel-line w40"></div><div class="eng-skel-line w60"></div><div class="eng-skel-line w40"></div></div>';
+  return '<div class="art-skel">' + one.repeat(3) + '</div>';
+}
+function renderArtStore() {
+  const list = $('engArtList');
+  if (!list) return;
+  // repo feed line: checked time + honest error when the feed is unreachable
+  const feed = $('engArtFeed');
+  if (feed) {
+    if (coresAvailBusy) {
+      feed.classList.remove('bad');
+      feed.innerHTML = '<i class="dot"></i>' + esc(tr('', 'Checking repo…'));
+    } else if (coresAvailErr) {
+      feed.classList.add('bad');
+      feed.innerHTML = '<i class="dot"></i><span title="' + esc(coresAvailErr) + '">' + esc(tr('', 'Repo feed error')) + '</span>';
+    } else if (coresAvailAt) {
+      feed.classList.remove('bad');
+      feed.innerHTML = '<i class="dot"></i>' + esc(tr('', 'Repo checked {d}').replace('{d}', artDate(coresAvailAt)));
+    } else {
+      feed.classList.remove('bad');
+      feed.innerHTML = '<i class="dot"></i>' + esc(tr('', 'Repo not checked yet'));
+    }
+  }
+  if (artLoading) { list.innerHTML = artSkeleton(); return; }
+  if (artError) {
+    list.innerHTML = '<div class="eng-error"><b>' + esc(tr('', 'Artifact store error')) + '</b><details><summary>' + esc(tr('', 'Details')) + '</summary><pre>' + esc(artError) + '</pre></details>' +
+      '<button type="button" class="eng-act" data-art-retry>' + esc(tr('', 'Retry')) + '</button></div>';
+    return;
+  }
+  const rows = artList || [];
+  if (!rows.length) {
+    list.innerHTML = '<div class="eng-empty"><b>' + esc(tr('', 'No artifacts stored yet.')) + '</b>' +
+      '<span class="art-empty-hint">' + esc(tr('', 'Add one from the repo — the panel downloads, verifies and stores the signed release asset.')) + '</span></div>';
+    return;
+  }
+  const keyBad = window.__engKeyCfg === false;
+  const keyWarn = keyBad
+    ? '<div class="art-keywarn">' + esc(tr('', 'The engine-artifact signing key is not configured — saving artifacts will be refused until it is set (E-ENG-03).')) + '</div>'
+    : '';
+  list.innerHTML = keyWarn +
+    '<div class="art-tblwrap"><table class="ent-tbl art-tbl"><thead><tr>' +
+    '<th>' + esc(tr('', 'Core')) + '</th><th>' + esc(tr('', 'Version')) + '</th><th>' + esc(tr('', 'OS · Arch')) + '</th>' +
+    '<th class="num">' + esc(tr('', 'Size')) + '</th><th>' + esc(tr('', 'Source')) + '</th><th>' + esc(tr('', 'Uploaded')) + '</th>' +
+    '<th>' + esc(tr('', 'Repo')) + '</th><th></th>' +
+    '</tr></thead><tbody>' + rows.map(artRow).join('') + '</tbody></table></div>';
+}
+async function loadArtStore(force) {
+  if (!$('engArtList') || artLoading) return;
+  if (!force && artList) { renderArtStore(); return; }
+  artLoading = true;
+  artError = null;
+  renderArtStore();
+  try {
+    const d = await api('/api/ui/engines/artifacts');
+    artList = (d && d.artifacts) || [];
+  } catch (e) {
+    artError = (e && e.message) || String(e);
+    artList = null;
+  } finally {
+    artLoading = false;
+    renderArtStore();
+  }
+}
+async function loadCoresAvailable(force) {
+  if (!$('engArtList') || coresAvailBusy) return;
+  if (!force && coresAvail) return;
+  coresAvailBusy = true;
+  coresAvailErr = null;
+  renderArtStore();
+  try {
+    // the feed itself never errors with the §1 envelope: unreachable comes
+    // back as 200 + cores:null + error; only auth/network failures throw
+    const d = await api('/api/cores/available' + (force ? '?refresh=1' : ''));
+    coresAvail = d && d.cores ? d : null;
+    coresAvailErr = (d && d.error) || null;
+    coresAvailAt = (d && d.checked_at) || 0;
+  } catch (e) {
+    coresAvail = null;
+    coresAvailErr = (e && e.message) || String(e);
+    coresAvailAt = 0;
+  } finally {
+    coresAvailBusy = false;
+    renderArtStore();
+    coresMergeFeedGroups();
+    renderCores();
+  }
+}
+// Arch auto-pick: prefer the arch the enrolled agents actually report,
+// falling back to amd64, then the first listed asset arch.
+function artAutoArch(archs) {
+  if (!archs || !archs.length) return '';
+  const want = {};
+  (window.__coresAgents || []).forEach(a => { if (a && a.arch) want[a.arch] = (want[a.arch] || 0) + 1; });
+  let best = '', bestN = 0;
+  archs.forEach(x => { const n = want[x] || 0; if (n > bestN) { bestN = n; best = x; } });
+  if (bestN > 0) return best;
+  return archs.includes('amd64') ? 'amd64' : archs[0];
+}
+function artCoreArchs(core) {
+  const repo = artRepoRow(core);
+  const archs = [];
+  ((repo && repo.assets) || []).forEach(a => {
+    if (a && a.os === 'linux' && a.arch && !archs.includes(a.arch)) archs.push(a.arch);
+  });
+  return archs;
+}
+function artModalBuild() {
+  let ov = document.getElementById('artStoreModal');
+  if (ov) return ov;
+  ov = document.createElement('div');
+  ov.id = 'artStoreModal';
+  ov.className = 'ent-modal-ov';
+  ov.innerHTML =
+    '<div class="ent-modal"><div class="ent-card cores-pick-card art-modal">' +
+    '<div class="art-modal-head"><b id="artMTitle"></b><button type="button" class="mtb-toast-x" data-art-close>\u00d7</button></div>' +
+    '<div class="art-modal-modes">' +
+    '<button type="button" class="art-mode-btn" data-art-mode="repo">' + ART_ICO_REPO + esc(tr('', 'From repo')) + '</button>' +
+    '<button type="button" class="art-mode-btn" data-art-mode="upload">' + ART_ICO_UPL + esc(tr('', 'Manual upload')) + '</button>' +
+    '</div>' +
+    '<div class="art-modal-body">' +
+    '<div id="artPaneRepo">' +
+    '<div class="art-field"><label for="artCoreSel">' + esc(tr('', 'Core')) + '</label><select id="artCoreSel"></select></div>' +
+    '<div class="art-field-row">' +
+    '<div class="art-field"><label for="artVerSel">' + esc(tr('', 'Version')) + '</label><select id="artVerSel"></select></div>' +
+    '<div class="art-field" id="artVerCustomWrap" hidden><label for="artVerCustom">' + esc(tr('', 'Exact version')) + '</label><input id="artVerCustom" type="text" placeholder="0.61.0" spellcheck="false" autocomplete="off"></div>' +
+    '</div>' +
+    '<div class="art-field"><span class="art-lbl" id="artArchLbl">' + esc(tr('', 'Architecture')) + '</span><div class="art-chips" id="artArchChips" role="group" aria-labelledby="artArchLbl"></div></div>' +
+    '<div class="art-sum" id="artRepoSum"></div>' +
+    '<div class="art-feedbox" id="artRepoFeedErr" hidden></div>' +
+    '</div>' +
+    '<div id="artPaneUpload" hidden>' +
+    '<div class="art-field-row">' +
+    '<div class="art-field"><label for="artUpEngine">' + esc(tr('', 'Core id')) + '</label><input id="artUpEngine" placeholder="frp" spellcheck="false" autocomplete="off"></div>' +
+    '<div class="art-field"><label for="artUpVersion">' + esc(tr('', 'Version')) + '</label><input id="artUpVersion" placeholder="0.61.2" spellcheck="false" autocomplete="off"></div>' +
+    '</div>' +
+    '<div class="art-field-row">' +
+    '<div class="art-field"><label for="artUpArch">' + esc(tr('', 'Architecture')) + '</label><select id="artUpArch"><option>amd64</option><option>arm64</option><option>arm</option><option>386</option></select></div>' +
+    '<div class="art-field"><label for="artUpName">' + esc(tr('', 'Download name (optional)')) + '</label><input id="artUpName" spellcheck="false" autocomplete="off"></div>' +
+    '</div>' +
+    '<div class="art-field"><label for="artUpSig">' + esc(tr('', 'Signature (base64 ed25519)')) + '</label><input id="artUpSig" spellcheck="false" autocomplete="off"></div>' +
+    '<div class="art-field"><label for="artUpFile">' + esc(tr('', 'File (.tar.gz)')) + '</label><input id="artUpFile" type="file" accept=".tar.gz"></div>' +
+    '</div>' +
+    '<div class="art-modal-err" id="artErr" hidden></div>' +
+    '</div>' +
+    '<div class="art-modal-foot"><span class="art-modal-busy" id="artBusy" hidden></span>' +
+    '<button type="button" class="quantum-btn quantum-btn-secondary" data-art-close>' + esc(tr('', 'Cancel')) + '</button>' +
+    '<button type="button" class="quantum-btn quantum-btn-primary" id="artGo"></button>' +
+    '</div>' +
+    '</div></div>';
+  document.body.appendChild(ov);
+  ov.addEventListener('click', e => {
+    if (e.target === ov) { artModalClose(); return; }
+    const mode = e.target.closest('[data-art-mode]');
+    if (mode) { artModalMode(mode.getAttribute('data-art-mode')); return; }
+    if (e.target.closest('[data-art-close]')) { artModalClose(); return; }
+    const chip = e.target.closest('[data-art-arch]');
+    if (chip) { artPick.arch = chip.getAttribute('data-art-arch') || ''; artModalChips(); artModalSum(); return; }
+    const retry = e.target.closest('[data-art-feed-retry]');
+    if (retry) { loadCoresAvailable(true); return; }
+  });
+  $('artCoreSel').addEventListener('change', function () {
+    artPick.core = this.value || '';
+    artPick.version = '';
+    artPick.arch = artAutoArch(artCoreArchs(artPick.core));
+    artModalVersion();
+    artModalChips();
+    artModalSum();
+  });
+  $('artVerSel').addEventListener('change', function () {
+    artPick.version = this.value === '__custom__' ? '' : (this.value || '');
+    $('artVerCustomWrap').hidden = this.value !== '__custom__';
+    if (this.value === '__custom__') $('artVerCustom').focus();
+    artModalSum();
+  });
+  $('artVerCustom').addEventListener('input', function () { artPick.version = this.value.trim(); artModalSum(); });
+  $('artGo').addEventListener('click', artModalSubmit);
+  return ov;
+}
+function artModalClose() {
+  if (artBusy) return; // never abandon an in-flight verify-then-store request
+  modalHide(document.getElementById('artStoreModal'));
+}
+function artModalErr(msg) {
+  const el = $('artErr');
+  if (!el) return;
+  if (msg) { el.textContent = msg; el.hidden = false; }
+  else { el.textContent = ''; el.hidden = true; }
+}
+function artModalMode(mode) {
+  artMode = mode === 'upload' ? 'upload' : 'repo';
+  const ov = document.getElementById('artStoreModal');
+  if (!ov) return;
+  ov.querySelectorAll('[data-art-mode]').forEach(b => {
+    const on = b.getAttribute('data-art-mode') === artMode;
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+  $('artPaneRepo').hidden = artMode !== 'repo';
+  $('artPaneUpload').hidden = artMode !== 'upload';
+  $('artGo').textContent = tr('', artMode === 'repo' ? 'Fetch from repo' : 'Upload & verify');
+  artModalErr('');
+}
+function artModalVersion() {
+  const sel = $('artVerSel');
+  if (!sel) return;
+  const repo = artRepoRow(artPick.core);
+  if (!repo) {
+    sel.innerHTML = '<option value="">—</option>';
+    sel.disabled = true;
+    $('artVerCustomWrap').hidden = true;
+    return;
+  }
+  sel.disabled = false;
+  sel.innerHTML = '<option value="' + esc(repo.latest_version) + '"><bdi dir="ltr">v' + esc(repo.latest_version) + '</bdi> · ' + esc(tr('', 'Latest in repo')) + '</option>' +
+    '<option value="__custom__">' + esc(tr('', 'Exact version…')) + '</option>';
+  if (artPick.version === repo.latest_version || !artPick.version) sel.value = repo.latest_version;
+  else { sel.value = '__custom__'; $('artVerCustomWrap').hidden = false; $('artVerCustom').value = artPick.version; }
+}
+function artModalChips() {
+  const host = $('artArchChips');
+  if (!host) return;
+  const archs = artPick.core ? artCoreArchs(artPick.core) : [];
+  if (!artPick.core) {
+    host.innerHTML = '<span class="art-chip-none">—</span>';
+    return;
+  }
+  if (!archs.length) {
+    host.innerHTML = '<span class="art-chip-none">' + esc(tr('', 'This release lists no linux asset')) + '</span>';
+    return;
+  }
+  host.innerHTML = archs.map(x =>
+    '<button type="button" class="art-chip' + (x === artPick.arch ? ' on' : '') + '" data-art-arch="' + esc(x) + '" aria-pressed="' + (x === artPick.arch ? 'true' : 'false') + '"><bdi dir="ltr">' + esc(x) + '</bdi></button>'
+  ).join('');
+}
+function artModalSum() {
+  const host = $('artRepoSum');
+  if (!host) return;
+  const repo = artRepoRow(artPick.core);
+  if (!repo) { host.innerHTML = ''; return; }
+  const custom = artPick.version && artPick.version !== repo.latest_version;
+  const tag = custom ? repo.core + '-v' + artPick.version : repo.latest_tag;
+  const asset = repo.core + '-linux-' + (artPick.arch || '—') + '.tar.gz';
+  const listed = custom ? null : (((repo.assets || []).find(a => a && a.name === asset)) || null);
+  const row = (k, v, mono) => '<div class="art-sum-row"><span>' + esc(k) + '</span><b' + (mono ? ' class="u-mono"><bdi dir="ltr">' + esc(v) + '</bdi></b' : '>' + esc(v) + '</b') + '></div>';
+  host.innerHTML =
+    row(tr('', 'Release tag'), tag, true) +
+    row(tr('', 'Asset'), asset, true) +
+    row(tr('', 'Size'), listed ? artSize(listed.size) : '—', false) +
+    row(tr('', 'Published'), custom ? '—' : artDateISO(repo.published_at), false);
+}
+function artModalOpen(editRow) {
+  const ov = artModalBuild();
+  artEdit = editRow || null;
+  artBusy = false;
+  $('artBusy').hidden = true;
+  $('artGo').disabled = false;
+  $('artMTitle').textContent = artEdit
+    ? tr('', 'Replace artifact') + ' — ' + ((CORES_ENGINE_NAME[artEdit.engine] || artEdit.engine || '—')) +
+      (artEdit.version ? ' v' + artEdit.version : '') + (artEdit.goarch ? ' · ' + artEdit.goarch : '')
+    : tr('', 'Add artifact');
+  // preset: a repo-sourced row naturally continues from the repo; a manual
+  // upload row keeps its fields (the file itself always re-uploads — rows
+  // are immutable hash+signature pairs, there is no in-place edit)
+  artModalMode(artEdit && artEdit.source !== 'repo' ? 'upload' : 'repo');
+  artModalErr('');
+  if (artEdit && artEdit.source !== 'repo') {
+    $('artUpEngine').value = artEdit.engine || '';
+    $('artUpVersion').value = artEdit.version || '';
+    $('artUpArch').value = artEdit.goarch || 'amd64';
+    $('artUpName').value = artEdit.artifact || '';
+    $('artUpSig').value = artEdit.signature || '';
+    $('artUpFile').value = '';
+  } else {
+    artPick = { core: (artEdit && artEdit.engine) || '', version: (artEdit && artEdit.version) || '', arch: '' };
+    artModalRepoPane();
+  }
+  modalShow(ov, artModalClose);
+}
+// (Re)fills the repo pane from the current feed data — including the honest
+// empty/error state when the feed is null or unreachable.
+function artModalRepoPane() {
+  const sel = $('artCoreSel');
+  const feedErr = $('artRepoFeedErr');
+  const rows = (coresAvail && coresAvail.cores) || [];
+  if (coresAvailErr && !rows.length) {
+    feedErr.hidden = false;
+    feedErr.innerHTML = '<b>' + esc(tr('', 'The repo feed is unreachable')) + '</b><span>' + esc(coresAvailErr) + '</span>' +
+      '<button type="button" class="eng-act" data-art-feed-retry>' + esc(tr('', 'Retry')) + '</button>';
+    sel.innerHTML = '<option value="">—</option>';
+    sel.disabled = true;
+    artModalVersion();
+    artModalChips();
+    $('artRepoSum').innerHTML = '';
+    return;
+  }
+  feedErr.hidden = true;
+  feedErr.innerHTML = '';
+  if (!rows.length) {
+    sel.innerHTML = '<option value="">' + esc(tr('', 'No cores in the repo yet')) + '</option>';
+    sel.disabled = true;
+    artModalVersion();
+    artModalChips();
+    $('artRepoSum').innerHTML = '';
+    return;
+  }
+  sel.disabled = false;
+  const names = rows.slice().sort((x, y) => (CORES_ENGINE_NAME[x.core] || x.core).localeCompare(CORES_ENGINE_NAME[y.core] || y.core));
+  sel.innerHTML = '<option value="">' + esc(tr('', 'Pick a core…')) + '</option>' +
+    names.map(r => '<option value="' + esc(r.core) + '">' + esc(CORES_ENGINE_NAME[r.core] || r.core) + ' <bdi dir="ltr">v' + esc(r.latest_version || '—') + '</bdi></option>').join('');
+  sel.value = artPick.core && names.some(r => r.core === artPick.core) ? artPick.core : '';
+  artPick.core = sel.value;
+  if (!artPick.version) artPick.version = '';
+  artPick.arch = artPick.arch || artAutoArch(artCoreArchs(artPick.core));
+  artModalVersion();
+  artModalChips();
+  artModalSum();
+}
+async function artModalSubmit() {
+  if (artBusy) return;
+  artModalErr('');
+  const fd = new FormData();
+  let label = '';
+  if (artMode === 'repo') {
+    if (!artPick.core) return artModalErr(tr('', 'Pick a core first'));
+    if (!artPick.arch) return artModalErr(tr('', 'Pick an architecture'));
+    if (artPick.version && !ART_VER_RE.test(artPick.version)) return artModalErr(tr('', 'Invalid version tag'));
+    fd.append('source', 'repo');
+    fd.append('engine', artPick.core);
+    // empty version = the core's latest release tag (the backend resolves it)
+    if (artPick.version) fd.append('version', artPick.version);
+    fd.append('goos', 'linux');
+    fd.append('goarch', artPick.arch);
+    label = tr('', 'Downloading and verifying…');
+  } else {
+    const engine = $('artUpEngine').value.trim();
+    const version = $('artUpVersion').value.trim();
+    const goarch = $('artUpArch').value;
+    const name = $('artUpName').value.trim();
+    const sig = $('artUpSig').value.trim();
+    const file = $('artUpFile').files && $('artUpFile').files[0];
+    if (!ART_ENG_RE.test(engine)) return artModalErr(tr('', 'Invalid core id (lowercase letters, digits, -, _; starts with a letter)'));
+    if (!version || !ART_VER_RE.test(version)) return artModalErr(tr('', 'Invalid version tag'));
+    if (!sig) return artModalErr(tr('', 'The signature is required for manual uploads'));
+    if (!file) return artModalErr(tr('', 'Pick the artifact file'));
+    fd.append('source', 'upload');
+    fd.append('engine', engine);
+    fd.append('version', version);
+    fd.append('goos', 'linux');
+    fd.append('goarch', goarch);
+    if (name) fd.append('name', name);
+    fd.append('signature', sig);
+    fd.append('file', file);
+    label = tr('', 'Uploading and verifying…');
+  }
+  artBusy = true;
+  const go = $('artGo'), busy = $('artBusy');
+  go.disabled = true;
+  busy.hidden = false;
+  busy.textContent = label + ' ' + tr('', 'sha256 + ed25519 are verified before anything is stored');
+  try {
+    const d = await apiForm('/api/ui/engines/artifacts', fd);
+    artBusy = false;
+    busy.hidden = true;
+    go.disabled = false;
+    modalHide(document.getElementById('artStoreModal'));
+    const saved = (d && d.artifact) || String((d && d.id) || '');
+    toastOk(tr('', 'Artifact store'), tr('', 'Artifact saved: {name}').replace('{name}', String(saved || '')) +
+      (d && d.tag ? ' (' + d.tag + ')' : ''));
+    loadArtStore(true);
+    loadCores(true);
+    // replacing: offer to retire the old row now — agents may still be
+    // downloading it, so the removal stays an explicit operator decision
+    if (artEdit) {
+      const old = artEdit;
+      artEdit = null;
+      const okDel = await entConfirm(
+        tr('', 'Remove the replaced artifact?'),
+        (CORES_ENGINE_NAME[old.engine] || old.engine || '') + (old.version ? ' v' + old.version : '') +
+        (old.goarch ? ' · ' + old.goarch : '') + ' — ' + (old.artifact || ''),
+        tr('', 'Remove'));
+      if (okDel) artDeleteRow(old);
+    }
+  } catch (e) {
+    artBusy = false;
+    busy.hidden = true;
+    go.disabled = false;
+    artModalErr((e && e.message) || String(e));
+  }
+}
+async function artDeleteRow(row) {
+  try {
+    await api('/api/mesh/engines/artifacts/' + encodeURIComponent(String(row.id)), null, 'DELETE');
+    toastOk(tr('', 'Artifact store'), tr('', 'Artifact removed: {name}').replace('{name}', String(row.artifact || row.id)));
+  } catch (e) {
+    toastErr(tr('', 'Artifact store'), (e && e.message) || String(e));
+  }
+  loadArtStore(true);
+  loadCores(true);
+}
+async function artDeleteClick(id) {
+  const row = (artList || []).find(x => String(x.id) === String(id));
+  if (!row) return;
+  const ok = await entConfirm(
+    tr('', 'Delete artifact {name}?').replace('{name}', String(row.artifact || row.id)),
+    tr('', 'Agents still downloading this artifact will fail their integrity pin.'),
+    tr('', 'Delete'));
+  if (ok) artDeleteRow(row);
+}
+async function apiForm(path, fd) {
+  // multipart twin of api(): same CSRF + §1 error-envelope handling, no JSON body
+  const headers = { 'X-CSRF-Token': getCSRFToken() };
+  if (Date.now() - userActiveAt < 30000) headers['X-User-Active'] = '1';
+  const r = await fetch(at(path), { method: 'POST', headers, body: fd });
+  if (r.status === 401 && !path.endsWith('/api/login')) { showLogin(); throw new Error('session expired'); }
+  if (!r.ok) {
+    const txt = await r.text();
+    let msg = txt || r.statusText;
+    try {
+      const j = JSON.parse(txt);
+      if (j && j.error_code) msg = '[' + j.error_code + '] ' + (j.error || r.statusText) + (j.hint ? '\n\u21aa ' + j.hint : '');
+    } catch (err) { /* raw text already carried */ }
+    throw new Error(msg);
+  }
+  const data = await r.json();
+  if (data && data.csrf_token) setCSRFToken(data.csrf_token);
+  return data;
+}
+(function artStoreWire() {
+  const add = $('engArtAdd');
+  if (add) add.addEventListener('click', () => { if (!coresAvail && !coresAvailErr && !coresAvailBusy) loadCoresAvailable(); artModalOpen(null); });
+  const ref = $('engArtRefresh');
+  if (ref) ref.addEventListener('click', () => { loadArtStore(true); loadCoresAvailable(true); });
+  const card = $('engArtCard');
+  if (card) card.addEventListener('click', e => {
+    const rep = e.target.closest('[data-art-replace]');
+    if (rep) {
+      const row = (artList || []).find(x => String(x.id) === rep.getAttribute('data-art-replace'));
+      if (row) { if (!coresAvail && !coresAvailErr && !coresAvailBusy) loadCoresAvailable(); artModalOpen(row); }
+      return;
+    }
+    const del = e.target.closest('[data-art-del]');
+    if (del) { artDeleteClick(del.getAttribute('data-art-del')); return; }
+    if (e.target.closest('[data-art-retry]')) loadArtStore(true);
+  });
+  document.querySelectorAll('[data-tab="cores"]').forEach(b => b.addEventListener('click', () => { loadArtStore(); loadCoresAvailable(); }));
+  if ((location.hash || '').indexOf('#t=cores') === 0) { loadArtStore(); loadCoresAvailable(); }
+})();
+
+// ===== Overnight methods checker (ui/ux-1, §2.23-family) =================
+// The completeness program's read surface: per SOURCE project, the tunnel
+// methods the overnight runs found upstream vs the ones added to the cores
+// manifests, with the missing list. Data source: GET /api/overnight/checker
+// (documented shape — the backend lands it in parallel):
+//   {projects:[{name, methods_found, methods_added, missing:[...], status}]}
+// null counts render "—" (unknown is not zero); until the endpoint goes
+// live the panel shows the honest "checker not live yet" state.
+let chkData = null;           // the last checker payload {projects:[…]}
+let chkBusy = false;
+let chkErr = null;            // { notlive: bool, msg: string } | null
+function chkNotLiveErr(e) {
+  // the endpoint is not deployed yet: the mux's plain-text 404 for
+  // unclaimed paths, or a §1-envelope 404/501 once it routes
+  if (e && (e.status === 404 || e.status === 501)) return true;
+  return /\b(not found|404|501)\b/i.test((e && e.message) || '');
+}
+async function loadChecker(force) {
+  const body = $('chkBody');
+  if (!body || chkBusy) return;
+  if (!force && (chkData || chkErr)) { renderChecker(); return; }
+  chkBusy = true;
+  chkErr = null;
+  renderChecker();
+  try {
+    const d = await api('/api/overnight/checker');
+    if (d && Array.isArray(d.projects)) chkData = d;
+    else chkErr = { notlive: false, msg: tr('', 'The checker answered no project list') };
+  } catch (e) {
+    chkData = null;
+    chkErr = { notlive: chkNotLiveErr(e), msg: (e && e.message) || String(e) };
+  } finally {
+    chkBusy = false;
+    renderChecker();
+  }
+}
+function chkSum(projects) {
+  // honest totals: sums run over numeric values only; an all-null column
+  // never masquerades as a zero
+  let found = 0, added = 0, anyF = false, anyA = false;
+  projects.forEach(p => {
+    if (typeof p.methods_found === 'number') { found += p.methods_found; anyF = true; }
+    if (typeof p.methods_added === 'number') { added += p.methods_added; anyA = true; }
+  });
+  return {
+    found: anyF ? String(found) : null,
+    added: anyA ? String(added) : null,
+  };
+}
+function chkMissingCell(missing) {
+  if (!Array.isArray(missing)) return '<span class="art-dash">—</span>';
+  if (!missing.length) return '<span class="chk-none">0</span>';
+  const items = missing.map(m => '<li><bdi dir="ltr">' + esc(String(m == null ? '' : m)) + '</bdi></li>').join('');
+  return '<details class="chk-missing"><summary>' + esc(tr('', '{n} missing').replace('{n}', String(missing.length))) + '</summary><ul>' + items + '</ul></details>';
+}
+// The §2.24 ctunnel three-way machine-check block, verbatim passthrough
+// from the endpoint: upstream catalog vs cores manifest vs agent driver —
+// three source counts + the match verdict + the named mismatches. Fields
+// stay honest (null/absent = —, never invented).
+function chkThreeWay(tc) {
+  if (!tc || typeof tc !== 'object') return '';
+  const src = (lbl, s) => {
+    const o = (s && typeof s === 'object') ? s : null;
+    const m = o && typeof o.methods === 'number' ? String(o.methods) : null;
+    const sv = o && o.source ? String(o.source) : '';
+    return '<span class="chk-tw-bit" data-chk-tw="' + esc(lbl) + '"><i>' + esc(lbl) + '</i>' +
+      (m ? ' <b><bdi dir="ltr">' + esc(m) + '</bdi></b>' : ' <b class="art-dash">—</b>') +
+      (sv ? ' <span class="chk-tw-src" title="' + esc(sv) + '"><bdi dir="ltr">' + esc(sv) + '</bdi></span>' : '') +
+      '</span>';
+  };
+  const match = tc.three_way_match;
+  const mBad = match === true
+    ? '<span class="chk-tw-match ok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>' + esc(tr('', 'Three-way match')) + '</span>'
+    : match === false
+      ? '<span class="chk-tw-match bad">' + esc(tr('', 'Mismatch')) + '</span>'
+      : '<span class="art-dash">—</span>';
+  const mm = Array.isArray(tc.mismatches) && tc.mismatches.length
+    ? '<details class="chk-missing chk-tw-mm"><summary>' + esc(tr('', '{n} mismatches').replace('{n}', String(tc.mismatches.length))) + '</summary><ul>' +
+      tc.mismatches.map(x => '<li><bdi dir="ltr">' + esc(String(x == null ? '' : x)) + '</bdi></li>').join('') + '</ul></details>'
+    : '';
+  return '<div class="chk-tew-way" data-chk-tew>' +
+    '<span class="chk-tew-t">' + esc(tr('', 'C-Tunnel three-way check')) + '</span>' +
+    src(tr('', 'Upstream catalog'), tc.upstream_catalog) +
+    src(tr('', 'Cores manifest'), tc.cores_manifest) +
+    src(tr('', 'Agent driver'), tc.agent_driver) +
+    mBad + mm + '</div>';
+}
+function chkStatusBadge(status) {
+  const s = status == null ? '' : String(status);
+  if (!s) return '<span class="art-dash">—</span>';
+  return '<span class="ctun-tb chk-status"><bdi dir="ltr">' + esc(s) + '</bdi></span>';
+}
+function chkNumCell(v) {
+  if (typeof v !== 'number') return '<span class="art-dash">—</span>';
+  return '<bdi dir="ltr">' + esc(String(v)) + '</bdi>';
+}
+function renderChecker() {
+  const body = $('chkBody'), feed = $('chkFeed');
+  if (!body) return;
+  if (feed) {
+    if (chkBusy) feed.innerHTML = '<i class="dot"></i>' + esc(tr('', 'Checking…'));
+    else if (chkErr && chkErr.notlive) feed.innerHTML = '<i class="dot"></i>' + esc(tr('', 'Not live yet'));
+    else if (chkErr) { feed.classList.add('bad'); feed.innerHTML = '<i class="dot"></i>' + esc(tr('', 'Checker error')); }
+    else if (chkData) { feed.classList.remove('bad'); feed.innerHTML = '<i class="dot"></i>' + esc(tr('', '{n} source projects').replace('{n}', String(chkData.projects.length))); }
+    else feed.innerHTML = '';
+  }
+  if (chkBusy) {
+    body.innerHTML = '<div class="art-skel">' + ('<div class="art-skel-row"><div class="eng-skel-line w40"></div><div class="eng-skel-line w20"></div><div class="eng-skel-line w30"></div></div>').repeat(3) + '</div>';
+    return;
+  }
+  if (chkErr && chkErr.notlive) {
+    body.innerHTML = '<div class="ent-empty" role="status">' +
+      '<span class="ent-empty-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 15.5h.01"/></svg></span>' +
+      '<b>' + esc(tr('', 'Checker not live yet')) + '</b>' +
+      '<span>' + esc(tr('', 'The backend has not published GET /api/overnight/checker yet — this view fills in as soon as the endpoint lands.')) + '</span>' +
+      '<button type="button" class="eng-act" data-chk-retry>' + esc(tr('', 'Retry')) + '</button></div>';
+    return;
+  }
+  if (chkErr) {
+    body.innerHTML = '<div class="eng-error"><b>' + esc(tr('', 'Checker error')) + '</b><details><summary>' + esc(tr('', 'Details')) + '</summary><pre>' + esc(chkErr.msg) + '</pre></details>' +
+      '<button type="button" class="eng-act" data-chk-retry>' + esc(tr('', 'Retry')) + '</button></div>';
+    return;
+  }
+  if (!chkData) return;
+  const projects = chkData.projects;
+  if (!projects.length) {
+    body.innerHTML = '<div class="eng-empty"><b>' + esc(tr('', 'The checker lists no projects yet.')) + '</b></div>';
+    return;
+  }
+  const sum = chkSum(projects);
+  // §2.24: generated == "" is the endpoint's own "no checker data yet"
+  // marker — an empty string renders nothing, never a fake date
+  const gen = chkData && typeof chkData.generated === 'string' && chkData.generated
+    ? '<span class="chk-sum-bit chk-gen">' + esc(tr('', 'Generated')) + ': <b><bdi dir="ltr">' + esc(chkData.generated) + '</bdi></b></span>'
+    : '';
+  const tew = chkThreeWay(chkData && chkData.ctunnel_check);
+  const sumLine =
+    '<div class="chk-sum">' +
+    '<span class="chk-sum-bit"><b>' + esc(String(projects.length)) + '</b> ' + esc(tr('', 'source projects')) + '</span>' +
+    '<span class="chk-sum-bit">' + esc(tr('', 'Methods found')) + ': <b>' + (sum.found == null ? '—' : '<bdi dir="ltr">' + esc(sum.found) + '</bdi>') + '</b></span>' +
+    '<span class="chk-sum-bit">' + esc(tr('', 'Methods added')) + ': <b>' + (sum.added == null ? '—' : '<bdi dir="ltr">' + esc(sum.added) + '</bdi>') + '</b></span>' +
+    gen + '</div>' + tew;
+  const rows = projects.map(p => {
+    const name = p && p.name != null ? String(p.name) : '—';
+    return '<tr>' +
+      '<td class="chk-cell-name" data-lbl="' + esc(tr('', 'Project')) + '"><b><bdi dir="ltr">' + esc(name) + '</bdi></b></td>' +
+      '<td class="num" data-lbl="' + esc(tr('', 'Methods found')) + '">' + chkNumCell(p && p.methods_found) + '</td>' +
+      '<td class="num" data-lbl="' + esc(tr('', 'Methods added')) + '">' + chkNumCell(p && p.methods_added) + '</td>' +
+      '<td data-lbl="' + esc(tr('', 'Status')) + '">' + chkStatusBadge(p && p.status) + '</td>' +
+      '<td data-lbl="' + esc(tr('', 'Missing methods')) + '">' + chkMissingCell(p && p.missing) + '</td>' +
+      '</tr>';
+  }).join('');
+  body.innerHTML = sumLine +
+    '<div class="ctun-tblwrap chk-tblwrap"><table class="ent-tbl ctun-tbl chk-tbl"><thead><tr>' +
+    '<th>' + esc(tr('', 'Project')) + '</th>' +
+    '<th class="num">' + esc(tr('', 'Methods found')) + '</th>' +
+    '<th class="num">' + esc(tr('', 'Methods added')) + '</th>' +
+    '<th>' + esc(tr('', 'Status')) + '</th>' +
+    '<th>' + esc(tr('', 'Missing methods')) + '</th>' +
+    '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+}
+(function chkWire() {
+  const ref = $('chkRefresh');
+  if (ref) ref.addEventListener('click', () => loadChecker(true));
+  const card = $('chkCard');
+  if (card) card.addEventListener('click', e => {
+    if (e.target.closest('[data-chk-retry]')) { loadChecker(true); return; }
+    // native <details> toggles the missing list — nothing to wire
+  });
+  document.querySelectorAll('[data-tab="cores"]').forEach(b => b.addEventListener('click', () => loadChecker()));
+  if ((location.hash || '').indexOf('#t=cores') === 0) loadChecker();
 })();
 
 
