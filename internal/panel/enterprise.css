@@ -1940,7 +1940,12 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
   top:-34px; inset-inline-start:-34px; pointer-events:none;
   background:radial-gradient(circle at 35% 35%, color-mix(in srgb, var(--ac) 26%, transparent) 0%, color-mix(in srgb, var(--ac) 9%, transparent) 72%); }
 .eng-headcard > * { position:relative; z-index:1; }
-.eng-gridcard { margin-top:12px; padding:14px; }
+/* the grid sits inside one large card, so the cores read as a single panel
+   instead of tiles floating on the page */
+.eng-gridcard { margin-top:12px; padding:16px; border:1px solid var(--ln); border-radius:16px;
+  background:
+    radial-gradient(circle at 10% 0%, color-mix(in srgb, var(--ac) 7%, transparent) 0%, transparent 55%),
+    var(--s1); }
 .eng-head { display:flex; align-items:center; gap:12px; margin-bottom:0; flex:none; }
 .eng-head-ic { width:44px; height:44px; border-radius:12px; display:inline-flex; align-items:center; justify-content:center; flex:none;
   background:color-mix(in srgb, var(--ac) 14%, transparent); color:var(--ac);
@@ -1970,7 +1975,9 @@ html[dir="rtl"] .eng-search input { padding:9px 38px 9px 14px; }
 .eng-grid { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:12px; }
 @media (max-width:1240px) { .eng-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); } }
 @media (max-width:760px) { .eng-grid { grid-template-columns:minmax(0, 1fr); } }
-.eng-card { display:flex; flex-direction:column; gap:10px; border:1px solid var(--ln); border-radius:12px; background:var(--sunk); padding:16px; min-width:0; height:100%; }
+.eng-card { display:flex; flex-direction:column; gap:10px; border:1px solid color-mix(in srgb, var(--ac) 22%, var(--ln));
+  border-radius:12px; padding:16px; min-width:0; height:100%;
+  background:linear-gradient(180deg, color-mix(in srgb, var(--ac) 12%, var(--sunk)) 0%, color-mix(in srgb, var(--ac) 4%, var(--sunk)) 100%); }
 .eng-card-top { display:flex; align-items:center; gap:12px; }
 .eng-logo { width:40px; height:40px; display:inline-flex; align-items:center; justify-content:center; flex:none; border-radius:10px;
   background:color-mix(in srgb, var(--ac) 12%, transparent); color:var(--ac); overflow:hidden;
@@ -2490,7 +2497,7 @@ html[dir="rtl"] .eng-search input { padding:9px 38px 9px 14px; }
 /* ===== C-Tunnel method catalog page (§2.22) + Method Board (§2.23) + Kernel Tuning ===== */
 /* Whole core card opens the details page; the Install/Manage button keeps its own action */
 .eng-card[data-cores-open] { cursor:pointer; }
-.eng-card[data-cores-open]:hover { border-color:color-mix(in srgb, var(--ac) 45%, var(--ln)); }
+.eng-card[data-cores-open]:hover { border-color:color-mix(in srgb, var(--ac) 55%, var(--ln)); background:linear-gradient(180deg, color-mix(in srgb, var(--ac) 18%, var(--sunk)) 0%, color-mix(in srgb, var(--ac) 7%, var(--sunk)) 100%); }
 #coresDetail { display:flex; flex-direction:column; gap:14px; }
 /* hero header */
 .ctun-hero { display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:16px 18px; border:1px solid var(--ln); border-radius:var(--r-lg); background:var(--s1); }
