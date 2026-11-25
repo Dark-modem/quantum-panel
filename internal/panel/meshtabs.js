@@ -603,7 +603,7 @@
     '.tu-ev-tx { font-size:12.5px; color:var(--tx2, #cbd5e1); }',
     '.tu-ev-at { margin-inline-start:auto; font-size:12px; }',
     '.tu-range { min-width:110px; }',
-    '.mtb-tun-key.tu-open { cursor:pointer; } .mtb-tun-key.tu-open:hover { color:var(--ac); text-decoration:underline; }',
+    '.mtb-tun-key.tu-open { cursor:pointer; border-radius:7px; transition:color .18s ease,background-color .18s ease; } .mtb-tun-key.tu-open:hover { color:var(--ac); text-decoration:none; background:color-mix(in srgb, var(--ac) 13%, transparent); }',
     '@media (max-width: 760px) { .tu-ends-row { grid-template-columns:1fr; } .tu-ends-mid { justify-content:center; transform:rotate(90deg); } .tu-key { max-width:200px; } }',
     '.mtb-modal-ov .mtb-modal:has(.tu-cards) { width:min(600px, 94vw); }',
     '.tu-wiz-ring-row { display:flex; align-items:center; gap:14px; margin:12px 0 16px; }',

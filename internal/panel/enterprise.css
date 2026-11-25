@@ -1208,8 +1208,10 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 .tnl-row:hover { background: var(--s2); }
 .tnl-name { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .tnl-name-col { display: flex; flex-direction: column; min-width: 0; }
-.tnl-link { background: none; border: none; padding: 0; color: var(--tx); font-weight: 600; font-size: 14px; cursor: pointer; text-align: start; font-family: inherit; }
-.tnl-link:hover { color: var(--ac); text-decoration: underline; }
+/* Clickable names read as a quiet button on hover — a rounded accent tint, the
+   same pill as the topbar crumb — instead of an underlined link. */
+.tnl-link { background: none; border: none; padding: 1px 5px; margin-inline-start: -5px; border-radius: 7px; color: var(--tx); font-weight: 600; font-size: 14px; cursor: pointer; text-align: start; font-family: inherit; text-decoration: none; transition: color .18s ease, background-color .18s ease; }
+.tnl-link:hover, .tnl-link:focus-visible { color: var(--ac); background: color-mix(in srgb, var(--ac) 13%, transparent); text-decoration: none; }
 .tnl-name-col small { color: var(--tx2); font-size: 12px; }
 .tnl-ip, .tnl-ports { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tnl-state { display: flex; }
@@ -1552,9 +1554,15 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
 .ag-card-head, .ag-card-foot { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
 .ag-card-name {
   border: 0; background: transparent; color: var(--tx);
-  font: inherit; font-weight: 650; cursor: pointer; padding: 0;
+  font: inherit; font-weight: 650; cursor: pointer;
+  padding: 1px 5px; margin-inline-start: -5px; border-radius: 7px;
+  text-decoration: none;
+  transition: color .18s ease, background-color .18s ease;
 }
-.ag-card-name:hover, .ag-card-name:focus-visible { color: var(--ac); text-decoration: underline; outline: none; }
+.ag-card-name:hover, .ag-card-name:focus-visible {
+  color: var(--ac); text-decoration: none;
+  background: color-mix(in srgb, var(--ac) 13%, transparent);
+}
 .ag-card-meta { font-size: var(--fs-small); color: var(--mu); min-width: 0; overflow-wrap: anywhere; }
 .ag-card-foot { justify-content: flex-start; }
 .ag-inst {
@@ -2543,10 +2551,10 @@ html[dir="rtl"] .eng-search input { padding:9px 38px 9px 14px; }
 .ctun-notice { display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:10px 14px; border:1px solid var(--ln); border-radius:var(--r-md); background:var(--s2); font-size:12.5px; color:var(--tx2); }
 .ctun-notice-bit { display:inline-flex; align-items:center; gap:6px; min-width:0; }
 .ctun-notice-bit bdi { color:var(--tx); font-weight:600; }
-.ctun-uplink { display:inline-flex; align-items:center; gap:5px; color:var(--ac); text-decoration:none; min-width:0; }
+.ctun-uplink { display:inline-flex; align-items:center; gap:5px; color:var(--ac); text-decoration:none; min-width:0; padding:1px 5px; border-radius:7px; transition:background-color .18s ease; }
 .ctun-uplink bdi { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:320px; font-weight:600; }
 .ctun-uplink svg { width:12px; height:12px; flex:none; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; }
-.ctun-uplink:hover bdi { text-decoration:underline; }
+.ctun-uplink:hover { background:color-mix(in srgb, var(--ac) 13%, transparent); }
 .ctun-notice-sep { color:var(--mu); }
 /* Methods checker (ui/ux-1): per source project, found vs added */
 .chk-sum { display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:12px; font-size:12.5px; color:var(--mu); }
