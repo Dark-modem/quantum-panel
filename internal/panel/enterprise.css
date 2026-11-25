@@ -2244,6 +2244,12 @@ html[dir="rtl"] .eng-search input { padding:9px 38px 9px 14px; }
 .topo-stat-tx { display:flex; flex-direction:column; gap:3px; min-width:0; }
 .topo-stat-tx b { font-size:19px; font-weight:700; line-height:1; color:var(--tx); }
 .topo-stat-tx span { font-size:12px; color:var(--dim); white-space:nowrap; }
+/* the count is a span inside .topo-stat-tx, so the muted label rule above greyed
+   it out; each card's number now carries that card's accent */
+.topo-stat .topo-stat-tx .topo-stat-v { color:var(--tx); font-weight:800; }
+.topo-stat-accent .topo-stat-tx .topo-stat-v { color:var(--ac); }
+.topo-stat-ok .topo-stat-tx .topo-stat-v { color:var(--ok); }
+.topo-stat-warn .topo-stat-tx .topo-stat-v { color:var(--wr); }
 /* the datacenter value matches its neighbor's two-line rhythm: bold value on
    top, the small dim label under it */
 .topo-head-stats .topo-stat-tx .topo-stat-dc { font-size:16px; font-weight:700; color:var(--tx); line-height:1.15; }
