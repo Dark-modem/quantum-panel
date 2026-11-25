@@ -13161,13 +13161,18 @@ function coresEngineCard(g) {
   const ver = g.latest ? '<span class="eng-ver"><bdi dir="ltr">v' + esc(g.latest) + '</bdi></span>' : '';
   const outdatedNote = stale > 0 ? '<span class="eng-outdated">' + esc(tr('', '{n} outdated').replace('{n}', String(stale))) + '</span>' : '';
   const openBtn = '<button type="button" class="eng-act" data-cores-open="' + esc(g.engine) + '">' + esc(tr('', 'Details')) + '</button>';
+  // three zones, same order in every card: identity (logo, name, badges,
+  // version, method line), the install bar once something is installed, then a
+  // foot that pins to the bottom with the release state on one side and the
+  // actions on the other — so neighbouring cards line up whatever they carry
   return '<div class="eng-card" data-cores-open="' + esc(g.engine) + '">' +
     '<div class="eng-card-top"><span class="eng-logo">' + img + '</span>' +
-    '<div class="eng-card-id"><div class="eng-card-namerow"><b>' + esc(disp) + '</b>' + coresBadges(g) + '</div>' +
-    coresMethodLine(g, installed, total) + '</div>' +
+    '<div class="eng-card-id"><div class="eng-card-namerow"><b>' + esc(disp) + '</b>' + coresBadges(g) +
     (ver ? '<span class="eng-verchip"><bdi dir="ltr">v' + esc(g.latest) + '</bdi></span>' : '') + '</div>' +
-    '<div class="eng-progress" role="img" aria-label="' + esc(tr('', 'Installed on {n} of {m} agents').replace('{n}', String(installed)).replace('{m}', String(total))) + '"><div class="eng-progress-fill" style="width:' + pct + '%"></div></div>' +
-    '<div class="eng-card-foot">' + rel + repoChip + outdatedNote + '<span class="u-flex-1"></span>' + openBtn + act + '</div>' +
+    coresMethodLine(g, installed, total) + '</div></div>' +
+    (installed > 0 ? '<div class="eng-progress" role="img" aria-label="' + esc(tr('', 'Installed on {n} of {m} agents').replace('{n}', String(installed)).replace('{m}', String(total))) + '"><div class="eng-progress-fill" style="width:' + pct + '%"></div></div>' : '') +
+    '<div class="eng-card-foot"><div class="eng-status">' + rel + repoChip + outdatedNote + '</div>' +
+    '<div class="eng-card-actions">' + openBtn + act + '</div></div>' +
     '</div>';
 }
 function renderCores() {

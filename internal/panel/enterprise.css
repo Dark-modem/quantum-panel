@@ -1968,7 +1968,7 @@ html[dir="rtl"] .eng-search input { padding:9px 38px 9px 14px; }
 .eng-grid { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:12px; }
 @media (max-width:1240px) { .eng-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); } }
 @media (max-width:760px) { .eng-grid { grid-template-columns:minmax(0, 1fr); } }
-.eng-card { display:flex; flex-direction:column; gap:10px; border:1px solid var(--ln); border-radius:12px; background:var(--sunk); padding:14px; min-width:0; }
+.eng-card { display:flex; flex-direction:column; gap:12px; border:1px solid var(--ln); border-radius:12px; background:var(--sunk); padding:14px; min-width:0; height:100%; }
 .eng-card-top { display:flex; align-items:center; gap:12px; }
 .eng-logo { width:44px; height:44px; display:inline-flex; align-items:center; justify-content:center; flex:none; border-radius:11px;
   background:color-mix(in srgb, var(--ac) 12%, transparent); color:var(--ac); overflow:hidden;
@@ -1987,11 +1987,17 @@ html[dir="rtl"] .eng-search input { padding:9px 38px 9px 14px; }
 .eng-installed { color:var(--tx2); font-size:12.5px; }
 .eng-installed-n { color:var(--info); font-weight:600; }
 .eng-installed-pend { color:var(--mu); font-weight:600; }
-.eng-verchip { flex:none; padding:2px 8px; border-radius:7px; border:1px solid var(--ln); color:var(--tx2); font-size:12px; font-weight:600; margin-inline-start:auto; }
+.eng-verchip { flex:none; padding:2px 8px; border-radius:7px; border:1px solid var(--ln); color:var(--tx2); font-size:12px; font-weight:600; }
 .eng-verchip bdi { direction:ltr; unicode-bidi:isolate; }
-.eng-progress { height:7px; border-radius:99px; background:color-mix(in srgb, var(--ln) 70%, transparent); overflow:hidden; }
+.eng-progress { height:6px; border-radius:99px; background:color-mix(in srgb, var(--ln) 55%, transparent); overflow:hidden; }
 .eng-progress-fill { height:100%; border-radius:99px; background:var(--ac); transition:width .3s ease; }
-.eng-card-foot { display:flex; align-items:center; gap:10px; }
+/* foot: release state on one side, actions on the other, never wrapping —
+   the card bottom is pinned so a row of cards lines up */
+.eng-card-foot { display:flex; flex-direction:column; align-items:stretch; gap:8px; margin-top:auto; padding-top:2px; min-width:0; }
+.eng-status { display:inline-flex; align-items:center; gap:8px; min-width:0; flex:1 1 auto; }
+/* the state chips shrink with an ellipsis instead of being cut mid-glyph */
+.eng-status > * { min-width:0; flex:0 1 auto; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.eng-card-actions { display:flex; align-items:center; justify-content:flex-end; gap:8px; flex:none; }
 .eng-rel { display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600; }
 .eng-rel svg { width:13px; height:13px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
 .eng-rel.ok { color:var(--ok); }
