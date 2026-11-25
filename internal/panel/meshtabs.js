@@ -561,7 +561,11 @@
     // the path stays one horizontal chain (flag name → flag name): stacking the
     // two ends made the cell three lines tall. Long names ellipsis instead of
     // stretching the column, so the row keeps its width.
-    '.mtb-tun-tbl .mtb-tupath { flex-wrap:nowrap; }',
+    '.mtb-tun-tbl .mtb-tupath { flex-wrap:nowrap; justify-content:center; }',
+    '.mtb-tun-tbl th.mtb-thc { text-align:center; }',
+    // flex (not inline-flex) so the label centres itself: the RTL table rule
+    // pins every th to text-align:right, which an inline-flex box would follow
+    '.mtb-tun-tbl th.mtb-thc .mtb-th { display:flex; justify-content:center; }',
     '.mtb-tun-tbl .mtb-tuarrow svg { transform:none; }',
     '.mtb-tun-tbl .mtb-tuside { min-width:0; padding:2px 6px; gap:6px; }',
     '.mtb-tun-tbl .mtb-tuside-tx { min-width:0; }',
@@ -1344,7 +1348,7 @@
       '<div class="ent-tbl-wrap"><table class="ent-tbl mtb-tun-tbl"><thead><tr>' +
       '<th><span class="mtb-th">' + MTB_ICO.tun + esc(L('tunnelKey')) + '</span></th>' +
       '<th><span class="mtb-th">' + MTB_ICO.mesh + esc(L('topologyCol')) + '</span></th>' +
-      '<th><span class="mtb-th">' + MTB_ICO.chain + esc(L('tuPath')) + '</span></th>' +
+      '<th class="mtb-thc"><span class="mtb-th">' + MTB_ICO.chain + esc(L('tuPath')) + '</span></th>' +
       '<th><span class="mtb-th">' + MTB_ICO.cube + esc(L('engineCol')) + '</span></th>' +
       '<th class="num"><span class="mtb-th">' + TU_WTH + esc(L('weightCol')) + '</span></th>' +
       '<th><span class="mtb-th">' + TU_STTH + esc(L('stateCol')) + '</span></th>' +
