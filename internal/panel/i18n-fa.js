@@ -3619,6 +3619,8 @@ window.FA_TEXT = {
  "The per-method transport catalog for this core has not landed on the feed — the table appears as soon as the backend serves methods[].": "کاتالوگ روش‌های حمل این هسته هنوز روی فید نیامده — جدول به‌محض سرو شدن methods[] از بک‌اند ظاهر می‌شود.",
  "Methods pending": "روش‌ها در انتظار",
  "1 method": "۱ روش",
+ "1 tunnel method": "۱ روش تانل",
+ "{n} tunnel methods": "{n} روش تانل",
  "Methods published in the core manifest": "روش‌های منتشرشده در مانیفست هسته",
  "The method catalog for this core has not landed on the feed yet": "کاتالوگ روش‌های این هسته هنوز روی فید نیامده است",
  "Pick the Iran agent of the pair": "ایجنت ایرانِ جفت را انتخاب کنید",

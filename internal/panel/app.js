@@ -12967,7 +12967,6 @@ const CORES_ALIAS = { wst: 'wstunnel', singbox: 'sing-box' };
 const CORES_CATS = { matrix: ['Recommended', 'Default'] };
 const CORES_SEARCH_ICO = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>';
 const CORES_QMARK = '<svg viewBox="0 0 100 100" aria-hidden="true"><path d="M50 48 C42 38 26 32 12 42 C4 48 1 56 3 62 C6 60 12 54 20 55 C32 56 42 60 50 52 C58 60 68 56 80 55 C88 54 94 60 97 62 C99 56 96 48 88 42 C74 32 58 38 50 48 Z" fill="#38bdf8"/></svg>';
-const CORES_ICO_MC = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M7.5 13h4M7.5 16.5h7"/></svg>';
 // the §2.22 method count for one grid card: {n, known} — known=true only
 // when the cores feed serves a non-empty methods[] for the core (the count
 // is REAL manifest data); known=false with a repo row = the honest
@@ -13090,24 +13089,25 @@ function coresBadges(g) {
   if (cats) return cats.map(c => `<span class="eng-badge eng-badge-cat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.5-4.8 2.5.9-5.4L4.2 7.7l5.4-.8z"/></svg>${esc(tr('', c))}</span>`).join('');
   return `<span class="eng-badge eng-badge-exp">${esc(tr('', 'Experimental'))}</span>`;
 }
-// the per-core METHOD COUNT badge (overnight order): the REAL count of the
-// §2.22 manifest methods[] when the feed serves it, the honest 'pending'
-// mark when the core exists on the feed without its catalog yet — never an
-// invented number; a core the §2.22 row doesn't resolve for (panel-internal
-// engines) renders no badge at all
-function coresMethodBadge(g) {
+// the card's sub-line: how many tunnel methods the core publishes — the REAL
+// count of the §2.22 manifest methods[] when the feed serves it, the honest
+// 'pending' mark when the core exists on the feed without its catalog yet,
+// and the agent-install count only for a core the §2.22 row doesn't resolve
+// (panel-internal engines) — never an invented number
+function coresMethodLine(g, installed, total) {
   const mc = coresMethodCount(g);
-  if (!mc) return '';
-  if (mc.known) {
+  if (mc && mc.known) {
     // one method reads as singular — three cores publish exactly one
     const count = mc.n === 1
-      ? esc(tr('', '1 method'))
-      : tr('', '{n} methods').replace('{n}', '<bdi dir="ltr">' + esc(String(mc.n)) + '</bdi>');
-    return '<span class="eng-badge eng-badge-mc" title="' + esc(tr('', 'Methods published in the core manifest')) + '">' + CORES_ICO_MC +
-      count + '</span>';
+      ? esc(tr('', '1 tunnel method'))
+      : tr('', '{n} tunnel methods').replace('{n}', '<bdi dir="ltr">' + esc(String(mc.n)) + '</bdi>');
+    return '<span class="eng-installed eng-installed-n" title="' + esc(tr('', 'Methods published in the core manifest')) + '">' + count + '</span>';
   }
-  return '<span class="eng-badge eng-badge-mc-pend" title="' + esc(tr('', 'The method catalog for this core has not landed on the feed yet')) + '">' + CORES_ICO_MC +
-    esc(tr('', 'Methods pending')) + '</span>';
+  if (mc) {
+    return '<span class="eng-installed eng-installed-pend" title="' + esc(tr('', 'The method catalog for this core has not landed on the feed yet')) + '">' +
+      esc(tr('', 'Methods pending')) + '</span>';
+  }
+  return '<span class="eng-installed">' + esc(tr('', 'Installed on {n} of {m} agents').replace('{n}', String(installed)).replace('{m}', String(total))) + '</span>';
 }
 function coresEngineCard(g) {
   const disp = CORES_ENGINE_NAME[g.engine] || g.engine || '';
@@ -13141,8 +13141,8 @@ function coresEngineCard(g) {
   const openBtn = '<button type="button" class="eng-act" data-cores-open="' + esc(g.engine) + '">' + esc(tr('', 'Details')) + '</button>';
   return '<div class="eng-card" data-cores-open="' + esc(g.engine) + '">' +
     '<div class="eng-card-top"><span class="eng-logo">' + img + '</span>' +
-    '<div class="eng-card-id"><div class="eng-card-namerow"><b>' + esc(disp) + '</b>' + coresBadges(g) + coresMethodBadge(g) + '</div>' +
-    '<span class="eng-installed">' + esc(tr('', 'Installed on {n} of {m} agents').replace('{n}', String(installed)).replace('{m}', String(total))) + '</span></div>' +
+    '<div class="eng-card-id"><div class="eng-card-namerow"><b>' + esc(disp) + '</b>' + coresBadges(g) + '</div>' +
+    coresMethodLine(g, installed, total) + '</div>' +
     (ver ? '<span class="eng-verchip"><bdi dir="ltr">v' + esc(g.latest) + '</bdi></span>' : '') + '</div>' +
     '<div class="eng-progress" role="img" aria-label="' + esc(tr('', 'Installed on {n} of {m} agents').replace('{n}', String(installed)).replace('{m}', String(total))) + '"><div class="eng-progress-fill" style="width:' + pct + '%"></div></div>' +
     '<div class="eng-card-foot">' + rel + repoChip + outdatedNote + '<span class="u-flex-1"></span>' + openBtn + act + '</div>' +

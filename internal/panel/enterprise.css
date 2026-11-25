@@ -1964,12 +1964,11 @@ html[dir="rtl"] .eng-search input { padding:9px 38px 9px 14px; }
 .eng-badge svg { width:10px; height:10px; fill:none; stroke:currentColor; stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; }
 .eng-badge-cat { background:color-mix(in srgb, var(--ac) 14%, transparent); color:var(--ac); border:1px solid color-mix(in srgb, var(--ac) 40%, transparent); }
 .eng-badge-exp { background:color-mix(in srgb, var(--wr) 12%, transparent); color:var(--wr); border:1px solid color-mix(in srgb, var(--wr) 38%, transparent); }
-/* the per-core METHOD COUNT badge (ui-ux-3): the real §2.22 manifest count,
-   and its honest pending mark while a core's catalog has not landed */
-.eng-badge-mc { background:color-mix(in srgb, var(--info) 12%, transparent); color:var(--info); border:1px solid color-mix(in srgb, var(--info) 38%, transparent); }
-.eng-badge-mc svg, .eng-badge-mc-pend svg { width:11px; height:11px; }
-.eng-badge-mc-pend { background:color-mix(in srgb, var(--mu) 9%, transparent); color:var(--mu); border:1px dashed var(--ln); font-weight:600; }
+/* the per-core METHOD COUNT line: the real §2.22 manifest count, and its
+   honest pending mark while a core's catalog has not landed */
 .eng-installed { color:var(--tx2); font-size:12.5px; }
+.eng-installed-n { color:var(--info); font-weight:600; }
+.eng-installed-pend { color:var(--mu); font-weight:600; }
 .eng-verchip { flex:none; padding:2px 8px; border-radius:7px; border:1px solid var(--ln); color:var(--tx2); font-size:12px; font-weight:600; margin-inline-start:auto; }
 .eng-verchip bdi { direction:ltr; unicode-bidi:isolate; }
 .eng-progress { height:7px; border-radius:99px; background:color-mix(in srgb, var(--ln) 70%, transparent); overflow:hidden; }
