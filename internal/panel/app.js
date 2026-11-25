@@ -12229,7 +12229,9 @@ window.loadClusterStatus = loadClusterStatus;
     'html[dir="ltr"] .mtb-pg-navbtn svg{transform:scaleX(-1)}',
     '.mtb-pg-size{display:flex;align-items:center;gap:10px}',
     '.mtb-pg-size .mtb-cdd-btn{min-height:32px;padding:4px 12px;gap:6px;font-size:12.5px}',
-    '.mtb-pg-size .mtb-cdd-pop{inset-inline-start:0;inset-inline-end:auto;min-width:70px}',
+    // the per-page dropdown sits in a card footer and its card clips overflow:
+    // opening downward cut the popup off at the card's bottom edge, so it opens up
+    '.mtb-pg-size .mtb-cdd-pop{inset-inline-start:0;inset-inline-end:auto;min-width:70px;top:auto;bottom:calc(100% + 6px)}',
     '.mtb-pg-szlbl{font-size:12.5px;color:var(--tx2)}',
     '.mtb-pg-nav{display:flex;align-items:center;gap:6px;flex-wrap:wrap}',
     '.mtb-pg-navbtn{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 10px;border-radius:8px;border:0;background:none;color:var(--tx2);font-size:12.5px;cursor:pointer}',
