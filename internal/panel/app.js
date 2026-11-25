@@ -9332,6 +9332,7 @@ async function loadBenchWizard() {
     ]);
     bwCache.topos = (topos && topos.topologies) || [];
     bwState.pool = bwCache.topos;
+    benchHistoryRender(st.history);
     if (st.running) { bwState.running = true; bwState.view = st; bwState.timer = setTimeout(bwPoll, 2000); bwRenderRun(); return; }
     if ((st.results || []).length) { bwState.view = st; bwRenderRun(); return; }
     bwRender();
@@ -9447,6 +9448,37 @@ function bwDcLabel(dcKey) {
   const dc = dcs.find(d => String(d.id) === String(dcKey));
   if (dc) return dc.datacenter_en || dc.name_en || dc.name || String(dcKey);
   return String(dcKey);
+}
+// the last ten finished runs, newest first — the server keeps exactly ten, so
+// clearing the wizard never loses what was already measured
+function benchHistoryRender(rows) {
+  const card = $('benchHistCard'), host = $('benchHistList');
+  if (!card || !host) return;
+  rows = (Array.isArray(rows) ? rows : []).slice(0, 10);
+  bwState.history = rows;
+  card.hidden = rows.length === 0;
+  host.innerHTML = '';
+  if (!rows.length) return;
+  const badge = $('benchHistN');
+  if (badge) badge.textContent = String(rows.length);
+  const when = sec => sec ? new Date(sec * 1000).toLocaleString(currentLang === 'fa' ? 'fa-IR' : undefined,
+    { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+  const head = ['When', 'Topology', 'Agents', 'Cores', 'Best core']
+    .map(k => '<span>' + esc(tr('', k)) + '</span>').join('');
+  const body = rows.map(r => {
+    const total = (r.engines || []).length;
+    const agents = (r.iran_agent || '—') + ' → ' + (r.foreign_agent || '—');
+    const best = r.best_engine
+      ? esc(r.best_engine) + (r.best_score ? ' · ' + String(r.best_score) : '')
+      : '<span class="art-dash">—</span>';
+    return '<div class="bh-row">' +
+      '<span class="bh-when">' + esc(when(r.finished)) + '</span>' +
+      '<span class="bh-topo" title="' + esc(r.topo_name || '') + '">' + esc(r.topo_name || '—') + '</span>' +
+      '<span class="bh-agents" title="' + esc(agents) + '">' + esc(agents) + '</span>' +
+      '<span class="bh-engs">' + String(r.ok || 0) + '/' + String(total) + '</span>' +
+      '<span class="bh-best">' + best + '</span></div>';
+  }).join('');
+  host.innerHTML = '<div class="bh-head">' + head + '</div>' + body;
 }
 function bwRender() {
   const host = $('benchWizard');
@@ -9740,7 +9772,7 @@ async function bwPoll() {
   if (!bwState.running && !bwState.boardRunning) { bwRenderRun(); return; }
   const jobs = [];
   if (bwState.running) {
-    jobs.push(api('/api/benchmark/pair').then(st => { bwState.view = st; if (!st.running) bwState.running = false; }).catch(err => { bwState.pairErr = (err && err.message) || String(err); }));
+    jobs.push(api('/api/benchmark/pair').then(st => { bwState.view = st; if (!st.running) bwState.running = false; benchHistoryRender(st.history); }).catch(err => { bwState.pairErr = (err && err.message) || String(err); }));
   }
   if (bwState.boardRunning && bwState.iranAgent && bwState.foreignAgent) {
     jobs.push(api('/api/benchmark/method-board?iran=' + encodeURIComponent(bwState.iranAgent) + '&kharej=' + encodeURIComponent(bwState.foreignAgent))

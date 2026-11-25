@@ -93,6 +93,59 @@ func savePairStateLocked() {
 	_ = os.Rename(tmp, benchmarkPairFile())
 }
 
+// The log of finished pair benchmarks, newest first. The live state above is
+// replaced by the next run; this log outlives it so the page can show what the
+// last ten tests measured.
+const pairBenchHistoryMax = 10
+
+type pairBenchRun struct {
+	Finished     int64    `json:"finished"`
+	TopoName     string   `json:"topo_name"`
+	IranAgent    string   `json:"iran_agent"`
+	ForeignAgent string   `json:"foreign_agent"`
+	Engines      []string `json:"engines"`
+	OK           int      `json:"ok"`
+	BestEngine   string   `json:"best_engine,omitempty"`
+	BestScore    int      `json:"best_score,omitempty"`
+}
+
+func benchmarkHistoryFile() string {
+	return filepath.Join(configDir, "benchmark-history.json")
+}
+
+func loadPairHistory() []pairBenchRun {
+	blob, err := os.ReadFile(benchmarkHistoryFile())
+	if err != nil {
+		return nil
+	}
+	var runs []pairBenchRun
+	if err := json.Unmarshal(blob, &runs); err != nil {
+		return nil
+	}
+	if len(runs) > pairBenchHistoryMax {
+		runs = runs[:pairBenchHistoryMax]
+	}
+	return runs
+}
+
+// appendPairHistory keeps the newest run at the head and drops anything past
+// the tenth, so the file never grows with the number of tests.
+func appendPairHistory(run pairBenchRun) {
+	runs := append([]pairBenchRun{run}, loadPairHistory()...)
+	if len(runs) > pairBenchHistoryMax {
+		runs = runs[:pairBenchHistoryMax]
+	}
+	blob, err := json.MarshalIndent(runs, "", "  ")
+	if err != nil {
+		return
+	}
+	tmp := benchmarkHistoryFile() + ".tmp"
+	if err := os.WriteFile(tmp, blob, 0o600); err != nil {
+		return
+	}
+	_ = os.Rename(tmp, benchmarkHistoryFile())
+}
+
 func restorePairState() {
 	blob, err := os.ReadFile(benchmarkPairFile())
 	if err != nil {
@@ -137,7 +190,7 @@ func pairBenchSnapshot() map[string]any {
 	pairMu.Lock()
 	defer pairMu.Unlock()
 	if pairCur == nil {
-		return map[string]any{"running": false}
+		return map[string]any{"running": false, "history": loadPairHistory()}
 	}
 	p := pairCur
 	p.mu.Lock()
@@ -160,6 +213,7 @@ func pairBenchSnapshot() map[string]any {
 		out["finished_at"] = p.finishedAt.Unix()
 		out["done"] = true
 	}
+	out["history"] = loadPairHistory()
 	return out
 }
 
@@ -288,10 +342,41 @@ func (p *pairBenchState) finish() {
 	p.mu.Lock()
 	p.running = false
 	p.finishedAt = time.Now()
+	run := pairBenchRun{
+		Finished:     p.finishedAt.Unix(),
+		TopoName:     p.topoName,
+		IranAgent:    p.agentName(p.iranAgent),
+		ForeignAgent: p.agentName(p.foreignAgent),
+		Engines:      append([]string(nil), p.engines...),
+	}
+	best := -1
+	for _, r := range p.results {
+		if r.Status != "ok" {
+			continue
+		}
+		run.OK++
+		if r.Score > best {
+			best = r.Score
+			run.BestEngine = r.Engine
+			run.BestScore = r.Score
+		}
+	}
 	p.mu.Unlock()
 	pairMu.Lock()
 	savePairStateLocked()
 	pairMu.Unlock()
+	appendPairHistory(run)
+}
+
+// the log shows the agent the operator picked, not its storage id
+func (p *pairBenchState) agentName(id string) string {
+	if p.store == nil || id == "" {
+		return id
+	}
+	if ag, err := p.store.GetAgent(id); err == nil && ag.Name != "" {
+		return ag.Name
+	}
+	return id
 }
 
 func (p *pairBenchState) run() {
