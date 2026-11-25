@@ -1944,8 +1944,8 @@ html[dir="rtl"] .ht-wires { transform: scaleX(-1); }
    instead of tiles floating on the page */
 .eng-gridcard { margin-top:12px; padding:16px; border:1px solid var(--ln); border-radius:16px;
   background:
-    radial-gradient(circle at 10% 0%, color-mix(in srgb, var(--ac) 7%, transparent) 0%, transparent 55%),
-    var(--s1); }
+    radial-gradient(circle at 10% 0%, color-mix(in srgb, var(--ac) 3%, transparent) 0%, transparent 55%),
+    color-mix(in srgb, #000 12%, var(--s1)); }
 .eng-head { display:flex; align-items:center; gap:12px; margin-bottom:0; flex:none; }
 .eng-head-ic { width:44px; height:44px; border-radius:12px; display:inline-flex; align-items:center; justify-content:center; flex:none;
   background:color-mix(in srgb, var(--ac) 14%, transparent); color:var(--ac);
