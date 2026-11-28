@@ -287,6 +287,19 @@ function topTitleSync(id) {
   const nid = id || ((location.hash.match(/t=([a-z]+)/) || [])[1]) || 'dashboard';
   const ni = document.querySelector('.sidebar-nav .nav-item[data-tab="' + nid + '"]');
   const lbl = ni ? (ni.querySelector('span[data-i18n]') || ni.querySelector('span:not([class*="badge"])')) : null;
+  if (nid === 'update') {
+    // The Update page carries its own heading; the toolbar keeps the brand
+    // instead of duplicating the page label.
+    let span = h1.querySelector('.tb-title-txt');
+    if (!span) {
+      h1.textContent = '';
+      span = document.createElement('span');
+      span.className = 'tb-title-txt';
+      h1.appendChild(span);
+    }
+    span.textContent = 'Quantum';
+    return;
+  }
   if (nid === 'tunnel' && typeof topologySelected !== 'undefined' && topologySelected) {
     // a topology is open: breadcrumb like the agents' — section ‹ topology name
     const topo = typeof topologyCurrent === 'function' ? topologyCurrent() : null;
@@ -1174,14 +1187,33 @@ const I18N = {
     err_bundle: "Bundle lookup failed",
     err_retry: "Retry failed",
     carrier_switch_confirm: "Switch both Iran & Foreign servers to carrier \"{id}\"?",
-    ghtok_title: "GitHub access token",
-    ghtok_hint: "Releases live in the private Dark-modem/quantum repository. Paste a fine-grained token with Contents: Read-only on that repo (GitHub → Settings → Developer settings → Fine-grained tokens). It is stored only on this server and is sent only to github.com.",
-    ghtok_save: "Save Token",
-    ghtok_clear: "Remove Token",
+    ghtok_title: "GitHub release access",
+    ghtok_sub: "Connect to your private release repository.",
+    ghtok_pat: "Personal access token",
+    ghtok_save: "Save token",
+    ghtok_replace: "Replace token",
+    ghtok_clear: "Remove token",
     ghtok_saved: "Token saved — update checks use it from now on.",
     ghtok_cleared: "Token removed.",
-    ghtok_set: "saved",
-    ghtok_unset: "not set",
+    ghtok_perm: "Required permission:",
+    ghtok_perm_scope: "Contents — Read-only",
+    ghtok_stored: "Stored on this server and sent only to github.com.",
+    upd_title: "Panel update",
+    upd_sub: "Review installed version, releases and update safety.",
+    upd_vercard: "Version overview",
+    upd_installed: "Installed build",
+    upd_avail_stable: "Available stable release",
+    upd_switch_title: "Review before switching",
+    upd_switch_body: "The stable release has a lower version number than your development build. Switching may replace newer development changes.",
+    upd_switch_hint: "Review the changes and compatibility before proceeding.",
+    upd_check_again: "Check again",
+    upd_svc: "Panel restart required. Tunnel connections continue running.",
+    upd_cache_hint: "Release information is cached for up to 10 minutes. Check again asks GitHub for fresh data (at most once every 30 s).",
+    upd_relnotes: "Release notes",
+    upd_notes_empty: "No release notes available.",
+    upd_channel_card: "Release channel",
+    upd_install_selected: "Install Selected Version",
+    upd_specific_hint: "For going back to an older release. Install the same version on the other server too.",
     ver_check_failed: "Version check failed: ",
     mx_title: "Matrix tunnel",
     mx_hint: "An encrypted tinc mesh between this server and its peer, independent of the main tunnel. The hub runs on the Iran side; the foreign side registers with the bundle. IPv4 rides the server's IPv4, IPv6 rides its global IPv6.",
@@ -4706,8 +4738,8 @@ $('savePass').onclick = async () => {
   catch(e) { toastErr('password change failed', e.message); }
   b.disabled = false;
 };
-// ---------- Update tab ----------
-let updState = { current: '', latest: '', avail: false, busy: false };
+// ---------- Panel update (tab-update): version overview, review-first flow, GitHub access ----------
+let updState = { current: '', latest: '', avail: false, busy: false, channel: 'stable', checkedAt: 0, changes: [], error: '', rolledBack: '', cls: null };
 
 // Release notes are Markdown; render the few parts they use, escaped first.
 function mdLite(src) {
@@ -4728,6 +4760,69 @@ function mdLite(src) {
   return html + (list ? '</ul>' : '');
 }
 
+// Version families, mirroring internal/panel/update_channel.go: 3 = stable
+// vX.Y.Z, 2 = dev-rN, 1 = legacy panel-rN, 0 = unknown (e.g. a v1.32-dev
+// build stamped at build time). The backend's update_available ranks every
+// unknown build BELOW any release, so a newer development build reads as
+// "update available" over an older stable release — this UI re-classifies
+// the relationship before offering anything.
+function updFamily(v) {
+  const s = String(v || '');
+  if (/^v\d+\.\d+\.\d+$/.test(s)) return 3;
+  if (/^dev-r\d+$/.test(s)) return 2;
+  if (/^panel-r\d+$/.test(s)) return 1;
+  return 0;
+}
+function updCompare(a, b) {
+  const ka = updFamily(a), kb = updFamily(b);
+  if (ka !== kb) return ka < kb ? -1 : 1;
+  const na = String(a || '').match(/\d+/g) || [], nb = String(b || '').match(/\d+/g) || [];
+  for (let i = 0; i < 3; i++) {
+    const x = +(na[i] || 0), y = +(nb[i] || 0);
+    if (x !== y) return x < y ? -1 : 1;
+  }
+  return 0;
+}
+// The state machine behind the version card:
+//   normal        — same family, strictly newer: a real update
+//   switch-stable — a stable release offered while a development build runs
+//   switch-dev    — the dev channel's prerelease offered over a stable build
+//   unverified    — the target's relationship to the running build cannot be
+//                   verified at all; the action stays disabled
+//   none          — up to date (or the check failed)
+function updClassify(cur, latest) {
+  if (!latest) return { state: 'none', failed: true };
+  const kc = updFamily(cur), kl = updFamily(latest);
+  if (kc === kl) return (latest !== cur && updCompare(latest, cur) > 0) ? { state: 'normal' } : { state: 'none' };
+  if (kl === 3) return { state: 'switch-stable' };
+  if (kl === 2 && kc === 3) return { state: 'switch-dev' };
+  return { state: 'unverified' };
+}
+function updBuildKind(ver) {
+  const f = updFamily(ver);
+  if (f === 2) return 'dev';
+  if (f === 3) return 'stable';
+  if (/-dev$/i.test(String(ver || ''))) return 'dev'; // v1.32-dev: a development build
+  return '';
+}
+function updKindLabel(ver) {
+  const k = updBuildKind(ver);
+  return k === 'dev' ? tr('', 'Development') : k === 'stable' ? tr('', 'Stable') : '—';
+}
+function updChip(el, ver) {
+  const k = updBuildKind(ver);
+  if (!k) { el.hidden = true; return; }
+  el.hidden = false;
+  el.textContent = k === 'dev' ? tr('', 'Development') : tr('', 'Stable');
+  el.className = 'upd-chip ' + k;
+}
+// The one sentence that says what a channel switch would do.
+function updSwitchText(state) {
+  return state === 'switch-dev'
+    ? tr('', 'The development build is newer by channel, not by stability: prereleases may break. Switching replaces the stable release with the development build.')
+    : tr('', 'The stable release has a lower version number than your development build. Switching may replace newer development changes.');
+}
+
 function updAgo(ts) {
   if (!ts) return '—';
   const d = Math.max(0, Math.floor(Date.now() / 1000) - ts);
@@ -4738,30 +4833,57 @@ function updAgo(ts) {
 function updRow(k, vHTML) { return '<div class="ver-row"><span class="k">' + esc(k) + '</span><span>' + vHTML + '</span></div>'; }
 function updDot(cls, txt) { $('updDot').className = 'status-indicator ' + cls; $('updDotTxt').textContent = txt; }
 
-// ---- GitHub token (Update tab): stored server-side 0600, shown only as a badge ----
-async function loadGhToken() {
-  const badge = $('ghtokBadge'), clear = $('ghtokClearBtn');
-  if (!badge) return;
-  try {
-    const r = await api('/api/update/github-token');
-    const set = !!r.set;
-    badge.textContent = set ? tr('', 'saved') : tr('', 'not set');
-    badge.className = 'badge ' + (set ? 'ok' : 'warn');
-    if (clear) clear.classList.toggle('hidden', !set);
-  } catch (e) { badge.textContent = '—'; }
+// Token access state: the backend only reports set/unset; the token's health
+// rides the last release check — our own backend words the 401/404/403
+// failures in update_channel.go (getJSONAt), so they are safe to match.
+function updTokenState(set, v) {
+  if (!set) return { cls: 'warn', txt: tr('', 'Not configured') };
+  if (v && v.error) {
+    if (/401|invalid or expired/i.test(v.error)) return { cls: 'err', txt: tr('', 'Invalid token') };
+    if (/403|404|cannot see|rate limit/i.test(v.error)) return { cls: 'err', txt: tr('', 'Permission insufficient') };
+    return { cls: 'err', txt: tr('', 'Connection failed') };
+  }
+  return { cls: 'ok', txt: tr('', 'Connected') };
 }
+
+// ---- GitHub token (Update tab): stored server-side 0600, shown only as a state badge ----
+async function loadGhToken(v) {
+  const badge = $('ghtokBadge'), entry = $('ghtokEntry'), setBox = $('ghtokSet');
+  if (!badge) return;
+  let set = false;
+  try { set = !!(await api('/api/update/github-token')).set; }
+  catch (e) { badge.textContent = '—'; badge.className = 'badge dim'; return; }
+  const st = updTokenState(set, v);
+  badge.textContent = st.txt;
+  badge.className = 'badge ' + st.cls;
+  entry.hidden = !!set; // a saved token is never shown again; Replace reveals a fresh input
+  setBox.hidden = !set;
+}
+if ($('ghtokEye')) $('ghtokEye').onclick = () => {
+  const inp = $('ghtokInput'), show = inp.type === 'password';
+  inp.type = show ? 'text' : 'password';
+  $('ghtokEye').setAttribute('aria-label', show ? tr('', 'Hide token') : tr('', 'Show token'));
+};
+if ($('ghtokReplaceBtn')) $('ghtokReplaceBtn').onclick = () => {
+  $('ghtokEntry').hidden = false;
+  $('ghtokSet').hidden = true;
+  const inp = $('ghtokInput');
+  inp.value = '';
+  inp.focus();
+};
 if ($('ghtokSaveBtn')) $('ghtokSaveBtn').onclick = async () => {
-  const inp = $('ghtokInput'), msg = $('ghtokMsg');
+  const inp = $('ghtokInput'), msg = $('ghtokMsg'), btn = $('ghtokSaveBtn');
   msg.classList.add('hidden');
+  btn.disabled = true;
   try {
     const r = await api('/api/update/github-token', { token: (inp.value || '').trim() });
     inp.value = '';
     msg.textContent = r.detail || tr('', 'Token saved — update checks use it from now on.');
     msg.classList.remove('hidden');
-    toastOk(tr('', 'GitHub access token') + ': ' + tr('', 'saved'));
-    loadGhToken();
+    toastOk(tr('', 'GitHub release access'), tr('', 'saved'));
     loadVersion(true);
-  } catch (e) { toastErr('token save failed', e.message); }
+  } catch (e) { toastErr(tr('', 'Token save failed'), e.message); }
+  btn.disabled = false;
 };
 if ($('ghtokClearBtn')) $('ghtokClearBtn').onclick = async () => {
   const msg = $('ghtokMsg');
@@ -4769,63 +4891,126 @@ if ($('ghtokClearBtn')) $('ghtokClearBtn').onclick = async () => {
     await api('/api/update/github-token', { token: '' });
     msg.textContent = tr('', 'Token removed.');
     msg.classList.remove('hidden');
-    loadGhToken();
     loadVersion(true);
-  } catch (e) { toastErr('token remove failed', e.message); }
+  } catch (e) { toastErr(tr('', 'Token remove failed'), e.message); }
 };
 
 async function loadVersion(force) {
-  loadGhToken();
   const chk = $('updCheckBtn');
   if (force) { chk.disabled = true; chk.textContent = tr('', 'Checking…'); }
+  let v = null;
   try {
-    const v = await api('/api/version' + (force ? '?refresh=1' : ''));
-    updState.current = v.current || ''; updState.latest = v.latest || ''; updState.avail = !!v.update_available;
-    $('verCurrent').textContent = v.current || '—';
-    const isDev = v.channel === 'dev';
-    $('updChannel').value = isDev ? 'dev' : 'stable';
-    $('updDevBadge').classList.toggle('hidden', !isDev);
-    $('updChannelWarn').classList.toggle('hidden', !isDev);
-    const badge = $('updBadge'); if (badge) badge.classList.toggle('hidden', !v.update_available);
-    if (typeof drawerSync === 'function') drawerSync();
-
-    const failed = !v.latest || v.latest === 'unknown';
-    $('updTo').hidden = !v.update_available;
-    $('verLatest').textContent = v.latest || '—';
-    if (failed) updDot('warn', tr('', 'Check failed'));
-    else updDot(v.update_available ? 'warn' : 'ok', tr('', v.update_available ? 'Update available' : 'Up to date'));
-
-    let rows = updRow(tr('', 'Latest release'), failed ? esc(tr('', 'Unknown: GitHub could not be reached')) : '<bdi dir="ltr">' + esc(v.latest) + '</bdi>');
-    rows += updRow(tr('', 'Last checked'), esc(updAgo(v.checked_at)));
-    rows += '<div class="ver-row" id="updPeerRow" hidden></div>';
-    $('verRowsUpd').innerHTML = rows;
-
-    const rb = $('updRollback');
-    rb.hidden = !v.rolled_back;
-    if (v.rolled_back) rb.textContent = docTpl('Version {0} did not start, so the panel went back to {1} by itself. See the Logs tab before trying again.', [v.rolled_back, v.current]);
-
-    const btn = $('updateBtn');
-    btn.hidden = !v.update_available || updState.busy;
-    btn.disabled = updState.busy;
-    btn.textContent = docTpl('Update to {0}', [v.latest]);
-    if (!updState.busy) {
-      $('updateMsg').textContent = failed
-        ? (v.error ? tr('', 'Version check failed: ') + v.error : tr('', 'Could not reach GitHub to check for a new version. Check that this server can reach github.com, then press Check Now.'))
-        : v.update_available ? tr('', 'A new version is ready. Updating restarts only the panel; tunnels keep running.') : '';
-    }
-
-    const changes = v.changes || [];
-    $('updNotesCard').hidden = !changes.length;
-    $('updNotes').innerHTML = changes.map(c =>
-      `<section class="upd-rel"><div class="upd-rel-head"><b data-no-i18n>${esc(c.tag)}</b><span class="qs-hint">${esc(c.date ? new Date(c.date).toLocaleDateString() : '')}</span></div><div class="upd-md" data-no-i18n>${mdLite(String(c.notes || '').replace(/^\s*#{1,6}[^\n]*\n?/, m => m.includes(c.tag) ? '' : m)) || '<p>' + esc(tr('', 'No notes for this release.')) + '</p>'}</div></section>`).join('');
+    v = await api('/api/version' + (force ? '?refresh=1' : ''));
+    updState.current = v.current || ''; updState.latest = v.latest || '';
+    updState.avail = !!v.update_available;
+    updState.channel = v.channel || 'stable';
+    updState.checkedAt = v.checked_at || 0;
+    updState.changes = v.changes || [];
+    updState.error = (!v.latest && v.error) ? String(v.error) : '';
+    updState.rolledBack = v.rolled_back || '';
+    updState.cls = updClassify(updState.current, updState.latest);
+    updRender();
   } catch (e) {
+    updState.cls = { state: 'none', failed: true };
     updDot('warn', tr('', 'Check failed'));
     if (!updState.busy) $('updateMsg').textContent = e.message;
   } finally {
     chk.disabled = updState.busy;
-    chk.textContent = tr('', 'Check Now');
+    chk.textContent = tr('', 'Check again');
   }
+  loadGhToken(v || undefined); // the token state rides the same render; it is answered locally, not by GitHub
   if (!$('tab-update').hidden) { loadRollback(); loadPeerVersion(); }
+}
+
+function updRender() {
+  const cls = updState.cls || { state: 'none', failed: true };
+  const failed = !!cls.failed;
+  const ok = !failed && !!updState.latest;
+  $('verCurrent').textContent = updState.current || '—';
+  $('verLatest').textContent = ok ? updState.latest : '—';
+  updChip($('updCurChip'), updState.current);
+  updChip($('updAvailChip'), ok ? updState.latest : '');
+  $('updAvailLbl').textContent = tr('', {
+    'switch-stable': 'Available stable release',
+    'switch-dev': 'Available development build',
+    'unverified': 'Target release',
+  }[cls.state] || 'Latest release');
+
+  const badge = $('updBadge');
+  if (badge) badge.classList.toggle('hidden', !(cls.state === 'normal' || cls.state === 'switch-stable' || cls.state === 'switch-dev'));
+  if (typeof drawerSync === 'function') drawerSync();
+
+  const stTxt = {
+    'normal': 'Update available',
+    'switch-stable': 'Stable release available',
+    'switch-dev': 'Development build available',
+    'unverified': 'Update path unverified',
+  }[cls.state] || (failed ? 'Check failed' : 'You\'re up to date');
+  updDot(failed ? 'warn' : (cls.state === 'none' ? 'ok' : 'warn'), stTxt);
+
+  const isDev = updState.channel === 'dev';
+  $('updChannel').value = isDev ? 'dev' : 'stable';
+  $('updChannelWarn').classList.toggle('hidden', !isDev);
+
+  let rows = updRow(tr('', 'Latest release'), ok
+    ? '<bdi dir="ltr">' + esc(updState.latest) + '</bdi>'
+    : '<span class="qs-hint">' + esc(tr('', 'Unknown: the release could not be fetched')) + '</span>');
+  if (ok) rows += updRow(tr('', 'Last successful check'), esc(updAgo(updState.checkedAt)));
+  else if (updState.checkedAt) rows += updRow(tr('', 'Last attempted check'), esc(updAgo(updState.checkedAt)));
+  rows += updRow(tr('', 'Release channel'), esc(isDev ? tr('', 'Development') : tr('', 'Stable')));
+  rows += '<div class="ver-row" id="updPeerRow" hidden></div>';
+  $('verRowsUpd').innerHTML = rows;
+
+  const warn = $('updSwitchWarn');
+  const risky = cls.state === 'switch-stable' || cls.state === 'switch-dev';
+  warn.hidden = !risky;
+  if (risky) $('updSwitchWarnBody').textContent = updSwitchText(cls.state);
+
+  const rb = $('updRollback');
+  rb.hidden = !updState.rolledBack;
+  if (updState.rolledBack) rb.textContent = docTpl('Version {0} did not start, so the panel went back to {1} by itself. See the Logs tab before trying again.', [updState.rolledBack, updState.current]);
+
+  const btn = $('updateBtn');
+  if (cls.state === 'unverified') {
+    btn.hidden = false;
+    btn.disabled = true;
+    btn.textContent = tr('', 'Review update');
+  } else {
+    const actionable = cls.state === 'normal' || cls.state === 'switch-stable' || cls.state === 'switch-dev';
+    btn.hidden = !actionable || updState.busy;
+    btn.disabled = updState.busy;
+    btn.textContent = cls.state === 'switch-stable' ? tr('', 'Review stable switch')
+      : cls.state === 'switch-dev' ? tr('', 'Review channel switch')
+      : docTpl('Update to {0}', [updState.latest]);
+  }
+  if (!updState.busy) {
+    $('updateMsg').textContent = failed
+      ? (updState.error ? tr('', 'Version check failed: ') + updState.error : tr('', 'Could not reach GitHub to check for a new version. Check that this server can reach github.com, then press Check again.'))
+      : cls.state === 'unverified'
+        ? tr('', 'The relationship between the running build and the offered release cannot be verified, so the update path stays disabled.')
+        : cls.state === 'switch-stable'
+          ? tr('', 'A stable release is available. Reviewing first is required: switching may replace newer development changes.')
+          : cls.state === 'switch-dev'
+            ? tr('', 'The development channel offers a newer prerelease. Review before switching.')
+            : cls.state === 'normal' ? tr('', 'A new version is ready. Updating restarts only the panel; tunnels keep running.') : '';
+  }
+
+  const changes = updState.changes || [];
+  $('updNotes').innerHTML = changes.map(updRelHTML).join('');
+  $('updNotesEmpty').hidden = !!changes.length;
+}
+
+// One release in the notes card: version + date + first line as the summary,
+// the full notes expand below.
+function updRelHTML(c) {
+  const notes = String(c.notes || '').replace(/^\s*#{1,6}[^\n]*\n?/, m => m.includes(c.tag) ? '' : m);
+  const text = notes.trim();
+  const first = (text.split('\n').find(l => l.trim() && !/^#{1,6}\s/.test(l)) || '').replace(/^[-*]\s+/, '').replace(/\*\*/g, '');
+  return '<details class="upd-rel"><summary class="upd-rel-head"><bdi dir="ltr">' + esc(c.tag) + '</bdi>' +
+    '<span class="qs-hint">' + esc(c.date ? new Date(c.date).toLocaleDateString() : '') + '</span>' +
+    '<span class="upd-rel-sum">' + esc(first) + '</span>' +
+    '<span class="upd-rel-chev" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></span></summary>' +
+    '<div class="upd-md" data-no-i18n>' + (mdLite(text) || '<p>' + esc(tr('', 'No notes for this release.')) + '</p>') + '</div></details>';
 }
 
 async function loadPeerVersion() {
@@ -4863,8 +5048,59 @@ function updStep(name, state) {
   if (li) li.dataset.state = state;
 }
 
-// Install `tag` (or the newest of the channel) and follow the restart until
-// the panel answers with a different version.
+// ---- the review dialog: every install and every channel switch goes through it ----
+let _updReviewTag = null;
+function updOpenReview() {
+  const cls = updState.cls;
+  if (!cls || cls.state === 'unverified' || cls.state === 'none') return;
+  $('updReviewTitle').textContent = cls.state === 'normal' ? docTpl('Update to {0}', [updState.latest])
+    : cls.state === 'switch-dev' ? tr('', 'Review channel switch') : tr('', 'Review stable switch');
+  const row = (k, val) => '<div class="ver-row"><span class="k">' + esc(k) + '</span><span>' + val + '</span></div>';
+  const kindText = {
+    'normal': 'Verified upgrade — same release family, strictly newer',
+    'switch-stable': 'Channel switch — development build to stable release',
+    'switch-dev': 'Channel switch — stable release to development build',
+  }[cls.state] || '—';
+  $('updReviewFacts').innerHTML =
+    row(tr('', 'Installed version'), '<bdi dir="ltr">' + esc(updState.current) + '</bdi>') +
+    row(tr('', 'Target version'), '<bdi dir="ltr">' + esc(updState.latest) + '</bdi>') +
+    row(tr('', 'Installed channel'), esc(updKindLabel(updState.current))) +
+    row(tr('', 'Target channel'), esc(updKindLabel(updState.latest))) +
+    row(tr('', 'Classification'), esc(kindText)) +
+    row(tr('', 'Artifact verification'), esc(tr('', 'Checksum manifest and signature are verified before install; a failed check refuses the update'))) +
+    row(tr('', 'Configuration'), esc(tr('', 'Kept untouched; the previous binary is kept for rollback'))) +
+    row(tr('', 'Automatic rollback'), esc(tr('', 'If the new panel does not start, the previous one is restored (systemd servers)'))) +
+    row(tr('', 'Expected downtime'), esc(tr('', 'A few seconds while the panel restarts'))) +
+    row(tr('', 'Tunnel agents'), esc(tr('', 'Keep running; the update changes the panel only')));
+  const warn = $('updReviewWarn');
+  if (cls.state === 'switch-stable' || cls.state === 'switch-dev') {
+    warn.hidden = false;
+    warn.innerHTML = '<div class="upd-warn-head"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4m0 4h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg><b>' + esc(tr('', 'Review before switching')) + '</b></div><p>' + esc(updSwitchText(cls.state)) + '</p>';
+  } else warn.hidden = true;
+  const notes = updState.changes || [];
+  $('updReviewNotes').innerHTML = notes.map(c => mdLite(String(c.notes || ''))).join('') ||
+    '<p>' + esc(tr('', 'No release notes available.')) + '</p>';
+  $('updReviewNotesBox').hidden = !notes.length;
+  $('updReviewNotesBox').open = !!notes.length;
+  const go = $('updReviewGo');
+  go.textContent = cls.state === 'normal' ? tr('', 'Confirm update')
+    : cls.state === 'switch-stable' ? tr('', 'Switch to stable') : tr('', 'Switch to development');
+  go.className = 'quantum-btn ' + (cls.state === 'normal' ? 'quantum-btn-primary' : 'quantum-btn-danger');
+  _updReviewTag = updState.latest; // install exactly the version that was reviewed
+  modalShow($('updReviewModal'), () => { _updReviewTag = null; });
+}
+$('updReviewGo').onclick = () => {
+  const tag = _updReviewTag;
+  _updReviewTag = null;
+  modalHide($('updReviewModal'));
+  if (tag) runUpdate(tag);
+};
+const updReviewClose = () => { _updReviewTag = null; modalHide($('updReviewModal')); };
+if ($('updReviewCancel')) $('updReviewCancel').onclick = updReviewClose;
+if ($('updReviewX')) $('updReviewX').onclick = updReviewClose;
+
+// Install `tag` and follow the restart until the panel answers with a
+// different version.
 async function runUpdate(tag) {
   let before = '';
   try { before = (await (await fetch(at('/api/health'), {cache: 'no-store'})).json()).version || ''; } catch (_) { /* unknown */ }
@@ -4875,7 +5111,7 @@ async function runUpdate(tag) {
   steps.querySelectorAll('li').forEach(li => { delete li.dataset.state; });
   updStep('dl', 'active');
   const msg = $('updateMsg');
-  msg.textContent = tr('', 'Downloading and checking the new version. This can take a minute on slow links.');
+  msg.textContent = tr('', 'Downloading and verifying the new version. This can take a minute on slow links.');
   let r;
   try {
     r = await api('/api/update', tag ? {tag} : {});
@@ -4898,8 +5134,8 @@ async function runUpdate(tag) {
   updStep('dl', 'done');
   updStep('restart', 'active');
   msg.textContent = r.guarded
-    ? tr('', 'Restarting the panel. If the new version does not start within a minute, the previous one is put back automatically.')
-    : tr('', 'Restarting the panel.');
+    ? tr('', 'Installed. Restarting the panel; if the new version does not start within a minute, the previous one comes back by itself.')
+    : tr('', 'Installed. Restarting the panel.');
   const t0 = Date.now();
   let warned = false;
   const tick = async () => {
@@ -4931,12 +5167,7 @@ async function runUpdate(tag) {
   setTimeout(tick, 2500);
 }
 
-$('updateBtn').onclick = async () => {
-  if (!await entConfirm(docTpl('Update to {0}?', [updState.latest]),
-    tr('', 'Only the panel restarts, for a few seconds; tunnels keep running. If the new version does not start, the previous one is put back automatically. Update the other server too, so both run the same version.'),
-    tr('', 'Update'))) return;
-  runUpdate('');
-};
+$('updateBtn').onclick = () => updOpenReview();
 $('updCheckBtn').onclick = () => loadVersion(true);
 $('rbBtn').onclick = async () => {
   const tag = $('rbTag').value; if (!tag) return;
