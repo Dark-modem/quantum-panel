@@ -6,16 +6,25 @@ let topologyData = { topologies: [], tunnels: [] };
 // serves; /api/mesh/servers contributes the per-server address. A topology
 // side renders every server it has — one line per datacenter group.
 let topoServersByTopo = {};
-let topoDcLoaded = ''; // the topology name the cache belongs to
+// the topology name the cache belongs to (null = nothing loaded yet, so the
+// first agent-layer fetch is not skipped the way it was with '')
+let topoDcLoaded = null;
 let topologyDcFilter = 'all';
 let topoPage = 1;
 let topoPerPage = 10;
 let topoTunFilter = 'all';
 function topoIsFa() { return typeof currentLang !== 'undefined' && currentLang === 'fa'; }
+// A second caller for the same topology must WAIT for the fetch in flight
+// instead of being told "already loaded" (that skip painted an empty map).
+let topoDcPending = null;
+let topoDcPendingKey = null;
 async function topoDcLoad(topo) {
   const key = topo ? topo.name : '';
   if (topoDcLoaded === key) return;
-  topoDcLoaded = key;
+  if (topoDcPending && topoDcPendingKey === key) return topoDcPending;
+  topoDcPendingKey = key;
+  let settle = () => {};
+  topoDcPending = new Promise(r => { settle = r; });
   try {
     const [ag, sv] = await Promise.all([api('/api/ui/agents'), api('/api/mesh/servers')]);
     window.__topoAgents = (ag.agents || []);
@@ -24,10 +33,12 @@ async function topoDcLoad(topo) {
     // the established tunnels live in the agent layer: every member agent of
     // the open topology reports the tunnels it actually runs for it
     window.__topoTunnels = [];
-    const memberAgs = window.__topoAgents.filter(a => !topo || (a.topologies || []).includes(topo.name));
+    window.__topoAgentTraffic = {};
+    // the list page only needs the agent/server cache; the per-agent tunnel
+    // details are for the open topology's map and cards
+    const memberAgs = topo ? window.__topoAgents.filter(a => (a.topologies || []).includes(topo.name)) : [];
     const detailRows = await Promise.all(memberAgs.map(a =>
       api('/api/ui/agents/' + encodeURIComponent(a.id)).then(d2 => ({ agent: a, d: d2 })).catch(() => null)));
-    window.__topoAgentTraffic = {};
     detailRows.filter(Boolean).forEach(({ agent, d }) => {
       window.__topoAgentTraffic[agent.id] = d.traffic24 || [];
       (d.tunnels || []).forEach(tn => {
@@ -63,7 +74,14 @@ async function topoDcLoad(topo) {
         if (!list.some(x => x.name === entry.name)) list.push(entry);
       });
     });
+    topoDcLoaded = key;
   } catch (e) { /* lists stay empty; the cells fall back to country names */ }
+  finally {
+    // clear only if this call still owns the slot (a newer topology may have
+    // replaced it while this fetch was in flight)
+    if (topoDcPendingKey === key) { topoDcPending = null; topoDcPendingKey = null; }
+    settle();
+  }
 }
 function topoSideServers(t, side) {
   return (topoServersByTopo[t.name] && topoServersByTopo[t.name][side]) || [];
@@ -740,7 +758,7 @@ function topoAgentTunnels(topo) {
     return true;
   });
 }
-function topoDcReset() { topoDcLoaded = ''; topoServersByTopo = {}; }
+function topoDcReset() { topoDcLoaded = null; topoServersByTopo = {}; }
 function renderTopoMembers(topo) {
   const card = $('topoMembersCard');
   if (!card || !topo) { if (card) card.innerHTML = ''; return; }
@@ -1018,6 +1036,8 @@ async function topologyReload() {
     topologyData = { topologies: r.topologies || [], tunnels: r.tunnels || [] };
     if (topologySelected && !topologyCurrent()) topologySelected = null;
     topologyLoadedOnce = true;
+    // a reload is the refresh path: the agent-layer cache must not outlive it
+    topoDcReset();
     await topoDcLoad(topologyCurrent());
     fillHeadCard(topologyCurrent());
     fillHeadStats(topologyCurrent());
@@ -1252,7 +1272,7 @@ function topologyRender() {
     const ENG_DISP = { aestun: 'AESTun', rakhsh: 'Rakhsh', matrix: 'Matrix', frp: 'FRP', backhaul: 'Backhaul', gost: 'Gost', xray: 'Xray', wireguard: 'WireGuard', wstunnel: 'wstunnel', chisel: 'Chisel', rathole: 'Rathole', tinc: 'Tinc', easytier: 'EasyTier', hysteria: 'Hysteria', singbox: 'sing-box', spoof: 'Spoof', udp2raw: 'udp2raw', waterwall: 'WaterWall', wattunnel: 'WatTunnel' };
     const engName = en => { const e = String(en || '').toLowerCase(); return ENG_DISP[e] || (en ? en.charAt(0).toUpperCase() + en.slice(1) : '—'); };
     const th = (svg, lbl) => `<th><span class="mtb-th">${svg}${esc(lbl)}</span></th>`;
-    const icoTun = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16"/><path d="M16.5 8.5L20 12l-3.5 3.5"/><path d="M7.5 8.5L4 12l3.5 3.5"/></svg>';
+    const icoName = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>';
     const icoDst = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="7" rx="1.5"/><rect x="3" y="13" width="18" height="7" rx="1.5"/><path d="M7 7.5h.01M7 16.5h.01"/></svg>';
     const icoEng = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
     const icoSt = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg>';
@@ -1291,7 +1311,7 @@ function topologyRender() {
     }).join('');
     tl.innerHTML = chipHtml +
       '<div class="ent-tbl-wrap"><table class="ent-tbl"><thead><tr>' +
-      th(icoTun, 'Tunnel') + th(icoDst, 'Destination') + th(icoEng, 'Engine') + th(icoSt, 'State') + th(icoW, 'Weight') + th(icoTd, 'Today traffic') + th(icoLat, 'Latency') + th(icoAct, 'Actions') +
+      th(icoName, 'Name') + th(icoDst, 'Destination') + th(icoEng, 'Engine') + th(icoSt, 'State') + th(icoW, 'Weight') + th(icoTd, 'Today traffic') + th(icoLat, 'Latency') + th(icoAct, 'Actions') +
       `</tr></thead><tbody>${rows || `<tr><td colspan="8" class="u-hint-12">${esc(tr('', 'No tunnels'))}</td></tr>`}</tbody></table></div>`;
   }
   // The header's power toggle mirrors the row menu: a pair whose tunnels are
@@ -1319,13 +1339,23 @@ function topologyChooseRole(role) {
   $('topologyRole').value = role;
   document.querySelectorAll('[data-topo-role]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.topoRole === role)));
 }
-function topologyOpen(id) {
+async function topologyOpen(id) {
   topologySelected = id;
   _tunnelDetail = null;
   applyTunnelDetail(false);
   topologyRender();
   renderTunnelsList();
   if (typeof tabHashWrite === 'function') tabHashWrite('tunnel');
+  // the map, the head stats and the established-tunnels card all read the
+  // agent layer, which is fetched per topology: without this a plain open
+  // painted an empty map until the page was reloaded
+  const topo = topologyCurrent();
+  if (!topo) return;
+  try {
+    await topoDcLoad(topo);
+    topologyRender();
+    renderTunnelsList();
+  } catch (e) { /* the shell stays painted; the next reload retries */ }
 }
 function topologyBack() {
   topologySelected = null;

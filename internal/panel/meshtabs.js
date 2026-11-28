@@ -204,6 +204,7 @@
     tuNew: ['تانل جدید', 'New tunnel'],
     tuNewHint: ['ترتیب را دنبال کنید: توپولوژی، سرور ایران، سرور خارج، هسته — سپس کلید تانل.', 'Follow the flow: topology, Iran server, foreign server, engine — then the tunnel key.'],
     tuNeedTopo: ['اول یک توپولوژی بسازید — تانل بدون توپولوژی معنا ندارد.', 'Build a topology first — a tunnel needs one.'],
+    tuNameCol: ['نام', 'Name'],
     tuPath: ['مسیر', 'Path'],
     tuD7: ['ترافیک ۷\u00a0روزه', '7d\u00a0traffic'],
     tuD30: ['ترافیک ۳۰\u00a0روزه', '30d\u00a0traffic'],
@@ -292,7 +293,7 @@
     agentCol: ['ایجنت', 'Agent'], roleCol: ['نقش', 'Role'],
     versionCol: ['نسخه', 'Version'], archCol: ['معماری', 'Arch'],
     lastSeenCol: ['آخرین حضور', 'Last seen'],
-    cpuCol: ['پردازنده', 'CPU'], memCol: ['حافظه', 'RAM'], diskCol: ['دیسک', 'Disk'],
+    cpuCol: ['پردازنده', 'CPU'], memCol: ['حافظه', 'RAM'],
     roleIran: ['ایران', 'Iran'], roleForeign: ['خارج', 'Foreign'],
     agentCountry: ['کشور میزبان', 'Hosting country'],
     pickCountry: ['کشور میزبان را انتخاب کنید', 'Pick a hosting country'],
@@ -534,7 +535,11 @@
     '.mtb-tunhead::after { content:""; position:absolute; width:96px; height:96px; border-radius:50%; top:-34px; inset-inline-start:-34px; pointer-events:none; background:radial-gradient(circle at 35% 35%, color-mix(in srgb, var(--ac) 26%, transparent) 0%, color-mix(in srgb, var(--ac) 9%, transparent) 72%); }',
     '.mtb-tunhead > * { position:relative; z-index:1; }',
     '.mtb-tunhead .mtb-agintro-row { flex-direction:row; }',
-    '.mtb-tunhead-id { display:flex; align-items:center; gap:10px; }',
+    '.mtb-tunhead-id { display:flex; align-items:center; gap:11px; }',
+    // the page name is the one heading on the strip: it carries the max size and
+    // weight, and its tunnel glyph matches so it is not a speck next to it
+    '.mtb-tunhead .mtb-tunhead-id .dcard-title { font-size:18px; font-weight:800; letter-spacing:-.015em; }',
+    '.mtb-tunhead .mtb-tunhead-id .dcard-title svg { width:22px; height:22px; stroke-width:2.2; }',
     '.mtb-keycopy { display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; margin-inline-start:6px; border:1px solid var(--ln, rgba(148,163,184,.25)); border-radius:6px; background:transparent; color:var(--mu, #94a3b8); cursor:pointer; vertical-align:middle; transition:color .15s, border-color .15s; }',
     '.mtb-keycopy svg { width:13px; height:13px; flex:none; fill:none; stroke:currentColor; stroke-width:1.7; }',
     '.mtb-keycopy:hover { color:var(--ac); border-color:var(--ac); }',
@@ -558,8 +563,18 @@
     // instead of pushing the row wider, paddings and action buttons tighten
     '.mtb-tun-tbl tbody td { padding:8px 9px; white-space:normal; }',
     '.mtb-tun-tbl tbody td .mtb-tuside-tx b, .mtb-tun-tbl tbody td .mtb-topobadge, .mtb-tun-tbl tbody td .badge { white-space:nowrap; }',
-    '.mtb-tun-tbl .mtb-tupath { flex-direction:column; align-items:flex-start; gap:3px; }',
-    '.mtb-tun-tbl .mtb-tuarrow svg { transform:rotate(90deg); }',
+    // the path stays one horizontal chain (flag name → flag name): stacking the
+    // two ends made the cell three lines tall. Long names ellipsis instead of
+    // stretching the column, so the row keeps its width.
+    '.mtb-tun-tbl .mtb-tupath { flex-wrap:nowrap; justify-content:center; }',
+    '.mtb-tun-tbl th.mtb-thc { text-align:center; }',
+    // flex (not inline-flex) so the label centres itself: the RTL table rule
+    // pins every th to text-align:right, which an inline-flex box would follow
+    '.mtb-tun-tbl th.mtb-thc .mtb-th { display:flex; justify-content:center; }',
+    '.mtb-tun-tbl .mtb-tuarrow svg { transform:none; }',
+    '.mtb-tun-tbl .mtb-tuside { min-width:0; padding:2px 6px; gap:6px; }',
+    '.mtb-tun-tbl .mtb-tuside-tx { min-width:0; }',
+    '.mtb-tun-tbl .mtb-tuside-tx b, .mtb-tun-tbl .mtb-tuside-tx .mtb-muted { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }',
     '.mtb-tun-tbl .mtb-acts-row { gap:4px; }',
     '.mtb-tun-tbl .mtb-act { width:26px; height:26px; border-radius:7px; }',
     '.mtb-tun-tbl .mtb-act svg { width:13px; height:13px; }',
@@ -603,7 +618,7 @@
     '.tu-ev-tx { font-size:12.5px; color:var(--tx2, #cbd5e1); }',
     '.tu-ev-at { margin-inline-start:auto; font-size:12px; }',
     '.tu-range { min-width:110px; }',
-    '.mtb-tun-key.tu-open { cursor:pointer; } .mtb-tun-key.tu-open:hover { color:var(--ac); text-decoration:underline; }',
+    '.mtb-tun-key.tu-open { cursor:pointer; border-radius:7px; transition:color .18s ease,background-color .18s ease; } .mtb-tun-key.tu-open:hover { color:var(--ac); text-decoration:none; background:color-mix(in srgb, var(--ac) 13%, transparent); }',
     '@media (max-width: 760px) { .tu-ends-row { grid-template-columns:1fr; } .tu-ends-mid { justify-content:center; transform:rotate(90deg); } .tu-key { max-width:200px; } }',
     '.mtb-modal-ov .mtb-modal:has(.tu-cards) { width:min(600px, 94vw); }',
     '.tu-wiz-ring-row { display:flex; align-items:center; gap:14px; margin:12px 0 16px; }',
@@ -1286,7 +1301,7 @@
       return '<tr data-tu-row="' + esc(r.key) + '">' +
         // the copy button went away on request — the key still opens the
         // tunnel's page on click and keeps its hover tooltip
-        '<td data-l="' + esc(L('tunnelKey')) + '"><b class="mono mtb-tun-key tu-open" dir="ltr" data-tuopen="' + esc(r.key) + '" title="' + esc(r.key) + '">' + esc(r.key) + '</b></td>' +
+        '<td data-l="' + esc(L('tuNameCol')) + '"><b class="mono mtb-tun-key tu-open" dir="ltr" data-tuopen="' + esc(r.key) + '" title="' + esc(r.key) + '">' + esc(r.key) + '</b></td>' +
         '<td data-l="' + esc(L('topologyCol')) + '"><button type="button" class="mtb-topobadge" data-tutopo="' + esc(r.topoId) + '" data-tuname="' + esc(r.topo) + '" title="' + esc(L('tuOpenTopo')) + '">' + MTB_ICO.mesh + esc(r.topo) + '</button></td>' +
         '<td data-l="' + esc(L('tuPath')) + '"><div class="mtb-tupath">' + tuSideChip(r.local) + '<span class="mtb-tuarrow">' + MTB_ICO.tun + '</span>' + tuSideChip(r.remote) + '</div></td>' +
         '<td data-l="' + esc(L('engineCol')) + '"><div class="mtb-engpair">' + engBadge + '</div></td>' +
@@ -1336,9 +1351,9 @@
       '<div class="tunnel-card mtb-agfilter">' + tcbar + '</div>' +
       '<div class="tunnel-card">' +
       '<div class="ent-tbl-wrap"><table class="ent-tbl mtb-tun-tbl"><thead><tr>' +
-      '<th><span class="mtb-th">' + MTB_ICO.tun + esc(L('tunnelKey')) + '</span></th>' +
+      '<th><span class="mtb-th">' + MTB_ICO.tag + esc(L('tuNameCol')) + '</span></th>' +
       '<th><span class="mtb-th">' + MTB_ICO.mesh + esc(L('topologyCol')) + '</span></th>' +
-      '<th><span class="mtb-th">' + MTB_ICO.chain + esc(L('tuPath')) + '</span></th>' +
+      '<th class="mtb-thc"><span class="mtb-th">' + MTB_ICO.chain + esc(L('tuPath')) + '</span></th>' +
       '<th><span class="mtb-th">' + MTB_ICO.cube + esc(L('engineCol')) + '</span></th>' +
       '<th class="num"><span class="mtb-th">' + TU_WTH + esc(L('weightCol')) + '</span></th>' +
       '<th><span class="mtb-th">' + TU_STTH + esc(L('stateCol')) + '</span></th>' +
@@ -2674,8 +2689,6 @@
       }));
       return;
     }
-    // cpu/mem/disk columns appear only if the payload actually carries resources
-    var hasRes = ags.some(function (a) { return a.cpu || a.mem || a.disk || a.resources; });
     var header = agentHeader();
     var filtered = agtFilter(ags);
     var PS = agtPerPage;
@@ -2694,8 +2707,6 @@
       (anyF ? '<button type="button" class="mtb-fclear" data-cdd-clear title="' + esc(L('agAllF')) + '">\u00d7</button>' : '') +
       '</div></div>';
     var trs = pageAgs.map(function (a) {
-      var r = a.resources || a;
-
       var dc = dcDisp((a.server && a.server.datacenter) || '', a.server && a.server.datacenter_en);
       var row = '<tr>' +
         '<td><b class="mtb-aglink" data-agd="' + esc(a.id) + '"><span class="mtb-ag-ic" aria-hidden="true">' + ICO_AGT + '</span>' + esc(a.name || a.id) + '</b>' +
@@ -2716,11 +2727,6 @@
         '</div>' +
         '<button type="button" class="mtb-act mtb-acts-kebab" data-actskebab title="' + esc(L('agActMore')) + '" aria-label="' + esc(L('agActMore')) + '"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="19" r="1.7"/></svg></button>' +
         '</div></td>';
-      if (hasRes) {
-        row += tdNum(r.cpu && r.cpu.percent != null ? pct(r.cpu.percent) : (r.cpu_pct != null ? pct(r.cpu_pct) : '—'));
-        row += tdNum(r.mem ? (r.mem.total_mb ? pct(r.mem.used_mb / r.mem.total_mb * 100) : (r.mem.used_mb != null ? bytes(r.mem.used_mb * 1048576) : '—')) : (r.mem_pct != null ? pct(r.mem_pct) : '—'));
-        row += tdNum(r.disk ? (r.disk.total_gb ? pct(r.disk.used_gb / r.disk.total_gb * 100) : (r.disk.used_gb != null ? bytes(r.disk.used_gb * 1073741824) : '—')) : (r.disk_pct != null ? pct(r.disk_pct) : '—'));
-      }
       return row + '</tr>';
     }).join('');
     var emptyRow = filtered.length ? '' : '<tr><td colspan="8">' + entEmpty(L('agNoMatch')) + '</td></tr>';
@@ -2737,7 +2743,6 @@
       '<th><span class="mtb-th">' + MTB_ICO.chip + esc(L('archCol')) + '</span></th>' +
       '<th><span class="mtb-th">' + MTB_ICO.mesh + esc(L('agToposH')) + '</span></th>' +
       '<th><span class="mtb-th">' + MTB_ICO.sliders + esc(L('agActs')) + '</span></th>' +
-      (hasRes ? '<th class="num">' + esc(L('cpuCol')) + '</th><th class="num">' + esc(L('memCol')) + '</th><th class="num">' + esc(L('diskCol')) + '</th>' : '') +
       '</tr></thead><tbody>' + (emptyRow || trs) + '</tbody></table></div>' +
       (function () {
         var pages;

@@ -492,12 +492,11 @@
   body[data-t="light"] .ent-chart-tip .sw-dl { background:var(--info); }
   body[data-t="light"] .ent-chart-tip .sw-ul { background:var(--sc); }
   /* Update tab */
-  .ver-big { font-size:28px; font-weight:700; color:var(--tx); letter-spacing:-.02em;
-    font-variant-numeric:tabular-nums; }
   .ver-row { display:flex; align-items:center; justify-content:space-between; gap:10px;
     padding:10px 0; border-bottom:1px solid var(--ln); font-size:var(--fs-body); }
   .ver-row:last-child { border:0; }
   .ver-row .k { color:var(--mu); }
+  #verRowsUpd .ver-row > span:last-child { white-space:nowrap; text-align:end; }
   /* ---- Apple-grade micro-polish ---- */
   .tunnel-card, .qs { box-shadow:var(--lift-sm), inset 0 1px 0 rgba(255,255,255,.045); }
   body[data-t="light"] .tunnel-card, body[data-t="light"] .qs {
@@ -510,7 +509,7 @@
   :focus-visible { outline:2px solid var(--ac-out70); outline-offset:2px; }
   .quantum-btn:active:not(:disabled) { transform:scale(.97); }
   .quantum-btn { transition:transform .15s var(--spring), box-shadow .2s ease, background .2s ease, opacity .2s; }
-  .kpi-val, .dash-big, .ver-big { font-variant-numeric:tabular-nums; }
+  .kpi-val, .dash-big { font-variant-numeric:tabular-nums; }
   .kpi-ico { transition:transform .18s ease-out, box-shadow .18s ease-out; }
   .kpi:hover .kpi-ico { transform:scale(1.08); box-shadow:0 0 0 4px var(--ac-b22); }
   .chart-card { overflow:hidden; }
@@ -702,13 +701,38 @@
   #loginErr { color:var(--er); font-size:13px; min-height:20px; margin:12px 0 0; }
   #login .foot b { color:var(--tx2); font-weight:600; }
   .hidden { display:none !important; }
-  /* Update tab */
-  .upd-hero { display:flex; align-items:flex-end; gap:16px; flex-wrap:wrap; margin-top:4px; }
-  .upd-to { display:flex; align-items:flex-end; gap:16px; }
-  .upd-to[hidden] { display:none; }
-  .upd-arrow svg { width:22px; height:22px; fill:none; stroke:var(--dim); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; margin-bottom:8px; }
-  [dir="rtl"] .upd-arrow svg { transform:scaleX(-1); }
-  .ver-big.upd-new { color:var(--ac); }
+  /* Update tab — page heading, version comparison, review-first flow */
+  .updh { display:flex; align-items:center; gap:14px; margin:2px 0 14px; }
+  .updh-ic { width:44px; height:44px; border-radius:12px; display:grid; place-items:center; flex:none;
+    background:var(--ac-soft); color:var(--ac); }
+  .updh-ic svg { width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+  .updh-title { font-size:var(--fs-h2); font-weight:var(--fw-h2); color:var(--tx); margin:0; line-height:var(--lh-h2); letter-spacing:-.02em; }
+  .updh-sub { margin:2px 0 0; color:var(--mu); font-size:var(--fs-body); }
+  .upd-cmp { display:grid; grid-template-columns:minmax(0,1fr) 1px minmax(0,1fr); gap:0 18px; align-items:stretch;
+    background:var(--sunk); border:1px solid var(--ln); border-radius:var(--r-md); padding:14px 16px; }
+  .upd-div { background:var(--ln); }
+  .upd-blk { display:flex; flex-direction:column; gap:6px; min-width:0; }
+  .upd-blk-lbl { font-size:12px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--mu); }
+  .upd-ver { display:flex; align-items:center; gap:10px; flex-wrap:wrap; min-width:0; }
+  .upd-ver bdi { font-size:24px; font-weight:700; color:var(--tx); letter-spacing:-.02em; font-variant-numeric:tabular-nums;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .upd-chip { flex:none; display:inline-flex; align-items:center; padding:3px 10px; border-radius:99px;
+    border:1px solid var(--ln2); font-size:12px; font-weight:600; color:var(--tx2); }
+  .upd-chip.dev { color:var(--ac); background:var(--ac-soft); border-color:var(--ac-b30); }
+  .upd-chip.stable { color:var(--ok); background:var(--ok-soft); border-color:var(--ok-badge-b); }
+  .upd-warn-head { display:flex; align-items:center; gap:10px; color:var(--wr); font-size:var(--fs-body); }
+  .upd-warn-head svg { width:18px; height:18px; flex:none; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+  .upd-warn p { margin:6px 0 0; color:var(--tx2); }
+  .upd-info { display:flex; align-items:flex-start; gap:10px; padding:10px 14px; border-radius:var(--r-md);
+    border:1px solid color-mix(in srgb, var(--info) 35%, transparent); background:color-mix(in srgb, var(--info) 10%, transparent);
+    color:var(--tx2); font-size:var(--fs-small); }
+  .upd-info svg { width:16px; height:16px; flex:none; margin-top:2px; fill:none; stroke:var(--info); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+  .ghtok-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .ghtok-input { flex:1 1 240px; max-width:420px; }
+  .ghtok-eye { width:36px; padding:0; flex:none; }
+  .ghtok-eye svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }
+  .ghtok-sec { display:flex; align-items:flex-start; gap:8px; }
+  .ghtok-sec svg { width:15px; height:15px; flex:none; margin-top:2px; fill:none; stroke:var(--ok); stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }
   .upd-steps { list-style:none; margin:0; padding:0; display:grid; gap:8px; counter-reset:updstep; }
   .upd-steps li { counter-increment:updstep; display:flex; align-items:center; gap:10px; color:var(--dim); font-size:13px; }
   .upd-steps li::before { content:counter(updstep); flex:none; width:22px; height:22px; border-radius:50%; display:inline-grid; place-items:center;
@@ -720,15 +744,37 @@
   .upd-steps li[data-state="fail"] { color:var(--er); }
   .upd-steps li[data-state="fail"]::before { content:"!"; border-color:var(--er); color:var(--er); background:var(--er-soft); }
   @media (prefers-reduced-motion: reduce) { .upd-steps li::before { animation:none !important; } }
-  .upd-notes { display:grid; gap:14px; max-height:440px; overflow:auto; }
-  .upd-rel + .upd-rel { border-top:1px solid var(--ln); padding-top:14px; }
-  .upd-rel-head { display:flex; align-items:baseline; gap:10px; margin-bottom:4px; }
-  .upd-md { direction:ltr; text-align:left; unicode-bidi:isolate; color:var(--tx2); font-size:13px; line-height:1.6; }
+  .upd-notes { display:grid; gap:4px; max-height:440px; overflow:auto; }
+  .upd-rel { padding:10px 0; }
+  .upd-rel + .upd-rel { border-top:1px solid var(--ln); }
+  .upd-rel summary { cursor:pointer; list-style:none; }
+  .upd-rel summary::-webkit-details-marker { display:none; }
+  .upd-rel-head { display:flex; align-items:baseline; gap:10px; min-width:0; }
+  .upd-rel-head bdi { font-weight:700; color:var(--tx); flex:none; }
+  .upd-rel-sum { color:var(--dim); font-size:var(--fs-small); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; flex:1 1 auto; }
+  .upd-rel-chev { flex:none; align-self:center; color:var(--mu); transition:transform var(--dur-fast) ease; }
+  .upd-rel-chev svg { width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+  .upd-rel[open] .upd-rel-chev { transform:rotate(90deg); }
+  [dir="rtl"] .upd-rel-chev svg { transform:scaleX(-1); }
+  .upd-md { direction:ltr; text-align:left; unicode-bidi:isolate; color:var(--tx2); font-size:13px; line-height:1.6; margin-top:8px; }
   .upd-md h4 { font-size:13px; font-weight:600; color:var(--tx); margin:12px 0 4px; }
   .upd-md p { margin:6px 0; }
   .upd-md ul { margin:4px 0; padding-inline-start:18px; }
   .upd-md li { margin:3px 0; }
   .upd-md code { font-family:var(--font-mono); font-size:12px; background:var(--sunk); padding:1px 5px; border-radius:4px; }
+  .upd-review { width:min(560px, calc(100vw - 32px)); }
+  .upd-review .ent-modal-b { max-height:min(52vh, 460px); overflow:auto; }
+  .upd-rev-grid .ver-row > span:last-child { text-align:end; }
+  .upd-rev-grid .ver-row bdi { white-space:nowrap; }
+  @media (max-width:760px) {
+    .upd-cmp { grid-template-columns:1fr; gap:0; }
+    .upd-div { display:none; }
+    .upd-blk + .upd-blk { border-top:1px solid var(--ln); margin-top:12px; padding-top:12px; }
+  }
+  @media (max-width:640px) {
+    #tab-update .quantum-btn, #tab-update .quantum-input, #tab-update .ghtok-eye { height:44px; }
+    .updh-title { font-size:var(--fs-h3); }
+  }
   /* Performance tab */
   .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
   .perf-fs { border:0; margin:0; padding:0; min-width:0; }
@@ -1539,7 +1585,6 @@
 <button role="tab" aria-selected="false" aria-controls="tab-logs" tabindex="-1" class="nav-item" data-tab="logs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span data-i18n="nav_logs">Logs</span></button>
 <button role="tab" aria-selected="false" aria-controls="tab-settings" tabindex="-1" class="nav-item" data-tab="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.06-.4.1-.8.1-1.2z"/></svg><span data-i18n="nav_settings">Settings</span></button>
 <button role="tab" aria-selected="false" aria-controls="tab-doctor" tabindex="-1" class="nav-item" data-tab="doctor" id="doctorNav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><span data-i18n="nav_doctor">Diagnostics</span><span class="nav-badge hidden u-ml-auto"></span></button>
-<button role="tab" aria-selected="false" aria-controls="tab-spoof" tabindex="-1" class="nav-item" data-tab="spoof" id="spoofNav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2l7 4v6c0 4-3 7-7 10-4-3-7-6-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg><span data-i18n="nav_spoof">Spoof</span></button>
 <button role="tab" aria-selected="false" aria-controls="tab-terminal" tabindex="-1" class="nav-item hidden" data-tab="terminal" id="termNav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M7 9l3 3-3 3M12 15h5"/></svg><span data-i18n="nav_terminal">Terminal</span><span class="term-live hidden u-ml-auto" id="termLiveDot" ></span></button>
 </nav>
     <div class="sidebar-foot">
@@ -1767,7 +1812,7 @@
         </div>
         <div class="tunnel-card" id="topologyTunnelsCard" hidden>
           <div class="tc-header u-flex-wrap-gap8">
-            <p class="tc-title" data-i18n="topo_tunnels_t">Established tunnels</p>
+            <span class="topo-map-head-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 007.1 0l2.1-2.1a5 5 0 00-7.1-7.1L10.9 5"/><path d="M14 11a5 5 0 00-7.1 0L4.8 13.1a5 5 0 007.1 7.1L13.1 19"/></svg></span><p class="tc-title" data-i18n="topo_tunnels_t">Established tunnels</p>
             <span class="badge dim" id="topologyTunnelsCount">—</span>
             <span class="u-flex-1"></span>
             <button type="button" class="quantum-btn quantum-btn-primary u-btn-30" id="topologyAddTunnelBtn2" hidden>+ <span data-i18n="tunnels_new">New Tunnel</span></button>
@@ -3128,6 +3173,15 @@
           </div>
           <div id="benchWizard"></div>
         </div>
+        <div class="tunnel-card u-mb-20" id="benchHistCard" hidden>
+          <div class="tc-header u-bb-ln u-pb-16 u-mb-16">
+            <p class="tc-title u-fs-18 u-fw-700" data-i18n="bench_hist_t">Previous tests</p>
+            <span class="badge dim" id="benchHistN">—</span>
+            <span class="u-flex-1"></span>
+            <span class="qs-hint" data-i18n="bench_hist_d">The last ten runs, newest first.</span>
+          </div>
+          <div id="benchHistList"></div>
+        </div>
       </section>
       <!-- Tab: C-Tunnel Method Board (§2.23) -->
       <section id="tab-cboard" role="tabpanel" hidden>
@@ -3139,19 +3193,6 @@
             </div>
           </div>
           <div id="ctunBoard"><div class="ent-skel u-h-14"></div></div>
-        </div>
-      </section>
-      <!-- Tab: Spoof Tunnel -->
-      <section id="tab-spoof" role="tabpanel" hidden>
-        <div class="tunnel-card u-mb-20">
-          <div class="tc-header u-bb-ln u-pb-16 u-mb-16">
-            <div>
-              <span class="tc-title u-fs-18 u-fw-700" data-i18n="spoof_title">Spoof Tunnel</span>
-              <div class="qs-hint u-mt-4" data-i18n="spoof_sub">A tunnel that forges its source IP on both servers to cross whitelist-based Layer-3 firewalls, wrapped with WireGuard for a real encrypted link. Test which spoof IPs get through first, then bring the tunnel up.</div>
-            </div>
-            <span class="badge dim" id="spoofBadge" data-i18n="spoof_idle">Not configured</span>
-          </div>
-          <div id="spoofBody"><div class="ent-skel u-h-14"></div></div>
         </div>
       </section>
       <section id="tab-xray" role="tabpanel" hidden>
@@ -3169,58 +3210,96 @@
         </div>
       </section>
       <section id="tab-update" role="tabpanel" hidden>
+        <div class="updh">
+          <span class="updh-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg></span>
+          <div>
+            <h2 class="updh-title" data-i18n="upd_title">Panel update</h2>
+            <p class="updh-sub" data-i18n="upd_sub">Review installed version, releases and update safety.</p>
+          </div>
+        </div>
+
         <div class="tunnel-card">
-          <div class="tc-header"><p class="tc-title">Panel Update <span class="badge info hidden" id="updDevBadge" data-i18n="upd_dev_badge">DEV</span></p><span class="status-indicator" id="updDot"><span class="dot"></span><span id="updDotTxt">—</span></span></div>
-          <div class="upd-hero">
-            <div><div class="qs-hint">Installed version</div><div class="ver-big" id="verCurrent" data-no-i18n>—</div></div>
-            <div class="upd-to" id="updTo" hidden>
-              <span class="upd-arrow" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
-              <div><div class="qs-hint">Available</div><div class="ver-big upd-new" id="verLatest" data-no-i18n>—</div></div>
+          <div class="tc-header"><p class="tc-title" data-i18n="upd_vercard">Version overview</p><span class="status-indicator" id="updDot"><span class="dot"></span><span id="updDotTxt">—</span></span></div>
+          <div class="upd-cmp">
+            <div class="upd-blk">
+              <div class="upd-blk-lbl" data-i18n="upd_installed">Installed build</div>
+              <div class="upd-ver"><bdi dir="ltr" id="verCurrent" data-no-i18n>—</bdi><span class="upd-chip" id="updCurChip" hidden>—</span></div>
             </div>
+            <div class="upd-div" aria-hidden="true"></div>
+            <div class="upd-blk">
+              <div class="upd-blk-lbl" id="updAvailLbl" data-i18n="upd_avail_stable">Available stable release</div>
+              <div class="upd-ver"><bdi dir="ltr" id="verLatest" data-no-i18n>—</bdi><span class="upd-chip" id="updAvailChip" hidden>—</span></div>
+            </div>
+          </div>
+          <div class="warnbox upd-warn u-mt-8" id="updSwitchWarn" hidden>
+            <div class="upd-warn-head"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4m0 4h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg><b data-i18n="upd_switch_title">Review before switching</b></div>
+            <p id="updSwitchWarnBody" data-i18n="upd_switch_body">The stable release has a lower version number than your development build. Switching may replace newer development changes.</p>
+            <p data-i18n="upd_switch_hint">Review the changes and compatibility before proceeding.</p>
           </div>
           <div class="warnbox u-mt-8" id="updRollback" hidden></div>
           <div id="verRowsUpd" class="u-grid-gap-0 u-mt-8"></div>
+          <p class="ent-help u-mt-8" id="updCacheHint" data-i18n="upd_cache_hint">Release information is cached for up to 10 minutes. Check again asks GitHub for fresh data (at most once every 30 s).</p>
           <div class="qs-actions u-mt-12">
-            <button class="quantum-btn quantum-btn-primary" id="updateBtn" hidden>Update</button>
-            <button class="quantum-btn quantum-btn-secondary" id="updCheckBtn">Check Now</button>
+            <button class="quantum-btn quantum-btn-primary" id="updateBtn" hidden>Review</button>
+            <button class="quantum-btn quantum-btn-secondary" id="updCheckBtn" data-i18n="upd_check_again">Check again</button>
           </div>
           <ol class="upd-steps u-mt-12" id="updSteps" hidden>
-            <li data-step="dl">Download and verify the new version</li>
+            <li data-step="dl">Download, verify and install the new version</li>
             <li data-step="restart">Restart the panel</li>
             <li data-step="back">Reload this page on the new version</li>
           </ol>
           <div class="qs-hint u-mt-8" id="updateMsg" aria-live="polite"></div>
+          <div class="upd-info u-mt-8" id="updSvcInfo">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>
+            <span data-i18n="upd_svc">Panel restart required. Tunnel connections continue running.</span>
+          </div>
         </div>
 
-        <!-- GitHub token for the private update repository -->
+        <!-- GitHub access for the private update repository -->
         <div class="tunnel-card" id="ghTokenCard">
-          <div class="tc-header"><p class="tc-title" data-i18n="ghtok_title">GitHub access token</p><span class="badge dim" id="ghtokBadge">—</span></div>
-          <p class="qs-hint" data-i18n="ghtok_hint">Releases live in the private Dark-modem/quantum repository. Paste a fine-grained token with Contents: Read-only on that repo (GitHub → Settings → Developer settings → Fine-grained tokens). It is stored only on this server and is sent only to github.com.</p>
-          <div class="u-flex-center-wrap10">
-            <input type="password" class="quantum-input u-max-w-360 u-mono" id="ghtokInput" aria-label="GitHub access token" autocomplete="new-password" spellcheck="false" placeholder="github_pat_…" dir="ltr">
-            <button class="quantum-btn quantum-btn-primary" id="ghtokSaveBtn" data-i18n="ghtok_save">Save Token</button>
-            <button class="quantum-btn quantum-btn-ghost hidden" id="ghtokClearBtn" data-i18n="ghtok_clear">Remove Token</button>
+          <div class="tc-header">
+            <div>
+              <p class="tc-title" data-i18n="ghtok_title">GitHub release access</p>
+              <p class="qs-hint u-mt-4" data-i18n="ghtok_sub">Connect to your private release repository.</p>
+            </div>
+            <span class="badge dim" id="ghtokBadge">—</span>
           </div>
+          <div id="ghtokEntry">
+            <div class="fg"><label for="ghtokInput" data-i18n="ghtok_pat">Personal access token</label>
+              <div class="ghtok-row">
+                <input type="password" class="quantum-input u-mono ghtok-input" id="ghtokInput" placeholder="github_pat_…" autocomplete="new-password" spellcheck="false" dir="ltr" aria-label="GitHub access token">
+                <button type="button" class="quantum-btn quantum-btn-ghost ghtok-eye" id="ghtokEye" data-i18n-aria="aria_toggle_visibility" aria-label="Toggle visibility"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                <button class="quantum-btn quantum-btn-primary" id="ghtokSaveBtn" data-i18n="ghtok_save">Save token</button>
+              </div>
+            </div>
+            <p class="ent-help u-mt-8"><span data-i18n="ghtok_perm">Required permission:</span> <bdi dir="ltr" data-i18n="ghtok_perm_scope">Contents — Read-only</bdi></p>
+          </div>
+          <div class="u-flex u-flex-wrap u-gap-8 u-mt-8" id="ghtokSet" hidden>
+            <button class="quantum-btn quantum-btn-secondary" id="ghtokReplaceBtn" data-i18n="ghtok_replace">Replace token</button>
+            <button class="quantum-btn quantum-btn-ghost" id="ghtokClearBtn" data-i18n="ghtok_clear">Remove token</button>
+          </div>
+          <p class="ent-help u-mt-8 ghtok-sec"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><span data-i18n="ghtok_stored">Stored on this server and sent only to github.com.</span></p>
           <div class="qs-hint u-mt-8 hidden" id="ghtokMsg" aria-live="polite"></div>
         </div>
 
-        <div class="tunnel-card" id="updNotesCard" hidden>
-          <div class="tc-header"><p class="tc-title">What's New</p></div>
+        <div class="tunnel-card" id="updNotesCard">
+          <div class="tc-header"><p class="tc-title" data-i18n="upd_relnotes">Release notes</p></div>
           <div class="upd-notes" id="updNotes"></div>
+          <p class="qs-hint u-m-0" id="updNotesEmpty" data-i18n="upd_notes_empty" hidden>No release notes available.</p>
         </div>
 
         <div class="tunnel-card">
-          <div class="tc-header"><p class="tc-title">Channel &amp; Versions</p></div>
+          <div class="tc-header"><p class="tc-title" data-i18n="upd_channel_card">Release channel</p></div>
           <div class="fg"><label for="updChannel" data-i18n="upd_channel">Update channel</label>
             <select class="quantum-input u-max-w-260" id="updChannel"><option value="stable" data-i18n="upd_channel_stable">Stable</option><option value="dev" data-i18n="upd_channel_dev">Dev</option></select>
           </div>
           <div class="warnbox hidden" id="updChannelWarn" data-i18n="upd_dev_warn">Dev channel: test builds, may break. Not for production tunnels.</div>
           <details class="qs-adv u-mt-12">
-            <summary>Install a specific version</summary>
-            <div class="qs-hint u-my-8">For going back to an older release. Install the same version on the other server too.</div>
+            <summary data-i18n="upd_install_specific">Install a specific version</summary>
+            <div class="qs-hint u-my-8" data-i18n="upd_specific_hint">For going back to an older release. Install the same version on the other server too.</div>
             <div class="u-flex-center-wrap10">
               <select class="quantum-input u-max-w-260" id="rbTag" aria-label="Version"><option value="">Loading…</option></select>
-              <button class="quantum-btn quantum-btn-secondary" id="rbBtn" disabled>Install Selected Version</button>
+              <button class="quantum-btn quantum-btn-secondary" id="rbBtn" disabled data-i18n="upd_install_selected">Install Selected Version</button>
             </div>
           </details>
         </div>
@@ -3236,7 +3315,7 @@
           <div id="fwOut" class="ops-out u-mono" dir="ltr" aria-live="polite"></div>
           <div class="dr"><span class="k" data-i18n="ops_ports">Listening ports (from the agent)</span></div>
           <div id="fwPorts" class="ops-out u-mono" dir="ltr" aria-live="polite"></div>
-          <div class="u-flex u-gap-8 u-mt-8">
+          <div class="u-flex u-flex-wrap u-gap-8 u-mt-8">
             <button type="button" class="quantum-btn quantum-btn-secondary" id="fwApplyBtn" data-i18n="ops_fw_plan">Plan / Apply firewall change</button>
             <button type="button" class="quantum-btn quantum-btn-danger" id="fwTeardownBtn" data-i18n="ops_fw_teardown">Teardown owner rules</button>
           </div>
@@ -3508,6 +3587,23 @@
     <div class="ent-modal-h"><b id="entModalTitle">Confirm</b><button class="ent-x" id="entModalX" aria-label="Close" data-i18n-aria="aria_close">×</button></div>
     <div class="ent-modal-b"><p class="u-m-0 u-color-tx2" id="entModalBody"></p></div>
     <div class="ent-modal-f"><button class="quantum-btn quantum-btn-ghost" id="entModalNo">Cancel</button><button class="quantum-btn quantum-btn-danger" id="entModalYes">Confirm</button></div>
+  </div>
+</div>
+
+<!-- Panel update review: the explicit look-before-you-leap step for every
+     update and every channel switch (dev → stable included). -->
+<div class="ent-modal-ov" id="updReviewModal" hidden>
+  <div class="ent-modal upd-review" role="dialog" aria-modal="true" aria-labelledby="updReviewTitle">
+    <div class="ent-modal-h"><b id="updReviewTitle">Review update</b><button type="button" class="ent-x" id="updReviewX" aria-label="Close" data-i18n-aria="aria_close">×</button></div>
+    <div class="ent-modal-b">
+      <div class="upd-rev-grid" id="updReviewFacts"></div>
+      <div class="warnbox u-mt-8" id="updReviewWarn" hidden></div>
+      <details class="qs-adv u-mt-8" id="updReviewNotesBox">
+        <summary data-i18n="upd_relnotes">Release notes</summary>
+        <div class="upd-md" id="updReviewNotes" data-no-i18n></div>
+      </details>
+    </div>
+    <div class="ent-modal-f"><button type="button" class="quantum-btn quantum-btn-ghost" id="updReviewCancel">Cancel</button><button type="button" class="quantum-btn quantum-btn-primary" id="updReviewGo">Confirm update</button></div>
   </div>
 </div>
 
@@ -4011,7 +4107,15 @@
     var btn = document.getElementById('themeBtnTop');
     if (!btn) return;
     var side = document.getElementById('themeBtn');
-    btn.addEventListener('click', function () { if (side) side.click(); });
+    btn.addEventListener('click', function () {
+      if (side) { side.click(); return; }
+      // The sidebar #themeBtn was dropped in the ui/live redesign; fall back to
+      // app.js setTheme() so the topbar toggle keeps working.
+      if (typeof window.setTheme === 'function') {
+        var cur = document.body.getAttribute('data-t') || document.documentElement.getAttribute('data-t');
+        window.setTheme(cur === 'light' ? 'dark' : 'light');
+      }
+    });
     function curTheme() {
       var t = document.body.getAttribute('data-t') || document.documentElement.getAttribute('data-t');
       if (!t) { try { t = localStorage.getItem('gre_theme'); } catch (e) { /* storage blocked */ } }

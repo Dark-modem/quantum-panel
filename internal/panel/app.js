@@ -287,6 +287,19 @@ function topTitleSync(id) {
   const nid = id || ((location.hash.match(/t=([a-z]+)/) || [])[1]) || 'dashboard';
   const ni = document.querySelector('.sidebar-nav .nav-item[data-tab="' + nid + '"]');
   const lbl = ni ? (ni.querySelector('span[data-i18n]') || ni.querySelector('span:not([class*="badge"])')) : null;
+  if (nid === 'update') {
+    // The Update page carries its own heading; the toolbar keeps the brand
+    // instead of duplicating the page label.
+    let span = h1.querySelector('.tb-title-txt');
+    if (!span) {
+      h1.textContent = '';
+      span = document.createElement('span');
+      span.className = 'tb-title-txt';
+      h1.appendChild(span);
+    }
+    span.textContent = 'Quantum';
+    return;
+  }
   if (nid === 'tunnel' && typeof topologySelected !== 'undefined' && topologySelected) {
     // a topology is open: breadcrumb like the agents' — section ‹ topology name
     const topo = typeof topologyCurrent === 'function' ? topologyCurrent() : null;
@@ -333,7 +346,22 @@ function topTitleSync(id) {
   }
   span.textContent = lbl.textContent;
 }
-window.addEventListener('hashchange', function () { try { topTitleSync(); } catch (e) {} });
+window.addEventListener('hashchange', function () {
+  try { topTitleSync(); } catch (e) {}
+  // Back/forward (and a hand-edited #t=…) must actually switch the page; the
+  // mesh tabs (magt/mtun/…) keep their own router in mesh.js.
+  try {
+    const m = (location.hash || '').match(/^#t=([a-z-]+)/);
+    if (!m) return;
+    let name = m[1] === 'topology' ? 'tunnel' : m[1];
+    // spoof is a core now: an old #t=spoof link opens its core page
+    if (name === 'spoof') { goTab('spoof'); return; }
+    const routed = ['dashboard','tunnel','cores','cluster','setup','xray','firewall','logs','perf','watchdog','doctor','benchmark','cboard','netopt','update','settings','terminal'];
+    if (routed.indexOf(name) < 0) return;
+    const el = $('tab-' + name);
+    if (el && el.hidden) goTab(name);
+  } catch (e) { /* hash routing is best-effort */ }
+});
 window.topTitleSync = topTitleSync;
 try { topTitleSync(); } catch (e) {} // sync now — no static «Quantum» flash
 window.addEventListener('load', function () { try { topTitleSync(); } catch (e) {} });
@@ -347,10 +375,13 @@ function goTab(name) {
   }
   if (name === 'terminal' && !$('termNav').classList.contains('hidden') && $('tab-terminal').hidden && !termState.ready) { /* allowed: overlay shows connect */ }
   if (name === 'terminal' && $('termNav').classList.contains('hidden')) return; // flag off: tab doesn't exist
-  if (name === 'add-peer') { goTab('setup'); const c = $('setupAddPeerStep'); if (c && c.scrollIntoView) c.scrollIntoView({behavior: 'smooth', block: 'start'}); return; }
+    if (name === 'add-peer') { goTab('setup'); const c = $('setupAddPeerStep'); if (c && c.scrollIntoView) c.scrollIntoView({behavior:'smooth', block:'start'}); return; }
   // Bagher lives in Setup (create) and Tunnel (run) like every other tunnel.
   if (name === 'sshfwd' || name === 'bagher') { openBagherSetup(); return; }
-  ['dashboard','tunnel','cores','cluster','setup','xray','logs','perf','watchdog','doctor','benchmark','cboard','spoof','netopt','update','settings','terminal'].forEach(t => { const el = $('tab-'+t); if (el) el.hidden = t !== name; });
+  // Spoof is a tunnel method, so it is a core: its old tab routes into the
+  // cores drill-down (core page), never a standalone page.
+  if (name === 'spoof') { goTab('cores'); ctunPageOpen('spoof'); return; }
+  ['dashboard','tunnel','cores','cluster','setup','xray','firewall','logs','perf','watchdog','doctor','benchmark','cboard','netopt','update','settings','terminal'].forEach(t => { const el = $('tab-'+t); if (el) el.hidden = t !== name; });
   const markTab = b => {
     const on = b.dataset.tab === name;
     b.classList.toggle('on', on);
@@ -375,7 +406,6 @@ function goTab(name) {
   if (name === 'benchmark') { loadBenchWizard(); }
   if (name === 'cboard') loadCtunBoard();
   if (name === 'netopt') loadKernelTuning();
-  if (name === 'spoof') loadSpoof();
   if (name === 'xray') loadXray();
   if (name === 'update') loadVersion();
   if (name === 'logs') { refreshLogPeers(); loadLogs(); loadErrors(); armLogFollow(); }
@@ -637,7 +667,6 @@ const I18N = {
     ctb_sub: "Pick an Iran and a foreign agent, then run the live board: every ctunnel transport method is probed through the real pair — reachability, latency, throughput, PMTU and a score, with the best method suggested at the end.",
     kt_title: "Kernel Tuning",
     kt_sub: "Live kernel network state per agent: TCP congestion control (BBR), queue discipline, GSO and MTU probing — read from the agents, nothing simulated.",
-    nav_spoof: "Spoof",
     spoof_title: "Spoof Tunnel",
     spoof_sub: "A tunnel that forges its source IP on both servers to cross whitelist-based Layer-3 firewalls, wrapped with WireGuard for a real encrypted link. Test which spoof IPs get through first, then bring the tunnel up.",
     spoof_idle: "Not configured",
@@ -1158,14 +1187,33 @@ const I18N = {
     err_bundle: "Bundle lookup failed",
     err_retry: "Retry failed",
     carrier_switch_confirm: "Switch both Iran & Foreign servers to carrier \"{id}\"?",
-    ghtok_title: "GitHub access token",
-    ghtok_hint: "Releases live in the private Dark-modem/quantum repository. Paste a fine-grained token with Contents: Read-only on that repo (GitHub → Settings → Developer settings → Fine-grained tokens). It is stored only on this server and is sent only to github.com.",
-    ghtok_save: "Save Token",
-    ghtok_clear: "Remove Token",
+    ghtok_title: "GitHub release access",
+    ghtok_sub: "Connect to your private release repository.",
+    ghtok_pat: "Personal access token",
+    ghtok_save: "Save token",
+    ghtok_replace: "Replace token",
+    ghtok_clear: "Remove token",
     ghtok_saved: "Token saved — update checks use it from now on.",
     ghtok_cleared: "Token removed.",
-    ghtok_set: "saved",
-    ghtok_unset: "not set",
+    ghtok_perm: "Required permission:",
+    ghtok_perm_scope: "Contents — Read-only",
+    ghtok_stored: "Stored on this server and sent only to github.com.",
+    upd_title: "Panel update",
+    upd_sub: "Review installed version, releases and update safety.",
+    upd_vercard: "Version overview",
+    upd_installed: "Installed build",
+    upd_avail_stable: "Available stable release",
+    upd_switch_title: "Review before switching",
+    upd_switch_body: "The stable release has a lower version number than your development build. Switching may replace newer development changes.",
+    upd_switch_hint: "Review the changes and compatibility before proceeding.",
+    upd_check_again: "Check again",
+    upd_svc: "Panel restart required. Tunnel connections continue running.",
+    upd_cache_hint: "Release information is cached for up to 10 minutes. Check again asks GitHub for fresh data (at most once every 30 s).",
+    upd_relnotes: "Release notes",
+    upd_notes_empty: "No release notes available.",
+    upd_channel_card: "Release channel",
+    upd_install_selected: "Install Selected Version",
+    upd_specific_hint: "For going back to an older release. Install the same version on the other server too.",
     ver_check_failed: "Version check failed: ",
     mx_title: "Matrix tunnel",
     mx_hint: "An encrypted tinc mesh between this server and its peer, independent of the main tunnel. The hub runs on the Iran side; the foreign side registers with the bundle. IPv4 rides the server's IPv4, IPv6 rides its global IPv6.",
@@ -4690,8 +4738,8 @@ $('savePass').onclick = async () => {
   catch(e) { toastErr('password change failed', e.message); }
   b.disabled = false;
 };
-// ---------- Update tab ----------
-let updState = { current: '', latest: '', avail: false, busy: false };
+// ---------- Panel update (tab-update): version overview, review-first flow, GitHub access ----------
+let updState = { current: '', latest: '', avail: false, busy: false, channel: 'stable', checkedAt: 0, changes: [], error: '', rolledBack: '', cls: null };
 
 // Release notes are Markdown; render the few parts they use, escaped first.
 function mdLite(src) {
@@ -4712,6 +4760,69 @@ function mdLite(src) {
   return html + (list ? '</ul>' : '');
 }
 
+// Version families, mirroring internal/panel/update_channel.go: 3 = stable
+// vX.Y.Z, 2 = dev-rN, 1 = legacy panel-rN, 0 = unknown (e.g. a v1.32-dev
+// build stamped at build time). The backend's update_available ranks every
+// unknown build BELOW any release, so a newer development build reads as
+// "update available" over an older stable release — this UI re-classifies
+// the relationship before offering anything.
+function updFamily(v) {
+  const s = String(v || '');
+  if (/^v\d+\.\d+\.\d+$/.test(s)) return 3;
+  if (/^dev-r\d+$/.test(s)) return 2;
+  if (/^panel-r\d+$/.test(s)) return 1;
+  return 0;
+}
+function updCompare(a, b) {
+  const ka = updFamily(a), kb = updFamily(b);
+  if (ka !== kb) return ka < kb ? -1 : 1;
+  const na = String(a || '').match(/\d+/g) || [], nb = String(b || '').match(/\d+/g) || [];
+  for (let i = 0; i < 3; i++) {
+    const x = +(na[i] || 0), y = +(nb[i] || 0);
+    if (x !== y) return x < y ? -1 : 1;
+  }
+  return 0;
+}
+// The state machine behind the version card:
+//   normal        — same family, strictly newer: a real update
+//   switch-stable — a stable release offered while a development build runs
+//   switch-dev    — the dev channel's prerelease offered over a stable build
+//   unverified    — the target's relationship to the running build cannot be
+//                   verified at all; the action stays disabled
+//   none          — up to date (or the check failed)
+function updClassify(cur, latest) {
+  if (!latest) return { state: 'none', failed: true };
+  const kc = updFamily(cur), kl = updFamily(latest);
+  if (kc === kl) return (latest !== cur && updCompare(latest, cur) > 0) ? { state: 'normal' } : { state: 'none' };
+  if (kl === 3) return { state: 'switch-stable' };
+  if (kl === 2 && kc === 3) return { state: 'switch-dev' };
+  return { state: 'unverified' };
+}
+function updBuildKind(ver) {
+  const f = updFamily(ver);
+  if (f === 2) return 'dev';
+  if (f === 3) return 'stable';
+  if (/-dev$/i.test(String(ver || ''))) return 'dev'; // v1.32-dev: a development build
+  return '';
+}
+function updKindLabel(ver) {
+  const k = updBuildKind(ver);
+  return k === 'dev' ? tr('', 'Development') : k === 'stable' ? tr('', 'Stable') : '—';
+}
+function updChip(el, ver) {
+  const k = updBuildKind(ver);
+  if (!k) { el.hidden = true; return; }
+  el.hidden = false;
+  el.textContent = k === 'dev' ? tr('', 'Development') : tr('', 'Stable');
+  el.className = 'upd-chip ' + k;
+}
+// The one sentence that says what a channel switch would do.
+function updSwitchText(state) {
+  return state === 'switch-dev'
+    ? tr('', 'The development build is newer by channel, not by stability: prereleases may break. Switching replaces the stable release with the development build.')
+    : tr('', 'The stable release has a lower version number than your development build. Switching may replace newer development changes.');
+}
+
 function updAgo(ts) {
   if (!ts) return '—';
   const d = Math.max(0, Math.floor(Date.now() / 1000) - ts);
@@ -4722,30 +4833,57 @@ function updAgo(ts) {
 function updRow(k, vHTML) { return '<div class="ver-row"><span class="k">' + esc(k) + '</span><span>' + vHTML + '</span></div>'; }
 function updDot(cls, txt) { $('updDot').className = 'status-indicator ' + cls; $('updDotTxt').textContent = txt; }
 
-// ---- GitHub token (Update tab): stored server-side 0600, shown only as a badge ----
-async function loadGhToken() {
-  const badge = $('ghtokBadge'), clear = $('ghtokClearBtn');
-  if (!badge) return;
-  try {
-    const r = await api('/api/update/github-token');
-    const set = !!r.set;
-    badge.textContent = set ? tr('', 'saved') : tr('', 'not set');
-    badge.className = 'badge ' + (set ? 'ok' : 'warn');
-    if (clear) clear.classList.toggle('hidden', !set);
-  } catch (e) { badge.textContent = '—'; }
+// Token access state: the backend only reports set/unset; the token's health
+// rides the last release check — our own backend words the 401/404/403
+// failures in update_channel.go (getJSONAt), so they are safe to match.
+function updTokenState(set, v) {
+  if (!set) return { cls: 'warn', txt: tr('', 'Not configured') };
+  if (v && v.error) {
+    if (/401|invalid or expired/i.test(v.error)) return { cls: 'err', txt: tr('', 'Invalid token') };
+    if (/403|404|cannot see|rate limit/i.test(v.error)) return { cls: 'err', txt: tr('', 'Permission insufficient') };
+    return { cls: 'err', txt: tr('', 'Connection failed') };
+  }
+  return { cls: 'ok', txt: tr('', 'Connected') };
 }
+
+// ---- GitHub token (Update tab): stored server-side 0600, shown only as a state badge ----
+async function loadGhToken(v) {
+  const badge = $('ghtokBadge'), entry = $('ghtokEntry'), setBox = $('ghtokSet');
+  if (!badge) return;
+  let set = false;
+  try { set = !!(await api('/api/update/github-token')).set; }
+  catch (e) { badge.textContent = '—'; badge.className = 'badge dim'; return; }
+  const st = updTokenState(set, v);
+  badge.textContent = st.txt;
+  badge.className = 'badge ' + st.cls;
+  entry.hidden = !!set; // a saved token is never shown again; Replace reveals a fresh input
+  setBox.hidden = !set;
+}
+if ($('ghtokEye')) $('ghtokEye').onclick = () => {
+  const inp = $('ghtokInput'), show = inp.type === 'password';
+  inp.type = show ? 'text' : 'password';
+  $('ghtokEye').setAttribute('aria-label', show ? tr('', 'Hide token') : tr('', 'Show token'));
+};
+if ($('ghtokReplaceBtn')) $('ghtokReplaceBtn').onclick = () => {
+  $('ghtokEntry').hidden = false;
+  $('ghtokSet').hidden = true;
+  const inp = $('ghtokInput');
+  inp.value = '';
+  inp.focus();
+};
 if ($('ghtokSaveBtn')) $('ghtokSaveBtn').onclick = async () => {
-  const inp = $('ghtokInput'), msg = $('ghtokMsg');
+  const inp = $('ghtokInput'), msg = $('ghtokMsg'), btn = $('ghtokSaveBtn');
   msg.classList.add('hidden');
+  btn.disabled = true;
   try {
     const r = await api('/api/update/github-token', { token: (inp.value || '').trim() });
     inp.value = '';
     msg.textContent = r.detail || tr('', 'Token saved — update checks use it from now on.');
     msg.classList.remove('hidden');
-    toastOk(tr('', 'GitHub access token') + ': ' + tr('', 'saved'));
-    loadGhToken();
+    toastOk(tr('', 'GitHub release access'), tr('', 'saved'));
     loadVersion(true);
-  } catch (e) { toastErr('token save failed', e.message); }
+  } catch (e) { toastErr(tr('', 'Token save failed'), e.message); }
+  btn.disabled = false;
 };
 if ($('ghtokClearBtn')) $('ghtokClearBtn').onclick = async () => {
   const msg = $('ghtokMsg');
@@ -4753,63 +4891,126 @@ if ($('ghtokClearBtn')) $('ghtokClearBtn').onclick = async () => {
     await api('/api/update/github-token', { token: '' });
     msg.textContent = tr('', 'Token removed.');
     msg.classList.remove('hidden');
-    loadGhToken();
     loadVersion(true);
-  } catch (e) { toastErr('token remove failed', e.message); }
+  } catch (e) { toastErr(tr('', 'Token remove failed'), e.message); }
 };
 
 async function loadVersion(force) {
-  loadGhToken();
   const chk = $('updCheckBtn');
   if (force) { chk.disabled = true; chk.textContent = tr('', 'Checking…'); }
+  let v = null;
   try {
-    const v = await api('/api/version' + (force ? '?refresh=1' : ''));
-    updState.current = v.current || ''; updState.latest = v.latest || ''; updState.avail = !!v.update_available;
-    $('verCurrent').textContent = v.current || '—';
-    const isDev = v.channel === 'dev';
-    $('updChannel').value = isDev ? 'dev' : 'stable';
-    $('updDevBadge').classList.toggle('hidden', !isDev);
-    $('updChannelWarn').classList.toggle('hidden', !isDev);
-    const badge = $('updBadge'); if (badge) badge.classList.toggle('hidden', !v.update_available);
-    if (typeof drawerSync === 'function') drawerSync();
-
-    const failed = !v.latest || v.latest === 'unknown';
-    $('updTo').hidden = !v.update_available;
-    $('verLatest').textContent = v.latest || '—';
-    if (failed) updDot('warn', tr('', 'Check failed'));
-    else updDot(v.update_available ? 'warn' : 'ok', tr('', v.update_available ? 'Update available' : 'Up to date'));
-
-    let rows = updRow(tr('', 'Latest release'), failed ? esc(tr('', 'Unknown: GitHub could not be reached')) : '<bdi dir="ltr">' + esc(v.latest) + '</bdi>');
-    rows += updRow(tr('', 'Last checked'), esc(updAgo(v.checked_at)));
-    rows += '<div class="ver-row" id="updPeerRow" hidden></div>';
-    $('verRowsUpd').innerHTML = rows;
-
-    const rb = $('updRollback');
-    rb.hidden = !v.rolled_back;
-    if (v.rolled_back) rb.textContent = docTpl('Version {0} did not start, so the panel went back to {1} by itself. See the Logs tab before trying again.', [v.rolled_back, v.current]);
-
-    const btn = $('updateBtn');
-    btn.hidden = !v.update_available || updState.busy;
-    btn.disabled = updState.busy;
-    btn.textContent = docTpl('Update to {0}', [v.latest]);
-    if (!updState.busy) {
-      $('updateMsg').textContent = failed
-        ? (v.error ? tr('', 'Version check failed: ') + v.error : tr('', 'Could not reach GitHub to check for a new version. Check that this server can reach github.com, then press Check Now.'))
-        : v.update_available ? tr('', 'A new version is ready. Updating restarts only the panel; tunnels keep running.') : '';
-    }
-
-    const changes = v.changes || [];
-    $('updNotesCard').hidden = !changes.length;
-    $('updNotes').innerHTML = changes.map(c =>
-      `<section class="upd-rel"><div class="upd-rel-head"><b data-no-i18n>${esc(c.tag)}</b><span class="qs-hint">${esc(c.date ? new Date(c.date).toLocaleDateString() : '')}</span></div><div class="upd-md" data-no-i18n>${mdLite(String(c.notes || '').replace(/^\s*#{1,6}[^\n]*\n?/, m => m.includes(c.tag) ? '' : m)) || '<p>' + esc(tr('', 'No notes for this release.')) + '</p>'}</div></section>`).join('');
+    v = await api('/api/version' + (force ? '?refresh=1' : ''));
+    updState.current = v.current || ''; updState.latest = v.latest || '';
+    updState.avail = !!v.update_available;
+    updState.channel = v.channel || 'stable';
+    updState.checkedAt = v.checked_at || 0;
+    updState.changes = v.changes || [];
+    updState.error = (!v.latest && v.error) ? String(v.error) : '';
+    updState.rolledBack = v.rolled_back || '';
+    updState.cls = updClassify(updState.current, updState.latest);
+    updRender();
   } catch (e) {
+    updState.cls = { state: 'none', failed: true };
     updDot('warn', tr('', 'Check failed'));
     if (!updState.busy) $('updateMsg').textContent = e.message;
   } finally {
     chk.disabled = updState.busy;
-    chk.textContent = tr('', 'Check Now');
+    chk.textContent = tr('', 'Check again');
   }
+  loadGhToken(v || undefined); // the token state rides the same render; it is answered locally, not by GitHub
   if (!$('tab-update').hidden) { loadRollback(); loadPeerVersion(); }
+}
+
+function updRender() {
+  const cls = updState.cls || { state: 'none', failed: true };
+  const failed = !!cls.failed;
+  const ok = !failed && !!updState.latest;
+  $('verCurrent').textContent = updState.current || '—';
+  $('verLatest').textContent = ok ? updState.latest : '—';
+  updChip($('updCurChip'), updState.current);
+  updChip($('updAvailChip'), ok ? updState.latest : '');
+  $('updAvailLbl').textContent = tr('', {
+    'switch-stable': 'Available stable release',
+    'switch-dev': 'Available development build',
+    'unverified': 'Target release',
+  }[cls.state] || 'Latest release');
+
+  const badge = $('updBadge');
+  if (badge) badge.classList.toggle('hidden', !(cls.state === 'normal' || cls.state === 'switch-stable' || cls.state === 'switch-dev'));
+  if (typeof drawerSync === 'function') drawerSync();
+
+  const stTxt = {
+    'normal': 'Update available',
+    'switch-stable': 'Stable release available',
+    'switch-dev': 'Development build available',
+    'unverified': 'Update path unverified',
+  }[cls.state] || (failed ? 'Check failed' : 'You\'re up to date');
+  updDot(failed ? 'warn' : (cls.state === 'none' ? 'ok' : 'warn'), stTxt);
+
+  const isDev = updState.channel === 'dev';
+  $('updChannel').value = isDev ? 'dev' : 'stable';
+  $('updChannelWarn').classList.toggle('hidden', !isDev);
+
+  let rows = updRow(tr('', 'Latest release'), ok
+    ? '<bdi dir="ltr">' + esc(updState.latest) + '</bdi>'
+    : '<span class="qs-hint">' + esc(tr('', 'Unknown: the release could not be fetched')) + '</span>');
+  if (ok) rows += updRow(tr('', 'Last successful check'), esc(updAgo(updState.checkedAt)));
+  else if (updState.checkedAt) rows += updRow(tr('', 'Last attempted check'), esc(updAgo(updState.checkedAt)));
+  rows += updRow(tr('', 'Release channel'), esc(isDev ? tr('', 'Development') : tr('', 'Stable')));
+  rows += '<div class="ver-row" id="updPeerRow" hidden></div>';
+  $('verRowsUpd').innerHTML = rows;
+
+  const warn = $('updSwitchWarn');
+  const risky = cls.state === 'switch-stable' || cls.state === 'switch-dev';
+  warn.hidden = !risky;
+  if (risky) $('updSwitchWarnBody').textContent = updSwitchText(cls.state);
+
+  const rb = $('updRollback');
+  rb.hidden = !updState.rolledBack;
+  if (updState.rolledBack) rb.textContent = docTpl('Version {0} did not start, so the panel went back to {1} by itself. See the Logs tab before trying again.', [updState.rolledBack, updState.current]);
+
+  const btn = $('updateBtn');
+  if (cls.state === 'unverified') {
+    btn.hidden = false;
+    btn.disabled = true;
+    btn.textContent = tr('', 'Review update');
+  } else {
+    const actionable = cls.state === 'normal' || cls.state === 'switch-stable' || cls.state === 'switch-dev';
+    btn.hidden = !actionable || updState.busy;
+    btn.disabled = updState.busy;
+    btn.textContent = cls.state === 'switch-stable' ? tr('', 'Review stable switch')
+      : cls.state === 'switch-dev' ? tr('', 'Review channel switch')
+      : docTpl('Update to {0}', [updState.latest]);
+  }
+  if (!updState.busy) {
+    $('updateMsg').textContent = failed
+      ? (updState.error ? tr('', 'Version check failed: ') + updState.error : tr('', 'Could not reach GitHub to check for a new version. Check that this server can reach github.com, then press Check again.'))
+      : cls.state === 'unverified'
+        ? tr('', 'The relationship between the running build and the offered release cannot be verified, so the update path stays disabled.')
+        : cls.state === 'switch-stable'
+          ? tr('', 'A stable release is available. Reviewing first is required: switching may replace newer development changes.')
+          : cls.state === 'switch-dev'
+            ? tr('', 'The development channel offers a newer prerelease. Review before switching.')
+            : cls.state === 'normal' ? tr('', 'A new version is ready. Updating restarts only the panel; tunnels keep running.') : '';
+  }
+
+  const changes = updState.changes || [];
+  $('updNotes').innerHTML = changes.map(updRelHTML).join('');
+  $('updNotesEmpty').hidden = !!changes.length;
+}
+
+// One release in the notes card: version + date + first line as the summary,
+// the full notes expand below.
+function updRelHTML(c) {
+  const notes = String(c.notes || '').replace(/^\s*#{1,6}[^\n]*\n?/, m => m.includes(c.tag) ? '' : m);
+  const text = notes.trim();
+  const first = (text.split('\n').find(l => l.trim() && !/^#{1,6}\s/.test(l)) || '').replace(/^[-*]\s+/, '').replace(/\*\*/g, '');
+  return '<details class="upd-rel"><summary class="upd-rel-head"><bdi dir="ltr">' + esc(c.tag) + '</bdi>' +
+    '<span class="qs-hint">' + esc(c.date ? new Date(c.date).toLocaleDateString() : '') + '</span>' +
+    '<span class="upd-rel-sum">' + esc(first) + '</span>' +
+    '<span class="upd-rel-chev" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></span></summary>' +
+    '<div class="upd-md" data-no-i18n>' + (mdLite(text) || '<p>' + esc(tr('', 'No notes for this release.')) + '</p>') + '</div></details>';
 }
 
 async function loadPeerVersion() {
@@ -4847,8 +5048,59 @@ function updStep(name, state) {
   if (li) li.dataset.state = state;
 }
 
-// Install `tag` (or the newest of the channel) and follow the restart until
-// the panel answers with a different version.
+// ---- the review dialog: every install and every channel switch goes through it ----
+let _updReviewTag = null;
+function updOpenReview() {
+  const cls = updState.cls;
+  if (!cls || cls.state === 'unverified' || cls.state === 'none') return;
+  $('updReviewTitle').textContent = cls.state === 'normal' ? docTpl('Update to {0}', [updState.latest])
+    : cls.state === 'switch-dev' ? tr('', 'Review channel switch') : tr('', 'Review stable switch');
+  const row = (k, val) => '<div class="ver-row"><span class="k">' + esc(k) + '</span><span>' + val + '</span></div>';
+  const kindText = {
+    'normal': 'Verified upgrade — same release family, strictly newer',
+    'switch-stable': 'Channel switch — development build to stable release',
+    'switch-dev': 'Channel switch — stable release to development build',
+  }[cls.state] || '—';
+  $('updReviewFacts').innerHTML =
+    row(tr('', 'Installed version'), '<bdi dir="ltr">' + esc(updState.current) + '</bdi>') +
+    row(tr('', 'Target version'), '<bdi dir="ltr">' + esc(updState.latest) + '</bdi>') +
+    row(tr('', 'Installed channel'), esc(updKindLabel(updState.current))) +
+    row(tr('', 'Target channel'), esc(updKindLabel(updState.latest))) +
+    row(tr('', 'Classification'), esc(kindText)) +
+    row(tr('', 'Artifact verification'), esc(tr('', 'Checksum manifest and signature are verified before install; a failed check refuses the update'))) +
+    row(tr('', 'Configuration'), esc(tr('', 'Kept untouched; the previous binary is kept for rollback'))) +
+    row(tr('', 'Automatic rollback'), esc(tr('', 'If the new panel does not start, the previous one is restored (systemd servers)'))) +
+    row(tr('', 'Expected downtime'), esc(tr('', 'A few seconds while the panel restarts'))) +
+    row(tr('', 'Tunnel agents'), esc(tr('', 'Keep running; the update changes the panel only')));
+  const warn = $('updReviewWarn');
+  if (cls.state === 'switch-stable' || cls.state === 'switch-dev') {
+    warn.hidden = false;
+    warn.innerHTML = '<div class="upd-warn-head"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4m0 4h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg><b>' + esc(tr('', 'Review before switching')) + '</b></div><p>' + esc(updSwitchText(cls.state)) + '</p>';
+  } else warn.hidden = true;
+  const notes = updState.changes || [];
+  $('updReviewNotes').innerHTML = notes.map(c => mdLite(String(c.notes || ''))).join('') ||
+    '<p>' + esc(tr('', 'No release notes available.')) + '</p>';
+  $('updReviewNotesBox').hidden = !notes.length;
+  $('updReviewNotesBox').open = !!notes.length;
+  const go = $('updReviewGo');
+  go.textContent = cls.state === 'normal' ? tr('', 'Confirm update')
+    : cls.state === 'switch-stable' ? tr('', 'Switch to stable') : tr('', 'Switch to development');
+  go.className = 'quantum-btn ' + (cls.state === 'normal' ? 'quantum-btn-primary' : 'quantum-btn-danger');
+  _updReviewTag = updState.latest; // install exactly the version that was reviewed
+  modalShow($('updReviewModal'), () => { _updReviewTag = null; });
+}
+$('updReviewGo').onclick = () => {
+  const tag = _updReviewTag;
+  _updReviewTag = null;
+  modalHide($('updReviewModal'));
+  if (tag) runUpdate(tag);
+};
+const updReviewClose = () => { _updReviewTag = null; modalHide($('updReviewModal')); };
+if ($('updReviewCancel')) $('updReviewCancel').onclick = updReviewClose;
+if ($('updReviewX')) $('updReviewX').onclick = updReviewClose;
+
+// Install `tag` and follow the restart until the panel answers with a
+// different version.
 async function runUpdate(tag) {
   let before = '';
   try { before = (await (await fetch(at('/api/health'), {cache: 'no-store'})).json()).version || ''; } catch (_) { /* unknown */ }
@@ -4859,7 +5111,7 @@ async function runUpdate(tag) {
   steps.querySelectorAll('li').forEach(li => { delete li.dataset.state; });
   updStep('dl', 'active');
   const msg = $('updateMsg');
-  msg.textContent = tr('', 'Downloading and checking the new version. This can take a minute on slow links.');
+  msg.textContent = tr('', 'Downloading and verifying the new version. This can take a minute on slow links.');
   let r;
   try {
     r = await api('/api/update', tag ? {tag} : {});
@@ -4882,8 +5134,8 @@ async function runUpdate(tag) {
   updStep('dl', 'done');
   updStep('restart', 'active');
   msg.textContent = r.guarded
-    ? tr('', 'Restarting the panel. If the new version does not start within a minute, the previous one is put back automatically.')
-    : tr('', 'Restarting the panel.');
+    ? tr('', 'Installed. Restarting the panel; if the new version does not start within a minute, the previous one comes back by itself.')
+    : tr('', 'Installed. Restarting the panel.');
   const t0 = Date.now();
   let warned = false;
   const tick = async () => {
@@ -4915,12 +5167,7 @@ async function runUpdate(tag) {
   setTimeout(tick, 2500);
 }
 
-$('updateBtn').onclick = async () => {
-  if (!await entConfirm(docTpl('Update to {0}?', [updState.latest]),
-    tr('', 'Only the panel restarts, for a few seconds; tunnels keep running. If the new version does not start, the previous one is put back automatically. Update the other server too, so both run the same version.'),
-    tr('', 'Update'))) return;
-  runUpdate('');
-};
+$('updateBtn').onclick = () => updOpenReview();
 $('updCheckBtn').onclick = () => loadVersion(true);
 $('rbBtn').onclick = async () => {
   const tag = $('rbTag').value; if (!tag) return;
@@ -6102,50 +6349,50 @@ function pollSwap(id) {
   }, 1000);
 }
 
-// ---------- Spoof Tunnel (tab-spoof) ----------
+// ---------- Spoof core (cores -> Spoof -> Details) ----------
 // An IP-spoofing UDP pipe (ParsaKSH/spoof-tunnel) wrapped with WireGuard. The
-// Iran server is "local", the foreign server "remote". Everything is rendered
-// into #spoofBody from the /api/spoof state.
+// Iran server is "local", the foreign server "remote". Spoof is a TUNNEL
+// METHOD, so it lives in the cores drill-down like every other core: the
+// state still comes from /api/spoof, and the page is drawn by
+// renderCtunPage (renderSpoofCore) — the old sidebar tab is gone.
 let _spoof = null;
+let _spoofErr = '';
 let _spoofTesterTimer = null;
 const SPOOF_TRANSPORTS = ['tcp', 'udp', 'icmp', 'icmpv6'];
 
 async function loadSpoof() {
-  const body = $('spoofBody');
-  if (!body) return;
   try {
     _spoof = await api('/api/spoof');
+    _spoofErr = '';
   } catch (e) {
-    body.innerHTML = stateError(e.message, null, true);
-    return;
+    _spoofErr = e.message;
   }
-  renderSpoof();
+  if (ctunOpen === 'spoof') renderCtunPage();
   loadSpoofTester();
 }
 
-function spoofBadge(d, h) {
-  const b = $('spoofBadge');
-  if (!b) return;
+// spoofBadgeHTML: the core page's state pill (idle/configured/starting/up).
+function spoofBadgeHTML(d) {
+  if (!d) return '';
+  const h = d.health || {};
   let cls = 'dim', txt = tr('spoof_idle', 'Not configured');
-  if (d.enabled && h && h.core_active && h.wg_active) { cls = 'ok'; txt = tr('', 'Tunnel up'); }
+  if (d.enabled && h.core_active && h.wg_active) { cls = 'ok'; txt = tr('', 'Tunnel up'); }
   else if (d.enabled) { cls = 'warn'; txt = tr('', 'Starting…'); }
   else if (d.has_keys || (d.spoof_ips && d.spoof_ips.length)) { cls = 'info'; txt = tr('', 'Configured'); }
-  b.className = 'badge ' + cls;
-  b.textContent = txt;
+  return '<span class="badge ' + cls + '">' + esc(txt) + '</span>';
 }
 
 function spoofOpt(sel, cur) {
   return SPOOF_TRANSPORTS.map(t => `<option value="${t}"${t === cur ? ' selected' : ''}>${t.toUpperCase()}</option>`).join('');
 }
 
-function renderSpoof() {
-  const d = _spoof, h = d.health || {};
-  spoofBadge(d, h);
-  const body = $('spoofBody');
-  if (!d.installed) {
-    body.innerHTML = `<div class="sw-result warn">${esc(tr('', 'The spoof core is not installed on this server yet. Install it from the terminal:'))}
+// the page body under the core hero (role, health, setup form, bundle, tester)
+function spoofPageBody() {
+  const d = _spoof;
+  if (!d) return '<div class="u-grid u-gap-8">' + skel(3) + '</div>';
+  const h = d.health || {};
+  const notInst = d.installed ? '' : `<div class="sw-result warn">${esc(tr('', 'The spoof core is not installed on this server yet. Install it from the terminal:'))}
       <textarea class="quantum-input sw-bundle" readonly data-no-i18n>quantum spoof install</textarea></div>`;
-  }
   const isLocal = d.role === 'local';
   const roleSeg = `<div class="qs-seg u-mb-12" role="group">
       <button type="button" id="spRoleLocal" class="${isLocal ? 'active' : ''}" aria-pressed="${isLocal}">${esc(tr('', 'This is the Iran server'))}</button>
@@ -6200,7 +6447,24 @@ function renderSpoof() {
       <button type="button" class="quantum-btn quantum-btn-secondary u-btn-30" id="spImportBtn">${esc(tr('', 'Import bundle'))}</button></div>`;
   }
 
-  body.innerHTML = (d.installed ? '' : body.innerHTML) + roleSeg + health + form + keyBlock + spoofTesterHTML();
+  return notInst + roleSeg + health + form + keyBlock + spoofTesterHTML();
+}
+
+// renderSpoofCore paints the whole spoof core page into the drill-down host.
+function renderSpoofCore() {
+  const host = $('ctunPage');
+  if (!host) return;
+  if (_spoofErr) { host.innerHTML = stateError(_spoofErr, null, true); return; }
+  const ico = '<span class="ctun-hero-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2l7 4v6c0 4-3 7-7 10-4-3-7-6-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg></span>';
+  const hero = '<div class="ctun-hero">' + ico +
+    '<div class="ctun-hero-tx"><h2 class="tc-title u-fs-16 u-fw-700 u-m-0">' + esc(tr('spoof_title', 'Spoof Tunnel')) + '</h2>' +
+    '<span class="ctun-hero-sub">' + esc(tr('', 'Forged source IP over WireGuard — a tunnel method for whitelist firewalls')) + '</span></div>' +
+    '<span class="u-flex-1"></span>' + spoofBadgeHTML(_spoof) +
+    '<button type="button" class="quantum-btn quantum-btn-secondary" data-ctun-back>' + esc(tr('', 'Back to cores')) + '</button></div>';
+  // the long explanation lives under the hero, not inside it (a long sub-line
+  // wrapped the whole title onto its own row)
+  const intro = '<p class="qs-hint sp-intro">' + esc(tr('spoof_sub', 'A tunnel that forges its source IP on both servers to cross whitelist-based Layer-3 firewalls, wrapped with WireGuard for a real encrypted link. Test which spoof IPs get through first, then bring the tunnel up.')) + '</p>';
+  host.innerHTML = hero + intro + spoofPageBody();
   spoofWire();
   renderSpoofTester();
 }
@@ -9299,6 +9563,7 @@ async function loadBenchWizard() {
     ]);
     bwCache.topos = (topos && topos.topologies) || [];
     bwState.pool = bwCache.topos;
+    benchHistoryRender(st.history);
     if (st.running) { bwState.running = true; bwState.view = st; bwState.timer = setTimeout(bwPoll, 2000); bwRenderRun(); return; }
     if ((st.results || []).length) { bwState.view = st; bwRenderRun(); return; }
     bwRender();
@@ -9414,6 +9679,37 @@ function bwDcLabel(dcKey) {
   const dc = dcs.find(d => String(d.id) === String(dcKey));
   if (dc) return dc.datacenter_en || dc.name_en || dc.name || String(dcKey);
   return String(dcKey);
+}
+// the last ten finished runs, newest first — the server keeps exactly ten, so
+// clearing the wizard never loses what was already measured
+function benchHistoryRender(rows) {
+  const card = $('benchHistCard'), host = $('benchHistList');
+  if (!card || !host) return;
+  rows = (Array.isArray(rows) ? rows : []).slice(0, 10);
+  bwState.history = rows;
+  card.hidden = rows.length === 0;
+  host.innerHTML = '';
+  if (!rows.length) return;
+  const badge = $('benchHistN');
+  if (badge) badge.textContent = String(rows.length);
+  const when = sec => sec ? new Date(sec * 1000).toLocaleString(currentLang === 'fa' ? 'fa-IR' : undefined,
+    { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+  const head = ['When', 'Topology', 'Agents', 'Cores', 'Best core']
+    .map(k => '<span>' + esc(tr('', k)) + '</span>').join('');
+  const body = rows.map(r => {
+    const total = (r.engines || []).length;
+    const agents = (r.iran_agent || '—') + ' → ' + (r.foreign_agent || '—');
+    const best = r.best_engine
+      ? esc(r.best_engine) + (r.best_score ? ' · ' + String(r.best_score) : '')
+      : '<span class="art-dash">—</span>';
+    return '<div class="bh-row">' +
+      '<span class="bh-when">' + esc(when(r.finished)) + '</span>' +
+      '<span class="bh-topo" title="' + esc(r.topo_name || '') + '">' + esc(r.topo_name || '—') + '</span>' +
+      '<span class="bh-agents" title="' + esc(agents) + '">' + esc(agents) + '</span>' +
+      '<span class="bh-engs">' + String(r.ok || 0) + '/' + String(total) + '</span>' +
+      '<span class="bh-best">' + best + '</span></div>';
+  }).join('');
+  host.innerHTML = '<div class="bh-head">' + head + '</div>' + body;
 }
 function bwRender() {
   const host = $('benchWizard');
@@ -9707,7 +10003,7 @@ async function bwPoll() {
   if (!bwState.running && !bwState.boardRunning) { bwRenderRun(); return; }
   const jobs = [];
   if (bwState.running) {
-    jobs.push(api('/api/benchmark/pair').then(st => { bwState.view = st; if (!st.running) bwState.running = false; }).catch(err => { bwState.pairErr = (err && err.message) || String(err); }));
+    jobs.push(api('/api/benchmark/pair').then(st => { bwState.view = st; if (!st.running) bwState.running = false; benchHistoryRender(st.history); }).catch(err => { bwState.pairErr = (err && err.message) || String(err); }));
   }
   if (bwState.boardRunning && bwState.iranAgent && bwState.foreignAgent) {
     jobs.push(api('/api/benchmark/method-board?iran=' + encodeURIComponent(bwState.iranAgent) + '&kharej=' + encodeURIComponent(bwState.foreignAgent))
@@ -11802,7 +12098,7 @@ window.loadClusterStatus = loadClusterStatus;
     '.mtb-act-del{color:var(--er);background:color-mix(in srgb, var(--er) 9%, transparent);border-color:color-mix(in srgb, var(--er) 26%, transparent)}',
     '@media (hover: hover){.mtb-act.mtb-act-del:hover{color:var(--er);background:color-mix(in srgb, var(--er) 18%, transparent);border-color:color-mix(in srgb, var(--er) 45%, transparent)}}',
     '.mtb-aglink{cursor:pointer;display:inline-flex;align-items:center;gap:5px;vertical-align:middle}', // flex: the glyph and the name center by construction
-    '.mtb-aglink:hover{color:var(--ac)}',
+    '.mtb-aglink:hover{color:var(--ac);background:color-mix(in srgb, var(--ac) 13%, transparent);border-radius:7px}',
     '.mtb-detail-head .quantum-btn svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}',
     '.mtb-dtl-head .quantum-btn svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}',
     '.mtb-upd-btn{display:inline-flex;align-items:center;gap:6px}',
@@ -11884,7 +12180,7 @@ window.loadClusterStatus = loadClusterStatus;
     '.mtb-fico{display:inline-flex;color:var(--tx2);flex:none}',
     '.mtb-bc{display:inline-flex;align-items:center;gap:8px}',
     '.mtb-bc-link{color:var(--ac);text-decoration:none;font-weight:600;cursor:pointer}',
-    '.mtb-bc-link:hover{text-decoration:underline}',
+    '.mtb-bc-link:hover{text-decoration:none;background:color-mix(in srgb, var(--ac) 13%, transparent);border-radius:7px}',
     '.mtb-bc-sep{color:var(--mu);display:inline-block}',
     'html[dir="ltr"] .mtb-bc-sep{transform:scaleX(-1)}',
     '.mtb-bc-cur{color:var(--tx)}',
@@ -12196,7 +12492,9 @@ window.loadClusterStatus = loadClusterStatus;
     'html[dir="ltr"] .mtb-pg-navbtn svg{transform:scaleX(-1)}',
     '.mtb-pg-size{display:flex;align-items:center;gap:10px}',
     '.mtb-pg-size .mtb-cdd-btn{min-height:32px;padding:4px 12px;gap:6px;font-size:12.5px}',
-    '.mtb-pg-size .mtb-cdd-pop{inset-inline-start:0;inset-inline-end:auto;min-width:70px}',
+    // the per-page dropdown sits in a card footer and its card clips overflow:
+    // opening downward cut the popup off at the card's bottom edge, so it opens up
+    '.mtb-pg-size .mtb-cdd-pop{inset-inline-start:0;inset-inline-end:auto;min-width:70px;top:auto;bottom:calc(100% + 6px)}',
     '.mtb-pg-szlbl{font-size:12.5px;color:var(--tx2)}',
     '.mtb-pg-nav{display:flex;align-items:center;gap:6px;flex-wrap:wrap}',
     '.mtb-pg-navbtn{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 10px;border-radius:8px;border:0;background:none;color:var(--tx2);font-size:12.5px;cursor:pointer}',
@@ -12381,7 +12679,8 @@ window.loadClusterStatus = loadClusterStatus;
     '#trfTotals .kpi-val{justify-self:end}',
     '.trf-grid .sw-fo{background:var(--dash-fo)}',
     '.li-dot.fo{background:var(--dash-fo)}',
-    '.dsum-link{color:var(--ac);font-size:13px;text-decoration:none;margin-top:auto}',
+    '.dsum-link{color:var(--ac);font-size:13px;text-decoration:none;margin-top:auto;padding:1px 5px;margin-inline-start:-5px;border-radius:7px;transition:background-color .18s ease}',
+    '.dsum-link:hover{background:color-mix(in srgb, var(--ac) 13%, transparent)}',
     '.conn-split{display:grid;grid-template-columns:1fr 1fr;gap:12px}',
     '.conn-side{align-content:center}',
     '.conn-side{display:grid;gap:4px;padding:10px 12px;border-radius:12px;background:var(--sunk)}',
@@ -12953,7 +13252,6 @@ const CORES_ALIAS = { wst: 'wstunnel', singbox: 'sing-box' };
 const CORES_CATS = { matrix: ['Recommended', 'Default'] };
 const CORES_SEARCH_ICO = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>';
 const CORES_QMARK = '<svg viewBox="0 0 100 100" aria-hidden="true"><path d="M50 48 C42 38 26 32 12 42 C4 48 1 56 3 62 C6 60 12 54 20 55 C32 56 42 60 50 52 C58 60 68 56 80 55 C88 54 94 60 97 62 C99 56 96 48 88 42 C74 32 58 38 50 48 Z" fill="#38bdf8"/></svg>';
-const CORES_ICO_MC = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M7.5 13h4M7.5 16.5h7"/></svg>';
 // the §2.22 method count for one grid card: {n, known} — known=true only
 // when the cores feed serves a non-empty methods[] for the core (the count
 // is REAL manifest data); known=false with a repo row = the honest
@@ -13076,20 +13374,25 @@ function coresBadges(g) {
   if (cats) return cats.map(c => `<span class="eng-badge eng-badge-cat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.5-4.8 2.5.9-5.4L4.2 7.7l5.4-.8z"/></svg>${esc(tr('', c))}</span>`).join('');
   return `<span class="eng-badge eng-badge-exp">${esc(tr('', 'Experimental'))}</span>`;
 }
-// the per-core METHOD COUNT badge (overnight order): the REAL count of the
-// §2.22 manifest methods[] when the feed serves it, the honest 'pending'
-// mark when the core exists on the feed without its catalog yet — never an
-// invented number; a core the §2.22 row doesn't resolve for (panel-internal
-// engines) renders no badge at all
-function coresMethodBadge(g) {
+// the card's sub-line: how many tunnel methods the core publishes — the REAL
+// count of the §2.22 manifest methods[] when the feed serves it, the honest
+// 'pending' mark when the core exists on the feed without its catalog yet,
+// and the agent-install count only for a core the §2.22 row doesn't resolve
+// (panel-internal engines) — never an invented number
+function coresMethodLine(g, installed, total) {
   const mc = coresMethodCount(g);
-  if (!mc) return '';
-  if (mc.known) {
-    return '<span class="eng-badge eng-badge-mc" title="' + esc(tr('', 'Methods published in the core manifest')) + '">' + CORES_ICO_MC +
-      tr('', '{n} methods').replace('{n}', '<bdi dir="ltr">' + esc(String(mc.n)) + '</bdi>') + '</span>';
+  if (mc && mc.known) {
+    // one method reads as singular — three cores publish exactly one
+    const count = mc.n === 1
+      ? esc(tr('', '1 tunnel method'))
+      : tr('', '{n} tunnel methods').replace('{n}', '<bdi dir="ltr">' + esc(String(mc.n)) + '</bdi>');
+    return '<span class="eng-installed eng-installed-n" title="' + esc(tr('', 'Methods published in the core manifest')) + '">' + count + '</span>';
   }
-  return '<span class="eng-badge eng-badge-mc-pend" title="' + esc(tr('', 'The method catalog for this core has not landed on the feed yet')) + '">' + CORES_ICO_MC +
-    esc(tr('', 'Methods pending')) + '</span>';
+  if (mc) {
+    return '<span class="eng-installed eng-installed-pend" title="' + esc(tr('', 'The method catalog for this core has not landed on the feed yet')) + '">' +
+      esc(tr('', 'Methods pending')) + '</span>';
+  }
+  return '<span class="eng-installed">' + esc(tr('', 'Installed on {n} of {m} agents').replace('{n}', String(installed)).replace('{m}', String(total))) + '</span>';
 }
 function coresEngineCard(g) {
   const disp = CORES_ENGINE_NAME[g.engine] || g.engine || '';
@@ -13121,13 +13424,18 @@ function coresEngineCard(g) {
   const ver = g.latest ? '<span class="eng-ver"><bdi dir="ltr">v' + esc(g.latest) + '</bdi></span>' : '';
   const outdatedNote = stale > 0 ? '<span class="eng-outdated">' + esc(tr('', '{n} outdated').replace('{n}', String(stale))) + '</span>' : '';
   const openBtn = '<button type="button" class="eng-act" data-cores-open="' + esc(g.engine) + '">' + esc(tr('', 'Details')) + '</button>';
+  // three zones, same order in every card: identity (logo, name, badges,
+  // version, method line), the install bar once something is installed, then a
+  // foot that pins to the bottom with the release state on one side and the
+  // actions on the other — so neighbouring cards line up whatever they carry
   return '<div class="eng-card" data-cores-open="' + esc(g.engine) + '">' +
     '<div class="eng-card-top"><span class="eng-logo">' + img + '</span>' +
-    '<div class="eng-card-id"><div class="eng-card-namerow"><b>' + esc(disp) + '</b>' + coresBadges(g) + coresMethodBadge(g) + '</div>' +
-    '<span class="eng-installed">' + esc(tr('', 'Installed on {n} of {m} agents').replace('{n}', String(installed)).replace('{m}', String(total))) + '</span></div>' +
+    '<div class="eng-card-id"><div class="eng-card-namerow"><b>' + esc(disp) + '</b>' + coresBadges(g) +
     (ver ? '<span class="eng-verchip"><bdi dir="ltr">v' + esc(g.latest) + '</bdi></span>' : '') + '</div>' +
-    '<div class="eng-progress" role="img" aria-label="' + esc(tr('', 'Installed on {n} of {m} agents').replace('{n}', String(installed)).replace('{m}', String(total))) + '"><div class="eng-progress-fill" style="width:' + pct + '%"></div></div>' +
-    '<div class="eng-card-foot">' + rel + repoChip + outdatedNote + '<span class="u-flex-1"></span>' + openBtn + act + '</div>' +
+    coresMethodLine(g, installed, total) + '</div></div>' +
+    (installed > 0 ? '<div class="eng-progress" role="img" aria-label="' + esc(tr('', 'Installed on {n} of {m} agents').replace('{n}', String(installed)).replace('{m}', String(total))) + '"><div class="eng-progress-fill" style="width:' + pct + '%"></div></div>' : '') +
+    '<div class="eng-card-foot"><div class="eng-status">' + rel + repoChip + outdatedNote + '</div>' +
+    '<div class="eng-card-actions">' + openBtn + act + '</div></div>' +
     '</div>';
 }
 function renderCores() {
@@ -13382,9 +13690,10 @@ function coresViewSync() {
   detail.hidden = !on;
 }
 function ctunPageOpen(engine) {
-  const g = ctunGroup(engine);
-  if (!g) return;
+  // a known core, or the list is still loading (the skeleton covers it)
+  if (!ctunGroup(engine) && coresCache !== null) return;
   ctunOpen = (CORES_ALIAS[engine] || engine);
+  if (ctunOpen === 'spoof') { if (!_spoof) loadSpoof(); }
   ctunLayer = 'all';
   ctunSearch = '';
   ctunF = { transport: '', ipver: '', port: '', userspace: '', mikrotik: '' };
@@ -13462,6 +13771,8 @@ function ctunNoticeLine(repo) {
 function renderCtunPage() {
   const body = $('ctunPage');
   if (!body || !ctunOpen) return;
+  // spoof is a core with its own logic page, not a method catalog
+  if (ctunOpen === 'spoof') { renderSpoofCore(); return; }
   const g = ctunGroup(ctunOpen);
   const repo = artRepoRow(ctunOpen);
   const disp = CORES_ENGINE_NAME[ctunOpen] || ctunOpen;
@@ -13494,7 +13805,7 @@ function renderCtunPage() {
     if (!coresAvailBusy && !coresAvailErr) {
       clearTimeout(ctunFeedRetryTimer);
       ctunFeedRetryTimer = setTimeout(() => {
-        if (ctunOpen && !ctunMethods(artRepoRow(ctunOpen))) loadCoresAvailable(true);
+        if (ctunOpen && !ctunMethods(artRepoRow(ctunOpen))) loadCoresAvailable(false, true);
       }, 2000);
     }
     middle = feedErr +
@@ -13868,9 +14179,37 @@ async function loadArtStore(force) {
     renderArtStore();
   }
 }
-async function loadCoresAvailable(force) {
+// The panel reads each core's MANIFEST.json in the BACKGROUND, so the first
+// feed answer after a panel start (or after an expired manifest cache) can
+// carry methods:null for every core while the catalogs are still on their
+// way. That answer used to stick for the whole session: every card read
+// "Methods pending" and the drill-down "No method catalog yet" even though a
+// read a second later carried the full catalog. A pending answer now re-reads
+// itself (bounded, and WITHOUT ?refresh=1 — the backend re-joins methods[]
+// from its cache on every request, so the light read is the whole fix).
+let coresAvailRetryTimer = 0;
+let coresAvailRetryN = 0;
+function coresAvailPending() {
+  const rows = (coresAvail && coresAvail.cores) || [];
+  if (!rows.length) return false;
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    if (r && (!Array.isArray(r.methods) || r.methods.length === 0)) return true;
+  }
+  return false;
+}
+function scheduleCoresAvailReread() {
+  clearTimeout(coresAvailRetryTimer);
+  if (coresAvailRetryN >= 3) return;
+  coresAvailRetryTimer = setTimeout(() => {
+    if (coresAvailBusy) { scheduleCoresAvailReread(); return; }
+    coresAvailRetryN++;
+    loadCoresAvailable(false, true);
+  }, 2500);
+}
+async function loadCoresAvailable(force, reread) {
   if (!$('engArtList') || coresAvailBusy) return;
-  if (!force && coresAvail) return;
+  if (!force && !reread && coresAvail) return;
   coresAvailBusy = true;
   coresAvailErr = null;
   renderArtStore();
@@ -13887,6 +14226,11 @@ async function loadCoresAvailable(force) {
     coresAvailAt = 0;
   } finally {
     coresAvailBusy = false;
+    if (coresAvail && !coresAvailErr) {
+      if (force) coresAvailRetryN = 0; // an explicit refresh restarts the budget
+      if (coresAvailPending()) scheduleCoresAvailReread();
+      else coresAvailRetryN = 0;
+    }
     renderArtStore();
     coresMergeFeedGroups();
     renderCores();

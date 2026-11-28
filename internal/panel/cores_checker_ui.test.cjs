@@ -5,8 +5,9 @@
 // the methods-checker view (GET /api/overnight/checker, documented shape —
 // the backend lands it in parallel; until then the honest not-live state).
 // ui-ux-2 extended the LIVE §2.24 payload + the feed-only grid groups;
-// ui-ux-3 adds the per-core METHOD COUNT badge (real count / honest
-// pending / no badge) and the data-derived layer chips.
+// ui-ux-3 adds the per-core METHOD COUNT line (real count / honest
+// pending / the install count only where no catalog resolves) and the
+// data-derived layer chips.
 // No server or browser required.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -283,10 +284,11 @@ function sourceMatchCoresListEnd() {
   assert.ok(tblHtml.includes('ctun-cell-id') && tblHtml.includes('>1</td>'), 'the row carries its # from the manifest id');
   vm.runInContext('ctunPageClose()', sandbox);
 
-  // ---- Piece 6 (ui-ux-3): the per-core METHOD COUNT badge + the generalized
-  // layer chips — the badge states (real count / honest pending / no badge),
-  // the alias join, the panel-internal silence, and the drill-down chips
-  // deriving from the LIVE catalog (compound layers ride verbatim)
+  // ---- Piece 6 (ui-ux-3): the per-core METHOD COUNT line + the generalized
+  // layer chips — the line states (real count / honest pending / install
+  // count fallback), the alias join, the panel-internal silence, and the
+  // drill-down chips deriving from the LIVE catalog (compound layers ride
+  // verbatim)
   vm.runInContext(`
   coresCache = [
     { engine: 'matrix', latest: '', builds: [], installed: {}, detail: {} },
@@ -307,24 +309,25 @@ function sourceMatchCoresListEnd() {
     return seg.length > 1 ? seg[1].split('<div class="eng-card"')[0] : '';
   };
   const frpCard = cardOf('frp'), sbCard = cardOf('singbox'), wwCard = cardOf('waterwall'), mxCard = cardOf('matrix');
-  assert.ok(frpCard.includes('eng-badge-mc-pend') && frpCard.includes('Methods pending'), 'a core without methods[] renders the honest pending badge');
-  assert.ok(!frpCard.includes('eng-badge-mc"'), 'the pending card carries NO count badge');
+  assert.ok(frpCard.includes('eng-installed-pend') && frpCard.includes('Methods pending'), 'a core without methods[] renders the honest pending line');
+  assert.ok(!frpCard.includes('eng-installed-n'), 'the pending card carries NO count');
   assert.ok(!frpCard.includes('<bdi dir="ltr">0</bdi>'), 'pending never masquerades as a zero count');
-  assert.ok(sbCard.includes('eng-badge-mc"') && sbCard.includes('<bdi dir="ltr">2</bdi> methods'), 'the sing-box count resolves THROUGH the alias (2 methods)');
-  assert.ok(wwCard.includes('eng-badge-mc"') && wwCard.includes('<bdi dir="ltr">3</bdi> methods'), 'the real manifest count renders on the feed-only card');
-  assert.ok(mxCard.includes('eng-badge-mc-pend') === false && mxCard.includes('eng-badge-mc"') === false, 'a panel-internal core with no §2.22 row renders NO badge (nothing invented)');
-  // the feed not having answered yet → no badge at all (not even pending)
+  assert.ok(sbCard.includes('eng-installed-n') && sbCard.includes('<bdi dir="ltr">2</bdi> tunnel methods'), 'the sing-box count resolves THROUGH the alias (2 tunnel methods)');
+  assert.ok(wwCard.includes('eng-installed-n') && wwCard.includes('<bdi dir="ltr">3</bdi> tunnel methods'), 'the real manifest count renders on the feed-only card');
+  assert.ok(mxCard.includes('eng-installed-pend') === false && mxCard.includes('eng-installed-n') === false, 'a panel-internal core with no §2.22 row renders no count — it keeps the install line');
+  assert.ok(mxCard.includes('Installed on 0 of'), 'the unresolvable core falls back to the honest install count');
+  // the feed not having answered yet → no count line at all (not even pending)
   vm.runInContext(`
   coresAvail = null; coresAvailErr = null;
   renderCores();
   `, sandbox);
-  assert.ok(!el('engList').innerHTML.includes('eng-badge-mc'), 'before the feed answers the cards carry no badge — no premature pending');
-  // the honest pending badge also explains itself (title tooltip)
+  assert.ok(!el('engList').innerHTML.includes('eng-installed-n') && !el('engList').innerHTML.includes('eng-installed-pend'), 'before the feed answers the cards carry no count line — no premature pending');
+  // the honest pending line also explains itself (title tooltip)
   vm.runInContext(`
   coresAvail = { cores: [{ core: 'frp', latest_version: '0.61.2', methods: null }] };
   renderCores();
   `, sandbox);
-  assert.ok(el('engList').innerHTML.includes('title="The method catalog for this core has not landed on the feed yet"'), 'the pending badge carries its honest tooltip');
+  assert.ok(el('engList').innerHTML.includes('title="The method catalog for this core has not landed on the feed yet"'), 'the pending line carries its honest tooltip');
   // XSS discipline: an odd manifest layer/name echoes as text
   vm.runInContext(`
   coresAvail = { cores: [{ core: 'frp', latest_version: '0.61.2', methods: [
