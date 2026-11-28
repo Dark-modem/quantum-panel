@@ -475,7 +475,7 @@ html[data-dens="compact"] .quantum-table th, html[data-dens="compact"] .quantum-
    had no rules at all: the table shrank to the width of its cells and left a
    dead grey block across the rest of the card. One base block styles them. */
 .quantum-table { width:100%; min-width:620px; border-collapse:separate; border-spacing:0; margin:0; }
-.quantum-table th { padding:11px 14px; font-size:11.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+.quantum-table th { padding:11px 14px; font-size:var(--ent-tbl-head-fs); font-weight:700; letter-spacing:.04em; text-transform:uppercase;
   color:var(--mu); text-align:start; background:var(--sunk); border-bottom:1px solid var(--ln); white-space:nowrap; }
 .quantum-table td { padding:12px 14px; font-size:13px; color:var(--tx2); text-align:start; vertical-align:middle; white-space:nowrap;
   border-bottom:1px solid color-mix(in srgb, var(--ln) 55%, transparent); }
@@ -1977,7 +1977,7 @@ html[dir="rtl"] .eng-search input { padding:9px 38px 9px 14px; }
 @media (max-width:760px) { .eng-grid { grid-template-columns:minmax(0, 1fr); } }
 .eng-card { display:flex; flex-direction:column; gap:10px; border:1px solid color-mix(in srgb, var(--ac) 8%, var(--ln));
   border-radius:12px; padding:16px; min-width:0; height:100%;
-  background:color-mix(in srgb, #000 20%, var(--sunk)); }
+  background:var(--sunk-deep); }
 .eng-card-top { display:flex; align-items:center; gap:12px; }
 .eng-logo { width:40px; height:40px; display:inline-flex; align-items:center; justify-content:center; flex:none; border-radius:10px;
   background:color-mix(in srgb, var(--ac) 12%, transparent); color:var(--ac); overflow:hidden;
@@ -1998,7 +1998,7 @@ html[dir="rtl"] .eng-search input { padding:9px 38px 9px 14px; }
 .eng-installed { color:var(--tx2); font-size:12.5px; }
 .eng-installed-n { color:var(--info); font-weight:600; }
 .eng-installed-pend { color:var(--mu); font-weight:600; }
-.eng-verchip { flex:none; padding:2px 7px; border-radius:7px; border:0; background:color-mix(in srgb, var(--tx) 6%, transparent); color:var(--mu); font-size:11.5px; font-weight:600; }
+.eng-verchip { flex:none; padding:2px 7px; border-radius:7px; border:0; background:color-mix(in srgb, var(--tx) 6%, transparent); color:var(--mu); font-size:var(--fs-small); font-weight:600; }
 .eng-verchip bdi { direction:ltr; unicode-bidi:isolate; }
 .eng-progress { height:6px; border-radius:99px; background:color-mix(in srgb, var(--ln) 55%, transparent); overflow:hidden; }
 .eng-progress-fill { height:100%; border-radius:99px; background:var(--ac); transition:width .3s ease; }
@@ -2424,7 +2424,7 @@ html[dir="rtl"] .eng-search input { padding:9px 38px 9px 14px; }
 .pbw-step .pbw-dot svg { width:12px; height:12px; fill:none; stroke:currentColor; stroke-width:2.6; stroke-linecap:round; stroke-linejoin:round; }
 /* the current step reads as one solid blue pill, so "where am I" is obvious */
 .pbw-step.cur { color:var(--ac-on); background:var(--ac-fill); border-color:var(--ac); }
-.pbw-step.cur .pbw-dot { background:color-mix(in srgb, #fff 22%, transparent); border-color:transparent; color:var(--ac-on); }
+.pbw-step.cur .pbw-dot { background:var(--white-b22); border-color:transparent; color:var(--ac-on); }
 .pbw-step.done { color:var(--ok); }
 .pbw-step.done .pbw-dot { background:var(--ok-soft); border-color:var(--ok-badge-b); color:var(--ok); }
 .pbw-step:disabled { cursor:default; opacity:.75; }
@@ -2443,14 +2443,14 @@ html[dir="rtl"] .eng-search input { padding:9px 38px 9px 14px; }
    value, so an empty pick no longer reads as an em dash at the far edge */
 .pbw-sum-body { padding:10px 14px 14px; display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:8px; }
 .pbw-sum-row { display:flex; flex-direction:column; align-items:flex-start; gap:3px; padding:8px 11px; border:1px solid var(--ln); border-radius:10px; background:var(--sunk); font-size:12.5px; min-width:0; }
-.pbw-sum-row span { color:var(--mu); font-size:11.5px; }
+.pbw-sum-row span { color:var(--mu); font-size:12px; }
 .pbw-sum-row b { color:var(--tx); text-align:start; font-size:13px; max-width:100%; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 /* step head */
 /* a hairline separates the step's own area from the stepper and summary above */
 .pbw-step-head { display:flex; align-items:center; gap:11px; margin:2px 0 12px; padding-top:14px; border-top:1px solid var(--ln); }
 /* the log of the last ten pair benchmarks */
 .bh-head, .bh-row { display:grid; grid-template-columns:140px minmax(0, 1.1fr) minmax(0, 1.5fr) 80px minmax(0, 1fr); gap:10px; align-items:center; padding:9px 12px; font-size:12.5px; }
-.bh-head { color:var(--mu); font-size:11.5px; font-weight:700; border-bottom:1px solid var(--ln); }
+.bh-head { color:var(--mu); font-size:12px; font-weight:700; border-bottom:1px solid var(--ln); }
 .bh-row { border-bottom:1px solid var(--ln); }
 .bh-row:last-child { border-bottom:0; }
 .bh-head > span, .bh-row > span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -2526,7 +2526,7 @@ html[dir="rtl"] .eng-search input { padding:9px 38px 9px 14px; }
 /* ===== C-Tunnel method catalog page (§2.22) + Method Board (§2.23) + Kernel Tuning ===== */
 /* Whole core card opens the details page; the Install/Manage button keeps its own action */
 .eng-card[data-cores-open] { cursor:pointer; }
-.eng-card[data-cores-open]:hover { border-color:color-mix(in srgb, var(--ac) 30%, var(--ln)); background:color-mix(in srgb, #000 8%, var(--sunk)); }
+.eng-card[data-cores-open]:hover { border-color:color-mix(in srgb, var(--ac) 30%, var(--ln)); background:var(--sunk-deep-hover); }
 #coresDetail { display:flex; flex-direction:column; gap:14px; }
 /* hero header */
 .ctun-hero { display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:16px 18px; border:1px solid var(--ln); border-radius:var(--r-lg); background:var(--s1); }
